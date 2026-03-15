@@ -4,7 +4,7 @@ import { type IConstruct } from "constructs";
  * Base type for the dependency context passed to a component's {@link Lifecycle.build} method.
  * A record of named dependencies, each being a record of their build outputs.
  */
-type LifecycleComponentBase = Record<string, Record<string, unknown>>;
+type LifecycleComponentBase = Record<string, object>;
 
 /**
  * The core interface for all ComposureCDK components. A `Lifecycle` represents
@@ -19,7 +19,7 @@ type LifecycleComponentBase = Record<string, Record<string, unknown>>;
  * @typeParam Context - The resolved dependencies this component requires, keyed by component name.
  */
 export interface Lifecycle<
-  T extends Record<string, unknown> = Record<string, unknown>,
+  T extends object = object,
   Context extends LifecycleComponentBase = LifecycleComponentBase,
 > {
   build(scope: IConstruct, id: string, context: Context): T;

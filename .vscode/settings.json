@@ -1,3 +1,10 @@
 {
-  "cSpell.words": ["composurecdk", "lifecycles", "organisation", "standardise"]
+  "cSpell.words": [
+    "behaviour",
+    "composurecdk",
+    "Inspectable",
+    "lifecycles",
+    "organisation",
+    "standardise"
+  ]
 }

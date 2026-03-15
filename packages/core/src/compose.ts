@@ -69,7 +69,7 @@ class ComposedLifecycle<Components extends Record<string, Lifecycle>> implements
   }
 
   build(scope: IConstruct, id: string): BuildResult<Components> {
-    const results: Record<string, Record<string, unknown>> = {};
+    const results: Record<string, object> = {};
 
     for (const key of alg.topsort(this.graph)) {
       const deps = (this.dependencies[key] ?? []) as string[];

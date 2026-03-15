@@ -23,10 +23,7 @@ describe("compose", () => {
   describe("cycle detection", () => {
     it("throws CyclicDependencyError for a direct cycle", () => {
       expect(() =>
-        compose(
-          { a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) },
-          { a: ["b"], b: ["a"] },
-        ),
+        compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: ["b"], b: ["a"] }),
       ).toThrow(CyclicDependencyError);
     });
 
@@ -45,10 +42,7 @@ describe("compose", () => {
 
     it("includes the cycle path in the error", () => {
       try {
-        compose(
-          { a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) },
-          { a: ["b"], b: ["a"] },
-        );
+        compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: ["b"], b: ["a"] });
         expect.fail("Expected CyclicDependencyError to be thrown");
       } catch (error) {
         expect(error).toBeInstanceOf(CyclicDependencyError);
@@ -58,7 +52,6 @@ describe("compose", () => {
         expect(cycleError.cycles.flat()).toContain("b");
       }
     });
-
   });
 
   describe("build order", () => {
@@ -165,10 +158,7 @@ describe("compose", () => {
       };
       const { lifecycle: server, build: serverBuild } = spyComponent({ port: 8080 });
 
-      const system = compose(
-        { db, cache, server },
-        { db: [], cache: [], server: ["db", "cache"] },
-      );
+      const system = compose({ db, cache, server }, { db: [], cache: [], server: ["db", "cache"] });
       system.build(createScope(), "app", {});
 
       expect(serverBuild.mock.calls[0][2]).toEqual({
@@ -188,10 +178,7 @@ describe("compose", () => {
       };
       const { lifecycle: service, build: serviceBuild } = spyComponent({ status: "ok" });
 
-      const system = compose(
-        { db, repo, service },
-        { db: [], repo: ["db"], service: ["repo"] },
-      );
+      const system = compose({ db, repo, service }, { db: [], repo: ["db"], service: ["repo"] });
       system.build(createScope(), "app", {});
 
       expect(serviceBuild.mock.calls[0][2]).toEqual({

@@ -8,7 +8,7 @@
     "lint:fix": "eslint --fix .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npx nx run-many -t test"
   },
   "repository": {
     "type": "git",
@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/laazyj/composureCDK#readme",
   "workspaces": [
-    "packages/core"
+    "packages/*"
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",

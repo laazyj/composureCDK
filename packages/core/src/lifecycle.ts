@@ -22,5 +22,5 @@ export interface Lifecycle<
   T extends object = object,
   Context extends LifecycleComponentBase = LifecycleComponentBase,
 > {
-  build(scope: IConstruct, id: string, context: Context): T;
+  build(scope: IConstruct, id: string, context?: Context): T;
 }

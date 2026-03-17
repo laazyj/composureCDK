@@ -3,12 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
+      "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
   },
@@ -34,8 +32,7 @@
   "license": "MIT",
   "type": "module",
   "peerDependencies": {
-    "aws-cdk-lib": "^2.243.0",
-    "constructs": "^10.5.1"
+    "constructs": "^10.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

@@ -8,7 +8,10 @@
     "lint:fix": "eslint --fix .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npx nx run-many -t test"
+    "typecheck": "npx nx run-many -t typecheck",
+    "test": "npx nx run-many -t test",
+    "build": "npx nx run-many -t build",
+    "release": "npm run format:check && npm run lint && npx nx run-many -t test && npx nx run-many -t build"
   },
   "repository": {
     "type": "git",

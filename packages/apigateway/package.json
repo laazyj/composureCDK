@@ -26,11 +26,9 @@
   "license": "MIT",
   "type": "module",
   "peerDependencies": {
+    "@composurecdk/core": "^1.0.0",
     "aws-cdk-lib": "^2.0.0",
     "constructs": "^10.0.0"
-  },
-  "dependencies": {
-    "@composurecdk/core": "1.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

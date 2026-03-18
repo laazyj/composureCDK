@@ -1,0 +1,391 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mock-api-app > matches the expected synthesised template 1`] = `
+{
+  "Outputs": {
+    "MockApiAppapiEndpointF2352C0B": {
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "MockApiAppapi1214B2FA",
+            },
+            ".execute-api.",
+            {
+              "Ref": "AWS::Region",
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix",
+            },
+            "/",
+            {
+              "Ref": "MockApiAppapiDeploymentStageprod294E2332",
+            },
+            "/",
+          ],
+        ],
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "MockApiAppapi1214B2FA": {
+      "Properties": {
+        "Description": "A mock CRUD API for demonstration",
+        "Name": "MockApi",
+      },
+      "Type": "AWS::ApiGateway::RestApi",
+    },
+    "MockApiAppapiAccountD54FA375": {
+      "DeletionPolicy": "Retain",
+      "DependsOn": [
+        "MockApiAppapi1214B2FA",
+      ],
+      "Properties": {
+        "CloudWatchRoleArn": {
+          "Fn::GetAtt": [
+            "MockApiAppapiCloudWatchRole0FB01F81",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::ApiGateway::Account",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "MockApiAppapiCloudWatchRole0FB01F81": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "apigateway.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "MockApiAppapiDeployment8D3A8ED7dd08de43b95755135362eea17a33bf5a": {
+      "DependsOn": [
+        "MockApiAppapiGET57E1548E",
+        "MockApiAppapiusersidDELETE5C48B58B",
+        "MockApiAppapiusersidGETA4BDD57E",
+        "MockApiAppapiusersidPUTCBEBD705",
+        "MockApiAppapiusersid20E3D95B",
+        "MockApiAppapiusersGET136C7EF1",
+        "MockApiAppapiusersPOST1A6FD6BB",
+        "MockApiAppapiusers7F89692E",
+      ],
+      "Metadata": {
+        "aws:cdk:do-not-refactor": true,
+      },
+      "Properties": {
+        "Description": "A mock CRUD API for demonstration",
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+      },
+      "Type": "AWS::ApiGateway::Deployment",
+    },
+    "MockApiAppapiDeploymentStageprod294E2332": {
+      "DependsOn": [
+        "MockApiAppapiAccountD54FA375",
+      ],
+      "Properties": {
+        "DeploymentId": {
+          "Ref": "MockApiAppapiDeployment8D3A8ED7dd08de43b95755135362eea17a33bf5a",
+        },
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+        "StageName": "prod",
+      },
+      "Type": "AWS::ApiGateway::Stage",
+    },
+    "MockApiAppapiGET57E1548E": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "GET",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{"service":"mock-api","status":"healthy"}",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": "{ "statusCode": 200 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Fn::GetAtt": [
+            "MockApiAppapi1214B2FA",
+            "RootResourceId",
+          ],
+        },
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "MockApiAppapiusers7F89692E": {
+      "Properties": {
+        "ParentId": {
+          "Fn::GetAtt": [
+            "MockApiAppapi1214B2FA",
+            "RootResourceId",
+          ],
+        },
+        "PathPart": "users",
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+      },
+      "Type": "AWS::ApiGateway::Resource",
+    },
+    "MockApiAppapiusersGET136C7EF1": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "GET",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{"users":[{"id":"1","name":"Alice"},{"id":"2","name":"Bob"}]}",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": "{ "statusCode": 200 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "MockApiAppapiusers7F89692E",
+        },
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "MockApiAppapiusersPOST1A6FD6BB": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "POST",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{"id":"new-user-123"}",
+              },
+              "StatusCode": "201",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": "{ "statusCode": 201 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "201",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "MockApiAppapiusers7F89692E",
+        },
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "MockApiAppapiusersid20E3D95B": {
+      "Properties": {
+        "ParentId": {
+          "Ref": "MockApiAppapiusers7F89692E",
+        },
+        "PathPart": "{id}",
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+      },
+      "Type": "AWS::ApiGateway::Resource",
+    },
+    "MockApiAppapiusersidDELETE5C48B58B": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "DELETE",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{"id":"123","deleted":true}",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": "{ "statusCode": 200 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "MockApiAppapiusersid20E3D95B",
+        },
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "MockApiAppapiusersidGETA4BDD57E": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "GET",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{"id":"123","name":"Alice"}",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": "{ "statusCode": 200 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "MockApiAppapiusersid20E3D95B",
+        },
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "MockApiAppapiusersidPUTCBEBD705": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "PUT",
+        "Integration": {
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{"id":"123","updated":true}",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": "{ "statusCode": 200 }",
+          },
+          "Type": "MOCK",
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "MockApiAppapiusersid20E3D95B",
+        },
+        "RestApiId": {
+          "Ref": "MockApiAppapi1214B2FA",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

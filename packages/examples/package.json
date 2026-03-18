@@ -12,6 +12,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@composurecdk/apigateway": "1.0.0",
     "@composurecdk/core": "1.0.0",
     "@composurecdk/lambda": "1.0.0",
     "aws-cdk-lib": "^2.243.0",

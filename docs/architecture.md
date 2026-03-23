@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the core abstractions in ComposureCDK: the **Lifecycle** interface, the **Builder** pattern, and the **compose** function that ties them together.
+This document describes the core abstractions in ComposureCDK: the **Lifecycle** interface, the **Builder** pattern, **compose**, and **Ref** — the lazy reference mechanism that wires them together.
 
 ## Design Drivers
 
@@ -90,7 +90,7 @@ new lambda.Function(scope, "Handler", {
 });
 ```
 
-This is a single expression with no intermediate state. You cannot conditionally set properties, apply defaults in layers, or inspect the configuration before building.
+This is a single expression with no intermediate state. We cannot conditionally set properties, apply defaults in layers, or inspect the configuration before building.
 
 The builder pattern converts this to:
 
@@ -164,6 +164,130 @@ function createFunctionBuilder(): IFunctionBuilder {
 
 The class must have a `props: Partial<Props>` field (this is how the builder proxy reads and writes configuration) and a no-argument constructor (the `Builder` function calls `new constructor()`).
 
+## Ref
+
+Lifecycle, Builder, and compose each solve a distinct problem. But there is a gap between them: **builders are configured before their dependencies are built.** When we set up a REST API builder and need to pass it a Lambda integration, the Lambda function does not exist yet — it will only be created when `compose` builds the system in dependency order. We need a way to say "the value that will come from _this_ component" at configuration time.
+
+`Ref` is that mechanism. It is a lazy reference to a value that another component will produce at build time.
+
+### The problem
+
+Consider an API that needs a Lambda integration. Without `Ref`, we would have to wire things up imperatively after building:
+
+```typescript
+// Without Ref — imperative post-build wiring
+const handler = createFunctionBuilder()
+  .runtime(Runtime.NODEJS_20_X)
+  .handler("index.handler")
+  .code(Code.fromAsset("lambda"));
+
+const handlerResult = handler.build(scope, "Handler");
+
+const api = createRestApiBuilder()
+  .restApiName("MyApi")
+  .addMethod("GET", new LambdaIntegration(handlerResult.function))
+  .build(scope, "Api");
+```
+
+This defeats the purpose of `compose`. The dependency order is managed manually. The configuration is split across two phases — builder setup and post-build wiring — and the relationship between the API and the handler is implicit in procedural sequencing rather than declared as data.
+
+### The solution
+
+`Ref` lets us capture a reference at configuration time that resolves at build time:
+
+```typescript
+// With Ref — declarative cross-component wiring
+compose(
+  {
+    handler: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_20_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("lambda")),
+
+    api: createRestApiBuilder()
+      .restApiName("MyApi")
+      .addMethod(
+        "GET",
+        ref("handler", (r: FunctionBuilderResult) => new LambdaIntegration(r.function)),
+      ),
+  },
+  { handler: [], api: ["handler"] },
+);
+```
+
+All configuration lives in one place. The dependency is declared in the `compose` call. The `ref` tells the API builder "when building, resolve the handler's output and transform it into an integration."
+
+### How it works
+
+A `Ref<T>` wraps a resolver function that takes the build context (a record of component outputs keyed by name) and returns a value of type `T`. It is created with the `ref` factory and can be narrowed or transformed:
+
+```typescript
+// Reference a component's full build output
+ref<FunctionBuilderResult>("handler");
+
+// Narrow to a specific property
+ref<FunctionBuilderResult>("handler").get("function");
+
+// Transform the referenced value
+ref<FunctionBuilderResult>("handler")
+  .get("function")
+  .map((fn) => new LambdaIntegration(fn));
+
+// Shorthand: ref with inline transform
+ref("handler", (r: FunctionBuilderResult) => new LambdaIntegration(r.function));
+```
+
+- **`ref<T>(component)`** — creates a `Ref` to the named component's build output.
+- **`.get(key)`** — narrows to a property of the resolved value. Type-safe: the key must exist on `T`.
+- **`.map(fn)`** — transforms the resolved value into a new type. This is the primary way to adapt a dependency's output into the shape a consumer needs.
+
+Resolution happens during the build phase. When `compose` builds a component, it passes the accumulated outputs of already-built dependencies as context. The component's `build` method (or the builder internals) calls `resolve()` on any `Ref` values, which evaluates the resolver chain against that context. If a referenced component is not in the context, a descriptive error is thrown indicating the missing dependency.
+
+### Resolvable
+
+Builders do not accept `Ref<T>` directly — they accept `Resolvable<T>`, which is the union `T | Ref<T>`. This means concrete values and refs are interchangeable at the call site:
+
+```typescript
+// Concrete value — works
+api.addMethod("GET", new LambdaIntegration(myFunction));
+
+// Ref — also works, same call site
+api.addMethod(
+  "GET",
+  ref("handler", (r) => new LambdaIntegration(r.function)),
+);
+```
+
+Internally, the builder stores the `Resolvable<T>` as-is. At build time, it calls `resolve(value, context)`, which either returns the concrete value unchanged or evaluates the `Ref`.
+
+### Implementing Ref support in a builder
+
+A builder that accepts cross-component references follows this pattern:
+
+1. Accept `Resolvable<T>` instead of `T` in any method that might receive a dependency's output.
+2. Store the `Resolvable<T>` during configuration.
+3. Call `resolve(value, context)` during `build` to obtain the concrete value.
+
+```typescript
+import { resolve, type Resolvable } from "@composurecdk/core";
+
+class MyBuilder implements Lifecycle<MyResult> {
+  private integration?: Resolvable<Integration>;
+
+  addIntegration(integration: Resolvable<Integration>): this {
+    this.integration = integration;
+    return this;
+  }
+
+  build(scope: IConstruct, id: string, context: Record<string, object>): MyResult {
+    const concreteIntegration = this.integration ? resolve(this.integration, context) : undefined;
+    // ... use concreteIntegration to create CDK constructs
+  }
+}
+```
+
+This is the only change required. The builder does not need to know whether it received a concrete value or a `Ref` — `resolve` handles both uniformly.
+
 ## How the pieces fit together
 
 ```
@@ -174,20 +298,33 @@ createFunctionBuilder()          ← Builder wraps a FunctionBuilder in a Proxy
                                     which reads this.props and creates the CDK construct
 ```
 
-At the system level:
+At the system level, with `Ref` wiring the components together:
 
 ```
 compose(
-  { fn: functionBuilder, table: tableBuilder },
-  { fn: ["table"], table: [] },
+  {
+    handler: createFunctionBuilder().runtime(...).handler(...).code(...),
+    api: createRestApiBuilder()
+           .restApiName("MyApi")
+           .addMethod("GET", ref("handler", r => new LambdaIntegration(r.function))),
+  },                                  ↑
+  { handler: [], api: ["handler"] },  ref captures a lazy reference during configuration
 )
 ```
 
 This produces a `Lifecycle` that, when built:
 
-1. Topologically sorts: `table`, then `fn`.
-2. Builds `table` with an empty context → returns `{ table: dynamodb.Table }`.
-3. Builds `fn` with context `{ table: { table: dynamodb.Table } }` → returns `{ function: lambda.Function }`.
-4. Returns the combined result: `{ table: { ... }, fn: { ... } }`.
+1. Topologically sorts: `handler`, then `api`.
+2. Builds `handler` with an empty context → returns `{ function: lambda.Function }`.
+3. Builds `api` with context `{ handler: { function: lambda.Function } }`.
+   - During build, the `Ref` passed to `addMethod` is resolved: the resolver reads `context["handler"]`, applies the transform, and produces a concrete `LambdaIntegration`.
+4. Returns the combined result: `{ handler: { ... }, api: { ... } }`.
 
 The composed system is itself a `Lifecycle`, so it can be nested into a larger system with the same mechanism.
+
+The four concepts — Lifecycle, compose, Builder, and Ref — form a closed loop:
+
+- **Lifecycle** defines the build contract.
+- **compose** manages dependency order and passes context.
+- **Builder** provides fluent configuration.
+- **Ref** bridges configuration time and build time, keeping all wiring declarative.

@@ -1,8 +1,9 @@
 import { type Integration, type IResource, type MethodOptions } from "aws-cdk-lib/aws-apigateway";
+import { resolve, type Resolvable } from "@composurecdk/core";
 
 interface MethodDefinition {
   httpMethod: string;
-  integration?: Integration;
+  integration?: Resolvable<Integration>;
   options?: MethodOptions;
 }
 
@@ -40,11 +41,16 @@ export class ResourceBuilder {
    * Adds an HTTP method to this resource.
    *
    * @param httpMethod - The HTTP verb (GET, POST, PUT, DELETE, etc.).
-   * @param integration - The backend integration for this method.
+   * @param integration - The backend integration for this method. Accepts a concrete
+   *   {@link Integration} or a {@link Ref} that resolves to one at build time.
    * @param options - Additional method configuration such as authorization or method responses.
    * @returns This builder for chaining.
    */
-  addMethod(httpMethod: string, integration?: Integration, options?: MethodOptions): this {
+  addMethod(
+    httpMethod: string,
+    integration?: Resolvable<Integration>,
+    options?: MethodOptions,
+  ): this {
     this.definition.methods.push({ httpMethod, integration, options });
     return this;
   }
@@ -66,16 +72,18 @@ export class ResourceBuilder {
   }
 
   /** @internal */
-  applyTo(resource: IResource): void {
+  applyTo(resource: IResource, context: Record<string, object> = {}): void {
     for (const method of this.definition.methods) {
-      resource.addMethod(method.httpMethod, method.integration, method.options);
+      const integration =
+        method.integration !== undefined ? resolve(method.integration, context) : undefined;
+      resource.addMethod(method.httpMethod, integration, method.options);
     }
     for (const [pathPart, childDef] of this.definition.children) {
       const childResource = resource.addResource(pathPart);
       const childBuilder = new ResourceBuilder();
       childBuilder.definition.methods = childDef.methods;
       childDef.children.forEach((v, k) => childBuilder.definition.children.set(k, v));
-      childBuilder.applyTo(childResource);
+      childBuilder.applyTo(childResource, context);
     }
   }
 }

@@ -5,7 +5,7 @@ import {
   type RestApiProps,
 } from "aws-cdk-lib/aws-apigateway";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { Builder, type IBuilder, type Lifecycle, type Resolvable } from "@composurecdk/core";
 import { ResourceBuilder } from "./resource-builder.js";
 
 type RestApiBuilderProps = RestApiProps;
@@ -55,11 +55,16 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
    * Adds an HTTP method to the API root resource (`/`).
    *
    * @param httpMethod - The HTTP verb (GET, POST, PUT, DELETE, etc.).
-   * @param integration - The backend integration for this method.
+   * @param integration - The backend integration for this method. Accepts a concrete
+   *   {@link Integration} or a {@link Ref} that resolves to one at build time.
    * @param options - Additional method configuration such as authorization or method responses.
    * @returns This builder for chaining.
    */
-  addMethod(httpMethod: string, integration?: Integration, options?: MethodOptions): this {
+  addMethod(
+    httpMethod: string,
+    integration?: Resolvable<Integration>,
+    options?: MethodOptions,
+  ): this {
     this.root.addMethod(httpMethod, integration, options);
     return this;
   }
@@ -76,9 +81,9 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
     return this;
   }
 
-  build(scope: IConstruct, id: string): RestApiBuilderResult {
+  build(scope: IConstruct, id: string, context?: Record<string, object>): RestApiBuilderResult {
     const api = new RestApi(scope, id, this.props as RestApiProps);
-    this.root.applyTo(api.root);
+    this.root.applyTo(api.root, context ?? {});
     return { api };
   }
 }

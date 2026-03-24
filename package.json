@@ -12,7 +12,8 @@
     "test": "npx nx run-many -t test",
     "build": "npx nx run-many -t build",
     "clean": "npx nx run-many -t clean",
-    "release": "npm run format:check && npm run lint && npx nx run-many -t test build"
+    "release": "npm run format:check && npm run lint && npx nx run-many -t test build",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -29,10 +30,15 @@
   "workspaces": [
     "packages/*"
   ],
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,md,yaml,yml}": "prettier --write"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "nx": "22.5.4",
     "prettier": "^3.8.1",
     "typescript-eslint": "^8.57.0"

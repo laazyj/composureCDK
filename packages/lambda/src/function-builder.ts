@@ -28,7 +28,7 @@ export interface FunctionBuilderResult {
  * @example
  * ```ts
  * const handler = createFunctionBuilder()
- *   .runtime(Runtime.NODEJS_20_X)
+ *   .runtime(Runtime.NODEJS_22_X)
  *   .handler("index.handler")
  *   .code(Code.fromAsset("lambda"))
  *   .memorySize(256)
@@ -59,7 +59,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
  * @example
  * ```ts
  * const handler = createFunctionBuilder()
- *   .runtime(Runtime.NODEJS_20_X)
+ *   .runtime(Runtime.NODEJS_22_X)
  *   .handler("index.handler")
  *   .code(Code.fromAsset("lambda"))
  *   .timeout(Duration.seconds(30));

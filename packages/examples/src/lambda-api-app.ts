@@ -1,3 +1,4 @@
+import { App, Stack } from "aws-cdk-lib";
 import { LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, ref } from "@composurecdk/core";
@@ -5,12 +6,13 @@ import { createRestApiBuilder } from "@composurecdk/apigateway";
 import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
 
 /**
- * A REST API backed by a Lambda function, wired together with {@link compose}.
+ * A REST API backed by a Lambda function, composed into a single stack.
  *
  * Demonstrates:
  * - Cross-component references using {@link ref}
  * - Lambda proxy integration with API Gateway
  * - Dependency-driven build ordering
+ * - Building the composed system into a CDK Stack
  *
  * Resource tree:
  * ```
@@ -23,10 +25,13 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
  * ```
  */
 export function createLambdaApiApp() {
-  return compose(
+  const app = new App();
+  const stack = new Stack(app, "LambdaApiStack");
+
+  compose(
     {
       handler: createFunctionBuilder()
-        .runtime(Runtime.NODEJS_20_X)
+        .runtime(Runtime.NODEJS_22_X)
         .handler("index.handler")
         .code(Code.fromInline('exports.handler = async () => ({ statusCode: 200, body: "Hello" })'))
         .description("API request handler"),
@@ -53,5 +58,7 @@ export function createLambdaApiApp() {
         ),
     },
     { handler: [], api: ["handler"] },
-  );
+  ).build(stack, "LambdaApiApp");
+
+  return { stack };
 }

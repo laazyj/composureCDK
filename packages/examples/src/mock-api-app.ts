@@ -1,3 +1,4 @@
+import { App, Stack } from "aws-cdk-lib";
 import {
   type Integration,
   type MethodOptions,
@@ -24,13 +25,14 @@ function jsonMock(statusCode: string, body: Record<string, unknown>): [Integrati
 }
 
 /**
- * A mock REST API demonstrating a typical CRUD resource tree.
+ * A mock REST API demonstrating a typical CRUD resource tree,
+ * composed into a single stack.
  *
  * Demonstrates:
  * - Defining a resource tree with nested paths
  * - Multiple HTTP methods per resource
  * - Mock integrations returning static JSON responses
- * - Composing the API as a standalone system
+ * - Building the composed system into a CDK Stack
  *
  * Resource tree:
  * ```
@@ -46,29 +48,37 @@ function jsonMock(statusCode: string, body: Record<string, unknown>): [Integrati
  * ```
  */
 export function createMockApiApp() {
-  const api = createRestApiBuilder()
-    .restApiName("MockApi")
-    .description("A mock CRUD API for demonstration")
-    .addMethod("GET", ...jsonMock("200", { service: "mock-api", status: "healthy" }))
-    .addResource("users", (users) =>
-      users
-        .addMethod(
-          "GET",
-          ...jsonMock("200", {
-            users: [
-              { id: "1", name: "Alice" },
-              { id: "2", name: "Bob" },
-            ],
-          }),
-        )
-        .addMethod("POST", ...jsonMock("201", { id: "new-user-123" }))
-        .addResource("{id}", (user) =>
-          user
-            .addMethod("GET", ...jsonMock("200", { id: "123", name: "Alice" }))
-            .addMethod("PUT", ...jsonMock("200", { id: "123", updated: true }))
-            .addMethod("DELETE", ...jsonMock("200", { id: "123", deleted: true })),
-        ),
-    );
+  const app = new App();
+  const stack = new Stack(app, "MockApiStack");
 
-  return compose({ api }, { api: [] });
+  compose(
+    {
+      api: createRestApiBuilder()
+        .restApiName("MockApi")
+        .description("A mock CRUD API for demonstration")
+        .addMethod("GET", ...jsonMock("200", { service: "mock-api", status: "healthy" }))
+        .addResource("users", (users) =>
+          users
+            .addMethod(
+              "GET",
+              ...jsonMock("200", {
+                users: [
+                  { id: "1", name: "Alice" },
+                  { id: "2", name: "Bob" },
+                ],
+              }),
+            )
+            .addMethod("POST", ...jsonMock("201", { id: "new-user-123" }))
+            .addResource("{id}", (user) =>
+              user
+                .addMethod("GET", ...jsonMock("200", { id: "123", name: "Alice" }))
+                .addMethod("PUT", ...jsonMock("200", { id: "123", updated: true }))
+                .addMethod("DELETE", ...jsonMock("200", { id: "123", deleted: true })),
+            ),
+        ),
+    },
+    { api: [] },
+  ).build(stack, "MockApiApp");
+
+  return { stack };
 }

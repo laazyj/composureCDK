@@ -23,7 +23,7 @@ describe("FunctionBuilder", () => {
       const builder = createFunctionBuilder();
 
       builder
-        .runtime(Runtime.NODEJS_20_X)
+        .runtime(Runtime.NODEJS_22_X)
         .handler("index.handler")
         .code(Code.fromInline("exports.handler = async () => {}"));
 
@@ -38,13 +38,13 @@ describe("FunctionBuilder", () => {
     it("creates a Lambda function with the specified runtime", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}")),
       );
 
       template.hasResourceProperties("AWS::Lambda::Function", {
-        Runtime: "nodejs20.x",
+        Runtime: "nodejs22.x",
         Handler: "index.handler",
       });
     });
@@ -52,7 +52,7 @@ describe("FunctionBuilder", () => {
     it("creates a Lambda function with custom memory size", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}"))
           .memorySize(512),
@@ -66,7 +66,7 @@ describe("FunctionBuilder", () => {
     it("creates a Lambda function with custom timeout", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}"))
           .timeout(Duration.seconds(60)),
@@ -80,7 +80,7 @@ describe("FunctionBuilder", () => {
     it("creates a Lambda function with tracing enabled", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}"))
           .tracing(Tracing.ACTIVE),
@@ -94,7 +94,7 @@ describe("FunctionBuilder", () => {
     it("creates a Lambda function with ARM64 architecture", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}"))
           .architecture(Architecture.ARM_64),
@@ -108,7 +108,7 @@ describe("FunctionBuilder", () => {
     it("creates a Lambda function with environment variables", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}"))
           .environment({ TABLE_NAME: "my-table", REGION: "us-east-1" }),
@@ -127,7 +127,7 @@ describe("FunctionBuilder", () => {
     it("creates a Lambda function with description", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}"))
           .description("Handles API requests"),
@@ -141,7 +141,7 @@ describe("FunctionBuilder", () => {
     it("creates exactly one Lambda function and one IAM role", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}")),
       );
@@ -153,7 +153,7 @@ describe("FunctionBuilder", () => {
     it("creates an execution role with the Lambda service principal", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}")),
       );
@@ -174,7 +174,7 @@ describe("FunctionBuilder", () => {
     it("creates a Lambda function with multiple configurations combined", () => {
       const template = synthTemplate((b) =>
         b
-          .runtime(Runtime.NODEJS_20_X)
+          .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}"))
           .memorySize(1024)
@@ -186,7 +186,7 @@ describe("FunctionBuilder", () => {
       );
 
       template.hasResourceProperties("AWS::Lambda::Function", {
-        Runtime: "nodejs20.x",
+        Runtime: "nodejs22.x",
         Handler: "index.handler",
         MemorySize: 1024,
         Timeout: 300,

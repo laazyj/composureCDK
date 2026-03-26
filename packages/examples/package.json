@@ -4,9 +4,14 @@
   "description": "Example applications exercising the ComposureCDK public API",
   "private": true,
   "scripts": {
+    "clean": "rm -rf dist cdk.out",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cdk": "cdk",
+    "deploy": "cdk deploy",
+    "synth": "cdk synth"
   },
   "author": "laazyj",
   "license": "MIT",
@@ -20,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "aws-cdk": "^2.243.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"
   }

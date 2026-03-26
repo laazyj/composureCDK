@@ -11,8 +11,7 @@ import { createFunctionBuilder } from "@composurecdk/lambda";
  * - Configuring multiple functions with different settings
  * - Composing independent components into a system
  */
-export function createDualFunctionApp() {
-  const app = new App();
+export function createDualFunctionApp(app = new App()) {
   const stack = new Stack(app, "DualFunctionStack");
 
   compose(

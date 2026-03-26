@@ -24,8 +24,7 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
  *         └── GET  → handler (Lambda proxy)
  * ```
  */
-export function createLambdaApiApp() {
-  const app = new App();
+export function createLambdaApiApp(app = new App()) {
   const stack = new Stack(app, "LambdaApiStack");
 
   compose(

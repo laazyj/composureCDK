@@ -47,8 +47,7 @@ function jsonMock(statusCode: string, body: Record<string, unknown>): [Integrati
  *         └── DELETE  → { "id": "123", "deleted": true }
  * ```
  */
-export function createMockApiApp() {
-  const app = new App();
+export function createMockApiApp(app = new App()) {
   const stack = new Stack(app, "MockApiStack");
 
   compose(

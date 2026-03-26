@@ -1,9 +1,9 @@
 import { App, Duration } from "aws-cdk-lib";
 import { LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
-import { compose, ref, groupedStacks } from "@composurecdk/core";
+import { compose, ref } from "@composurecdk/core";
 import { createRestApiBuilder } from "@composurecdk/apigateway";
-import { createStackBuilder } from "@composurecdk/cloudformation";
+import { groupedStacks } from "@composurecdk/cloudformation";
 import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
 
 /**
@@ -11,19 +11,16 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
  * {@link StackStrategy} that groups components by a classifier function.
  *
  * The classifier assigns "api" components to a "gateway" group and everything
- * else to a "service" group. Each group gets its own Stack, created via the
- * factory function passed to {@link groupedStacks}.
+ * else to a "service" group. Each group gets its own Stack, created
+ * automatically by the default factory.
  *
  * Demonstrates:
  * - Strategy-based stack assignment via `.withStackStrategy()`
- * - Custom scope factory for Stack creation
+ * - Default Stack factory from `@composurecdk/cloudformation`
  * - Automatic grouping — no per-component stack mapping required
  */
 export function createStrategyStackApp(app = new App()) {
-  const strategy = groupedStacks(
-    (key) => (key === "api" ? "gateway" : "service"),
-    createStackBuilder().toScopeFactory(),
-  );
+  const strategy = groupedStacks((key) => (key === "api" ? "gateway" : "service"));
 
   compose(
     {

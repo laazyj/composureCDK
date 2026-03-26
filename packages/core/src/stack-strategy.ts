@@ -23,12 +23,12 @@ export type ScopeFactory = (scope: IConstruct, id: string) => IConstruct;
  * ```ts
  * // Every component in one auto-created stack
  * compose({ handler, api }, { handler: [], api: ["handler"] })
- *   .withStackStrategy(singleStack())
+ *   .withStackStrategy(singleStack(myFactory))
  *   .build(app, "MySystem");
  *
  * // Components grouped by a key function
  * compose({ handler, api, table }, { ... })
- *   .withStackStrategy(groupedStacks(key => key === "table" ? "persistence" : "service"))
+ *   .withStackStrategy(groupedStacks(key => key === "table" ? "persistence" : "service", myFactory))
  *   .build(app, "MySystem");
  * ```
  */
@@ -50,16 +50,15 @@ export interface StackStrategy {
  * The scope is created lazily on the first call to `resolve` and reused for
  * all subsequent components.
  *
- * @param factory - Optional factory for creating the scope. Defaults to
- *   creating a plain `Construct`.
+ * @param factory - Factory for creating the scope (e.g. a Stack).
  * @returns A {@link StackStrategy} that groups all components into one scope.
  */
-export function singleStack(factory?: ScopeFactory): StackStrategy {
+export function singleStack(factory: ScopeFactory): StackStrategy {
   return {
     resolve: (() => {
       let stack: IConstruct | undefined;
       return (scope: IConstruct, systemId: string) => {
-        stack ??= factory ? factory(scope, systemId) : scope;
+        stack ??= factory(scope, systemId);
         return stack;
       };
     })(),
@@ -74,8 +73,8 @@ export function singleStack(factory?: ScopeFactory): StackStrategy {
  * lazily as new group keys are encountered.
  *
  * @param classify - A function that maps a component key to a group name.
- * @param factory - Optional factory for creating scopes. Defaults to creating
- *   a plain `Construct`. The factory receives the group name as the id.
+ * @param factory - Factory for creating scopes (e.g. Stacks). The factory
+ *   receives `${systemId}-${group}` as the id.
  * @returns A {@link StackStrategy} that groups components by classifier output.
  *
  * @example
@@ -88,7 +87,7 @@ export function singleStack(factory?: ScopeFactory): StackStrategy {
  */
 export function groupedStacks(
   classify: (componentKey: string) => string,
-  factory?: ScopeFactory,
+  factory: ScopeFactory,
 ): StackStrategy {
   const groups = new Map<string, IConstruct>();
   return {
@@ -96,7 +95,7 @@ export function groupedStacks(
       const group = classify(componentKey);
       let groupScope = groups.get(group);
       if (!groupScope) {
-        groupScope = factory ? factory(scope, `${systemId}-${group}`) : scope;
+        groupScope = factory(scope, `${systemId}-${group}`);
         groups.set(group, groupScope);
       }
       return groupScope;

@@ -7,15 +7,6 @@ function createScope(id = "root"): Construct {
 }
 
 describe("singleStack", () => {
-  it("returns the parent scope when no factory is provided", () => {
-    const strategy = singleStack();
-    const scope = createScope();
-
-    const result = strategy.resolve(scope, "sys", "a");
-
-    expect(result).toBe(scope);
-  });
-
   it("creates a scope via the factory on first resolve", () => {
     const factory = vi.fn((scope: Construct, id: string) => new Construct(scope, id));
     const strategy = singleStack(factory);
@@ -41,15 +32,6 @@ describe("singleStack", () => {
 });
 
 describe("groupedStacks", () => {
-  it("returns the parent scope when no factory is provided", () => {
-    const strategy = groupedStacks(() => "all");
-    const scope = createScope();
-
-    const result = strategy.resolve(scope, "sys", "a");
-
-    expect(result).toBe(scope);
-  });
-
   it("creates a scope per group via the factory", () => {
     const factory = vi.fn((scope: Construct, id: string) => new Construct(scope, id));
     const classify = (key: string) => (key === "table" ? "persistence" : "service");

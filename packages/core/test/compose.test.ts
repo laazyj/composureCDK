@@ -214,7 +214,7 @@ describe("compose", () => {
       const scope = createScope();
 
       const system = compose({ a: lifecycle }, { a: [] });
-      system.build(scope, "test", {});
+      system.build(scope, "test");
 
       expect(build.mock.calls[0][0]).toBe(scope);
     });
@@ -224,10 +224,89 @@ describe("compose", () => {
       const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
 
       const system = compose({ a, b }, { a: [], b: ["a"] });
-      system.build(createScope(), "myapp", {});
+      system.build(createScope(), "myapp");
 
       expect(aBuild.mock.calls[0][1]).toBe("myapp/a");
       expect(bBuild.mock.calls[0][1]).toBe("myapp/b");
+    });
+  });
+
+  describe("withStacks", () => {
+    it("routes a component to a specific scope", () => {
+      const { lifecycle, build } = spyComponent({ value: 1 });
+      const defaultScope = createScope();
+      const customScope = new Construct(undefined as never, "custom");
+
+      compose({ a: lifecycle }, { a: [] })
+        .withStacks({ a: customScope })
+        .build(defaultScope, "test");
+
+      expect(build.mock.calls[0][0]).toBe(customScope);
+    });
+
+    it("falls back to default scope for components not in the stacks map", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
+      const defaultScope = createScope();
+      const customScope = new Construct(undefined as never, "custom");
+
+      compose({ a, b }, { a: [], b: ["a"] })
+        .withStacks({ a: customScope })
+        .build(defaultScope, "test");
+
+      expect(aBuild.mock.calls[0][0]).toBe(customScope);
+      expect(bBuild.mock.calls[0][0]).toBe(defaultScope);
+    });
+
+    it("supports multiple components routed to different scopes", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
+      const { lifecycle: c, build: cBuild } = spyComponent({ z: 3 });
+      const scopeA = new Construct(undefined as never, "scopeA");
+      const scopeB = new Construct(undefined as never, "scopeB");
+      const defaultScope = createScope();
+
+      compose({ a, b, c }, { a: [], b: ["a"], c: ["b"] })
+        .withStacks({ a: scopeA, b: scopeB })
+        .build(defaultScope, "test");
+
+      expect(aBuild.mock.calls[0][0]).toBe(scopeA);
+      expect(bBuild.mock.calls[0][0]).toBe(scopeB);
+      expect(cBuild.mock.calls[0][0]).toBe(defaultScope);
+    });
+
+    it("still resolves cross-component dependencies across scopes", () => {
+      const db: Lifecycle = {
+        build: () => ({ connection: "pg://localhost" }),
+      };
+      const { lifecycle: server, build: serverBuild } = spyComponent({ port: 8080 });
+      const scopeA = new Construct(undefined as never, "scopeA");
+      const scopeB = new Construct(undefined as never, "scopeB");
+
+      compose({ db, server }, { db: [], server: ["db"] })
+        .withStacks({ db: scopeA, server: scopeB })
+        .build(createScope(), "app");
+
+      expect(serverBuild.mock.calls[0][2]).toEqual({
+        db: { connection: "pg://localhost" },
+      });
+    });
+
+    it("returns a Lifecycle that can be used as a component in another compose", () => {
+      const inner = compose(
+        {
+          a: stubComponent({ x: 1 }),
+          b: stubComponent({ y: 2 }),
+        },
+        { a: [], b: ["a"] },
+      );
+
+      const system = compose({ sub: inner, c: stubComponent({ z: 3 }) }, { sub: [], c: ["sub"] });
+
+      const result = system.build(createScope(), "app");
+
+      expect(result.sub).toEqual({ a: { x: 1 }, b: { y: 2 } });
+      expect(result.c).toEqual({ z: 3 });
     });
   });
 });

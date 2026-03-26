@@ -2,11 +2,12 @@
 
 Example applications demonstrating ComposureCDK patterns. Each example is a self-contained CDK stack that can be synthesised and deployed to an AWS account.
 
-| Stack                                           | Description                                                                     |
-| ----------------------------------------------- | ------------------------------------------------------------------------------- |
-| [`DualFunctionStack`](src/dual-function-app.ts) | Two Lambda functions (API handler + async worker) with different configurations |
-| [`LambdaApiStack`](src/lambda-api-app.ts)       | REST API backed by a Lambda function, wired with `ref`                          |
-| [`MockApiStack`](src/mock-api-app.ts)           | CRUD REST API with mock integrations                                            |
+| Stack                                                                     | Description                                                                     |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [`DualFunctionStack`](src/dual-function-app.ts)                           | Two Lambda functions (API handler + async worker) with different configurations |
+| [`LambdaApiStack`](src/lambda-api-app.ts)                                 | REST API backed by a Lambda function, wired with `ref`                          |
+| [`MockApiStack`](src/mock-api-app.ts)                                     | CRUD REST API with mock integrations                                            |
+| [`MultiStackServiceStack` / `MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                   |
 
 ## Prerequisites
 

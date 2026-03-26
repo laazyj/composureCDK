@@ -53,12 +53,44 @@ function buildDependencyGraph<Components extends Record<string, Lifecycle>>(
 }
 
 /**
+ * A {@link Lifecycle} produced by {@link compose}, with an additional
+ * {@link withStacks} method for routing components to different scopes.
+ *
+ * Because `ComposedSystem` extends `Lifecycle`, a composed system can be
+ * nested as a component inside another `compose` call — composition is
+ * recursive.
+ */
+export interface ComposedSystem<Components extends Record<string, Lifecycle>> extends Lifecycle<
+  BuildResult<Components>
+> {
+  /**
+   * Returns a new {@link Lifecycle} that routes components to specific scopes
+   * (typically Stacks) during build. Components not listed in the map use the
+   * default scope passed to `build`.
+   *
+   * Accepts any `IConstruct`, so `Stack`, `DeploymentStack`, or custom
+   * subclasses all work.
+   *
+   * @param stacks - A partial map from component key to scope.
+   * @returns A {@link Lifecycle} with stack routing applied.
+   *
+   * @example
+   * ```ts
+   * compose({ handler, api }, { handler: [], api: ["handler"] })
+   *   .withStacks({ handler: serviceStack, api: apiStack })
+   *   .build(app, "MySystem");
+   * ```
+   */
+  withStacks(stacks: { [K in keyof Components]?: IConstruct }): Lifecycle<BuildResult<Components>>;
+}
+
+/**
  * A composed system of {@link Lifecycle} components. Holds the dependency graph
  * built at composition time and traverses it in topological order during build.
  */
-class ComposedLifecycle<Components extends Record<string, Lifecycle>> implements Lifecycle<
-  BuildResult<Components>
-> {
+class ComposedLifecycle<
+  Components extends Record<string, Lifecycle>,
+> implements ComposedSystem<Components> {
   private readonly graph: Graph;
 
   constructor(
@@ -68,13 +100,28 @@ class ComposedLifecycle<Components extends Record<string, Lifecycle>> implements
     this.graph = buildDependencyGraph(components, dependencies);
   }
 
+  withStacks(stacks: { [K in keyof Components]?: IConstruct }): Lifecycle<BuildResult<Components>> {
+    return {
+      build: (scope: IConstruct, id: string) => this.buildWith(scope, id, stacks),
+    };
+  }
+
   build(scope: IConstruct, id: string): BuildResult<Components> {
+    return this.buildWith(scope, id);
+  }
+
+  private buildWith(
+    scope: IConstruct,
+    id: string,
+    stacks?: { [K in keyof Components]?: IConstruct },
+  ): BuildResult<Components> {
     const results: Record<string, object> = {};
 
     for (const key of alg.topsort(this.graph)) {
+      const componentScope = stacks?.[key] ?? scope;
       const deps = (this.dependencies[key] ?? []) as string[];
       const context = Object.fromEntries(deps.map((dep) => [dep, results[dep]]));
-      results[key] = this.components[key].build(scope, `${id}/${key}`, context);
+      results[key] = this.components[key].build(componentScope, `${id}/${key}`, context);
     }
 
     return results as BuildResult<Components>;
@@ -82,7 +129,7 @@ class ComposedLifecycle<Components extends Record<string, Lifecycle>> implements
 }
 
 /**
- * Composes a set of {@link Lifecycle} components into a single `Lifecycle` that
+ * Composes a set of {@link Lifecycle} components into a single system that
  * manages their build order and dependency resolution.
  *
  * A directed acyclic graph is built eagerly from the declared dependencies.
@@ -90,13 +137,18 @@ class ComposedLifecycle<Components extends Record<string, Lifecycle>> implements
  * When `build` is called, components are built in topological order, each
  * receiving the build outputs of its dependencies as its context.
  *
+ * The returned {@link ComposedSystem} is a {@link Lifecycle}, so it can be
+ * nested as a component in a larger `compose` call. Use
+ * {@link ComposedSystem.withStacks | .withStacks()} to route components to
+ * different scopes before building.
+ *
  * @param components - A record of named {@link Lifecycle} components.
  * @param dependencies - For each component, the list of other component keys it depends on.
- * @returns A {@link Lifecycle} whose build output is the combined {@link BuildResult} of all components.
+ * @returns A {@link ComposedSystem} whose build output is the combined {@link BuildResult} of all components.
  */
 export function compose<Components extends Record<string, Lifecycle>>(
   components: Components,
   dependencies: { [Property in keyof Components]: Dependency<Components> },
-): Lifecycle<BuildResult<Components>> {
+): ComposedSystem<Components> {
   return new ComposedLifecycle(components, dependencies);
 }

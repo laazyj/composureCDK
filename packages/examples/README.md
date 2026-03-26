@@ -8,6 +8,7 @@ Example applications demonstrating ComposureCDK patterns. Each example is a self
 | [`LambdaApiStack`](src/lambda-api-app.ts)                                 | REST API backed by a Lambda function, wired with `ref`                          |
 | [`MockApiStack`](src/mock-api-app.ts)                                     | CRUD REST API with mock integrations                                            |
 | [`MultiStackServiceStack` / `MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                   |
+| [`StrategyStackApp-*`](src/strategy-stack-app.ts)                         | REST API + Lambda split across stacks via `.withStackStrategy()`                |
 
 ## Prerequisites
 

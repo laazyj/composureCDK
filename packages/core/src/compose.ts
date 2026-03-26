@@ -2,6 +2,7 @@ import { Graph, alg, json } from "@dagrejs/graphlib";
 import { type IConstruct } from "constructs";
 import { CyclicDependencyError } from "./cyclic-dependency-error.js";
 import { type Lifecycle } from "./lifecycle.js";
+import { type StackStrategy } from "./stack-strategy.js";
 
 /**
  * Maps a record of {@link Lifecycle} components to a record of their build outputs.
@@ -53,8 +54,8 @@ function buildDependencyGraph<Components extends Record<string, Lifecycle>>(
 }
 
 /**
- * A {@link Lifecycle} produced by {@link compose}, with an additional
- * {@link withStacks} method for routing components to different scopes.
+ * A {@link Lifecycle} produced by {@link compose}, extended with methods
+ * for controlling how components are routed to scopes during build.
  *
  * Because `ComposedSystem` extends `Lifecycle`, a composed system can be
  * nested as a component inside another `compose` call — composition is
@@ -82,6 +83,25 @@ export interface ComposedSystem<Components extends Record<string, Lifecycle>> ex
    * ```
    */
   withStacks(stacks: { [K in keyof Components]?: IConstruct }): Lifecycle<BuildResult<Components>>;
+
+  /**
+   * Returns a new {@link Lifecycle} that uses a {@link StackStrategy} to
+   * determine each component's scope during build.
+   *
+   * @param strategy - The strategy that resolves scopes for components.
+   * @returns A {@link Lifecycle} with strategy-based stack routing applied.
+   *
+   * @example
+   * ```ts
+   * compose({ handler, api, table }, { ... })
+   *   .withStackStrategy(groupedStacks(
+   *     key => key === "table" ? "persistence" : "service",
+   *     (app, id) => new Stack(app, id),
+   *   ))
+   *   .build(app, "MySystem");
+   * ```
+   */
+  withStackStrategy(strategy: StackStrategy): Lifecycle<BuildResult<Components>>;
 }
 
 /**
@@ -103,6 +123,17 @@ class ComposedLifecycle<
   withStacks(stacks: { [K in keyof Components]?: IConstruct }): Lifecycle<BuildResult<Components>> {
     return {
       build: (scope: IConstruct, id: string) => this.buildWith(scope, id, stacks),
+    };
+  }
+
+  withStackStrategy(strategy: StackStrategy): Lifecycle<BuildResult<Components>> {
+    return {
+      build: (scope: IConstruct, id: string) => {
+        const stacks = Object.fromEntries(
+          Object.keys(this.components).map((key) => [key, strategy.resolve(scope, id, key)]),
+        ) as { [K in keyof Components]?: IConstruct };
+        return this.buildWith(scope, id, stacks);
+      },
     };
   }
 
@@ -138,9 +169,7 @@ class ComposedLifecycle<
  * receiving the build outputs of its dependencies as its context.
  *
  * The returned {@link ComposedSystem} is a {@link Lifecycle}, so it can be
- * nested as a component in a larger `compose` call. Use
- * {@link ComposedSystem.withStacks | .withStacks()} to route components to
- * different scopes before building.
+ * nested as a component in a larger `compose` call.
  *
  * @param components - A record of named {@link Lifecycle} components.
  * @param dependencies - For each component, the list of other component keys it depends on.

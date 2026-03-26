@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { Construct } from "constructs";
 import { compose } from "../src/compose.js";
+import { groupedStacks } from "../src/stack-strategy.js";
 import { CyclicDependencyError } from "../src/cyclic-dependency-error.js";
 import { type Lifecycle } from "../src/lifecycle.js";
 
@@ -307,6 +308,46 @@ describe("compose", () => {
 
       expect(result.sub).toEqual({ a: { x: 1 }, b: { y: 2 } });
       expect(result.c).toEqual({ z: 3 });
+    });
+  });
+
+  describe("withStackStrategy", () => {
+    it("routes components to scopes determined by the strategy", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
+      const scope = createScope();
+
+      const classify = (key: string) => (key === "a" ? "groupA" : "groupB");
+      const factory = (parent: Construct, id: string) => new Construct(parent, id);
+
+      compose({ a, b }, { a: [], b: ["a"] })
+        .withStackStrategy(groupedStacks(classify, factory))
+        .build(scope, "sys");
+
+      expect(aBuild.mock.calls[0][0]).not.toBe(scope);
+      expect(bBuild.mock.calls[0][0]).not.toBe(scope);
+      expect(aBuild.mock.calls[0][0]).not.toBe(bBuild.mock.calls[0][0]);
+    });
+
+    it("still resolves dependencies across strategy-assigned scopes", () => {
+      const db: Lifecycle = {
+        build: () => ({ connection: "pg://localhost" }),
+      };
+      const { lifecycle: server, build: serverBuild } = spyComponent({ port: 8080 });
+      const scope = createScope();
+
+      compose({ db, server }, { db: [], server: ["db"] })
+        .withStackStrategy(
+          groupedStacks(
+            (key) => (key === "db" ? "data" : "compute"),
+            (parent, id) => new Construct(parent, id),
+          ),
+        )
+        .build(scope, "sys");
+
+      expect(serverBuild.mock.calls[0][2]).toEqual({
+        db: { connection: "pg://localhost" },
+      });
     });
   });
 });

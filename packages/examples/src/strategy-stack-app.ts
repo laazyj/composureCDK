@@ -1,8 +1,9 @@
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { App, Duration } from "aws-cdk-lib";
 import { LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, ref, groupedStacks } from "@composurecdk/core";
 import { createRestApiBuilder } from "@composurecdk/apigateway";
+import { createStackBuilder } from "@composurecdk/cloudformation";
 import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
 
 /**
@@ -21,7 +22,7 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
 export function createStrategyStackApp(app = new App()) {
   const strategy = groupedStacks(
     (key) => (key === "api" ? "gateway" : "service"),
-    (parent, id) => new Stack(parent, id),
+    createStackBuilder().toScopeFactory(),
   );
 
   compose(

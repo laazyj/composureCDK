@@ -1,8 +1,9 @@
-import { App, Stack } from "aws-cdk-lib";
+import { App } from "aws-cdk-lib";
 import { LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, ref } from "@composurecdk/core";
 import { createRestApiBuilder } from "@composurecdk/apigateway";
+import { createStackBuilder } from "@composurecdk/cloudformation";
 import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
 
 /**
@@ -25,7 +26,9 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
  * ```
  */
 export function createLambdaApiApp(app = new App()) {
-  const stack = new Stack(app, "LambdaApiStack");
+  const { stack } = createStackBuilder()
+    .description("REST API backed by a Lambda function")
+    .build(app, "LambdaApiStack");
 
   compose(
     {

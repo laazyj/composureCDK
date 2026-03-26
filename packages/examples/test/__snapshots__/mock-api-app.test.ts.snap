@@ -2,6 +2,7 @@
 
 exports[`mock-api-app > matches the expected synthesised template 1`] = `
 {
+  "Description": "A mock CRUD API for demonstration",
   "Outputs": {
     "MockApiAppapiEndpointF2352C0B": {
       "Value": {

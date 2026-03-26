@@ -1,8 +1,9 @@
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { App, Duration } from "aws-cdk-lib";
 import { LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, ref } from "@composurecdk/core";
 import { createRestApiBuilder } from "@composurecdk/apigateway";
+import { createStackBuilder } from "@composurecdk/cloudformation";
 import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
 
 /**
@@ -15,8 +16,12 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
  * - Components without a stack mapping fall back to the default scope
  */
 export function createMultiStackApp(app = new App()) {
-  const serviceStack = new Stack(app, "MultiStackServiceStack");
-  const apiStack = new Stack(app, "MultiStackApiStack");
+  const { stack: serviceStack } = createStackBuilder()
+    .description("Service resources for multi-stack example")
+    .build(app, "MultiStackServiceStack");
+  const { stack: apiStack } = createStackBuilder()
+    .description("API resources for multi-stack example")
+    .build(app, "MultiStackApiStack");
 
   compose(
     {

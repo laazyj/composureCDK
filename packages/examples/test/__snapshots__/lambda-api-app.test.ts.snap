@@ -2,6 +2,7 @@
 
 exports[`lambda-api-app > matches the expected synthesised template 1`] = `
 {
+  "Description": "REST API backed by a Lambda function",
   "Outputs": {
     "LambdaApiAppapiEndpoint5E406D3E": {
       "Value": {

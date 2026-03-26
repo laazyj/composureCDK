@@ -2,6 +2,7 @@
 
 exports[`multi-stack-app > matches the expected api stack template 1`] = `
 {
+  "Description": "API resources for multi-stack example",
   "Outputs": {
     "MultiStackAppapiEndpointD0598FD7": {
       "Value": {
@@ -269,6 +270,7 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
 
 exports[`multi-stack-app > matches the expected service stack template 1`] = `
 {
+  "Description": "Service resources for multi-stack example",
   "Outputs": {
     "ExportsOutputFnGetAttMultiStackApphandler260E0508Arn47C6D6F6": {
       "Export": {

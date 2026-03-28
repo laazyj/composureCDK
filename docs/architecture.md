@@ -27,6 +27,14 @@ interface Lifecycle<T, Context> {
 
 A `Lifecycle` is deliberately minimal. It has one method. It does not manage its own dependencies or know where it sits in a larger system — that is the job of `compose`.
 
+### Build results must be complete
+
+A builder's result type (`T`) must include every significant resource the builder creates — not just the primary construct. If a builder creates auxiliary resources (such as a log group for access logging, or an IAM role), those resources must be exposed in the result so that consumers can reference, configure, or compose with them.
+
+Resources that are created but not returned are invisible to the rest of the system. This breaks composability: a consuming component cannot declare a dependency on something it cannot see. It also makes testing harder, since there is no programmatic way to inspect or assert against the hidden resource.
+
+The rule: **if a builder creates it, the result should expose it.**
+
 ### Why an interface, not a base class
 
 Components are composed, not inherited. A component is any object with a `build` method that matches the signature. This keeps the coupling to ComposureCDK minimal — a component does not need to extend a framework class, call `super()`, or conform to a class hierarchy. It just implements a single method.

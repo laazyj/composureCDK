@@ -172,6 +172,39 @@ function createFunctionBuilder(): IFunctionBuilder {
 
 The class must have a `props: Partial<Props>` field (this is how the builder proxy reads and writes configuration) and a no-argument constructor (the `Builder` function calls `new constructor()`).
 
+## Defaults
+
+Builders apply secure, AWS-recommended defaults to every resource they create. Each builder package exports a `defaults.ts` module containing a constant of type `Partial<Props>` — the set of properties that are applied unless the user explicitly overrides them.
+
+### How it works
+
+Defaults are merged in the builder's `build()` method using a single spread: `{ ...DEFAULTS, ...this.props }`. Because the `Builder` proxy writes user-provided values to `this.props`, any value the user sets takes precedence over the default. There is no opt-out flag — every default is individually overridable through the existing fluent API, making deviations intentional and visible.
+
+```typescript
+// defaults.ts — each property documents the AWS recommendation it implements
+export const FUNCTION_DEFAULTS: Partial<FunctionProps> = {
+  /** @see https://docs.aws.amazon.com/.../opex-distributed-tracing.html */
+  tracing: Tracing.ACTIVE,
+  /** @see https://docs.aws.amazon.com/.../opex-logging.html */
+  loggingFormat: LoggingFormat.JSON,
+};
+
+// function-builder.ts — one-line merge in build()
+build(scope, id) {
+  const mergedProps = { ...FUNCTION_DEFAULTS, ...this.props };
+  return { function: new LambdaFunction(scope, id, mergedProps) };
+}
+```
+
+For nested properties like `deployOptions`, the builder performs a targeted deep merge to avoid clobbering user-provided values within the nested object.
+
+### Design rationale
+
+- **Defaults live in each builder package**, not in core. The core `Builder` proxy and `Lifecycle` interface are generic — defaults are domain-specific (Lambda defaults differ from API Gateway defaults).
+- **Every default property has a JSDoc annotation** linking to the specific AWS recommendation it implements, preferring the [AWS Well-Architected Framework](https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html) and its lenses (e.g. Serverless Applications Lens, Security Pillar) as the primary source. This keeps each default traceable and auditable.
+- **Defaults are exported** so consumers can inspect them, reference them in documentation, or use them in tests.
+- **Build-time resources** (such as the `LogGroup` auto-created for API Gateway access logging) are only created when the user has not provided their own. This avoids creating unused resources when the user has a custom setup.
+
 ## Ref
 
 Lifecycle, Builder, and compose each solve a distinct problem. But there is a gap between them: **builders are configured before their dependencies are built.** When we set up a REST API builder and need to pass it a Lambda integration, the Lambda function does not exist yet — it will only be created when `compose` builds the system in dependency order. We need a way to say "the value that will come from _this_ component" at configuration time.

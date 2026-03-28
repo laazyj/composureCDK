@@ -33,12 +33,12 @@
   "license": "MIT",
   "type": "module",
   "peerDependencies": {
-    "constructs": "^10.0.0"
+    "constructs": "^10.6.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.0"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
   },
   "dependencies": {
     "@dagrejs/graphlib": "^4.0.1"

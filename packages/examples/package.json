@@ -22,13 +22,13 @@
     "@composurecdk/cloudformation": "0.1.0",
     "@composurecdk/core": "0.1.0",
     "@composurecdk/lambda": "0.1.0",
-    "aws-cdk-lib": "^2.243.0",
-    "constructs": "^10.5.1"
+    "aws-cdk-lib": "^2.245.0",
+    "constructs": "^10.6.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "aws-cdk": "^2.243.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.0"
+    "aws-cdk": "^2.1114.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
   }
 }

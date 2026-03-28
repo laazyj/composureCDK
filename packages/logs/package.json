@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/logs",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "ComposureCDK CloudWatch Logs components",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,11 +23,11 @@
     "test:watch": "vitest"
   },
   "keywords": [],
-  "author": "laazyj",
+  "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
   "type": "module",
   "peerDependencies": {
-    "@composurecdk/core": "^1.0.0",
+    "@composurecdk/core": "^0.1.0",
     "aws-cdk-lib": "^2.0.0",
     "constructs": "^10.0.0"
   },

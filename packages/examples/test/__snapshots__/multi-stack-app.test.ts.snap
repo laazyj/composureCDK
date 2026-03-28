@@ -294,6 +294,7 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
   "Resources": {
     "MultiStackApphandler260E0508": {
       "DependsOn": [
+        "MultiStackApphandlerServiceRoleDefaultPolicy0F10DD68",
         "MultiStackApphandlerServiceRoleC2F86FDD",
       ],
       "Properties": {
@@ -302,6 +303,9 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         },
         "Description": "Request handler",
         "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+        },
         "Role": {
           "Fn::GetAtt": [
             "MultiStackApphandlerServiceRoleC2F86FDD",
@@ -310,6 +314,9 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         },
         "Runtime": "nodejs22.x",
         "Timeout": 30,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
       },
       "Type": "AWS::Lambda::Function",
     },
@@ -343,6 +350,30 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         ],
       },
       "Type": "AWS::IAM::Role",
+    },
+    "MultiStackApphandlerServiceRoleDefaultPolicy0F10DD68": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "MultiStackApphandlerServiceRoleDefaultPolicy0F10DD68",
+        "Roles": [
+          {
+            "Ref": "MultiStackApphandlerServiceRoleC2F86FDD",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
   },
   "Rules": {

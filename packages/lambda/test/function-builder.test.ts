@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
+import { Match } from "aws-cdk-lib/assertions";
 import { Template } from "aws-cdk-lib/assertions";
-import { Code, Runtime, Tracing, Architecture } from "aws-cdk-lib/aws-lambda";
+import { Code, LoggingFormat, Runtime, Tracing, Architecture } from "aws-cdk-lib/aws-lambda";
 import { createFunctionBuilder } from "../src/function-builder.js";
 
 function synthTemplate(
@@ -196,6 +197,62 @@ describe("FunctionBuilder", () => {
         Environment: {
           Variables: { STAGE: "prod" },
         },
+      });
+    });
+  });
+
+  describe("secure defaults", () => {
+    it("enables X-Ray active tracing by default", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}")),
+      );
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        TracingConfig: { Mode: "Active" },
+      });
+    });
+
+    it("enables JSON structured logging by default", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}")),
+      );
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        LoggingConfig: Match.objectLike({ LogFormat: "JSON" }),
+      });
+    });
+
+    it("allows the user to override tracing", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}"))
+          .tracing(Tracing.PASS_THROUGH),
+      );
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        TracingConfig: { Mode: "PassThrough" },
+      });
+    });
+
+    it("allows the user to override logging format", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}"))
+          .loggingFormat(LoggingFormat.TEXT),
+      );
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        LoggingConfig: Match.objectLike({ LogFormat: "Text" }),
       });
     });
   });

@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:update": "vitest run --update",
     "test:watch": "vitest",
     "cdk": "cdk",
     "deploy": "cdk deploy",

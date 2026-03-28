@@ -292,6 +292,7 @@ exports[`strategy-stack-app > matches the expected service stack template 1`] = 
   "Resources": {
     "StrategyStackApphandler192EDDB3": {
       "DependsOn": [
+        "StrategyStackApphandlerServiceRoleDefaultPolicyBFD64CC4",
         "StrategyStackApphandlerServiceRole02BF32F5",
       ],
       "Properties": {
@@ -300,6 +301,9 @@ exports[`strategy-stack-app > matches the expected service stack template 1`] = 
         },
         "Description": "Request handler",
         "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+        },
         "Role": {
           "Fn::GetAtt": [
             "StrategyStackApphandlerServiceRole02BF32F5",
@@ -308,6 +312,9 @@ exports[`strategy-stack-app > matches the expected service stack template 1`] = 
         },
         "Runtime": "nodejs22.x",
         "Timeout": 30,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
       },
       "Type": "AWS::Lambda::Function",
     },
@@ -341,6 +348,30 @@ exports[`strategy-stack-app > matches the expected service stack template 1`] = 
         ],
       },
       "Type": "AWS::IAM::Role",
+    },
+    "StrategyStackApphandlerServiceRoleDefaultPolicyBFD64CC4": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "StrategyStackApphandlerServiceRoleDefaultPolicyBFD64CC4",
+        "Roles": [
+          {
+            "Ref": "StrategyStackApphandlerServiceRole02BF32F5",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
   },
   "Rules": {

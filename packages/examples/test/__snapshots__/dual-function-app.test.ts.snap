@@ -21,6 +21,9 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         },
         "Description": "API handler — receives and validates incoming requests",
         "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+        },
         "MemorySize": 256,
         "Role": {
           "Fn::GetAtt": [
@@ -102,6 +105,9 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         },
         "Description": "Worker — processes requests asynchronously",
         "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+        },
         "MemorySize": 512,
         "Role": {
           "Fn::GetAtt": [

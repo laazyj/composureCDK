@@ -1,6 +1,7 @@
 import { Function as LambdaFunction, type FunctionProps } from "aws-cdk-lib/aws-lambda";
 import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { FUNCTION_DEFAULTS } from "./defaults.js";
 
 type FunctionBuilderProps = FunctionProps;
 
@@ -41,8 +42,12 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   props: Partial<FunctionBuilderProps> = {};
 
   build(scope: IConstruct, id: string): FunctionBuilderResult {
+    const mergedProps = {
+      ...FUNCTION_DEFAULTS,
+      ...this.props,
+    } as FunctionBuilderProps;
     return {
-      function: new LambdaFunction(scope, id, this.props as FunctionBuilderProps),
+      function: new LambdaFunction(scope, id, mergedProps),
     };
   }
 }

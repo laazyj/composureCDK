@@ -39,6 +39,14 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
     },
   },
   "Resources": {
+    "LambdaApiAppapiAccessLogsB5DCE571": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
     "LambdaApiAppapiAccountEA927EA7": {
       "DeletionPolicy": "Retain",
       "DependsOn": [
@@ -119,13 +127,31 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
         "LambdaApiAppapiAccountEA927EA7",
       ],
       "Properties": {
+        "AccessLogSetting": {
+          "DestinationArn": {
+            "Fn::GetAtt": [
+              "LambdaApiAppapiAccessLogsB5DCE571",
+              "Arn",
+            ],
+          },
+          "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
+        },
         "DeploymentId": {
           "Ref": "LambdaApiAppapiDeployment0BAC688F1f60d05431157c125b2ed5fb3ade8297",
         },
+        "MethodSettings": [
+          {
+            "DataTraceEnabled": false,
+            "HttpMethod": "*",
+            "LoggingLevel": "INFO",
+            "ResourcePath": "/*",
+          },
+        ],
         "RestApiId": {
           "Ref": "LambdaApiAppapiC81E106B",
         },
         "StageName": "prod",
+        "TracingEnabled": true,
       },
       "Type": "AWS::ApiGateway::Stage",
     },

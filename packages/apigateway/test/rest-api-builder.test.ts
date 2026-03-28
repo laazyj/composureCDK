@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
-import { Template } from "aws-cdk-lib/assertions";
-import { MockIntegration, PassthroughBehavior } from "aws-cdk-lib/aws-apigateway";
+import { Match, Template } from "aws-cdk-lib/assertions";
+import {
+  LogGroupLogDestination,
+  MethodLoggingLevel,
+  MockIntegration,
+  PassthroughBehavior,
+} from "aws-cdk-lib/aws-apigateway";
+import { LogGroup } from "aws-cdk-lib/aws-logs";
 import { createRestApiBuilder } from "../src/rest-api-builder.js";
 
 function mockIntegration(body: Record<string, unknown>) {
@@ -49,6 +55,47 @@ describe("RestApiBuilder", () => {
 
       expect(result).toBeDefined();
       expect(result.api).toBeDefined();
+    });
+
+    it("returns the auto-created access log group in the result", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const builder = createRestApiBuilder();
+
+      withStubMethod(builder);
+
+      const result = builder.build(stack, "TestApi");
+
+      expect(result.accessLogGroup).toBeDefined();
+    });
+
+    it("returns undefined accessLogGroup when access logging is disabled", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const builder = createRestApiBuilder();
+
+      withStubMethod(builder.accessLogging(false));
+
+      const result = builder.build(stack, "TestApi");
+
+      expect(result.accessLogGroup).toBeUndefined();
+    });
+
+    it("returns undefined accessLogGroup when user provides their own destination", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const userLogGroup = new LogGroup(stack, "UserLogGroup");
+      const builder = createRestApiBuilder();
+
+      withStubMethod(
+        builder.deployOptions({
+          accessLogDestination: new LogGroupLogDestination(userLogGroup),
+        }),
+      );
+
+      const result = builder.build(stack, "TestApi");
+
+      expect(result.accessLogGroup).toBeUndefined();
     });
   });
 
@@ -203,6 +250,98 @@ describe("RestApiBuilder", () => {
       );
 
       template.resourceCountIs("AWS::ApiGateway::RestApi", 1);
+    });
+  });
+
+  describe("secure defaults", () => {
+    it("enables X-Ray tracing on the stage by default", () => {
+      const template = synthTemplate((b) => withStubMethod(b));
+
+      template.hasResourceProperties("AWS::ApiGateway::Stage", {
+        TracingEnabled: true,
+      });
+    });
+
+    it("enables CloudWatch execution logging by default", () => {
+      const template = synthTemplate((b) => withStubMethod(b));
+
+      template.hasResourceProperties("AWS::ApiGateway::Stage", {
+        MethodSettings: Match.arrayWith([Match.objectLike({ LoggingLevel: "INFO" })]),
+      });
+    });
+
+    it("creates an access log group by default", () => {
+      const template = synthTemplate((b) => withStubMethod(b));
+
+      template.resourceCountIs("AWS::Logs::LogGroup", 1);
+      template.hasResourceProperties("AWS::Logs::LogGroup", {
+        RetentionInDays: 731,
+      });
+    });
+
+    it("configures access log destination on the stage by default", () => {
+      const template = synthTemplate((b) => withStubMethod(b));
+
+      template.hasResourceProperties("AWS::ApiGateway::Stage", {
+        AccessLogSetting: {
+          DestinationArn: Match.anyValue(),
+        },
+      });
+    });
+
+    it("allows the user to override tracing", () => {
+      const template = synthTemplate((b) =>
+        withStubMethod(b.deployOptions({ tracingEnabled: false })),
+      );
+
+      template.hasResourceProperties("AWS::ApiGateway::Stage", {
+        TracingEnabled: false,
+      });
+    });
+
+    it("allows the user to override logging level", () => {
+      const template = synthTemplate((b) =>
+        withStubMethod(b.deployOptions({ loggingLevel: MethodLoggingLevel.ERROR })),
+      );
+
+      template.hasResourceProperties("AWS::ApiGateway::Stage", {
+        MethodSettings: Match.arrayWith([Match.objectLike({ LoggingLevel: "ERROR" })]),
+      });
+    });
+
+    it("skips auto log group when user provides their own access log destination", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const userLogGroup = new LogGroup(stack, "UserLogGroup");
+      const builder = createRestApiBuilder();
+      withStubMethod(
+        builder.deployOptions({
+          accessLogDestination: new LogGroupLogDestination(userLogGroup),
+        }),
+      );
+      builder.build(stack, "TestApi");
+      const template = Template.fromStack(stack);
+
+      // Only the user-provided log group exists, no auto-created one
+      template.resourceCountIs("AWS::Logs::LogGroup", 1);
+    });
+
+    it("creates no log group when access logging is disabled", () => {
+      const template = synthTemplate((b) => withStubMethod(b.accessLogging(false)));
+
+      template.resourceCountIs("AWS::Logs::LogGroup", 0);
+    });
+
+    it("preserves user deployOptions while applying defaults for missing fields", () => {
+      const template = synthTemplate((b) => withStubMethod(b.deployOptions({ stageName: "live" })));
+
+      template.hasResourceProperties("AWS::ApiGateway::Stage", {
+        StageName: "live",
+        TracingEnabled: true,
+        AccessLogSetting: {
+          DestinationArn: Match.anyValue(),
+        },
+      });
     });
   });
 });

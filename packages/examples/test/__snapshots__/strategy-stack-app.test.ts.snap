@@ -45,6 +45,14 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
       },
       "Type": "AWS::ApiGateway::RestApi",
     },
+    "StrategyStackAppapiAccessLogsA2DAE255": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
     "StrategyStackAppapiAccount4B2A0FF8": {
       "DeletionPolicy": "Retain",
       "DependsOn": [
@@ -114,13 +122,31 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
         "StrategyStackAppapiAccount4B2A0FF8",
       ],
       "Properties": {
+        "AccessLogSetting": {
+          "DestinationArn": {
+            "Fn::GetAtt": [
+              "StrategyStackAppapiAccessLogsA2DAE255",
+              "Arn",
+            ],
+          },
+          "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
+        },
         "DeploymentId": {
           "Ref": "StrategyStackAppapiDeploymentEDA326D01f5119f065bc5a22d9e33d696f9835d1",
         },
+        "MethodSettings": [
+          {
+            "DataTraceEnabled": false,
+            "HttpMethod": "*",
+            "LoggingLevel": "INFO",
+            "ResourcePath": "/*",
+          },
+        ],
         "RestApiId": {
           "Ref": "StrategyStackAppapi0B0977AD",
         },
         "StageName": "prod",
+        "TracingEnabled": true,
       },
       "Type": "AWS::ApiGateway::Stage",
     },

@@ -46,6 +46,14 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::ApiGateway::RestApi",
     },
+    "MockApiAppapiAccessLogsAB4BAE4E": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
     "MockApiAppapiAccountD54FA375": {
       "DeletionPolicy": "Retain",
       "DependsOn": [
@@ -122,13 +130,31 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
         "MockApiAppapiAccountD54FA375",
       ],
       "Properties": {
+        "AccessLogSetting": {
+          "DestinationArn": {
+            "Fn::GetAtt": [
+              "MockApiAppapiAccessLogsAB4BAE4E",
+              "Arn",
+            ],
+          },
+          "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
+        },
         "DeploymentId": {
           "Ref": "MockApiAppapiDeployment8D3A8ED7dd08de43b95755135362eea17a33bf5a",
         },
+        "MethodSettings": [
+          {
+            "DataTraceEnabled": false,
+            "HttpMethod": "*",
+            "LoggingLevel": "INFO",
+            "ResourcePath": "/*",
+          },
+        ],
         "RestApiId": {
           "Ref": "MockApiAppapi1214B2FA",
         },
         "StageName": "prod",
+        "TracingEnabled": true,
       },
       "Type": "AWS::ApiGateway::Stage",
     },

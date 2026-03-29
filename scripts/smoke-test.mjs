@@ -36,14 +36,44 @@ function aws(...args) {
 
 console.log("\n=== Stack health ===\n");
 
-const { Stacks: allStacks } = aws("cloudformation", "describe-stacks", "--output", "json");
+// list-stacks returns all stacks (requires ListStacks on *).
+// We filter by prefix, then describe each individually
+// (DescribeStacks is scoped to ComposureCDK-* in the IAM policy).
+const ACTIVE_FILTERS = [
+  "CREATE_COMPLETE",
+  "UPDATE_COMPLETE",
+  "UPDATE_IN_PROGRESS",
+  "CREATE_IN_PROGRESS",
+  "ROLLBACK_COMPLETE",
+  "ROLLBACK_IN_PROGRESS",
+  "UPDATE_ROLLBACK_COMPLETE",
+];
+const { StackSummaries: summaries } = aws(
+  "cloudformation",
+  "list-stacks",
+  "--stack-status-filter",
+  ...ACTIVE_FILTERS,
+  "--output",
+  "json",
+);
 
-const exampleStacks = allStacks.filter((s) => s.StackName.startsWith(STACK_PREFIX));
+const exampleNames = summaries
+  .filter((s) => s.StackName.startsWith(STACK_PREFIX))
+  .map((s) => s.StackName);
 
-if (exampleStacks.length === 0) {
+if (exampleNames.length === 0) {
   fail(`No stacks found with prefix ${STACK_PREFIX}`);
 } else {
-  for (const stack of exampleStacks) {
+  for (const name of exampleNames) {
+    const { Stacks: stacks } = aws(
+      "cloudformation",
+      "describe-stacks",
+      "--stack-name",
+      name,
+      "--output",
+      "json",
+    );
+    const stack = stacks[0];
     if (HEALTHY_STATUSES.has(stack.StackStatus)) {
       pass(`${stack.StackName} — ${stack.StackStatus}`);
     } else {

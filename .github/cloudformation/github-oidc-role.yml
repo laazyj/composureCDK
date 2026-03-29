@@ -102,7 +102,7 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cdk-bootstrap/*
 
-          # CloudFormation — scoped to stacks with the ComposureCDK- prefix.
+          # CloudFormation — mutating actions scoped to ComposureCDK- stacks.
           # Resource ARNs are string patterns evaluated at request time;
           # the stacks do not need to exist when this template is deployed.
           - Sid: CloudFormation
@@ -121,6 +121,14 @@ Resources:
               - cloudformation:GetTemplateSummary
             Resource:
               - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/ComposureCDK-*
+          # ListStacks is read-only (names and statuses only) and cannot
+          # be scoped to specific stacks. Needed by the smoke test to
+          # discover ComposureCDK-* stacks.
+          - Sid: CloudFormationList
+            Effect: Allow
+            Action:
+              - cloudformation:ListStacks
+            Resource: "*"
 
           # Lambda — scoped by CloudFormation stack-name tag.
           # CreateFunction accepts Tags, so aws:RequestTag works at

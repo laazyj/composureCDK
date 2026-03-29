@@ -3,14 +3,14 @@
 exports[`strategy-stack-app > matches the expected gateway stack template 1`] = `
 {
   "Outputs": {
-    "StrategyStackAppapiEndpoint2784A504": {
+    "ComposureCDKStrategyStackAppapiEndpointD5DF5184": {
       "Value": {
         "Fn::Join": [
           "",
           [
             "https://",
             {
-              "Ref": "StrategyStackAppapi0B0977AD",
+              "Ref": "ComposureCDKStrategyStackAppapiBC520129",
             },
             ".execute-api.",
             {
@@ -22,7 +22,7 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
             },
             "/",
             {
-              "Ref": "StrategyStackAppapiDeploymentStageprod77FD11AC",
+              "Ref": "ComposureCDKStrategyStackAppapiDeploymentStageprod965FDA14",
             },
             "/",
           ],
@@ -38,14 +38,7 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
     },
   },
   "Resources": {
-    "StrategyStackAppapi0B0977AD": {
-      "Properties": {
-        "Description": "API routed by stack strategy",
-        "Name": "StrategyApi",
-      },
-      "Type": "AWS::ApiGateway::RestApi",
-    },
-    "StrategyStackAppapiAccessLogsA2DAE255": {
+    "ComposureCDKStrategyStackAppapiAccessLogs24BA9AD0": {
       "DeletionPolicy": "Retain",
       "Properties": {
         "RetentionInDays": 731,
@@ -53,15 +46,15 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
       "Type": "AWS::Logs::LogGroup",
       "UpdateReplacePolicy": "Retain",
     },
-    "StrategyStackAppapiAccount4B2A0FF8": {
+    "ComposureCDKStrategyStackAppapiAccount10B568B2": {
       "DeletionPolicy": "Retain",
       "DependsOn": [
-        "StrategyStackAppapi0B0977AD",
+        "ComposureCDKStrategyStackAppapiBC520129",
       ],
       "Properties": {
         "CloudWatchRoleArn": {
           "Fn::GetAtt": [
-            "StrategyStackAppapiCloudWatchRoleD8797C18",
+            "ComposureCDKStrategyStackAppapiCloudWatchRole4BF9AE1A",
             "Arn",
           ],
         },
@@ -69,7 +62,14 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
       "Type": "AWS::ApiGateway::Account",
       "UpdateReplacePolicy": "Retain",
     },
-    "StrategyStackAppapiCloudWatchRoleD8797C18": {
+    "ComposureCDKStrategyStackAppapiBC520129": {
+      "Properties": {
+        "Description": "API routed by stack strategy",
+        "Name": "StrategyApi",
+      },
+      "Type": "AWS::ApiGateway::RestApi",
+    },
+    "ComposureCDKStrategyStackAppapiCloudWatchRole4BF9AE1A": {
       "DeletionPolicy": "Retain",
       "Properties": {
         "AssumeRolePolicyDocument": {
@@ -102,9 +102,9 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
       "Type": "AWS::IAM::Role",
       "UpdateReplacePolicy": "Retain",
     },
-    "StrategyStackAppapiDeploymentEDA326D01f5119f065bc5a22d9e33d696f9835d1": {
+    "ComposureCDKStrategyStackAppapiDeployment9D148075829021e7dcef18a2fd501f2e964db9ab": {
       "DependsOn": [
-        "StrategyStackAppapiGETDB4640B5",
+        "ComposureCDKStrategyStackAppapiGET3FCC49AF",
       ],
       "Metadata": {
         "aws:cdk:do-not-refactor": true,
@@ -112,27 +112,27 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
       "Properties": {
         "Description": "API routed by stack strategy",
         "RestApiId": {
-          "Ref": "StrategyStackAppapi0B0977AD",
+          "Ref": "ComposureCDKStrategyStackAppapiBC520129",
         },
       },
       "Type": "AWS::ApiGateway::Deployment",
     },
-    "StrategyStackAppapiDeploymentStageprod77FD11AC": {
+    "ComposureCDKStrategyStackAppapiDeploymentStageprod965FDA14": {
       "DependsOn": [
-        "StrategyStackAppapiAccount4B2A0FF8",
+        "ComposureCDKStrategyStackAppapiAccount10B568B2",
       ],
       "Properties": {
         "AccessLogSetting": {
           "DestinationArn": {
             "Fn::GetAtt": [
-              "StrategyStackAppapiAccessLogsA2DAE255",
+              "ComposureCDKStrategyStackAppapiAccessLogs24BA9AD0",
               "Arn",
             ],
           },
           "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
         },
         "DeploymentId": {
-          "Ref": "StrategyStackAppapiDeploymentEDA326D01f5119f065bc5a22d9e33d696f9835d1",
+          "Ref": "ComposureCDKStrategyStackAppapiDeployment9D148075829021e7dcef18a2fd501f2e964db9ab",
         },
         "MethodSettings": [
           {
@@ -143,86 +143,14 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
           },
         ],
         "RestApiId": {
-          "Ref": "StrategyStackAppapi0B0977AD",
+          "Ref": "ComposureCDKStrategyStackAppapiBC520129",
         },
         "StageName": "prod",
         "TracingEnabled": true,
       },
       "Type": "AWS::ApiGateway::Stage",
     },
-    "StrategyStackAppapiGETApiPermissionStrategyStackAppgatewayStrategyStackAppapiEEF35F1BGET84244501": {
-      "Properties": {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": {
-          "Fn::ImportValue": "StrategyStackApp-service:ExportsOutputFnGetAttStrategyStackApphandler192EDDB3Arn881CBD1D",
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": {
-          "Fn::Join": [
-            "",
-            [
-              "arn:",
-              {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:",
-              {
-                "Ref": "AWS::Region",
-              },
-              ":",
-              {
-                "Ref": "AWS::AccountId",
-              },
-              ":",
-              {
-                "Ref": "StrategyStackAppapi0B0977AD",
-              },
-              "/",
-              {
-                "Ref": "StrategyStackAppapiDeploymentStageprod77FD11AC",
-              },
-              "/GET/",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "StrategyStackAppapiGETApiPermissionTestStrategyStackAppgatewayStrategyStackAppapiEEF35F1BGET6089B6B7": {
-      "Properties": {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": {
-          "Fn::ImportValue": "StrategyStackApp-service:ExportsOutputFnGetAttStrategyStackApphandler192EDDB3Arn881CBD1D",
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceArn": {
-          "Fn::Join": [
-            "",
-            [
-              "arn:",
-              {
-                "Ref": "AWS::Partition",
-              },
-              ":execute-api:",
-              {
-                "Ref": "AWS::Region",
-              },
-              ":",
-              {
-                "Ref": "AWS::AccountId",
-              },
-              ":",
-              {
-                "Ref": "StrategyStackAppapi0B0977AD",
-              },
-              "/test-invoke-stage/GET/",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
-    "StrategyStackAppapiGETDB4640B5": {
+    "ComposureCDKStrategyStackAppapiGET3FCC49AF": {
       "Properties": {
         "AuthorizationType": "NONE",
         "HttpMethod": "GET",
@@ -243,7 +171,7 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
                 },
                 ":lambda:path/2015-03-31/functions/",
                 {
-                  "Fn::ImportValue": "StrategyStackApp-service:ExportsOutputFnGetAttStrategyStackApphandler192EDDB3Arn881CBD1D",
+                  "Fn::ImportValue": "ComposureCDK-StrategyStackApp-service:ExportsOutputFnGetAttComposureCDKStrategyStackApphandler5D513C4EArnD191B7D5",
                 },
                 "/invocations",
               ],
@@ -252,15 +180,87 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
         },
         "ResourceId": {
           "Fn::GetAtt": [
-            "StrategyStackAppapi0B0977AD",
+            "ComposureCDKStrategyStackAppapiBC520129",
             "RootResourceId",
           ],
         },
         "RestApiId": {
-          "Ref": "StrategyStackAppapi0B0977AD",
+          "Ref": "ComposureCDKStrategyStackAppapiBC520129",
         },
       },
       "Type": "AWS::ApiGateway::Method",
+    },
+    "ComposureCDKStrategyStackAppapiGETApiPermissionComposureCDKStrategyStackAppgatewayComposureCDKStrategyStackAppapi9A143A5FGETCA50EA94": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::ImportValue": "ComposureCDK-StrategyStackApp-service:ExportsOutputFnGetAttComposureCDKStrategyStackApphandler5D513C4EArnD191B7D5",
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              {
+                "Ref": "ComposureCDKStrategyStackAppapiBC520129",
+              },
+              "/",
+              {
+                "Ref": "ComposureCDKStrategyStackAppapiDeploymentStageprod965FDA14",
+              },
+              "/GET/",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "ComposureCDKStrategyStackAppapiGETApiPermissionTestComposureCDKStrategyStackAppgatewayComposureCDKStrategyStackAppapi9A143A5FGETE5F91DC8": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::ImportValue": "ComposureCDK-StrategyStackApp-service:ExportsOutputFnGetAttComposureCDKStrategyStackApphandler5D513C4EArnD191B7D5",
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region",
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId",
+              },
+              ":",
+              {
+                "Ref": "ComposureCDKStrategyStackAppapiBC520129",
+              },
+              "/test-invoke-stage/GET/",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
     },
   },
   "Rules": {
@@ -296,13 +296,13 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
 exports[`strategy-stack-app > matches the expected service stack template 1`] = `
 {
   "Outputs": {
-    "ExportsOutputFnGetAttStrategyStackApphandler192EDDB3Arn881CBD1D": {
+    "ExportsOutputFnGetAttComposureCDKStrategyStackApphandler5D513C4EArnD191B7D5": {
       "Export": {
-        "Name": "StrategyStackApp-service:ExportsOutputFnGetAttStrategyStackApphandler192EDDB3Arn881CBD1D",
+        "Name": "ComposureCDK-StrategyStackApp-service:ExportsOutputFnGetAttComposureCDKStrategyStackApphandler5D513C4EArnD191B7D5",
       },
       "Value": {
         "Fn::GetAtt": [
-          "StrategyStackApphandler192EDDB3",
+          "ComposureCDKStrategyStackApphandler5D513C4E",
           "Arn",
         ],
       },
@@ -316,10 +316,10 @@ exports[`strategy-stack-app > matches the expected service stack template 1`] = 
     },
   },
   "Resources": {
-    "StrategyStackApphandler192EDDB3": {
+    "ComposureCDKStrategyStackApphandler5D513C4E": {
       "DependsOn": [
-        "StrategyStackApphandlerServiceRoleDefaultPolicyBFD64CC4",
-        "StrategyStackApphandlerServiceRole02BF32F5",
+        "ComposureCDKStrategyStackApphandlerServiceRoleDefaultPolicyEDA09313",
+        "ComposureCDKStrategyStackApphandlerServiceRole6ECCEF31",
       ],
       "Properties": {
         "Code": {
@@ -332,7 +332,7 @@ exports[`strategy-stack-app > matches the expected service stack template 1`] = 
         },
         "Role": {
           "Fn::GetAtt": [
-            "StrategyStackApphandlerServiceRole02BF32F5",
+            "ComposureCDKStrategyStackApphandlerServiceRole6ECCEF31",
             "Arn",
           ],
         },
@@ -344,7 +344,7 @@ exports[`strategy-stack-app > matches the expected service stack template 1`] = 
       },
       "Type": "AWS::Lambda::Function",
     },
-    "StrategyStackApphandlerServiceRole02BF32F5": {
+    "ComposureCDKStrategyStackApphandlerServiceRole6ECCEF31": {
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
@@ -375,7 +375,7 @@ exports[`strategy-stack-app > matches the expected service stack template 1`] = 
       },
       "Type": "AWS::IAM::Role",
     },
-    "StrategyStackApphandlerServiceRoleDefaultPolicyBFD64CC4": {
+    "ComposureCDKStrategyStackApphandlerServiceRoleDefaultPolicyEDA09313": {
       "Properties": {
         "PolicyDocument": {
           "Statement": [
@@ -390,10 +390,10 @@ exports[`strategy-stack-app > matches the expected service stack template 1`] = 
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "StrategyStackApphandlerServiceRoleDefaultPolicyBFD64CC4",
+        "PolicyName": "ComposureCDKStrategyStackApphandlerServiceRoleDefaultPolicyEDA09313",
         "Roles": [
           {
-            "Ref": "StrategyStackApphandlerServiceRole02BF32F5",
+            "Ref": "ComposureCDKStrategyStackApphandlerServiceRole6ECCEF31",
           },
         ],
       },

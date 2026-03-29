@@ -12,7 +12,7 @@ import { createFunctionBuilder } from "@composurecdk/lambda";
  * - Composing independent components into a system
  */
 export function createDualFunctionApp(app = new App()) {
-  const stack = new Stack(app, "DualFunctionStack");
+  const stack = new Stack(app, "ComposureCDK-DualFunctionStack");
 
   compose(
     {

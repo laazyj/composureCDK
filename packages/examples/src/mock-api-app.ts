@@ -51,7 +51,7 @@ function jsonMock(statusCode: string, body: Record<string, unknown>): [Integrati
 export function createMockApiApp(app = new App()) {
   const { stack } = createStackBuilder()
     .description("A mock CRUD API for demonstration")
-    .build(app, "MockApiStack");
+    .build(app, "ComposureCDK-MockApiStack");
 
   compose(
     {

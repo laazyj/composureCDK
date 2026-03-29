@@ -2,13 +2,15 @@
 
 Example applications demonstrating ComposureCDK patterns. Each example is a self-contained CDK stack that can be synthesised and deployed to an AWS account.
 
-| Stack                                                                     | Description                                                                     |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [`DualFunctionStack`](src/dual-function-app.ts)                           | Two Lambda functions (API handler + async worker) with different configurations |
-| [`LambdaApiStack`](src/lambda-api-app.ts)                                 | REST API backed by a Lambda function, wired with `ref`                          |
-| [`MockApiStack`](src/mock-api-app.ts)                                     | CRUD REST API with mock integrations                                            |
-| [`MultiStackServiceStack` / `MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                   |
-| [`StrategyStackApp-*`](src/strategy-stack-app.ts)                         | REST API + Lambda split across stacks via `.withStackStrategy()`                |
+All example stacks use the `ComposureCDK-` name prefix. This convention enables the CI deploy-test pipeline to scope IAM permissions and discover stacks automatically — see [CI documentation](../../docs/ci.md#stack-naming-convention) for details. **New examples must follow this prefix.**
+
+| Stack                                                                                               | Description                                                                     |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [`ComposureCDK-DualFunctionStack`](src/dual-function-app.ts)                                        | Two Lambda functions (API handler + async worker) with different configurations |
+| [`ComposureCDK-LambdaApiStack`](src/lambda-api-app.ts)                                              | REST API backed by a Lambda function, wired with `ref`                          |
+| [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations                                            |
+| [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                   |
+| [`ComposureCDK-StrategyStackApp-*`](src/strategy-stack-app.ts)                                      | REST API + Lambda split across stacks via `.withStackStrategy()`                |
 
 ## Prerequisites
 
@@ -19,13 +21,13 @@ Example applications demonstrating ComposureCDK patterns. Each example is a self
 ## Usage
 
 ```sh
-npx nx build examples                                    # build examples and dependencies
-npx nx synth examples -- --list                           # list available stacks
-npx nx synth examples -- DualFunctionStack                # synthesise a stack to cdk.out/
-npx nx deploy examples -- DualFunctionStack               # deploy a stack
-npx nx deploy examples -- DualFunctionStack LambdaApiStack  # deploy multiple stacks
-npx nx cdk examples -- destroy DualFunctionStack          # tear down a stack
-npx nx cdk examples -- destroy --all                      # tear down all example stacks
+npx nx build examples                                                        # build examples and dependencies
+npx nx synth examples -- --list                                               # list available stacks
+npx nx synth examples -- ComposureCDK-DualFunctionStack                       # synthesise a stack to cdk.out/
+npx nx deploy examples -- ComposureCDK-DualFunctionStack                      # deploy a stack
+npx nx deploy examples -- ComposureCDK-DualFunctionStack ComposureCDK-LambdaApiStack  # deploy multiple stacks
+npx nx cdk examples -- destroy ComposureCDK-DualFunctionStack                 # tear down a stack
+npx nx cdk examples -- destroy --all                                          # tear down all example stacks
 ```
 
 To skip IAM approval prompts (e.g. in CI): add `--require-approval never` to deploy commands.

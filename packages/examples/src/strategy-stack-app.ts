@@ -42,7 +42,7 @@ export function createStrategyStackApp(app = new App()) {
     { handler: [], api: ["handler"] },
   )
     .withStackStrategy(strategy)
-    .build(app, "StrategyStackApp");
+    .build(app, "ComposureCDK-StrategyStackApp");
 
   return { app };
 }

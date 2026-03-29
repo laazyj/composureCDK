@@ -1,0 +1,73 @@
+name: Deploy Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment for deployment test
+        required: true
+        default: sandbox
+        type: choice
+        options:
+          - sandbox
+
+permissions:
+  contents: read
+  id-token: write # Required for AWS OIDC
+
+concurrency:
+  group: deploy-test-${{ github.event.inputs.environment }}
+  cancel-in-progress: false # Never cancel in-flight deployments
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  deploy-test:
+    name: Deploy and Verify Examples
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NX_DAEMON: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: CDK Deploy
+        working-directory: packages/examples
+        run: npx cdk deploy --all --require-approval never
+
+      - name: Smoke Test
+        working-directory: packages/examples
+        run: node ../../scripts/smoke-test.mjs
+
+      - name: CDK Destroy
+        if: always()
+        working-directory: packages/examples
+        run: |
+          # Only destroy if AWS credentials were configured
+          aws sts get-caller-identity > /dev/null 2>&1 && \
+            npx cdk destroy --all --force || \
+            echo "Skipping destroy — no AWS credentials available"

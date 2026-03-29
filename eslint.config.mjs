@@ -13,7 +13,7 @@ export default defineConfig(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["eslint.config.mjs"],
+          allowDefaultProject: ["eslint.config.mjs", "scripts/*.mjs"],
         },
       },
     },
@@ -21,6 +21,17 @@ export default defineConfig(
   {
     files: ["eslint.config.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
+    files: ["scripts/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        fetch: "readonly",
+      },
+    },
   },
   eslintConfigPrettier,
 );

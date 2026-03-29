@@ -18,10 +18,10 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
 export function createMultiStackApp(app = new App()) {
   const { stack: serviceStack } = createStackBuilder()
     .description("Service resources for multi-stack example")
-    .build(app, "MultiStackServiceStack");
+    .build(app, "ComposureCDK-MultiStackServiceStack");
   const { stack: apiStack } = createStackBuilder()
     .description("API resources for multi-stack example")
-    .build(app, "MultiStackApiStack");
+    .build(app, "ComposureCDK-MultiStackApiStack");
 
   compose(
     {

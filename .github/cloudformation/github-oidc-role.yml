@@ -1,0 +1,256 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  GitHub Actions OIDC federation for ComposureCDK deploy-test pipeline.
+  Deploy this stack once in your sandbox account before running the workflow.
+
+  Usage:
+    aws cloudformation deploy \
+      --template-file github-oidc-role.yml \
+      --stack-name github-actions-oidc \
+      --parameter-overrides GitHubOrg=laazyj RepoName=composureCDK \
+      --capabilities CAPABILITY_NAMED_IAM
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Default: laazyj
+    Description: GitHub organisation or username that owns the repository.
+
+  RepoName:
+    Type: String
+    Default: composureCDK
+    Description: GitHub repository name.
+
+  OIDCProviderArn:
+    Type: String
+    Default: ""
+    Description: >
+      ARN of an existing GitHub OIDC provider in this account.
+      Leave blank to create one. Only one provider per account is allowed,
+      so if another stack already created it, paste its ARN here.
+
+Conditions:
+  CreateOIDCProvider: !Equals [!Ref OIDCProviderArn, ""]
+
+Resources:
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateOIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        # GitHub's OIDC thumbprint — AWS validates the provider certificate
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  DeployTestRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: github-actions-composurecdk-deploy
+      Description: Assumed by GitHub Actions to deploy ComposureCDK examples
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - CreateOIDCProvider
+                - !Ref GitHubOIDCProvider
+                - !Ref OIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrg}/${RepoName}:environment:sandbox
+
+  # Managed policy rather than inline — avoids IAM_NO_INLINE_POLICY_CHECK
+  # and makes the role easier to audit independently of the stack.
+  #
+  # All example stacks use the "ComposureCDK-" prefix convention.
+  # CloudFormation auto-tags every resource with aws:cloudformation:stack-name,
+  # so tag conditions using "ComposureCDK-*" limit access to resources belonging
+  # to example stacks without needing to enumerate each stack by name.
+  # New examples automatically get coverage as long as they follow the prefix.
+  DeployTestPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: github-actions-composurecdk-deploy
+      Description: Permissions for ComposureCDK deploy-test pipeline
+      Roles:
+        - !Ref DeployTestRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # CDK bootstrap resources — read/write assets to the CDK staging bucket
+          - Sid: CDKBootstrapBucket
+            Effect: Allow
+            Action:
+              - s3:GetObject*
+              - s3:GetBucket*
+              - s3:List*
+              - s3:DeleteObject*
+              - s3:PutObject*
+              - s3:GetEncryptionConfiguration
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::cdk-*
+          - Sid: CDKBootstrapSSM
+            Effect: Allow
+            Action:
+              - ssm:GetParameter
+            Resource:
+              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cdk-bootstrap/*
+
+          # CloudFormation — scoped to stacks with the ComposureCDK- prefix.
+          # Resource ARNs are string patterns evaluated at request time;
+          # the stacks do not need to exist when this template is deployed.
+          - Sid: CloudFormation
+            Effect: Allow
+            Action:
+              - cloudformation:CreateStack
+              - cloudformation:UpdateStack
+              - cloudformation:DeleteStack
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackEvents
+              - cloudformation:GetTemplate
+              - cloudformation:CreateChangeSet
+              - cloudformation:DescribeChangeSet
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:DeleteChangeSet
+              - cloudformation:GetTemplateSummary
+            Resource:
+              - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/ComposureCDK-*
+
+          # Lambda — scoped by CloudFormation stack-name tag.
+          # CreateFunction accepts Tags, so aws:RequestTag works at
+          # creation time. Mutations use aws:ResourceTag on the
+          # already-tagged resource.
+          - Sid: LambdaCreate
+            Effect: Allow
+            Action:
+              - lambda:CreateFunction
+              - lambda:TagResource
+            Resource:
+              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:*
+            Condition:
+              StringLike:
+                aws:RequestTag/aws:cloudformation:stack-name: ComposureCDK-*
+          - Sid: LambdaMutate
+            Effect: Allow
+            Action:
+              - lambda:DeleteFunction
+              - lambda:GetFunction
+              - lambda:GetFunctionConfiguration
+              - lambda:UpdateFunctionCode
+              - lambda:UpdateFunctionConfiguration
+              - lambda:AddPermission
+              - lambda:RemovePermission
+              - lambda:UntagResource
+              - lambda:ListTags
+            Resource:
+              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:*
+            Condition:
+              StringLike:
+                aws:ResourceTag/aws:cloudformation:stack-name: ComposureCDK-*
+
+          # API Gateway — tag-based conditions are not consistently
+          # supported across all API Gateway actions, so we rely on
+          # ARN-scoped resources here.
+          - Sid: APIGateway
+            Effect: Allow
+            Action:
+              - apigateway:GET
+              - apigateway:POST
+              - apigateway:PUT
+              - apigateway:PATCH
+              - apigateway:DELETE
+            Resource:
+              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis*
+              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags*
+
+          # CloudWatch Logs — scoped by CloudFormation stack-name tag.
+          - Sid: LogsCreate
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:TagResource
+              - logs:TagLogGroup
+            Resource:
+              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+            Condition:
+              StringLike:
+                aws:RequestTag/aws:cloudformation:stack-name: ComposureCDK-*
+          - Sid: LogsMutate
+            Effect: Allow
+            Action:
+              - logs:DeleteLogGroup
+              - logs:DescribeLogGroups
+              - logs:PutRetentionPolicy
+              - logs:DeleteRetentionPolicy
+              - logs:UntagLogGroup
+              - logs:UntagResource
+              - logs:ListTagsForResource
+              - logs:ListTagsLogGroup
+            Resource:
+              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+            Condition:
+              StringLike:
+                aws:ResourceTag/aws:cloudformation:stack-name: ComposureCDK-*
+
+          # IAM — CDK creates execution roles for Lambda.
+          # CreateRole needs aws:RequestTag because the role has no
+          # tags at creation time.
+          - Sid: IAMCreateRole
+            Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:TagRole
+            Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/*
+            Condition:
+              StringLike:
+                aws:RequestTag/aws:cloudformation:stack-name: ComposureCDK-*
+          - Sid: IAMMutateRoles
+            Effect: Allow
+            Action:
+              - iam:DeleteRole
+              - iam:GetRole
+              - iam:PassRole
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+              - iam:PutRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:GetRolePolicy
+              - iam:UntagRole
+            Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/*
+            Condition:
+              StringLike:
+                aws:ResourceTag/aws:cloudformation:stack-name: ComposureCDK-*
+
+          # CDK bootstrap roles — assumed by CDK CLI for asset publishing
+          # and CloudFormation execution
+          - Sid: CDKAssetRoles
+            Effect: Allow
+            Action:
+              - iam:PassRole
+              - iam:GetRole
+            Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-*
+          - Sid: STS
+            Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-*
+
+Outputs:
+  RoleArn:
+    Description: ARN to use in the GitHub Actions workflow
+    Value: !GetAtt DeployTestRole.Arn
+
+  OIDCProviderArn:
+    Description: Pass this to other stacks via OIDCProviderArn parameter to avoid duplicates
+    Condition: CreateOIDCProvider
+    Value: !Ref GitHubOIDCProvider

@@ -28,7 +28,7 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
 export function createLambdaApiApp(app = new App()) {
   const { stack } = createStackBuilder()
     .description("REST API backed by a Lambda function")
-    .build(app, "LambdaApiStack");
+    .build(app, "ComposureCDK-LambdaApiStack");
 
   compose(
     {

@@ -198,7 +198,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::ApiGateway::Method",
     },
-    "LambdaApiAppapiGETApiPermissionLambdaApiStackLambdaApiAppapiAE9573ABGET1EE2EA06": {
+    "LambdaApiAppapiGETApiPermissionComposureCDKLambdaApiStackLambdaApiAppapiE166F057GETD05FF530": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -239,7 +239,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::Lambda::Permission",
     },
-    "LambdaApiAppapiGETApiPermissionTestLambdaApiStackLambdaApiAppapiAE9573ABGETFBC6FED7": {
+    "LambdaApiAppapiGETApiPermissionTestComposureCDKLambdaApiStackLambdaApiAppapiE166F057GET39ACBBA1": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -331,7 +331,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::ApiGateway::Method",
     },
-    "LambdaApiAppapiusersGETApiPermissionLambdaApiStackLambdaApiAppapiAE9573ABGETusers9A90E260": {
+    "LambdaApiAppapiusersGETApiPermissionComposureCDKLambdaApiStackLambdaApiAppapiE166F057GETusers21EF36C7": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -372,7 +372,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::Lambda::Permission",
     },
-    "LambdaApiAppapiusersGETApiPermissionTestLambdaApiStackLambdaApiAppapiAE9573ABGETusersA9F8AD83": {
+    "LambdaApiAppapiusersGETApiPermissionTestComposureCDKLambdaApiStackLambdaApiAppapiE166F057GETusers889F6C09": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -421,7 +421,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::ApiGateway::Resource",
     },
-    "LambdaApiAppapiusersidGETApiPermissionLambdaApiStackLambdaApiAppapiAE9573ABGETusersid254D4BD8": {
+    "LambdaApiAppapiusersidGETApiPermissionComposureCDKLambdaApiStackLambdaApiAppapiE166F057GETusersid9BD3B497": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -462,7 +462,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::Lambda::Permission",
     },
-    "LambdaApiAppapiusersidGETApiPermissionTestLambdaApiStackLambdaApiAppapiAE9573ABGETusersidAFB1E54F": {
+    "LambdaApiAppapiusersidGETApiPermissionTestComposureCDKLambdaApiStackLambdaApiAppapiE166F057GETusersid78965AA6": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {

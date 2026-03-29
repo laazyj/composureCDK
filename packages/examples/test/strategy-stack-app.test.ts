@@ -16,8 +16,8 @@ function findStack(stacks: Stack[], name: string): Stack {
 describe("strategy-stack-app", () => {
   const { app } = createStrategyStackApp();
   const stacks = app.node.children.filter((c): c is Stack => c instanceof Stack);
-  const serviceStack = findStack(stacks, "StrategyStackApp-service");
-  const gatewayStack = findStack(stacks, "StrategyStackApp-gateway");
+  const serviceStack = findStack(stacks, "ComposureCDK-StrategyStackApp-service");
+  const gatewayStack = findStack(stacks, "ComposureCDK-StrategyStackApp-gateway");
 
   it("creates two stacks", () => {
     expect(stacks).toHaveLength(2);

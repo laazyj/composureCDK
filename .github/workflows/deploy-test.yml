@@ -10,6 +10,13 @@ on:
         type: choice
         options:
           - sandbox
+  workflow_call:
+    inputs:
+      environment:
+        description: Target environment for deployment test
+        required: false
+        default: sandbox
+        type: string
 
 permissions:
   contents: read

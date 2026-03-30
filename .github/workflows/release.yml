@@ -10,13 +10,16 @@ permissions:
   id-token: write # For npm provenance
 
 jobs:
-  ci:
-    name: CI
-    uses: ./.github/workflows/ci.yml
+  deploy-test:
+    name: Deploy Test
+    uses: ./.github/workflows/deploy-test.yml
+    permissions:
+      contents: read
+      id-token: write
 
   publish:
     name: Publish to npm
-    needs: ci
+    needs: deploy-test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm

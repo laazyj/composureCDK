@@ -38,11 +38,11 @@ This workflow uses a GitHub Environment (`sandbox`) for protection rules and to 
 
 ### Stage 3: Release (`.github/workflows/release.yml`)
 
-Triggered by pushing a version tag (`v*.*.*`). Runs CI as a quality gate, then publishes all public packages to npm with provenance.
+Triggered by pushing a version tag (`v*.*.*`). Runs the full deploy-test pipeline (which includes CI) as a quality gate, then publishes all public packages to npm with provenance.
 
 Steps:
 
-1. Run the CI workflow as a prerequisite
+1. Run the deploy-test workflow (CI → deploy → smoke test → destroy)
 2. Build all packages
 3. `npx nx release publish` to publish to npm
 

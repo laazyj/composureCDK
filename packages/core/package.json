@@ -1,7 +1,7 @@
 {
   "name": "@composurecdk/core",
   "version": "0.1.0",
-  "description": "",
+  "description": "Composable CDK component system — lifecycle, dependency resolution, and builder pattern",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -31,6 +31,9 @@
   "keywords": [],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "peerDependencies": {
     "constructs": "^10.6.0"

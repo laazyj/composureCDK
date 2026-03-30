@@ -38,7 +38,72 @@ This workflow uses a GitHub Environment (`sandbox`) for protection rules and to 
 
 ### Stage 3: Release (`.github/workflows/release.yml`)
 
-Triggered by pushing a version tag (`v*.*.*`). Currently stubbed — depends on the versioning strategy being finalised in issue #1.
+Triggered by pushing a version tag (`v*.*.*`). Runs CI as a quality gate, then publishes all public packages to npm with provenance.
+
+Steps:
+
+1. Run the CI workflow as a prerequisite
+2. Build all packages
+3. `npx nx release publish` to publish to npm
+
+This workflow uses a GitHub Environment (`npm`) and [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) for authentication — no long-lived npm tokens. Provenance attestations are generated automatically, cryptographically linking each published package to this repository and workflow run.
+
+## Versioning
+
+All publishable packages share a single version number (fixed versioning). When any package changes, all are bumped and published together. This guarantees compatibility — `@composurecdk/apigateway@0.5.0` always works with `@composurecdk/core@0.5.0`.
+
+The `@composurecdk/examples` package is excluded from releases because it is `"private": true` — it exists for reference, not as an installable library.
+
+Version bumps are determined automatically from conventional commit messages:
+
+| Commit prefix      | Version bump |
+| ------------------ | ------------ |
+| `fix:`             | Patch        |
+| `feat:`            | Minor        |
+| `BREAKING CHANGE:` | Major        |
+
+### Creating a release
+
+```sh
+npx nx release --dry-run        # preview version bump, changelog, and tag
+npx nx release                  # bump versions, generate changelog, commit, tag, push
+```
+
+This command:
+
+1. Determines the next version from conventional commits since the last tag
+2. Updates every `package.json` version and cross-package peer dependency ranges
+3. Generates/updates `CHANGELOG.md`
+4. Commits the changes and creates a `v*.*.*` git tag
+5. Creates a GitHub Release with the changelog
+
+Publishing is disabled locally (`"publish": false` in `nx.json`). The tag push triggers the release workflow, which runs CI and then publishes to npm via `npx nx release publish`.
+
+### npm publishing setup
+
+Publishing uses [trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) — no long-lived npm tokens to manage.
+
+**One-time setup:**
+
+1. Create the `@composurecdk` organisation on [npmjs.com](https://www.npmjs.com) (free plan, public packages)
+2. Create a GitHub Environment called `npm` on the repository
+3. Do an initial publish to create the packages on npm (this must be done locally before trusted publishers can be configured):
+   ```sh
+   npm login
+   npx nx release publish
+   ```
+4. Configure a trusted publisher for each package:
+   ```sh
+   npm trust github @composurecdk/<name> --file release.yml --repo laazyj/composureCDK --env npm
+   ```
+
+**Adding a new package:**
+
+1. Add `"publishConfig": { "access": "public" }` to its `package.json`
+2. Publish it once locally: `npx nx release publish`
+3. Configure its trusted publisher using the `npm trust github` command above
+
+After that, the release workflow handles all future publishes automatically.
 
 ## Stack naming convention
 
@@ -119,6 +184,14 @@ Go to **Actions > Deploy Test > Run workflow**, select the `sandbox` environment
 
 ### Full CI checks
 
+Run all checks in one command:
+
+```sh
+npm run verify
+```
+
+Or individually:
+
 ```sh
 npm run format:check
 npm run typecheck
@@ -160,8 +233,9 @@ npx nx cdk examples -- destroy --all
 
 ## Security notes
 
-- **OIDC federation** — No long-lived AWS credentials are stored in GitHub. The workflow assumes an IAM role via short-lived OIDC tokens.
-- **Environment-scoped trust** — The IAM role's trust policy restricts assumption to the `sandbox` GitHub Environment, not the entire repository.
+- **OIDC everywhere** — Both AWS and npm use OIDC federation. No long-lived credentials or tokens are stored in GitHub.
+- **Environment-scoped trust** — The AWS IAM role restricts assumption to the `sandbox` GitHub Environment. npm trusted publishers restrict publishing to the `release.yml` workflow in the `npm` environment.
 - **Tag-based resource scoping** — Lambda, CloudWatch Logs, and IAM permissions use `aws:cloudformation:stack-name` tag conditions to limit access to resources created by `ComposureCDK-*` stacks.
+- **npm provenance** — Published packages include provenance attestations, cryptographically linking them to this repository and the specific workflow run that produced them.
 - **Action pinning** — All GitHub Actions are pinned by commit SHA (not tag) to prevent supply-chain attacks. Dependabot keeps these current.
 - **Concurrency controls** — The deploy-test workflow uses `cancel-in-progress: false` to prevent cancelling in-flight deployments, which could leave stacks in an inconsistent state.

@@ -1,7 +1,7 @@
 {
   "name": "@composurecdk/apigateway",
   "version": "0.1.0",
-  "description": "ComposureCDK API Gateway components",
+  "description": "Composable API Gateway REST API builder with well-architected defaults",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -25,6 +25,9 @@
   "keywords": [],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "peerDependencies": {
     "@composurecdk/core": "^0.1.0",

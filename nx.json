@@ -17,5 +17,26 @@
     "clean": {
       "cache": false
     }
-  }
+  },
+  "release": {
+    "projectsRelationship": "fixed",
+    "projects": ["packages/*", "!@composurecdk/examples"],
+    "version": {
+      "conventionalCommits": true,
+      "fallbackCurrentVersionResolver": "disk"
+    },
+    "releaseTagPattern": "v{version}",
+    "git": {
+      "commitMessage": "chore(release): v{version}"
+    },
+    "publish": false,
+    "changelog": {
+      "automaticFromRef": true,
+      "projectChangelogs": false,
+      "workspaceChangelog": {
+        "createRelease": "github"
+      }
+    }
+  },
+  "analytics": false
 }

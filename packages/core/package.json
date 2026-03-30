@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Composable CDK component system — lifecycle, dependency resolution, and builder pattern",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

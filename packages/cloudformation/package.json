@@ -2,6 +2,11 @@
   "name": "@composurecdk/cloudformation",
   "version": "0.1.1",
   "description": "Composable CloudFormation stack builder and stack assignment strategies",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laazyj/composureCDK",
+    "directory": "packages/cloudformation"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

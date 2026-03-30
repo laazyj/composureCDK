@@ -2,6 +2,11 @@
   "name": "@composurecdk/lambda",
   "version": "0.1.1",
   "description": "Composable Lambda function builder with well-architected defaults",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laazyj/composureCDK",
+    "directory": "packages/lambda"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

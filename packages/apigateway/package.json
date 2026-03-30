@@ -2,6 +2,11 @@
   "name": "@composurecdk/apigateway",
   "version": "0.1.1",
   "description": "Composable API Gateway REST API builder with well-architected defaults",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laazyj/composureCDK",
+    "directory": "packages/apigateway"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

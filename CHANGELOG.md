@@ -1,3 +1,18 @@
+## 0.1.2 (2026-04-01)
+
+### 🚀 Features
+
+- **cloudfront:** add CloudFront Distribution builder ([7eaae0e](https://github.com/laazyj/composureCDK/commit/7eaae0e))
+- **s3:** add S3 package ([9b3518f](https://github.com/laazyj/composureCDK/commit/9b3518f))
+
+### 🩹 Fixes
+
+- **ci:** create GitHub release after successful publish ([7cac1eb](https://github.com/laazyj/composureCDK/commit/7cac1eb))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.1.1 (2026-03-30)
 
 ### 🚀 Features

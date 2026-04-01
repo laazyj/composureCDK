@@ -6,7 +6,7 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: read
+  contents: write # Changed from read to write for creating releases
   id-token: write # For npm provenance
 
 jobs:
@@ -43,7 +43,7 @@ jobs:
         env:
           NX_DAEMON: false
 
-      - name: Publish
+      - name: Publish to npm
         run: npx nx release publish
         env:
           NPM_CONFIG_PROVENANCE: true

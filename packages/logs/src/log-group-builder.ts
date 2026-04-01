@@ -3,7 +3,7 @@ import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
 import { LOG_GROUP_DEFAULTS } from "./defaults.js";
 
-type LogGroupBuilderProps = LogGroupProps;
+export type LogGroupBuilderProps = LogGroupProps;
 
 /**
  * The build output of a {@link ILogGroupBuilder}. Contains the CDK constructs

@@ -3,7 +3,7 @@ import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
 import { FUNCTION_DEFAULTS } from "./defaults.js";
 
-type FunctionBuilderProps = FunctionProps;
+export type FunctionBuilderProps = FunctionProps;
 
 /**
  * The build output of a {@link IFunctionBuilder}. Contains the CDK constructs

@@ -1,6 +1,8 @@
 import { Function as LambdaFunction, type FunctionProps } from "aws-cdk-lib/aws-lambda";
+import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { createLogGroupBuilder } from "@composurecdk/logs";
 import { FUNCTION_DEFAULTS } from "./defaults.js";
 
 export type FunctionBuilderProps = FunctionProps;
@@ -12,6 +14,21 @@ export type FunctionBuilderProps = FunctionProps;
 export interface FunctionBuilderResult {
   /** The Lambda function construct created by the builder. */
   function: LambdaFunction;
+
+  /**
+   * The CloudWatch LogGroup created for the function, or `undefined` if
+   * the user provided their own via the `logGroup` property.
+   *
+   * By default the builder creates a managed LogGroup using
+   * {@link createLogGroupBuilder} with well-architected defaults (retention
+   * policy, removal policy). This follows AWS CDK guidance to create a
+   * `LogGroup` explicitly rather than relying on the auto-created default,
+   * which cannot be configured via CDK.
+   *
+   * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_lambda-readme.html
+   * @see https://docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs-loggroups.html
+   */
+  logGroup?: LogGroup;
 }
 
 /**
@@ -25,6 +42,14 @@ export interface FunctionBuilderResult {
  * component in a {@link compose | composed system}. When built, it creates
  * a Lambda function with the configured properties and returns a
  * {@link FunctionBuilderResult}.
+ *
+ * Unless a user-supplied `logGroup` is provided, the builder automatically
+ * creates a managed CloudWatch LogGroup via {@link createLogGroupBuilder}
+ * with well-architected defaults (retention, removal policy) and wires it
+ * to the function. This ensures full control over log lifecycle and follows
+ * AWS CDK guidance to create a LogGroup explicitly.
+ *
+ * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_lambda-readme.html
  *
  * @example
  * ```ts
@@ -42,12 +67,23 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   props: Partial<FunctionBuilderProps> = {};
 
   build(scope: IConstruct, id: string): FunctionBuilderResult {
+    let logGroup: LogGroup | undefined;
+    let logGroupProps = {};
+
+    if (!this.props.logGroup) {
+      logGroup = createLogGroupBuilder().build(scope, `${id}LogGroup`).logGroup;
+      logGroupProps = { logGroup };
+    }
+
     const mergedProps = {
       ...FUNCTION_DEFAULTS,
+      ...logGroupProps,
       ...this.props,
     } as FunctionBuilderProps;
+
     return {
       function: new LambdaFunction(scope, id, mergedProps),
+      logGroup,
     };
   }
 }

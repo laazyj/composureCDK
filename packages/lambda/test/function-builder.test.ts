@@ -3,6 +3,7 @@ import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
 import { Template } from "aws-cdk-lib/assertions";
 import { Code, LoggingFormat, Runtime, Tracing, Architecture } from "aws-cdk-lib/aws-lambda";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { createFunctionBuilder } from "../src/function-builder.js";
 
 function synthTemplate(
@@ -139,7 +140,7 @@ describe("FunctionBuilder", () => {
       });
     });
 
-    it("creates exactly one Lambda function and one IAM role", () => {
+    it("creates exactly one Lambda function, one IAM role, and one LogGroup", () => {
       const template = synthTemplate((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
@@ -149,6 +150,7 @@ describe("FunctionBuilder", () => {
 
       template.resourceCountIs("AWS::Lambda::Function", 1);
       template.resourceCountIs("AWS::IAM::Role", 1);
+      template.resourceCountIs("AWS::Logs::LogGroup", 1);
     });
 
     it("creates an execution role with the Lambda service principal", () => {
@@ -253,6 +255,96 @@ describe("FunctionBuilder", () => {
 
       template.hasResourceProperties("AWS::Lambda::Function", {
         LoggingConfig: Match.objectLike({ LogFormat: "Text" }),
+      });
+    });
+  });
+
+  describe("logging", () => {
+    it("creates a managed LogGroup by default", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}")),
+      );
+
+      template.resourceCountIs("AWS::Logs::LogGroup", 1);
+    });
+
+    it("returns the auto-created LogGroup in the build result", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .build(stack, "TestFunction");
+
+      expect(result.logGroup).toBeDefined();
+    });
+
+    it("applies RETAIN removal policy on the auto-created LogGroup", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}")),
+      );
+
+      template.hasResource("AWS::Logs::LogGroup", {
+        DeletionPolicy: "Retain",
+        UpdateReplacePolicy: "Retain",
+      });
+    });
+
+    it("applies TWO_YEARS retention on the auto-created LogGroup", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}")),
+      );
+
+      template.hasResourceProperties("AWS::Logs::LogGroup", {
+        RetentionInDays: 731,
+      });
+    });
+
+    it("configures the Lambda function to use the auto-created LogGroup", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}")),
+      );
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        LoggingConfig: Match.objectLike({
+          LogGroup: Match.anyValue(),
+        }),
+      });
+    });
+
+    it("skips auto LogGroup when user provides their own", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const userLogGroup = new LogGroup(stack, "UserLogGroup", {
+        retention: RetentionDays.ONE_WEEK,
+      });
+
+      const result = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .logGroup(userLogGroup)
+        .build(stack, "TestFunction");
+
+      expect(result.logGroup).toBeUndefined();
+      const template = Template.fromStack(stack);
+      // Only the user-provided LogGroup, no auto-created one
+      template.resourceCountIs("AWS::Logs::LogGroup", 1);
+      template.hasResourceProperties("AWS::Logs::LogGroup", {
+        RetentionInDays: 7,
       });
     });
   });

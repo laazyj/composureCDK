@@ -350,4 +350,136 @@ describe("compose", () => {
       });
     });
   });
+
+  describe("afterBuild", () => {
+    it("invokes the hook after all components are built", () => {
+      const hookFn = vi.fn();
+      const scope = createScope();
+
+      compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: [], b: ["a"] })
+        .afterBuild(hookFn)
+        .build(scope, "test");
+
+      expect(hookFn).toHaveBeenCalledOnce();
+    });
+
+    it("passes scope, id, and build results to the hook", () => {
+      const hookFn = vi.fn();
+      const scope = createScope();
+
+      compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: [], b: ["a"] })
+        .afterBuild(hookFn)
+        .build(scope, "sys");
+
+      expect(hookFn).toHaveBeenCalledWith(scope, "sys", {
+        a: { x: 1 },
+        b: { y: 2 },
+      });
+    });
+
+    it("returns the original build results", () => {
+      const hookFn = vi.fn();
+
+      const result = compose({ a: stubComponent({ x: 1 }) }, { a: [] })
+        .afterBuild(hookFn)
+        .build(createScope(), "test");
+
+      expect(result).toEqual({ a: { x: 1 } });
+    });
+
+    it("invokes the hook after dependencies are resolved", () => {
+      const buildOrder: string[] = [];
+
+      const db: Lifecycle = {
+        build: () => {
+          buildOrder.push("db");
+          return { connection: "pg://localhost" };
+        },
+      };
+      const server: Lifecycle = {
+        build: () => {
+          buildOrder.push("server");
+          return { port: 8080 };
+        },
+      };
+
+      compose({ db, server }, { db: [], server: ["db"] })
+        .afterBuild(() => {
+          buildOrder.push("hook");
+        })
+        .build(createScope(), "app");
+
+      expect(buildOrder).toEqual(["db", "server", "hook"]);
+    });
+
+    it("supports chaining multiple afterBuild hooks", () => {
+      const order: string[] = [];
+
+      compose({ a: stubComponent({ x: 1 }) }, { a: [] })
+        .afterBuild(() => order.push("first"))
+        .afterBuild(() => order.push("second"))
+        .afterBuild(() => order.push("third"))
+        .build(createScope(), "test");
+
+      expect(order).toEqual(["first", "second", "third"]);
+    });
+
+    it("chains afterBuild after withStacks", () => {
+      const hookFn = vi.fn();
+      const customScope = new Construct(undefined as never, "custom");
+
+      compose({ a: stubComponent({ x: 1 }) }, { a: [] })
+        .withStacks({ a: customScope })
+        .afterBuild(hookFn)
+        .build(createScope(), "test");
+
+      expect(hookFn).toHaveBeenCalledOnce();
+      expect(hookFn).toHaveBeenCalledWith(expect.anything(), "test", { a: { x: 1 } });
+    });
+
+    it("chains afterBuild after withStackStrategy", () => {
+      const hookFn = vi.fn();
+      const scope = createScope();
+
+      compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: [], b: ["a"] })
+        .withStackStrategy(
+          groupedStacks(
+            (key) => (key === "a" ? "groupA" : "groupB"),
+            (parent, id) => new Construct(parent, id),
+          ),
+        )
+        .afterBuild(hookFn)
+        .build(scope, "sys");
+
+      expect(hookFn).toHaveBeenCalledOnce();
+      expect(hookFn).toHaveBeenCalledWith(scope, "sys", { a: { x: 1 }, b: { y: 2 } });
+    });
+
+    it("chains multiple afterBuild hooks after withStacks", () => {
+      const order: string[] = [];
+      const customScope = new Construct(undefined as never, "custom");
+
+      compose({ a: stubComponent({ x: 1 }) }, { a: [] })
+        .withStacks({ a: customScope })
+        .afterBuild(() => order.push("first"))
+        .afterBuild(() => order.push("second"))
+        .build(createScope(), "test");
+
+      expect(order).toEqual(["first", "second"]);
+    });
+
+    it("respects stack routing when chained with afterBuild", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const customScope = new Construct(undefined as never, "custom");
+
+      compose({ a }, { a: [] })
+        .withStacks({ a: customScope })
+        .afterBuild(() => {
+          // intentionally empty
+        })
+        .build(createScope(), "test");
+
+      expect(aBuild.mock.calls[0][0]).toBe(customScope);
+    });
+  });
 });

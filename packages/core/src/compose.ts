@@ -54,8 +54,32 @@ function buildDependencyGraph<Components extends Record<string, Lifecycle>>(
 }
 
 /**
+ * A callback invoked after all components in a composed system have been
+ * built. Receives the scope, system id, and the fully-typed build results
+ * of every component. Use this to create additional constructs that depend
+ * on the composed system's outputs — CloudFormation outputs, tags, alarms,
+ * dashboards, etc.
+ *
+ * Domain-specific packages provide helper functions that return hooks. For
+ * example, `@composurecdk/cloudformation` exports {@link outputs} which
+ * creates `CfnOutput` constructs from {@link Ref}-based definitions.
+ *
+ * @typeParam T - The build result type of the composed system.
+ *
+ * @example
+ * ```ts
+ * const logResults: AfterBuildHook<{ site: BucketBuilderResult }> =
+ *   (_scope, _id, results) => {
+ *     console.log("Bucket:", results.site.bucket.bucketName);
+ *   };
+ * ```
+ */
+export type AfterBuildHook<T extends object> = (scope: IConstruct, id: string, results: T) => void;
+
+/**
  * A {@link Lifecycle} produced by {@link compose}, extended with methods
- * for controlling how components are routed to scopes during build.
+ * for controlling how components are routed to scopes and for registering
+ * post-build hooks.
  *
  * Because `ComposedSystem` extends `Lifecycle`, a composed system can be
  * nested as a component inside another `compose` call — composition is
@@ -82,14 +106,19 @@ export interface ComposedSystem<Components extends Record<string, Lifecycle>> ex
    *   .build(app, "MySystem");
    * ```
    */
-  withStacks(stacks: { [K in keyof Components]?: IConstruct }): Lifecycle<BuildResult<Components>>;
+  withStacks(stacks: { [K in keyof Components]?: IConstruct }): ConfiguredSystem<Components>;
 
   /**
-   * Returns a new {@link Lifecycle} that uses a {@link StackStrategy} to
-   * determine each component's scope during build.
+   * Returns a new {@link ConfiguredSystem} that uses a {@link StackStrategy}
+   * to determine each component's scope during build. The returned system
+   * supports further chaining of {@link ConfiguredSystem.afterBuild | .afterBuild()} hooks.
+   *
+   * Mutually exclusive with {@link withStacks} — calling one locks the
+   * stack routing; further stack-routing methods are not available on the
+   * returned {@link ConfiguredSystem}.
    *
    * @param strategy - The strategy that resolves scopes for components.
-   * @returns A {@link Lifecycle} with strategy-based stack routing applied.
+   * @returns A {@link ConfiguredSystem} with strategy-based stack routing applied.
    *
    * @example
    * ```ts
@@ -98,10 +127,63 @@ export interface ComposedSystem<Components extends Record<string, Lifecycle>> ex
    *     key => key === "table" ? "persistence" : "service",
    *     (app, id) => new Stack(app, id),
    *   ))
+   *   .afterBuild(outputs({ ... }))
    *   .build(app, "MySystem");
    * ```
    */
-  withStackStrategy(strategy: StackStrategy): Lifecycle<BuildResult<Components>>;
+  withStackStrategy(strategy: StackStrategy): ConfiguredSystem<Components>;
+
+  /**
+   * Returns a new {@link ConfiguredSystem} that invokes the given hook after
+   * all components have been built. The hook receives the scope, system id,
+   * and the fully-typed build results.
+   *
+   * Multiple hooks can be chained — each `.afterBuild()` appends to the
+   * hook list and returns the same {@link ConfiguredSystem} for further
+   * chaining.
+   *
+   * This is the extension point for adding post-build behaviour to a
+   * composed system without modifying the system itself. Domain-specific
+   * packages provide helper functions that return hooks — for example,
+   * `outputs()` from `@composurecdk/cloudformation` creates CfnOutput
+   * constructs.
+   *
+   * @param hook - A callback invoked after all components are built.
+   * @returns A {@link ConfiguredSystem} with the hook applied.
+   *
+   * @example
+   * ```ts
+   * compose({ site, cdn }, { site: [], cdn: ["site"] })
+   *   .afterBuild(outputs({
+   *     Url: { value: ref("cdn", r => r.distribution.domainName) },
+   *   }))
+   *   .build(stack, "MySystem");
+   * ```
+   */
+  afterBuild(hook: AfterBuildHook<BuildResult<Components>>): ConfiguredSystem<Components>;
+}
+
+/**
+ * A {@link Lifecycle} with stack routing or post-build hooks applied.
+ * Returned by {@link ComposedSystem.withStacks},
+ * {@link ComposedSystem.withStackStrategy}, and
+ * {@link ComposedSystem.afterBuild}.
+ *
+ * Supports chaining further {@link afterBuild} hooks. Stack routing methods
+ * are not available — they are mutually exclusive and must be chosen on
+ * the original {@link ComposedSystem}.
+ */
+export interface ConfiguredSystem<Components extends Record<string, Lifecycle>> extends Lifecycle<
+  BuildResult<Components>
+> {
+  /**
+   * Appends a post-build hook. Multiple hooks can be chained; they execute
+   * in registration order after all components have been built.
+   *
+   * @param hook - A callback invoked after all components are built.
+   * @returns This {@link ConfiguredSystem} for further chaining.
+   */
+  afterBuild(hook: AfterBuildHook<BuildResult<Components>>): ConfiguredSystem<Components>;
 }
 
 /**
@@ -120,21 +202,23 @@ class ComposedLifecycle<
     this.graph = buildDependencyGraph(components, dependencies);
   }
 
-  withStacks(stacks: { [K in keyof Components]?: IConstruct }): Lifecycle<BuildResult<Components>> {
-    return {
-      build: (scope: IConstruct, id: string) => this.buildWith(scope, id, stacks),
-    };
+  withStacks(stacks: { [K in keyof Components]?: IConstruct }): ConfiguredSystem<Components> {
+    return new ConfiguredLifecycle((scope, id) => this.buildWith(scope, id, stacks));
   }
 
-  withStackStrategy(strategy: StackStrategy): Lifecycle<BuildResult<Components>> {
-    return {
-      build: (scope: IConstruct, id: string) => {
-        const stacks = Object.fromEntries(
-          Object.keys(this.components).map((key) => [key, strategy.resolve(scope, id, key)]),
-        ) as { [K in keyof Components]?: IConstruct };
-        return this.buildWith(scope, id, stacks);
-      },
-    };
+  withStackStrategy(strategy: StackStrategy): ConfiguredSystem<Components> {
+    return new ConfiguredLifecycle((scope, id) => {
+      const stacks = Object.fromEntries(
+        Object.keys(this.components).map((key) => [key, strategy.resolve(scope, id, key)]),
+      ) as { [K in keyof Components]?: IConstruct };
+      return this.buildWith(scope, id, stacks);
+    });
+  }
+
+  afterBuild(hook: AfterBuildHook<BuildResult<Components>>): ConfiguredSystem<Components> {
+    return new ConfiguredLifecycle<Components>((scope, id) => this.buildWith(scope, id)).afterBuild(
+      hook,
+    );
   }
 
   build(scope: IConstruct, id: string): BuildResult<Components> {
@@ -156,6 +240,35 @@ class ComposedLifecycle<
     }
 
     return results as BuildResult<Components>;
+  }
+}
+
+/**
+ * A configured lifecycle that accumulates post-build hooks and applies them
+ * after the underlying build function completes. Returned by
+ * {@link ComposedLifecycle}'s `withStacks`, `withStackStrategy`, and
+ * `afterBuild` methods.
+ */
+class ConfiguredLifecycle<
+  Components extends Record<string, Lifecycle>,
+> implements ConfiguredSystem<Components> {
+  private readonly hooks: AfterBuildHook<BuildResult<Components>>[] = [];
+
+  constructor(
+    private readonly buildFn: (scope: IConstruct, id: string) => BuildResult<Components>,
+  ) {}
+
+  afterBuild(hook: AfterBuildHook<BuildResult<Components>>): ConfiguredSystem<Components> {
+    this.hooks.push(hook);
+    return this;
+  }
+
+  build(scope: IConstruct, id: string): BuildResult<Components> {
+    const results = this.buildFn(scope, id);
+    for (const hook of this.hooks) {
+      hook(scope, id, results);
+    }
+    return results;
   }
 }
 

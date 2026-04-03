@@ -1,3 +1,22 @@
+## 0.1.3 (2026-04-03)
+
+### 🚀 Features
+
+- **cloudformation:** add extension for CfnOutputs ([bd1f6ea](https://github.com/laazyj/composureCDK/commit/bd1f6ea))
+- **core:** add afterBuild extensions ([a79f809](https://github.com/laazyj/composureCDK/commit/a79f809))
+- **examples:** add a CleanDeskPolicy to clear examples on destroy ([d9a19d7](https://github.com/laazyj/composureCDK/commit/d9a19d7))
+- **lambda:** add managed LogGroup to FunctionBuilder ([87afac0](https://github.com/laazyj/composureCDK/commit/87afac0))
+- **s3:** add BucketDeploymentBuilder ([2845a7d](https://github.com/laazyj/composureCDK/commit/2845a7d))
+
+### 🩹 Fixes
+
+- **ci:** regenerate lockfile with cross-platform bindings ([8a010e6](https://github.com/laazyj/composureCDK/commit/8a010e6))
+- **examples:** update snapshots with managed Lambda log groups ([54b74c0](https://github.com/laazyj/composureCDK/commit/54b74c0))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.1.2 (2026-04-01)
 
 ### 🚀 Features

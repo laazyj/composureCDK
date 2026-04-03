@@ -331,6 +331,9 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         "Handler": "index.handler",
         "LoggingConfig": {
           "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "MultiStackApphandlerLogGroup53CDB07D",
+          },
         },
         "Role": {
           "Fn::GetAtt": [
@@ -345,6 +348,14 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         },
       },
       "Type": "AWS::Lambda::Function",
+    },
+    "MultiStackApphandlerLogGroup53CDB07D": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "MultiStackApphandlerServiceRoleC2F86FDD": {
       "Properties": {

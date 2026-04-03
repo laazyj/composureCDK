@@ -23,6 +23,9 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         "Handler": "index.handler",
         "LoggingConfig": {
           "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "DualFunctionAppapiLogGroup154F590C",
+          },
         },
         "MemorySize": 256,
         "Role": {
@@ -38,6 +41,14 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         },
       },
       "Type": "AWS::Lambda::Function",
+    },
+    "DualFunctionAppapiLogGroup154F590C": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "DualFunctionAppapiServiceRoleDA932E71": {
       "Properties": {
@@ -107,6 +118,9 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         "Handler": "index.handler",
         "LoggingConfig": {
           "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "DualFunctionAppworkerLogGroup1F739007",
+          },
         },
         "MemorySize": 512,
         "Role": {
@@ -122,6 +136,14 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         },
       },
       "Type": "AWS::Lambda::Function",
+    },
+    "DualFunctionAppworkerLogGroup1F739007": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "DualFunctionAppworkerServiceRole2CE81560": {
       "Properties": {

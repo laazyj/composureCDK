@@ -552,6 +552,9 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
         "Handler": "index.handler",
         "LoggingConfig": {
           "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "LambdaApiApphandlerLogGroup4901B22C",
+          },
         },
         "Role": {
           "Fn::GetAtt": [
@@ -565,6 +568,14 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
         },
       },
       "Type": "AWS::Lambda::Function",
+    },
+    "LambdaApiApphandlerLogGroup4901B22C": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "LambdaApiApphandlerServiceRole49FE5DC1": {
       "Properties": {

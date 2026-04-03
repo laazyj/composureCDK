@@ -1,0 +1,83 @@
+import { describe, it, expect } from "vitest";
+import { App, Stack } from "aws-cdk-lib";
+import { Template } from "aws-cdk-lib/assertions";
+import { Bucket } from "aws-cdk-lib/aws-s3";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { MockIntegration, RestApi } from "aws-cdk-lib/aws-apigateway";
+import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
+import { createLambdaApiApp } from "../src/lambda-api-app.js";
+
+function buildWithPolicy(buildFn: (stack: Stack) => void): Template {
+  const app = new App();
+  cleanDeskPolicy(app);
+  const stack = new Stack(app, "TestStack");
+  buildFn(stack);
+  return Template.fromStack(stack);
+}
+
+describe("cleanDeskPolicy", () => {
+  it("overrides S3 bucket removal policy to DESTROY", () => {
+    const template = buildWithPolicy((stack) => {
+      new Bucket(stack, "Bucket");
+    });
+
+    template.hasResource("AWS::S3::Bucket", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+  });
+
+  it("overrides LogGroup removal policy to DESTROY", () => {
+    const template = buildWithPolicy((stack) => {
+      new LogGroup(stack, "LG", { retention: RetentionDays.ONE_WEEK });
+    });
+
+    template.hasResource("AWS::Logs::LogGroup", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+  });
+
+  it("overrides RestApi Account and CloudWatch Role removal policy to DESTROY", () => {
+    const template = buildWithPolicy((stack) => {
+      const api = new RestApi(stack, "Api", { restApiName: "TestApi" });
+      api.root.addMethod("GET", new MockIntegration());
+    });
+
+    template.hasResource("AWS::ApiGateway::Account", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+  });
+
+  it("does not affect stacks without the policy", () => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack");
+    new Bucket(stack, "Bucket");
+    new LogGroup(stack, "LG", { retention: RetentionDays.ONE_WEEK });
+    const template = Template.fromStack(stack);
+
+    template.hasResource("AWS::S3::Bucket", {
+      DeletionPolicy: "Retain",
+      UpdateReplacePolicy: "Retain",
+    });
+    template.hasResource("AWS::Logs::LogGroup", {
+      DeletionPolicy: "Retain",
+      UpdateReplacePolicy: "Retain",
+    });
+  });
+
+  it("sets all resources to Delete in a full example stack", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createLambdaApiApp(app);
+    const template = Template.fromStack(stack);
+    const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
+
+    const retainedResources = Object.entries(resources)
+      .filter(([, resource]) => resource.DeletionPolicy === "Retain")
+      .map(([logicalId]) => logicalId);
+
+    expect(retainedResources).toEqual([]);
+  });
+});

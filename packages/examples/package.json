@@ -18,12 +18,14 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@composurecdk/apigateway": "0.1.0",
-    "@composurecdk/cloudformation": "0.1.0",
-    "@composurecdk/core": "0.1.0",
-    "@composurecdk/lambda": "0.1.0",
     "aws-cdk-lib": "^2.245.0",
     "constructs": "^10.6.0"
+  },
+  "peerDependencies": {
+    "@composurecdk/apigateway": "^0.1.0",
+    "@composurecdk/cloudformation": "^0.1.0",
+    "@composurecdk/core": "^0.1.0",
+    "@composurecdk/lambda": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

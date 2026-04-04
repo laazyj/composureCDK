@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier/flat";
 
 export default defineConfig(
-  { ignores: ["**/dist/", "**/node_modules/"] },
+  { ignores: ["**/dist/", "**/node_modules/", "**/cdk.out/"] },
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,

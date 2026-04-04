@@ -118,6 +118,51 @@ if (exampleApis.length === 0) {
   }
 }
 
+// --- Static website checks ---------------------------------------------------
+
+console.log("\n=== Static website checks ===\n");
+
+const WEBSITE_STACK = "ComposureCDK-StaticWebsiteStack";
+
+try {
+  const { Stacks: wsStacks } = aws(
+    "cloudformation",
+    "describe-stacks",
+    "--stack-name",
+    WEBSITE_STACK,
+    "--output",
+    "json",
+  );
+  const outputs = wsStacks[0]?.Outputs ?? [];
+  const urlOutput = outputs.find((o) => o.OutputKey === "DistributionUrl");
+
+  if (!urlOutput) {
+    fail(`${WEBSITE_STACK} — DistributionUrl output not found`);
+  } else {
+    const siteUrl = urlOutput.OutputValue;
+
+    // Check index page serves HTML
+    const indexRes = await fetch(siteUrl);
+    const indexBody = await indexRes.text();
+    if (indexRes.ok && indexBody.includes("</html>")) {
+      pass(`${siteUrl} — ${indexRes.status} (index page)`);
+    } else {
+      fail(`${siteUrl} — ${indexRes.status} (expected HTML index page)`);
+    }
+
+    // Check 404 returns custom error page
+    const errorRes = await fetch(`${siteUrl}/does-not-exist`);
+    const errorBody = await errorRes.text();
+    if (errorRes.status === 404 && errorBody.includes("</html>")) {
+      pass(`${siteUrl}/does-not-exist — ${errorRes.status} (custom error page)`);
+    } else {
+      fail(`${siteUrl}/does-not-exist — ${errorRes.status} (expected 404 with custom error page)`);
+    }
+  }
+} catch (err) {
+  fail(`${WEBSITE_STACK} — ${err.message}`);
+}
+
 // --- Summary ----------------------------------------------------------------
 
 console.log("");

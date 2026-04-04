@@ -10,6 +10,7 @@ All example stacks use the `ComposureCDK-` name prefix. This convention enables 
 | [`ComposureCDK-LambdaApiStack`](src/lambda-api-app.ts)                                              | REST API backed by a Lambda function, wired with `ref`                          |
 | [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations                                            |
 | [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                   |
+| [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment    |
 | [`ComposureCDK-StrategyStackApp-*`](src/strategy-stack-app.ts)                                      | REST API + Lambda split across stacks via `.withStackStrategy()`                |
 
 ## Prerequisites
@@ -34,4 +35,4 @@ To skip IAM approval prompts (e.g. in CI): add `--require-approval never` to dep
 
 ## Costs
 
-These examples create minimal resources (Lambda functions, API Gateway endpoints) and should fall within the [AWS Free Tier](https://aws.amazon.com/free/). Destroy stacks when done to avoid unexpected charges.
+These examples create minimal resources (Lambda functions, API Gateway endpoints, S3 buckets, CloudFront distributions) and should fall within the [AWS Free Tier](https://aws.amazon.com/free/). Destroy stacks when done to avoid unexpected charges.

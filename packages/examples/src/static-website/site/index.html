@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Example Static Website</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        background: #f8f9fa;
+        color: #2c2c2c;
+        text-align: center;
+      }
+      .page {
+        max-width: 520px;
+        padding: 40px 24px;
+      }
+      h1 {
+        font-size: 2rem;
+        margin-bottom: 12px;
+      }
+      p {
+        font-size: 1.1rem;
+        color: #5a5a5a;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>Hello from ComposureCDK</h1>
+      <p>
+        This static website is hosted on S3 and served through CloudFront, deployed using
+        <strong>ComposureCDK</strong> builders.
+      </p>
+    </div>
+  </body>
+</html>

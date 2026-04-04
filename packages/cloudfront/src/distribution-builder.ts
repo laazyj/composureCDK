@@ -4,7 +4,7 @@ import {
   type IOrigin,
   type AddBehaviorOptions,
 } from "aws-cdk-lib/aws-cloudfront";
-import { type Bucket } from "aws-cdk-lib/aws-s3";
+import { type Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
 import {
@@ -149,6 +149,8 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
     if (autoAccessLog) {
       accessLogsBucket = createBucketBuilder()
         .accessLogging(false)
+        // CloudFront standard logging writes via ACLs, which requires BucketOwnerPreferred.
+        .objectOwnership(ObjectOwnership.BUCKET_OWNER_PREFERRED)
         .removalPolicy(RemovalPolicy.RETAIN)
         .build(scope, `${id}AccessLogs`).bucket;
       accessLogProps = {

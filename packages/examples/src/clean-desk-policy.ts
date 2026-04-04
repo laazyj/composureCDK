@@ -8,11 +8,6 @@ import { type IConstruct } from "constructs";
 /**
  * A {@link IPropertyInjector} that overrides `removalPolicy` to
  * `RemovalPolicy.DESTROY` on a specific construct type.
- *
- * Works at the CDK props level — injected *before* construct creation —
- * so builder-level logic that depends on the removal policy (e.g. the
- * S3 builder's automatic `autoDeleteObjects`) sees the overridden value
- * and responds correctly.
  */
 class RemovalPolicyInjector<
   Props extends { removalPolicy?: RemovalPolicy },
@@ -25,6 +20,25 @@ class RemovalPolicyInjector<
 
   inject(originalProps: Props): Props {
     return { ...originalProps, removalPolicy: RemovalPolicy.DESTROY };
+  }
+}
+
+/**
+ * A {@link IPropertyInjector} for S3 buckets that sets `removalPolicy` to
+ * `DESTROY` and enables `autoDeleteObjects` so non-empty buckets can be
+ * deleted. `autoDeleteObjects` must be set at construct creation time —
+ * setting only `removalPolicy` via injection is not enough because the
+ * builder's auto-delete logic runs before injection.
+ */
+class BucketRemovalPolicyInjector implements IPropertyInjector {
+  readonly constructUniqueId = Bucket.PROPERTY_INJECTION_ID;
+
+  inject(originalProps: BucketProps): BucketProps {
+    return {
+      ...originalProps,
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    };
   }
 }
 
@@ -51,10 +65,6 @@ class RestApiRemovalPolicyInjector implements IPropertyInjector {
  * and any resources they create internally — is cleaned up when the stack
  * is deleted.
  *
- * Because PropertyInjectors run *before* construct creation, builder-level
- * logic that reacts to the removal policy (e.g. the S3 builder's automatic
- * `autoDeleteObjects`) works correctly.
- *
  * Intended for development, testing, and example stacks where orphaned
  * resources are undesirable. **Do not use in production.**
  *
@@ -70,7 +80,7 @@ class RestApiRemovalPolicyInjector implements IPropertyInjector {
  */
 export function cleanDeskPolicy(scope: IConstruct): void {
   const injectors = PropertyInjectors.of(scope);
-  injectors.add(new RemovalPolicyInjector<BucketProps>(Bucket.PROPERTY_INJECTION_ID));
+  injectors.add(new BucketRemovalPolicyInjector());
   injectors.add(new RemovalPolicyInjector<LogGroupProps>(LogGroup.PROPERTY_INJECTION_ID));
   injectors.add(new RestApiRemovalPolicyInjector());
 }

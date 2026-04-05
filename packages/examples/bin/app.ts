@@ -5,6 +5,7 @@ import { createDualFunctionApp } from "../src/dual-function-app.js";
 import { createLambdaApiApp } from "../src/lambda-api-app.js";
 import { createMockApiApp } from "../src/mock-api-app.js";
 import { createMultiStackApp } from "../src/multi-stack-app.js";
+import { createOpenApiPetstoreApp } from "../src/openapi-petstore-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
 import { createStrategyStackApp } from "../src/strategy-stack-app.js";
 
@@ -15,6 +16,7 @@ createDualFunctionApp(app);
 createLambdaApiApp(app);
 createMockApiApp(app);
 createMultiStackApp(app);
+createOpenApiPetstoreApp(app);
 createStaticWebsiteApp(app);
 createStrategyStackApp(app);
 

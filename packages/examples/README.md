@@ -11,6 +11,7 @@ All example stacks use the `ComposureCDK-` name prefix. This convention enables 
 | [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations                                            |
 | [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                   |
 | [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment    |
+| [`ComposureCDK-OpenApiPetstoreStack`](src/openapi-petstore-app.ts)                                  | PetStore REST API defined by an inline OpenAPI 3.0 specification                |
 | [`ComposureCDK-StrategyStackApp-*`](src/strategy-stack-app.ts)                                      | REST API + Lambda split across stacks via `.withStackStrategy()`                |
 
 ## Prerequisites

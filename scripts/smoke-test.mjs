@@ -96,15 +96,22 @@ function getRegion() {
 
 const region = getRegion();
 
-const exampleApiNames = new Set(["LambdaApi", "MockApi", "MultiStackApi", "StrategyApi"]);
+const exampleApiPaths = {
+  LambdaApi: "/",
+  MockApi: "/",
+  MultiStackApi: "/",
+  PetStore: "/pets",
+  StrategyApi: "/",
+};
 
-const exampleApis = (apis ?? []).filter((api) => exampleApiNames.has(api.name));
+const exampleApis = (apis ?? []).filter((api) => api.name in exampleApiPaths);
 
 if (exampleApis.length === 0) {
   fail("No example REST APIs found");
 } else {
   for (const api of exampleApis) {
-    const url = `https://${api.id}.execute-api.${region}.amazonaws.com/prod/`;
+    const path = exampleApiPaths[api.name];
+    const url = `https://${api.id}.execute-api.${region}.amazonaws.com/prod${path}`;
     try {
       const res = await fetch(url);
       if (res.ok) {

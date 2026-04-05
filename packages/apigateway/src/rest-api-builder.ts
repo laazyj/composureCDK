@@ -1,7 +1,5 @@
 import {
-  AccessLogFormat,
   type Integration,
-  LogGroupLogDestination,
   type MethodOptions,
   RestApi,
   type RestApiProps,
@@ -9,9 +7,9 @@ import {
 import { type LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle, type Resolvable } from "@composurecdk/core";
-import { createLogGroupBuilder } from "@composurecdk/logs";
-import { ResourceBuilder } from "./resource-builder.js";
 import { REST_API_DEFAULTS } from "./defaults.js";
+import { resolveDeployOptions } from "./deploy-options.js";
+import { ResourceBuilder } from "./resource-builder.js";
 
 /**
  * Configuration properties for the REST API builder.
@@ -115,31 +113,18 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): RestApiBuilderResult {
     const { accessLogging, ...restApiProps } = this.props;
-    const userDeployOptions = restApiProps.deployOptions ?? {};
-    const autoAccessLog =
-      (accessLogging ?? REST_API_DEFAULTS.accessLogging) && !userDeployOptions.accessLogDestination;
+    const { accessLogGroup, deployOptions } = resolveDeployOptions(
+      scope,
+      id,
+      accessLogging,
+      REST_API_DEFAULTS.deployOptions ?? {},
+      restApiProps.deployOptions ?? {},
+    );
 
-    let accessLogGroup: LogGroup | undefined;
-    let accessLogProps = {};
-
-    if (autoAccessLog) {
-      accessLogGroup = createLogGroupBuilder().build(scope, `${id}AccessLogs`).logGroup;
-      accessLogProps = {
-        accessLogDestination: new LogGroupLogDestination(accessLogGroup),
-        accessLogFormat: AccessLogFormat.jsonWithStandardFields(),
-      };
-    }
-
-    const mergedProps = {
+    const api = new RestApi(scope, id, {
       ...restApiProps,
-      deployOptions: {
-        ...REST_API_DEFAULTS.deployOptions,
-        ...accessLogProps,
-        ...userDeployOptions,
-      },
-    } as RestApiProps;
-
-    const api = new RestApi(scope, id, mergedProps);
+      deployOptions,
+    } as RestApiProps);
     this.root.applyTo(api.root, context ?? {});
     return { api, accessLogGroup };
   }

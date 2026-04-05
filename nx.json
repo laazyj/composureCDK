@@ -23,13 +23,13 @@
     "projects": ["packages/*", "!@composurecdk/examples"],
     "version": {
       "conventionalCommits": true,
-      "fallbackCurrentVersionResolver": "disk"
+      "fallbackCurrentVersionResolver": "disk",
+      "preVersionCommand": "npm run verify"
     },
     "releaseTagPattern": "v{version}",
     "git": {
       "commitMessage": "chore(release): v{version}"
     },
-    "publish": false,
     "changelog": {
       "automaticFromRef": true,
       "projectChangelogs": false,

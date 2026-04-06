@@ -1,3 +1,20 @@
+## 0.2.0 (2026-04-06)
+
+### 🚀 Features
+
+- **apigateway:** add SpecRestApiBuilder ([4924565](https://github.com/laazyj/composureCDK/commit/4924565))
+- **examples:** clean-desk-policy auto deletes S3 objects ([d76c310](https://github.com/laazyj/composureCDK/commit/d76c310))
+- **examples:** add Static Website example ([09a1ffb](https://github.com/laazyj/composureCDK/commit/09a1ffb))
+- **examples:** demonstrate ApiGateway from OpenAPI specification ([5e8360a](https://github.com/laazyj/composureCDK/commit/5e8360a))
+
+### 🩹 Fixes
+
+- **cloudfront:** enable ACLs on Access Logging bucket ([31beb8b](https://github.com/laazyj/composureCDK/commit/31beb8b))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.1.3 (2026-04-03)
 
 ### 🚀 Features

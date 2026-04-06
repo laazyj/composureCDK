@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/lambda",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Composable Lambda function builder with well-architected defaults",
   "repository": {
     "type": "git",
@@ -35,8 +35,8 @@
   },
   "type": "module",
   "peerDependencies": {
-    "@composurecdk/core": "^0.1.0",
-    "@composurecdk/logs": "^0.1.0",
+    "@composurecdk/core": "^0.2.0",
+    "@composurecdk/logs": "^0.2.0",
     "aws-cdk-lib": "^2.0.0",
     "constructs": "^10.0.0"
   },

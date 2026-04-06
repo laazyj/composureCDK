@@ -79,6 +79,32 @@ This command:
 
 Publishing is disabled locally (`"publish": false` in `nx.json`). The tag push triggers the release workflow, which runs CI and then publishes to npm via `npx nx release publish`.
 
+### Bumping the minor version in 0.x (breaking change)
+
+SemVer treats the minor segment of a `0.x` version like a major version — `^0.1.0` means `>=0.1.0 <0.2.0`. Because of this, `nx release` cannot automatically update cross-package peer dependency ranges when the minor version changes: the new version falls outside the existing `^0.x.0` range and the `preserveMatchingDependencyRanges` safety check blocks the release.
+
+To release a new minor version (e.g. `0.1.x` → `0.2.0`):
+
+1. Update every internal `@composurecdk/*` peer dependency range to match the new minor:
+
+   ```sh
+   # macOS sed — adjust -i flag for GNU sed
+   for f in packages/*/package.json; do
+     sed -i '' 's/"@composurecdk\/\([^"]*\)": "\^0\.1\.0"/"@composurecdk\/\1": "^0.2.0"/g' "$f"
+   done
+   ```
+
+2. Run the release with an explicit version specifier:
+
+   ```sh
+   npx nx release --specifier=0.2.0 --dry-run   # preview first
+   npx nx release --specifier=0.2.0              # bump, changelog, commit, tag, push
+   ```
+
+The `--specifier` flag overrides the conventional-commits auto-detection and sets the exact version. The `nx release` command will update every `package.json` version, generate the changelog, commit, tag, and push — the peer dependency ranges you updated in step 1 are included in the same commit.
+
+For patch releases within the same minor (e.g. `0.2.0` → `0.2.1`), the standard `npx nx release` workflow works as normal because the new version stays within the existing `^0.2.0` range.
+
 ### npm publishing setup
 
 Publishing uses [trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) — no long-lived npm tokens to manage.

@@ -1,0 +1,86 @@
+# @composurecdk/cloudfront
+
+CloudFront builders for [ComposureCDK](../../README.md).
+
+This package provides a fluent builder for CloudFront distributions with secure, AWS-recommended defaults. It wraps the CDK [Distribution](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudfront.Distribution.html) construct — refer to the CDK documentation for the full set of configurable properties.
+
+## Distribution Builder
+
+```ts
+import { createDistributionBuilder } from "@composurecdk/cloudfront";
+import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+
+const cdn = createDistributionBuilder()
+  .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+  .comment("My website CDN")
+  .build(stack, "CDN");
+```
+
+Every [DistributionProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudfront.DistributionProps.html) property (except `defaultBehavior.origin`) is available as a fluent setter on the builder. The origin is set via the dedicated `.origin()` method, which supports `Ref` for cross-component wiring.
+
+### Cross-component wiring
+
+The `origin` method accepts a `Ref` for use in composed systems:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import type { BucketBuilderResult } from "@composurecdk/s3";
+
+const cdn = createDistributionBuilder().origin(
+  ref<BucketBuilderResult>("site", (r) => S3BucketOrigin.withOriginAccessControl(r.bucket)),
+);
+
+compose({ site: createBucketBuilder(), cdn }, { site: [], cdn: ["site"] }).build(stack, "Website");
+```
+
+## Secure Defaults
+
+`createDistributionBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
+
+| Property                                | Default             | Rationale                                                                |
+| --------------------------------------- | ------------------- | ------------------------------------------------------------------------ |
+| `accessLogging`                         | `true`              | Auto-creates an S3 logging bucket for access log audit trail.            |
+| `priceClass`                            | `PRICE_CLASS_100`   | North America and Europe edge locations — sufficient and cost-effective. |
+| `httpVersion`                           | `HTTP2_AND_3`       | Enables HTTP/2 and HTTP/3 (QUIC) for improved performance.               |
+| `defaultRootObject`                     | `"index.html"`      | Standard for static website hosting.                                     |
+| `minimumProtocolVersion`                | `TLS_V1_2_2021`     | Requires TLS 1.2+ to prevent older, less secure protocol negotiation.    |
+| `defaultBehavior.viewerProtocolPolicy`  | `REDIRECT_TO_HTTPS` | Ensures all viewer traffic is encrypted in transit.                      |
+| `defaultBehavior.responseHeadersPolicy` | `SECURITY_HEADERS`  | Applies managed security headers (HSTS, X-Content-Type-Options, etc.).   |
+
+These defaults are guided by the [AWS Well-Architected Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-in-transit.html).
+
+The defaults are exported as `DISTRIBUTION_DEFAULTS` for visibility and testing:
+
+```ts
+import { DISTRIBUTION_DEFAULTS } from "@composurecdk/cloudfront";
+```
+
+### Overriding defaults
+
+```ts
+import { PriceClass, ViewerProtocolPolicy } from "aws-cdk-lib/aws-cloudfront";
+
+const cdn = createDistributionBuilder()
+  .origin(myOrigin)
+  .priceClass(PriceClass.PRICE_CLASS_ALL)
+  .accessLogging(false)
+  .defaultBehavior({ viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL })
+  .build(stack, "CDN");
+```
+
+### Access logging
+
+By default, the builder creates an S3 logging bucket (using `@composurecdk/s3` with its secure defaults) and configures it as the distribution's log destination. The created bucket is returned in the build result:
+
+```ts
+const result = createDistributionBuilder().origin(myOrigin).build(stack, "CDN");
+
+result.distribution; // Distribution
+result.accessLogsBucket; // Bucket | undefined
+```
+
+To provide your own bucket instead, set `logBucket` — the auto-created logging bucket is skipped. To disable access logging entirely, set `.accessLogging(false)`.
+
+## Examples
+
+- [StaticWebsiteStack](../examples/src/static-website/app.ts) — S3 + CloudFront static website with OAC, error pages, and content deployment

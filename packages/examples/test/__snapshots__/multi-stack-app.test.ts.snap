@@ -349,6 +349,52 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
       },
       "Type": "AWS::Lambda::Function",
     },
+    "MultiStackApphandlerDurationAlarm94B3212A": {
+      "Properties": {
+        "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 27000ms (90% of 30000ms timeout).",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "MultiStackApphandler260E0508",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Threshold": 27000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "MultiStackApphandlerErrorsAlarm7A72223A": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "MultiStackApphandler260E0508",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "MultiStackApphandlerLogGroup53CDB07D": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -411,6 +457,29 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "MultiStackApphandlerThrottlesAlarm959649F7": {
+      "Properties": {
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "MultiStackApphandler260E0508",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
   },
   "Rules": {

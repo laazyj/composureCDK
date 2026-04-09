@@ -24,6 +24,7 @@
   "peerDependencies": {
     "@composurecdk/apigateway": "^0.2.0",
     "@composurecdk/cloudformation": "^0.2.0",
+    "@composurecdk/cloudwatch": "^0.2.0",
     "@composurecdk/cloudfront": "^0.2.0",
     "@composurecdk/core": "^0.2.0",
     "@composurecdk/lambda": "^0.2.0",

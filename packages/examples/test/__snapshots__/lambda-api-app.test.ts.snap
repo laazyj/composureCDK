@@ -569,6 +569,29 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::Lambda::Function",
     },
+    "LambdaApiApphandlerErrorsAlarmE1842A74": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "LambdaApiApphandlerCAA5E3A8",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "LambdaApiApphandlerLogGroup4901B22C": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -631,6 +654,29 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "LambdaApiApphandlerThrottlesAlarmD765BB57": {
+      "Properties": {
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "LambdaApiApphandlerCAA5E3A8",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
   },
   "Rules": {

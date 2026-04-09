@@ -1,11 +1,38 @@
+import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Function as LambdaFunction, type FunctionProps } from "aws-cdk-lib/aws-lambda";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createLogGroupBuilder } from "@composurecdk/logs";
+import type { FunctionAlarmConfig } from "./alarm-config.js";
+import { createFunctionAlarms } from "./function-alarms.js";
 import { FUNCTION_DEFAULTS } from "./defaults.js";
 
-export type FunctionBuilderProps = FunctionProps;
+/**
+ * Configuration properties for the Lambda function builder.
+ *
+ * Extends the CDK {@link FunctionProps} with additional builder-specific options.
+ */
+export interface FunctionBuilderProps extends FunctionProps {
+  /**
+   * Configuration for AWS-recommended CloudWatch alarms.
+   *
+   * By default, the builder creates recommended alarms with sensible
+   * thresholds for every applicable metric. Individual alarms can be
+   * customized or disabled. Set to `false` to disable all alarms.
+   *
+   * No alarm actions are configured by default since notification
+   * methods are user-specific. Access alarms from the build result
+   * or use an `afterBuild` hook to apply actions.
+   *
+   * Contextual alarms (duration, concurrentExecutions) are only created
+   * when the corresponding function configuration is present.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda
+   */
+  recommendedAlarms?: FunctionAlarmConfig | false;
+}
 
 /**
  * The build output of a {@link IFunctionBuilder}. Contains the CDK constructs
@@ -29,6 +56,20 @@ export interface FunctionBuilderResult {
    * @see https://docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs-loggroups.html
    */
   logGroup?: LogGroup;
+
+  /**
+   * CloudWatch alarms created for the function, keyed by alarm name.
+   *
+   * Includes both AWS-recommended alarms and any custom alarms added
+   * via {@link IFunctionBuilder.addAlarm}. Access individual alarms
+   * by key (e.g., `result.alarms.errors`).
+   *
+   * No alarm actions are configured — apply them via the result or an
+   * `afterBuild` hook.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda
+   */
+  alarms: Record<string, Alarm>;
 }
 
 /**
@@ -49,6 +90,10 @@ export interface FunctionBuilderResult {
  * to the function. This ensures full control over log lifecycle and follows
  * AWS CDK guidance to create a LogGroup explicitly.
  *
+ * The builder also creates AWS-recommended CloudWatch alarms by default.
+ * Alarms can be customized or disabled via the `recommendedAlarms` property.
+ * Custom alarms can be added via the {@link addAlarm} method.
+ *
  * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_lambda-readme.html
  *
  * @example
@@ -65,6 +110,17 @@ export type IFunctionBuilder = IBuilder<FunctionBuilderProps, FunctionBuilder>;
 
 class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   props: Partial<FunctionBuilderProps> = {};
+  private readonly customAlarms: AlarmDefinitionBuilder<LambdaFunction>[] = [];
+
+  addAlarm(
+    key: string,
+    configure: (
+      alarm: AlarmDefinitionBuilder<LambdaFunction>,
+    ) => AlarmDefinitionBuilder<LambdaFunction>,
+  ): this {
+    this.customAlarms.push(configure(new AlarmDefinitionBuilder<LambdaFunction>(key)));
+    return this;
+  }
 
   build(scope: IConstruct, id: string): FunctionBuilderResult {
     let logGroup: LogGroup | undefined;
@@ -75,16 +131,19 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       logGroupProps = { logGroup };
     }
 
+    const { recommendedAlarms: alarmConfig, ...functionProps } = this.props;
+
     const mergedProps = {
       ...FUNCTION_DEFAULTS,
       ...logGroupProps,
-      ...this.props,
+      ...functionProps,
     } as FunctionBuilderProps;
 
-    return {
-      function: new LambdaFunction(scope, id, mergedProps),
-      logGroup,
-    };
+    const fn = new LambdaFunction(scope, id, mergedProps);
+
+    const alarms = createFunctionAlarms(scope, id, fn, alarmConfig, mergedProps, this.customAlarms);
+
+    return { function: fn, logGroup, alarms };
   }
 }
 
@@ -92,7 +151,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
  * Creates a new {@link IFunctionBuilder} for configuring an AWS Lambda function.
  *
  * This is the entry point for defining a Lambda function component. The returned
- * builder exposes every {@link FunctionProps} property as a fluent setter/getter
+ * builder exposes every {@link FunctionBuilderProps} property as a fluent setter/getter
  * and implements {@link Lifecycle} for use with {@link compose}.
  *
  * @returns A fluent builder for an AWS Lambda function.

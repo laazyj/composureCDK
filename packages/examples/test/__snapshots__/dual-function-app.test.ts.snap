@@ -10,6 +10,9 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
     },
   },
   "Resources": {
+    "AlertTopic2720D535": {
+      "Type": "AWS::SNS::Topic",
+    },
     "DualFunctionAppapiC345E44D": {
       "DependsOn": [
         "DualFunctionAppapiServiceRoleDefaultPolicy91D1FC15",
@@ -41,6 +44,90 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         },
       },
       "Type": "AWS::Lambda::Function",
+    },
+    "DualFunctionAppapiDurationAlarm42FEB5D5": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 27000ms (90% of 30000ms timeout).",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DualFunctionAppapiC345E44D",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Threshold": 27000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DualFunctionAppapiErrorsAlarmC7AA2BBB": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DualFunctionAppapiC345E44D",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DualFunctionAppapiHighInvocationsAlarmCD791F1D": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "API receiving unusually high traffic. Threshold: >= 1000 invocations per minute.",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DualFunctionAppapiC345E44D",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Invocations",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 1000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
     "DualFunctionAppapiLogGroup154F590C": {
       "DeletionPolicy": "Retain",
@@ -105,6 +192,34 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
+    "DualFunctionAppapiThrottlesAlarmDF6A514E": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DualFunctionAppapiC345E44D",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "DualFunctionAppworker219B5B02": {
       "DependsOn": [
         "DualFunctionAppworkerServiceRoleDefaultPolicy9B9601EC",
@@ -123,6 +238,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         },
         "MemorySize": 512,
+        "ReservedConcurrentExecutions": 50,
         "Role": {
           "Fn::GetAtt": [
             "DualFunctionAppworkerServiceRole2CE81560",
@@ -136,6 +252,90 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         },
       },
       "Type": "AWS::Lambda::Function",
+    },
+    "DualFunctionAppworkerConcurrentExecutionsAlarmA7498926": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "Lambda function concurrent executions approaching reserved concurrency limit. Threshold: >= 40 (80% of 50 reserved).",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DualFunctionAppworker219B5B02",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "ConcurrentExecutions",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 40,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DualFunctionAppworkerDurationAlarmAAF89DEE": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 270000ms (90% of 300000ms timeout).",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DualFunctionAppworker219B5B02",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Threshold": 270000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DualFunctionAppworkerErrorsAlarmBA8D514B": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 5 errors in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 2,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DualFunctionAppworker219B5B02",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 5,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
     "DualFunctionAppworkerLogGroup1F739007": {
       "DeletionPolicy": "Retain",
@@ -199,6 +399,34 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "DualFunctionAppworkerThrottlesAlarmCD35C889": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DualFunctionAppworker219B5B02",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
   },
   "Rules": {

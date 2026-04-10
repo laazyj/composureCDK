@@ -23,6 +23,8 @@ import {
  * - Automatic content deployment with CloudFront cache invalidation
  * - Custom error responses for 403/404 handling
  * - Cost-optimised defaults (PriceClass 100, HTTP→HTTPS redirect)
+ * - Recommended CloudWatch alarms for CloudFront (5xx error rate, origin latency)
+ * - S3 bucket alarms (5xx/4xx errors) with request metrics filter
  *
  * Architecture:
  * ```
@@ -65,7 +67,11 @@ export function createStaticWebsiteApp(app = new App()) {
             responseHttpStatus: 404,
             ttl: Duration.seconds(60),
           },
-        ]),
+        ])
+        .recommendedAlarms({
+          // Tighter error rate threshold for a production website
+          errorRate: { threshold: 2 },
+        }),
 
       deploy: createBucketDeploymentBuilder()
         .sources([Source.asset("./src/static-website/site")])

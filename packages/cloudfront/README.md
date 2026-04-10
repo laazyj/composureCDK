@@ -81,6 +81,102 @@ result.accessLogsBucket; // Bucket | undefined
 
 To provide your own bucket instead, set `logBucket` — the auto-created logging bucket is skipped. To disable access logging entirely, set `.accessLogging(false)`.
 
+## Recommended Alarms
+
+The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.
+
+| Alarm           | Metric                        | Default threshold | Created when |
+| --------------- | ----------------------------- | ----------------- | ------------ |
+| `errorRate`     | 5xxErrorRate (Average, 1 min) | > 5 (5%)          | Always       |
+| `originLatency` | OriginLatency (p90, 1 min)    | > 5000ms          | Always       |
+
+The `originLatency` alarm requires [additional CloudFront metrics](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/viewing-cloudfront-metrics.html#monitoring-console.distributions-additional) to be enabled on the distribution. With the default `treatMissingData: NOT_BREACHING`, the alarm will not fire when additional metrics are not enabled.
+
+Function-level alarms (FunctionValidationErrors, FunctionExecutionErrors, FunctionThrottles) require per-function dimensions. Use `addAlarm` to add them — see [Custom alarms](#custom-alarms) below.
+
+The defaults are exported as `DISTRIBUTION_ALARM_DEFAULTS` for visibility and testing:
+
+```ts
+import { DISTRIBUTION_ALARM_DEFAULTS } from "@composurecdk/cloudfront";
+```
+
+### Customizing thresholds
+
+Override individual alarm properties via `recommendedAlarms`. Unspecified fields keep their defaults.
+
+```ts
+const cdn = createDistributionBuilder()
+  .origin(myOrigin)
+  .recommendedAlarms({
+    errorRate: { threshold: 2, evaluationPeriods: 3 },
+    originLatency: { threshold: 3000 },
+  });
+```
+
+### Disabling alarms
+
+Disable all recommended alarms:
+
+```ts
+builder.recommendedAlarms(false);
+// or
+builder.recommendedAlarms({ enabled: false });
+```
+
+Disable individual alarms:
+
+```ts
+builder.recommendedAlarms({ errorRate: false });
+```
+
+### Custom alarms
+
+Add custom alarms alongside the recommended ones via `addAlarm`. The callback receives an `AlarmDefinitionBuilder` typed to the CloudFront `Distribution`.
+
+For function-level alarms, provide the function name dimension:
+
+```ts
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+
+const cdn = createDistributionBuilder()
+  .origin(myOrigin)
+  .addAlarm("functionErrors", (alarm) =>
+    alarm
+      .metric(
+        (dist) =>
+          new Metric({
+            namespace: "AWS/CloudFront",
+            metricName: "FunctionExecutionErrors",
+            dimensionsMap: {
+              DistributionId: dist.distributionId,
+              FunctionName: "MyViewerRequestFn",
+              Region: "Global",
+            },
+            statistic: "Sum",
+            period: Duration.minutes(1),
+          }),
+      )
+      .threshold(0)
+      .greaterThan()
+      .evaluationPeriods(5)
+      .datapointsToAlarm(5)
+      .description("CloudFront function execution errors detected"),
+  );
+```
+
+### Applying alarm actions
+
+Alarms are returned in the build result as `Record<string, Alarm>`:
+
+```ts
+const result = cdn.build(stack, "CDN");
+
+const alertTopic = new Topic(stack, "AlertTopic");
+for (const alarm of Object.values(result.alarms)) {
+  alarm.addAlarmAction(new SnsAction(alertTopic));
+}
+```
+
 ## Examples
 
 - [StaticWebsiteStack](../examples/src/static-website/app.ts) — S3 + CloudFront static website with OAC, error pages, and content deployment

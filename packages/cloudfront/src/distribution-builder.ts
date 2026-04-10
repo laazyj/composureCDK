@@ -4,6 +4,7 @@ import {
   type IOrigin,
   type AddBehaviorOptions,
 } from "aws-cdk-lib/aws-cloudfront";
+import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
@@ -14,7 +15,10 @@ import {
   resolve,
   type Resolvable,
 } from "@composurecdk/core";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createBucketBuilder } from "@composurecdk/s3";
+import type { DistributionAlarmConfig } from "./alarm-config.js";
+import { createDistributionAlarms } from "./distribution-alarms.js";
 import { DISTRIBUTION_DEFAULTS } from "./defaults.js";
 
 /**
@@ -59,6 +63,25 @@ export interface DistributionBuilderProps extends Omit<
    * configured here.
    */
   defaultBehavior?: AddBehaviorOptions;
+
+  /**
+   * Configuration for AWS-recommended CloudWatch alarms.
+   *
+   * By default, the builder creates recommended alarms for 5xx error rate
+   * and origin latency. Individual alarms can be customized or disabled.
+   * Set to `false` to disable all alarms.
+   *
+   * No alarm actions are configured by default since notification
+   * methods are user-specific. Access alarms from the build result
+   * or use an `afterBuild` hook to apply actions.
+   *
+   * Function-level alarms (FunctionValidationErrors, FunctionExecutionErrors,
+   * FunctionThrottles) require per-function dimensions. Use
+   * {@link IDistributionBuilder.addAlarm} to add them.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront
+   */
+  recommendedAlarms?: DistributionAlarmConfig | false;
 }
 
 /**
@@ -74,6 +97,20 @@ export interface DistributionBuilderResult {
    * logging was disabled or the user provided their own bucket.
    */
   accessLogsBucket?: Bucket;
+
+  /**
+   * CloudWatch alarms created for the distribution, keyed by alarm name.
+   *
+   * Includes both AWS-recommended alarms and any custom alarms added
+   * via {@link IDistributionBuilder.addAlarm}. Access individual alarms
+   * by key (e.g., `result.alarms.errorRate`).
+   *
+   * No alarm actions are configured — apply them via the result or an
+   * `afterBuild` hook.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront
+   */
+  alarms: Record<string, Alarm>;
 }
 
 /**
@@ -106,6 +143,17 @@ export type IDistributionBuilder = IBuilder<DistributionBuilderProps, Distributi
 class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
   props: Partial<DistributionBuilderProps> = {};
   private _origin?: Resolvable<IOrigin>;
+  private readonly customAlarms: AlarmDefinitionBuilder<Distribution>[] = [];
+
+  addAlarm(
+    key: string,
+    configure: (
+      alarm: AlarmDefinitionBuilder<Distribution>,
+    ) => AlarmDefinitionBuilder<Distribution>,
+  ): this {
+    this.customAlarms.push(configure(new AlarmDefinitionBuilder<Distribution>(key)));
+    return this;
+  }
 
   /**
    * Sets the default origin for the distribution.
@@ -135,7 +183,12 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       );
     }
 
-    const { accessLogging, defaultBehavior: userBehavior, ...distProps } = this.props;
+    const {
+      accessLogging,
+      defaultBehavior: userBehavior,
+      recommendedAlarms: alarmConfig,
+      ...distProps
+    } = this.props;
     const {
       accessLogging: defaultAccessLogging,
       defaultBehavior: defaultBehavior,
@@ -170,9 +223,20 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       },
     } as DistributionProps;
 
+    const distribution = new Distribution(scope, id, mergedProps);
+
+    const alarms = createDistributionAlarms(
+      scope,
+      id,
+      distribution,
+      alarmConfig,
+      this.customAlarms,
+    );
+
     return {
-      distribution: new Distribution(scope, id, mergedProps),
+      distribution,
       accessLogsBucket,
+      alarms,
     };
   }
 }

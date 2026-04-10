@@ -350,6 +350,33 @@ exports[`static-website-app > stack > matches the expected synthesised template 
       },
       "Type": "AWS::CloudFront::Distribution",
     },
+    "StaticWebsitecdnErrorRateAlarmEDAC30D6": {
+      "Properties": {
+        "AlarmDescription": "CloudFront distribution 5xx error rate is elevated. Threshold: > 2% in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "DistributionId",
+            "Value": {
+              "Ref": "StaticWebsitecdnDDCEC06E",
+            },
+          },
+          {
+            "Name": "Region",
+            "Value": "Global",
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "5xxErrorRate",
+        "Namespace": "AWS/CloudFront",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 2,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "StaticWebsitecdnOrigin1S3OriginAccessControl00704AC0": {
       "Properties": {
         "OriginAccessControlConfig": {
@@ -360,6 +387,33 @@ exports[`static-website-app > stack > matches the expected synthesised template 
         },
       },
       "Type": "AWS::CloudFront::OriginAccessControl",
+    },
+    "StaticWebsitecdnOriginLatencyAlarm26EE4DC0": {
+      "Properties": {
+        "AlarmDescription": "CloudFront origin latency is elevated. Threshold: > 5000ms p90 in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "DistributionId",
+            "Value": {
+              "Ref": "StaticWebsitecdnDDCEC06E",
+            },
+          },
+          {
+            "Name": "Region",
+            "Value": "Global",
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "OriginLatency",
+        "Namespace": "AWS/CloudFront",
+        "Period": 60,
+        "Threshold": 5000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
     "StaticWebsitedeployAwsCliLayer0DAF6098": {
       "Properties": {

@@ -7,8 +7,8 @@ import {
 } from "aws-cdk-lib/aws-cloudwatch";
 import type { Function as LambdaFunction, FunctionProps } from "aws-cdk-lib/aws-lambda";
 import type { IConstruct } from "constructs";
-import type { AlarmConfig, AlarmDefinition } from "@composurecdk/cloudwatch";
-import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
+import type { AlarmDefinition } from "@composurecdk/cloudwatch";
+import { AlarmDefinitionBuilder, createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
 import type { FunctionAlarmConfig, PercentageAlarmConfig } from "./alarm-config.js";
 import { FUNCTION_ALARM_DEFAULTS } from "./alarm-defaults.js";
 
@@ -128,42 +128,7 @@ export function createFunctionAlarms(
   const recommended = resolveFunctionAlarmDefinitions(fn, config, props);
   const custom = customAlarms.map((b) => b.resolve(fn));
 
-  // Validate no duplicate keys
-  const allKeys = new Set<string>();
-  for (const def of [...recommended, ...custom]) {
-    if (allKeys.has(def.key)) {
-      throw new Error(
-        `Duplicate alarm key "${def.key}". Custom alarms cannot use the same key as a recommended alarm. ` +
-          `Disable the recommended alarm first, or use a different key.`,
-      );
-    }
-    allKeys.add(def.key);
-  }
-
   return createAlarms(scope, id, [...recommended, ...custom]);
-}
-
-interface ResolvedAlarmConfig {
-  threshold: number;
-  evaluationPeriods: number;
-  datapointsToAlarm: number;
-  treatMissingData: TreatMissingData;
-}
-
-/**
- * Resolves an absolute-threshold alarm config by layering user overrides
- * onto the defaults.
- */
-function resolveAlarmConfig(
-  userConfig: AlarmConfig | undefined,
-  defaults: Required<AlarmConfig>,
-): ResolvedAlarmConfig {
-  return {
-    threshold: userConfig?.threshold ?? defaults.threshold,
-    evaluationPeriods: userConfig?.evaluationPeriods ?? defaults.evaluationPeriods,
-    datapointsToAlarm: userConfig?.datapointsToAlarm ?? defaults.datapointsToAlarm,
-    treatMissingData: userConfig?.treatMissingData ?? defaults.treatMissingData,
-  };
 }
 
 interface ResolvedPercentageAlarmConfig {

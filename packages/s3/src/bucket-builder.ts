@@ -1,7 +1,11 @@
 import { RemovalPolicy } from "aws-cdk-lib";
+import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket, type BucketProps } from "aws-cdk-lib/aws-s3";
 import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import type { BucketAlarmConfig } from "./alarm-config.js";
+import { createBucketAlarms } from "./bucket-alarms.js";
 import { BUCKET_DEFAULTS } from "./defaults.js";
 
 /**
@@ -39,6 +43,22 @@ export interface BucketBuilderProps extends BucketProps {
    * @default "logs/"
    */
   accessLogsPrefix?: string;
+
+  /**
+   * Configuration for AWS-recommended CloudWatch alarms.
+   *
+   * S3 request metric alarms (5xxErrors, 4xxErrors) require
+   * [CloudWatch request metrics](https://docs.aws.amazon.com/AmazonS3/latest/userguide/configure-request-metrics-bucket.html)
+   * to be enabled on the bucket. Set {@link BucketAlarmConfig.requestMetricsFilterId}
+   * to the ID of the request metrics configuration to create these alarms.
+   *
+   * No alarm actions are configured by default since notification
+   * methods are user-specific. Access alarms from the build result
+   * or use an `afterBuild` hook to apply actions.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#S3
+   */
+  recommendedAlarms?: BucketAlarmConfig | false;
 }
 
 /**
@@ -54,6 +74,20 @@ export interface BucketBuilderResult {
    * logging was disabled or the user provided their own destination.
    */
   accessLogsBucket?: Bucket;
+
+  /**
+   * CloudWatch alarms created for the bucket, keyed by alarm name.
+   *
+   * Includes both AWS-recommended alarms and any custom alarms added
+   * via {@link IBucketBuilder.addAlarm}. Access individual alarms
+   * by key (e.g., `result.alarms.serverErrors`).
+   *
+   * No alarm actions are configured — apply them via the result or an
+   * `afterBuild` hook.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#S3
+   */
+  alarms: Record<string, Alarm>;
 }
 
 /**
@@ -79,9 +113,23 @@ export type IBucketBuilder = IBuilder<BucketBuilderProps, BucketBuilder>;
 
 class BucketBuilder implements Lifecycle<BucketBuilderResult> {
   props: Partial<BucketBuilderProps> = {};
+  private readonly customAlarms: AlarmDefinitionBuilder<Bucket>[] = [];
+
+  addAlarm(
+    key: string,
+    configure: (alarm: AlarmDefinitionBuilder<Bucket>) => AlarmDefinitionBuilder<Bucket>,
+  ): this {
+    this.customAlarms.push(configure(new AlarmDefinitionBuilder<Bucket>(key)));
+    return this;
+  }
 
   build(scope: IConstruct, id: string): BucketBuilderResult {
-    const { accessLogging, accessLogsPrefix, ...bucketProps } = this.props;
+    const {
+      accessLogging,
+      accessLogsPrefix,
+      recommendedAlarms: alarmConfig,
+      ...bucketProps
+    } = this.props;
     const {
       accessLogging: defaultAccessLogging,
       accessLogsPrefix: defaultLogsPrefix,
@@ -119,9 +167,21 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
       ...autoDeleteProps(bucketProps, BUCKET_DEFAULTS),
     } as BucketProps;
 
+    const bucket = new Bucket(scope, id, mergedProps);
+
+    const alarms = createBucketAlarms(
+      scope,
+      id,
+      bucket,
+      alarmConfig,
+      bucketProps.metrics ?? [],
+      this.customAlarms,
+    );
+
     return {
-      bucket: new Bucket(scope, id, mergedProps),
+      bucket,
       accessLogsBucket,
+      alarms,
     };
   }
 }

@@ -39,7 +39,13 @@ export function createStaticWebsiteApp(app = new App()) {
 
   compose(
     {
-      site: createBucketBuilder().versioned(false),
+      site: createBucketBuilder()
+        .versioned(false)
+        .metrics([{ id: "EntireBucket" }])
+        .recommendedAlarms({
+          // Tolerate some client errors (e.g. 404s from crawlers)
+          clientErrors: { threshold: 50 },
+        }),
 
       cdn: createDistributionBuilder()
         .comment("Example static website")

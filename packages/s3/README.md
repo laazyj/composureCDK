@@ -64,6 +64,114 @@ result.accessLogsBucket; // Bucket | undefined
 
 To provide your own destination instead, set `serverAccessLogsBucket` — the auto-created logging bucket is skipped. To disable access logging entirely, set `.accessLogging(false)`.
 
+## Recommended Alarms
+
+The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#S3) automatically when [CloudWatch request metrics](https://docs.aws.amazon.com/AmazonS3/latest/userguide/configure-request-metrics-bucket.html) are configured on the bucket via `.metrics()`. One alarm per metric is created for each metrics configuration entry. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.
+
+| Alarm          | Metric                 | Default threshold | Created when               |
+| -------------- | ---------------------- | ----------------- | -------------------------- |
+| `serverErrors` | 5xxErrors (Sum, 5 min) | > 0               | `.metrics()` is configured |
+| `clientErrors` | 4xxErrors (Sum, 5 min) | > 0               | `.metrics()` is configured |
+
+Alarm keys include the metrics filter ID (e.g. `serverErrors:EntireBucket`). When multiple metrics configurations are provided, alarms are created for each one.
+
+The defaults are exported as `BUCKET_ALARM_DEFAULTS` for visibility and testing:
+
+```ts
+import { BUCKET_ALARM_DEFAULTS } from "@composurecdk/s3";
+```
+
+### Enabling alarms
+
+Configure request metrics on the bucket — alarms are created automatically:
+
+```ts
+const site = createBucketBuilder().metrics([{ id: "EntireBucket" }]);
+```
+
+### Multiple metrics configurations
+
+Alarms are created for each metrics configuration entry:
+
+```ts
+const site = createBucketBuilder().metrics([
+  { id: "EntireBucket" },
+  { id: "UploadsOnly", prefix: "uploads/" },
+]);
+
+// Creates: serverErrors:EntireBucket, clientErrors:EntireBucket,
+//          serverErrors:UploadsOnly, clientErrors:UploadsOnly
+```
+
+### Customizing thresholds
+
+Override individual alarm properties via `recommendedAlarms`. Unspecified fields keep their defaults.
+
+```ts
+builder.metrics([{ id: "EntireBucket" }]).recommendedAlarms({
+  serverErrors: { threshold: 5, evaluationPeriods: 3 },
+  clientErrors: { threshold: 50 },
+});
+```
+
+### Disabling alarms
+
+Disable all recommended alarms:
+
+```ts
+builder.recommendedAlarms(false);
+// or
+builder.recommendedAlarms({ enabled: false });
+```
+
+Disable individual alarms:
+
+```ts
+builder.metrics([{ id: "EntireBucket" }]).recommendedAlarms({ clientErrors: false });
+```
+
+### Custom alarms
+
+Add custom alarms alongside the recommended ones via `addAlarm`. The callback receives an `AlarmDefinitionBuilder` typed to the S3 `Bucket`, so the metric factory has access to the bucket's metric helpers.
+
+```ts
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+
+const site = createBucketBuilder()
+  .metrics([{ id: "EntireBucket" }])
+  .addAlarm("lowTraffic", (alarm) =>
+    alarm
+      .metric(
+        (bucket) =>
+          new Metric({
+            namespace: "AWS/S3",
+            metricName: "GetRequests",
+            dimensionsMap: {
+              BucketName: bucket.bucketName,
+              FilterId: "EntireBucket",
+            },
+            period: Duration.minutes(5),
+          }),
+      )
+      .threshold(10)
+      .lessThan()
+      .description("Bucket traffic has dropped below expected level"),
+  );
+```
+
+### Applying alarm actions
+
+Alarms are returned in the build result as `Record<string, Alarm>`:
+
+```ts
+const result = site.build(stack, "SiteBucket");
+
+const alertTopic = new Topic(stack, "AlertTopic");
+for (const alarm of Object.values(result.alarms)) {
+  alarm.addAlarmAction(new SnsAction(alertTopic));
+}
+```
+
 ## Bucket Deployment Builder
 
 Deploys local assets to an S3 bucket with optional CloudFront cache invalidation.

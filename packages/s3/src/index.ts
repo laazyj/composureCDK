@@ -4,6 +4,8 @@ export {
   type IBucketBuilder,
 } from "./bucket-builder.js";
 export { BUCKET_DEFAULTS } from "./defaults.js";
+export { type BucketAlarmConfig } from "./alarm-config.js";
+export { BUCKET_ALARM_DEFAULTS } from "./alarm-defaults.js";
 export {
   createBucketDeploymentBuilder,
   type BucketDeploymentBuilderResult,

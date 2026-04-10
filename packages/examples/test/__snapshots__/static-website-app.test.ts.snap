@@ -433,6 +433,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
           "LogFilePrefix": "logs/",
         },
+        "MetricsConfigurations": [
+          {
+            "Id": "EntireBucket",
+          },
+        ],
         "PublicAccessBlockConfiguration": {
           "BlockPublicAcls": true,
           "BlockPublicPolicy": true,
@@ -529,6 +534,33 @@ exports[`static-website-app > stack > matches the expected synthesised template 
       },
       "Type": "AWS::S3::BucketPolicy",
     },
+    "StaticWebsitesiteClientErrorsEntireBucketAlarmBDD2E6F0": {
+      "Properties": {
+        "AlarmDescription": "S3 bucket is returning client-side errors (filter: EntireBucket). Threshold: > 50 4xx errors in 5 minutes.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "BucketName",
+            "Value": {
+              "Ref": "StaticWebsitesite792D65DA",
+            },
+          },
+          {
+            "Name": "FilterId",
+            "Value": "EntireBucket",
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "4xxErrors",
+        "Namespace": "AWS/S3",
+        "Period": 300,
+        "Statistic": "Sum",
+        "Threshold": 50,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "StaticWebsitesitePolicy0FD77C0C": {
       "Properties": {
         "Bucket": {
@@ -619,6 +651,33 @@ exports[`static-website-app > stack > matches the expected synthesised template 
         },
       },
       "Type": "AWS::S3::BucketPolicy",
+    },
+    "StaticWebsitesiteServerErrorsEntireBucketAlarm4D0598AA": {
+      "Properties": {
+        "AlarmDescription": "S3 bucket is returning server-side errors (filter: EntireBucket). Threshold: > 0 5xx errors in 5 minutes.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "BucketName",
+            "Value": {
+              "Ref": "StaticWebsitesite792D65DA",
+            },
+          },
+          {
+            "Name": "FilterId",
+            "Value": "EntireBucket",
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "5xxErrors",
+        "Namespace": "AWS/S3",
+        "Period": 300,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
   },
   "Rules": {

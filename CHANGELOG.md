@@ -1,3 +1,18 @@
+## 0.3.0 (2026-04-10)
+
+### 🚀 Features
+
+- **apigateway:** add AWS recommended alarms ([#13](https://github.com/laazyj/composureCDK/issues/13))
+- **cloudwatch:** add cloudwatch package for working with Alarms ([#13](https://github.com/laazyj/composureCDK/issues/13))
+- **cloudwatch:** add AWS recommended alarms ([30bbd98](https://github.com/laazyj/composureCDK/commit/30bbd98))
+- **lambda:** add AWS recommended alarms ([d7dadef](https://github.com/laazyj/composureCDK/commit/d7dadef))
+- **s3:** add AWS recommended alarms ([0b3f95f](https://github.com/laazyj/composureCDK/commit/0b3f95f))
+- **sns:** add TopicBuilder with recommended alarms ([#16](https://github.com/laazyj/composureCDK/issues/16))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.2.0 (2026-04-06)
 
 ### 🚀 Features

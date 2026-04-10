@@ -2,52 +2,30 @@ import {
   type Integration,
   type MethodOptions,
   RestApi,
+  type RestApiBase,
   type RestApiProps,
 } from "aws-cdk-lib/aws-apigateway";
-import { type LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle, type Resolvable } from "@composurecdk/core";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { REST_API_DEFAULTS } from "./defaults.js";
 import { resolveDeployOptions } from "./deploy-options.js";
 import { ResourceBuilder } from "./resource-builder.js";
+import { createRestApiAlarms } from "./rest-api-alarms.js";
 
 /**
  * Configuration properties for the REST API builder.
  *
  * Extends the CDK {@link RestApiProps} with additional builder-specific options.
  */
-export interface RestApiBuilderProps extends RestApiProps {
-  /**
-   * Whether to automatically create a CloudWatch log group for access logging.
-   *
-   * When `true`, the builder creates a log group using
-   * {@link createLogGroupBuilder} (with its secure defaults) and configures it
-   * as the stage's access log destination with JSON-formatted output. The
-   * created log group is returned in the build result as `accessLogGroup`.
-   *
-   * When `false`, no access log group is created. You can still provide your
-   * own destination via `deployOptions.accessLogDestination`.
-   *
-   * This setting is ignored when `deployOptions.accessLogDestination` is
-   * provided — the user-supplied destination takes precedence.
-   */
-  accessLogging?: boolean;
-}
+export interface RestApiBuilderProps extends RestApiProps, RestApiBuilderPropsBase {}
 
 /**
  * The build output of a {@link IRestApiBuilder}. Contains the CDK constructs
  * created during {@link Lifecycle.build}, keyed by role.
  */
-export interface RestApiBuilderResult {
-  /** The REST API construct created by the builder. */
-  api: RestApi;
-
-  /**
-   * The CloudWatch log group created for access logging, or `undefined` if
-   * access logging was disabled or the user provided their own destination.
-   */
-  accessLogGroup?: LogGroup;
-}
+export type RestApiBuilderResult = RestApiBuilderResultBase<RestApi>;
 
 /**
  * A fluent builder for configuring and creating an API Gateway REST API.
@@ -80,6 +58,15 @@ export type IRestApiBuilder = IBuilder<RestApiBuilderProps, RestApiBuilder>;
 class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
   props: Partial<RestApiBuilderProps> = {};
   private readonly root = new ResourceBuilder();
+  private readonly customAlarms: AlarmDefinitionBuilder<RestApiBase>[] = [];
+
+  addAlarm(
+    key: string,
+    configure: (alarm: AlarmDefinitionBuilder<RestApiBase>) => AlarmDefinitionBuilder<RestApiBase>,
+  ): this {
+    this.customAlarms.push(configure(new AlarmDefinitionBuilder<RestApiBase>(key)));
+    return this;
+  }
 
   /**
    * Adds an HTTP method to the API root resource (`/`).
@@ -112,7 +99,7 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): RestApiBuilderResult {
-    const { accessLogging, ...restApiProps } = this.props;
+    const { accessLogging, recommendedAlarms: alarmConfig, ...restApiProps } = this.props;
     const { accessLogGroup, deployOptions } = resolveDeployOptions(
       scope,
       id,
@@ -126,7 +113,10 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
       deployOptions,
     } as RestApiProps);
     this.root.applyTo(api.root, context ?? {});
-    return { api, accessLogGroup };
+
+    const alarms = createRestApiAlarms(scope, id, api, alarmConfig, this.customAlarms);
+
+    return { api, accessLogGroup, alarms };
   }
 }
 

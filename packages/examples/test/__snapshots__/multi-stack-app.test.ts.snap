@@ -63,6 +63,33 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
       "Type": "AWS::ApiGateway::Account",
       "UpdateReplacePolicy": "Retain",
     },
+    "MultiStackAppapiClientErrorAlarmEB102EFC": {
+      "Properties": {
+        "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "MultiStackApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "MultiStackAppapiDeploymentStageprod995AB209",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "4XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "MultiStackAppapiCloudWatchRoleA9E9F25F": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -262,6 +289,60 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
         },
       },
       "Type": "AWS::Lambda::Permission",
+    },
+    "MultiStackAppapiLatencyAlarm8D8FBA0C": {
+      "Properties": {
+        "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "MultiStackApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "MultiStackAppapiDeploymentStageprod995AB209",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "Latency",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Threshold": 2500,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "MultiStackAppapiServerErrorAlarm04133ED9": {
+      "Properties": {
+        "AlarmDescription": "REST API server error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "MultiStackApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "MultiStackAppapiDeploymentStageprod995AB209",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "5XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
   },
   "Rules": {

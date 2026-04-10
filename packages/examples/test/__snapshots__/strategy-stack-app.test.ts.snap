@@ -69,6 +69,33 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
       },
       "Type": "AWS::ApiGateway::RestApi",
     },
+    "ComposureCDKStrategyStackAppapiClientErrorAlarm25C2B2FB": {
+      "Properties": {
+        "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "StrategyApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "ComposureCDKStrategyStackAppapiDeploymentStageprod965FDA14",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "4XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "ComposureCDKStrategyStackAppapiCloudWatchRole4BF9AE1A": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -261,6 +288,60 @@ exports[`strategy-stack-app > matches the expected gateway stack template 1`] = 
         },
       },
       "Type": "AWS::Lambda::Permission",
+    },
+    "ComposureCDKStrategyStackAppapiLatencyAlarm7E803A5C": {
+      "Properties": {
+        "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "StrategyApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "ComposureCDKStrategyStackAppapiDeploymentStageprod965FDA14",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "Latency",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Threshold": 2500,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "ComposureCDKStrategyStackAppapiServerErrorAlarmC7DC467F": {
+      "Properties": {
+        "AlarmDescription": "REST API server error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "StrategyApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "ComposureCDKStrategyStackAppapiDeploymentStageprod965FDA14",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "5XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
   },
   "Rules": {

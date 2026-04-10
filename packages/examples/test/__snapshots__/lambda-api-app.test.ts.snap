@@ -39,6 +39,9 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
     },
   },
   "Resources": {
+    "AlertTopic2720D535": {
+      "Type": "AWS::SNS::Topic",
+    },
     "LambdaApiAppapiAccessLogsB5DCE571": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -69,6 +72,38 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
         "Name": "LambdaApi",
       },
       "Type": "AWS::ApiGateway::RestApi",
+    },
+    "LambdaApiAppapiClientErrorAlarm682CA3E3": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "LambdaApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "LambdaApiAppapiDeploymentStageprodBE961405",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "4XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
     "LambdaApiAppapiCloudWatchRole6ED06475": {
       "DeletionPolicy": "Retain",
@@ -275,6 +310,70 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
         },
       },
       "Type": "AWS::Lambda::Permission",
+    },
+    "LambdaApiAppapiLatencyAlarmF54187DB": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "LambdaApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "LambdaApiAppapiDeploymentStageprodBE961405",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "Latency",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Threshold": 2500,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "LambdaApiAppapiServerErrorAlarm4527EB31": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
+        "AlarmDescription": "REST API server error rate is elevated. Threshold: > 2% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "LambdaApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "LambdaApiAppapiDeploymentStageprodBE961405",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "5XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.02,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
     "LambdaApiAppapiusersB492BBF6": {
       "Properties": {
@@ -571,6 +670,11 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
     },
     "LambdaApiApphandlerErrorsAlarmE1842A74": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
         "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -657,6 +761,11 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
     },
     "LambdaApiApphandlerThrottlesAlarmD765BB57": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AlertTopic2720D535",
+          },
+        ],
         "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,

@@ -11,7 +11,7 @@
     "test": "npx nx run-many -t test",
     "build": "npx nx run-many -t build",
     "clean": "npx nx run-many -t clean",
-    "verify": "npm run format:check && npm run lint && npx nx run-many -t test build",
+    "verify": "npm run format:check && npm run build && npm run lint && npm run test",
     "prepare": "husky"
   },
   "repository": {

@@ -200,6 +200,33 @@ exports[`openapi-petstore-app > matches the expected synthesised template 1`] = 
       "Type": "AWS::ApiGateway::Account",
       "UpdateReplacePolicy": "Retain",
     },
+    "OpenApiPetstoreAppapiClientErrorAlarm755B4262": {
+      "Properties": {
+        "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "PetStore",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "OpenApiPetstoreAppapiDeploymentStageprod0B59E801",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "4XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "OpenApiPetstoreAppapiCloudWatchRoleC33BCA6B": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -277,6 +304,60 @@ exports[`openapi-petstore-app > matches the expected synthesised template 1`] = 
         "TracingEnabled": true,
       },
       "Type": "AWS::ApiGateway::Stage",
+    },
+    "OpenApiPetstoreAppapiLatencyAlarm28B7B0BF": {
+      "Properties": {
+        "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "PetStore",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "OpenApiPetstoreAppapiDeploymentStageprod0B59E801",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "Latency",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Threshold": 2500,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "OpenApiPetstoreAppapiServerErrorAlarm5B7B1B44": {
+      "Properties": {
+        "AlarmDescription": "REST API server error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "PetStore",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "OpenApiPetstoreAppapiDeploymentStageprod0B59E801",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "5XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
   },
   "Rules": {

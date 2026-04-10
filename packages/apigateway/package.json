@@ -35,6 +35,7 @@
   },
   "type": "module",
   "peerDependencies": {
+    "@composurecdk/cloudwatch": "^0.2.0",
     "@composurecdk/core": "^0.2.0",
     "@composurecdk/logs": "^0.2.0",
     "aws-cdk-lib": "^2.0.0",

@@ -70,6 +70,33 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
       "Type": "AWS::ApiGateway::Account",
       "UpdateReplacePolicy": "Retain",
     },
+    "MockApiAppapiClientErrorAlarmFE89E37D": {
+      "Properties": {
+        "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "MockApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "MockApiAppapiDeploymentStageprod294E2332",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "4XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "MockApiAppapiCloudWatchRole0FB01F81": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -193,6 +220,60 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
         },
       },
       "Type": "AWS::ApiGateway::Method",
+    },
+    "MockApiAppapiLatencyAlarmBB38671F": {
+      "Properties": {
+        "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "MockApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "MockApiAppapiDeploymentStageprod294E2332",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "Latency",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Threshold": 2500,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "MockApiAppapiServerErrorAlarm6503E5FE": {
+      "Properties": {
+        "AlarmDescription": "REST API server error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "MockApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "MockApiAppapiDeploymentStageprod294E2332",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "5XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
     "MockApiAppapiusers7F89692E": {
       "Properties": {

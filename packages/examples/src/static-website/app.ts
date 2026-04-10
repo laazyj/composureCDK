@@ -1,7 +1,9 @@
 import { App, Duration } from "aws-cdk-lib";
+import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Source } from "aws-cdk-lib/aws-s3-deployment";
 import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { compose, ref } from "@composurecdk/core";
+import { createTopicBuilder } from "@composurecdk/sns";
 import { createStackBuilder, outputs } from "@composurecdk/cloudformation";
 import {
   createBucketBuilder,
@@ -25,6 +27,8 @@ import {
  * - Cost-optimised defaults (PriceClass 100, HTTP→HTTPS redirect)
  * - Recommended CloudWatch alarms for CloudFront (5xx error rate, origin latency)
  * - S3 bucket alarms (5xx/4xx errors) with request metrics filter
+ * - Using TopicBuilder for the alert topic with recommended alarms
+ * - Applying alarm actions via afterBuild hook
  *
  * Architecture:
  * ```
@@ -41,6 +45,8 @@ export function createStaticWebsiteApp(app = new App()) {
 
   compose(
     {
+      alerts: createTopicBuilder().displayName("Static Website Alerts"),
+
       site: createBucketBuilder()
         .versioned(false)
         .metrics([{ id: "EntireBucket" }])
@@ -78,8 +84,18 @@ export function createStaticWebsiteApp(app = new App()) {
         .destinationBucket(ref("site", (r: BucketBuilderResult) => r.bucket))
         .distribution(ref("cdn", (r: DistributionBuilderResult) => r.distribution)),
     },
-    { site: [], cdn: ["site"], deploy: ["site", "cdn"] },
+    { alerts: [], site: [], cdn: ["site"], deploy: ["site", "cdn"] },
   )
+    .afterBuild((_scope, _id, results) => {
+      // Apply SNS actions to all alarms across S3 and CloudFront components
+      const allAlarms = [results.site.alarms, results.cdn.alarms].flatMap((alarms) =>
+        Object.values(alarms),
+      );
+      const action = new SnsAction(results.alerts.topic);
+      for (const alarm of allAlarms) {
+        alarm.addAlarmAction(action);
+      }
+    })
     .afterBuild(
       outputs({
         DistributionUrl: {

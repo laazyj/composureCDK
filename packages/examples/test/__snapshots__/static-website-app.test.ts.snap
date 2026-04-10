@@ -209,6 +209,93 @@ exports[`static-website-app > stack > matches the expected synthesised template 
       },
       "Type": "AWS::IAM::Role",
     },
+    "StaticWebsitealertsBD655E35": {
+      "Properties": {
+        "DisplayName": "Static Website Alerts",
+      },
+      "Type": "AWS::SNS::Topic",
+    },
+    "StaticWebsitealertsNumberOfNotificationsFailedAlarmDBF19693": {
+      "Properties": {
+        "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "StaticWebsitealertsBD655E35",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFailed",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "StaticWebsitealertsNumberOfNotificationsFilteredOutInvalidAttributesAlarmD7DE960B": {
+      "Properties": {
+        "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "StaticWebsitealertsBD655E35",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "StaticWebsitealertsPolicy66E455B9": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sns:Publish",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": {
+                "Ref": "StaticWebsitealertsBD655E35",
+              },
+              "Sid": "AllowPublishThroughSSLOnly",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Topics": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
+      },
+      "Type": "AWS::SNS::TopicPolicy",
+    },
     "StaticWebsitecdnAccessLogsFAE00048": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -352,6 +439,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitecdnErrorRateAlarmEDAC30D6": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "CloudFront distribution 5xx error rate is elevated. Threshold: > 2% in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,
@@ -390,6 +482,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitecdnOriginLatencyAlarm26EE4DC0": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "CloudFront origin latency is elevated. Threshold: > 5000ms p90 in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,
@@ -590,6 +687,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitesiteClientErrorsEntireBucketAlarmBDD2E6F0": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "S3 bucket is returning client-side errors (filter: EntireBucket). Threshold: > 50 4xx errors in 5 minutes.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -708,6 +810,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitesiteServerErrorsEntireBucketAlarm4D0598AA": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "S3 bucket is returning server-side errors (filter: EntireBucket). Threshold: > 0 5xx errors in 5 minutes.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,

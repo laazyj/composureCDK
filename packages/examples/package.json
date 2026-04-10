@@ -28,7 +28,8 @@
     "@composurecdk/cloudfront": "^0.2.0",
     "@composurecdk/core": "^0.2.0",
     "@composurecdk/lambda": "^0.2.0",
-    "@composurecdk/s3": "^0.2.0"
+    "@composurecdk/s3": "^0.2.0",
+    "@composurecdk/sns": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

@@ -2,11 +2,11 @@ import { App } from "aws-cdk-lib";
 import { LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
-import { Topic } from "aws-cdk-lib/aws-sns";
 import { compose, ref } from "@composurecdk/core";
 import { createRestApiBuilder } from "@composurecdk/apigateway";
 import { createStackBuilder } from "@composurecdk/cloudformation";
 import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
+import { createTopicBuilder } from "@composurecdk/sns";
 
 /**
  * A REST API backed by a Lambda function, composed into a single stack.
@@ -16,8 +16,9 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
  * - Lambda proxy integration with API Gateway
  * - Dependency-driven build ordering
  * - Building the composed system into a CDK Stack
- * - Recommended alarms for both Lambda and API Gateway
+ * - Recommended alarms for Lambda, API Gateway, and SNS
  * - Customizing API Gateway alarm thresholds
+ * - Using TopicBuilder for the alert topic with recommended alarms
  * - Applying alarm actions via afterBuild hook
  *
  * Resource tree:
@@ -35,10 +36,10 @@ export function createLambdaApiApp(app = new App()) {
     .description("REST API backed by a Lambda function")
     .build(app, "ComposureCDK-LambdaApiStack");
 
-  const alertTopic = new Topic(stack, "AlertTopic");
-
   compose(
     {
+      alerts: createTopicBuilder().displayName("Lambda API Alerts"),
+
       handler: createFunctionBuilder()
         .runtime(Runtime.NODEJS_22_X)
         .handler("index.handler")
@@ -70,15 +71,16 @@ export function createLambdaApiApp(app = new App()) {
             ),
         ),
     },
-    { handler: [], api: ["handler"] },
+    { alerts: [], handler: [], api: ["handler"] },
   )
     .afterBuild((_scope, _id, results) => {
       // Apply SNS actions to all alarms across Lambda and API Gateway
       const allAlarms = [results.handler.alarms, results.api.alarms].flatMap((alarms) =>
         Object.values(alarms),
       );
+      const action = new SnsAction(results.alerts.topic);
       for (const alarm of allAlarms) {
-        alarm.addAlarmAction(new SnsAction(alertTopic));
+        alarm.addAlarmAction(action);
       }
     })
     .build(stack, "LambdaApiApp");

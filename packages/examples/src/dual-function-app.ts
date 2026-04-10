@@ -1,9 +1,9 @@
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Code, Runtime, Tracing } from "aws-cdk-lib/aws-lambda";
-import { Topic } from "aws-cdk-lib/aws-sns";
 import { compose } from "@composurecdk/core";
 import { createFunctionBuilder } from "@composurecdk/lambda";
+import { createTopicBuilder } from "@composurecdk/sns";
 
 /**
  * Two Lambda functions — an API handler and an async worker — composed
@@ -15,15 +15,16 @@ import { createFunctionBuilder } from "@composurecdk/lambda";
  * - Recommended alarms created by default (errors, throttles, duration)
  * - Customizing alarm thresholds on the worker
  * - Adding a custom alarm via `addAlarm`
+ * - Using TopicBuilder for the alert topic with recommended alarms
  * - Applying alarm actions via afterBuild hook
  */
 export function createDualFunctionApp(app = new App()) {
   const stack = new Stack(app, "ComposureCDK-DualFunctionStack");
 
-  const alertTopic = new Topic(stack, "AlertTopic");
-
   compose(
     {
+      alerts: createTopicBuilder().displayName("Dual Function Alerts"),
+
       api: createFunctionBuilder()
         .runtime(Runtime.NODEJS_22_X)
         .handler("index.handler")
@@ -57,15 +58,16 @@ export function createDualFunctionApp(app = new App()) {
           errors: { threshold: 5, evaluationPeriods: 3, datapointsToAlarm: 2 },
         }),
     },
-    { api: [], worker: [] },
+    { alerts: [], api: [], worker: [] },
   )
     .afterBuild((_scope, _id, results) => {
       // Apply SNS actions to all alarms across all components
       const allAlarms = [results.api.alarms, results.worker.alarms].flatMap((alarms) =>
         Object.values(alarms),
       );
+      const action = new SnsAction(results.alerts.topic);
       for (const alarm of allAlarms) {
-        alarm.addAlarmAction(new SnsAction(alertTopic));
+        alarm.addAlarmAction(action);
       }
     })
     .build(stack, "DualFunctionApp");

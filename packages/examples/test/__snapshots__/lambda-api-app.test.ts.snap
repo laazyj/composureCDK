@@ -39,8 +39,92 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
     },
   },
   "Resources": {
-    "AlertTopic2720D535": {
+    "LambdaApiAppalerts4EFC6FCB": {
+      "Properties": {
+        "DisplayName": "Lambda API Alerts",
+      },
       "Type": "AWS::SNS::Topic",
+    },
+    "LambdaApiAppalertsNumberOfNotificationsFailedAlarm0501DF1D": {
+      "Properties": {
+        "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "LambdaApiAppalerts4EFC6FCB",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFailed",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "LambdaApiAppalertsNumberOfNotificationsFilteredOutInvalidAttributesAlarm849A5CBF": {
+      "Properties": {
+        "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "LambdaApiAppalerts4EFC6FCB",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "LambdaApiAppalertsPolicy7A5D3612": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sns:Publish",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": {
+                "Ref": "LambdaApiAppalerts4EFC6FCB",
+              },
+              "Sid": "AllowPublishThroughSSLOnly",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Topics": [
+          {
+            "Ref": "LambdaApiAppalerts4EFC6FCB",
+          },
+        ],
+      },
+      "Type": "AWS::SNS::TopicPolicy",
     },
     "LambdaApiAppapiAccessLogsB5DCE571": {
       "DeletionPolicy": "Retain",
@@ -77,7 +161,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       "Properties": {
         "AlarmActions": [
           {
-            "Ref": "AlertTopic2720D535",
+            "Ref": "LambdaApiAppalerts4EFC6FCB",
           },
         ],
         "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
@@ -315,7 +399,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       "Properties": {
         "AlarmActions": [
           {
-            "Ref": "AlertTopic2720D535",
+            "Ref": "LambdaApiAppalerts4EFC6FCB",
           },
         ],
         "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
@@ -347,7 +431,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       "Properties": {
         "AlarmActions": [
           {
-            "Ref": "AlertTopic2720D535",
+            "Ref": "LambdaApiAppalerts4EFC6FCB",
           },
         ],
         "AlarmDescription": "REST API server error rate is elevated. Threshold: > 2% of requests in 1 minute.",
@@ -672,7 +756,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       "Properties": {
         "AlarmActions": [
           {
-            "Ref": "AlertTopic2720D535",
+            "Ref": "LambdaApiAppalerts4EFC6FCB",
           },
         ],
         "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
@@ -763,7 +847,7 @@ exports[`lambda-api-app > matches the expected synthesised template 1`] = `
       "Properties": {
         "AlarmActions": [
           {
-            "Ref": "AlertTopic2720D535",
+            "Ref": "LambdaApiAppalerts4EFC6FCB",
           },
         ],
         "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",

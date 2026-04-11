@@ -75,6 +75,24 @@ jobs:
         working-directory: packages/examples
         run: |
           # Only destroy if AWS credentials were configured
-          aws sts get-caller-identity > /dev/null 2>&1 && \
-            npx cdk destroy --all --force || \
+          if ! aws sts get-caller-identity > /dev/null 2>&1; then
             echo "Skipping destroy — no AWS credentials available"
+            exit 0
+          fi
+
+          # Attempt destroy up to 3 times. A single stack failure (e.g.
+          # non-empty S3 bucket) causes CDK to abort before reaching the
+          # remaining stacks. Retrying gives CloudFormation a chance to
+          # finish async cleanup and proceed with the rest.
+          for attempt in 1 2 3; do
+            echo "=== Destroy attempt $attempt ==="
+            if npx cdk destroy --all --force 2>&1; then
+              echo "All stacks destroyed successfully."
+              exit 0
+            fi
+            echo "Attempt $attempt failed — retrying in 10s..."
+            sleep 10
+          done
+
+          echo "::warning::Some stacks could not be destroyed after 3 attempts. Check the AWS console for orphaned ComposureCDK-* stacks."
+          exit 1

@@ -113,17 +113,20 @@ Publishing uses [trusted publishers](https://docs.npmjs.com/trusted-publishers/)
 
 1. Create the `@composurecdk` organisation on [npmjs.com](https://www.npmjs.com) (free plan, public packages)
 2. Create a GitHub Environment called `npm` on the repository
-3. Do an initial publish to create the packages on npm (this must be done locally before trusted publishers can be configured). If your npm account has 2FA enabled, use a granular access token with the **Automation** type to bypass the OTP prompt:
+3. Do an initial publish to create the packages on npm (this must be done locally before trusted publishers can be configured). Trusted publishers cannot be configured until the package exists on the registry, so this first publish must use token or OTP authentication:
 
    ```sh
-   # Option A: use an automation token (recommended — avoids OTP prompt)
+   # Option A: use a granular access token with the "Automation" type
+   # (recommended — bypasses 2FA/OTP entirely)
+   # Create one at https://www.npmjs.com → Access Tokens → Generate New Token → Granular Access Token
+   # Set the token type to "Automation" and scope it to the @composurecdk org.
    npm config set //registry.npmjs.org/:_authToken=YOUR_AUTOMATION_TOKEN
    npx nx release publish
    npm config delete //registry.npmjs.org/:_authToken
 
    # Option B: pass an OTP code from your authenticator app
    npm login
-   npx nx release publish -- --otp=CODE
+   npx nx release publish --otp=CODE
    ```
 
 4. Configure a trusted publisher for each package:
@@ -134,13 +137,22 @@ Publishing uses [trusted publishers](https://docs.npmjs.com/trusted-publishers/)
 **Adding a new package:**
 
 1. Add `"publishConfig": { "access": "public" }` to its `package.json`
-2. Publish it once locally (same authentication options as the one-time setup above):
+2. Publish it once locally to create it on the registry. Use `nx run` to target only the new package — `npx nx release publish` publishes all packages, which will fail for any that already exist at the current version:
+
    ```sh
+   # Option A: automation token (no OTP prompt)
    npm config set //registry.npmjs.org/:_authToken=YOUR_AUTOMATION_TOKEN
-   npx nx release publish
+   npx nx run @composurecdk/<name>:nx-release-publish
    npm config delete //registry.npmjs.org/:_authToken
+
+   # Option B: OTP from authenticator app
+   npx nx run @composurecdk/<name>:nx-release-publish --otp=CODE
    ```
-3. Configure its trusted publisher using the `npm trust github` command above
+
+3. Configure its trusted publisher:
+   ```sh
+   npm trust github @composurecdk/<name> --file release.yml --repo laazyj/composureCDK --env npm
+   ```
 
 After that, the release workflow handles all future publishes automatically.
 

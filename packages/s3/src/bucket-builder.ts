@@ -152,6 +152,7 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
     if (autoAccessLog) {
       accessLogsBucket = createBucketBuilder()
         .accessLogging(false)
+        .versioned(false)
         .removalPolicy(RemovalPolicy.RETAIN)
         .build(scope, `${id}AccessLogs`).bucket;
       accessLogProps = {

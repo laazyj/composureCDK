@@ -202,6 +202,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
     if (autoAccessLog) {
       accessLogsBucket = createBucketBuilder()
         .accessLogging(false)
+        .versioned(false)
         // CloudFront standard logging writes via ACLs, which requires BucketOwnerPreferred.
         .objectOwnership(ObjectOwnership.BUCKET_OWNER_PREFERRED)
         .removalPolicy(RemovalPolicy.RETAIN)

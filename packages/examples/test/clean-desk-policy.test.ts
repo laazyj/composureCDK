@@ -6,6 +6,7 @@ import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { MockIntegration, RestApi } from "aws-cdk-lib/aws-apigateway";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
 import { createLambdaApiApp } from "../src/lambda-api-app.js";
+import { createStaticWebsiteApp } from "../src/static-website/app.js";
 
 function buildWithPolicy(buildFn: (stack: Stack) => void): Template {
   const app = new App();
@@ -71,6 +72,20 @@ describe("cleanDeskPolicy", () => {
     const app = new App();
     cleanDeskPolicy(app);
     const { stack } = createLambdaApiApp(app);
+    const template = Template.fromStack(stack);
+    const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
+
+    const retainedResources = Object.entries(resources)
+      .filter(([, resource]) => resource.DeletionPolicy === "Retain")
+      .map(([logicalId]) => logicalId);
+
+    expect(retainedResources).toEqual([]);
+  });
+
+  it("sets all resources to Delete in the static website stack", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createStaticWebsiteApp(app);
     const template = Template.fromStack(stack);
     const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
 

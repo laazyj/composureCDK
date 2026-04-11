@@ -321,9 +321,6 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           "IgnorePublicAcls": true,
           "RestrictPublicBuckets": true,
         },
-        "VersioningConfiguration": {
-          "Status": "Enabled",
-        },
       },
       "Type": "AWS::S3::Bucket",
       "UpdateReplacePolicy": "Retain",
@@ -630,9 +627,6 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           "BlockPublicPolicy": true,
           "IgnorePublicAcls": true,
           "RestrictPublicBuckets": true,
-        },
-        "VersioningConfiguration": {
-          "Status": "Enabled",
         },
       },
       "Type": "AWS::S3::Bucket",

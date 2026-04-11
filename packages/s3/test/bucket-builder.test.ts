@@ -208,7 +208,7 @@ describe("BucketBuilder", () => {
       template.resourceCountIs("AWS::S3::Bucket", 2);
     });
 
-    it("enables versioning on the auto-created logging bucket for log integrity", () => {
+    it("disables versioning on the auto-created logging bucket", () => {
       const template = synthTemplate((b) => b.bucketName("main"));
 
       const buckets = template.findResources("AWS::S3::Bucket", {
@@ -219,9 +219,7 @@ describe("BucketBuilder", () => {
       const logBucket = Object.values(buckets)[0] as {
         Properties: Record<string, unknown>;
       };
-      expect(logBucket.Properties.VersioningConfiguration).toEqual({
-        Status: "Enabled",
-      });
+      expect(logBucket.Properties.VersioningConfiguration).toBeUndefined();
     });
 
     it("disables access logging on the auto-created logging bucket", () => {

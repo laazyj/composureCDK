@@ -6,3 +6,8 @@ export {
 export { TOPIC_DEFAULTS } from "./defaults.js";
 export { type TopicAlarmConfig } from "./alarm-config.js";
 export { TOPIC_ALARM_DEFAULTS } from "./alarm-defaults.js";
+export {
+  createSubscriptionBuilder,
+  SubscriptionBuilder,
+  type SubscriptionBuilderResult,
+} from "./subscription-builder.js";

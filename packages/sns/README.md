@@ -122,6 +122,58 @@ for (const alarm of Object.values(result.alarms)) {
 }
 ```
 
+## Subscriptions
+
+### From the Topic Builder
+
+Attach subscriptions to a topic while the topic itself is being configured. The resulting `Subscription` construct is exposed on `result.subscriptions`, keyed by the name passed to `addSubscription`.
+
+```ts
+import { createTopicBuilder } from "@composurecdk/sns";
+import { EmailSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
+
+const alerts = createTopicBuilder()
+  .topicName("budget-alerts")
+  .addSubscription("email", new EmailSubscription("ops@example.com"));
+
+const { topic, subscriptions } = alerts.build(stack, "AlertsTopic");
+subscriptions.email; // aws-cdk-lib/aws-sns.Subscription
+```
+
+`addSubscription` accepts any `ITopicSubscription` or a `Resolvable<ITopicSubscription>`, so subscriptions whose endpoint is produced by a sibling component can be declared via `ref(...)`:
+
+```ts
+compose(
+  {
+    alerts: createTopicBuilder().addSubscription(
+      "onBudgetBreach",
+      ref("handler", (r) => new LambdaSubscription(r.function)),
+    ),
+    handler: createFunctionBuilder().runtime(...).handler(...).code(...),
+  },
+  { alerts: ["handler"], handler: [] },
+);
+```
+
+### Standalone Subscription Builder
+
+When the topic and subscription live in separate components, use the standalone builder:
+
+```ts
+import { createSubscriptionBuilder } from "@composurecdk/sns";
+
+compose(
+  {
+    alerts: createTopicBuilder(),
+    handler: createFunctionBuilder().runtime(...).handler(...).code(...),
+    alertSub: createSubscriptionBuilder()
+      .topic(ref("alerts", (r) => r.topic))
+      .subscription(ref("handler", (r) => new LambdaSubscription(r.function))),
+  },
+  { alerts: [], handler: [], alertSub: ["alerts", "handler"] },
+);
+```
+
 ## Examples
 
 - [LambdaApiStack](../examples/src/lambda-api-app.ts) — REST API with TopicBuilder for alarm actions

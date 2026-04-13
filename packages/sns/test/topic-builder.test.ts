@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { EmailSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import { createTopicBuilder } from "../src/topic-builder.js";
 
 function synthTemplate(
@@ -94,6 +95,49 @@ describe("TopicBuilder", () => {
       const template = synthTemplate((b) => b.enforceSSL(false));
 
       template.resourceCountIs("AWS::SNS::TopicPolicy", 0);
+    });
+  });
+
+  describe("addSubscription", () => {
+    it("creates no subscriptions by default", () => {
+      const template = synthTemplate();
+      template.resourceCountIs("AWS::SNS::Subscription", 0);
+    });
+
+    it("attaches each added subscription to the topic", () => {
+      const template = synthTemplate((b) =>
+        b
+          .addSubscription("email", new EmailSubscription("ops@example.com"))
+          .addSubscription("oncall", new EmailSubscription("oncall@example.com")),
+      );
+      template.resourceCountIs("AWS::SNS::Subscription", 2);
+      template.hasResourceProperties("AWS::SNS::Subscription", {
+        Protocol: "email",
+        Endpoint: "ops@example.com",
+      });
+      template.hasResourceProperties("AWS::SNS::Subscription", {
+        Protocol: "email",
+        Endpoint: "oncall@example.com",
+      });
+    });
+
+    it("exposes created subscriptions on the result, keyed by the added name", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createTopicBuilder()
+        .addSubscription("email", new EmailSubscription("ops@example.com"))
+        .build(stack, "TestTopic");
+
+      expect(Object.keys(result.subscriptions)).toEqual(["email"]);
+      expect(result.subscriptions.email).toBeDefined();
+    });
+
+    it("returns an empty subscriptions map when none were added", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createTopicBuilder().build(stack, "TestTopic");
+
+      expect(result.subscriptions).toEqual({});
     });
   });
 });

@@ -1,7 +1,19 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { type ITopic, Topic, type TopicProps } from "aws-cdk-lib/aws-sns";
+import {
+  type ITopic,
+  type ITopicSubscription,
+  type Subscription,
+  Topic,
+  type TopicProps,
+} from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TopicAlarmConfig } from "./alarm-config.js";
 import { createTopicAlarms } from "./topic-alarms.js";
@@ -50,6 +62,15 @@ export interface TopicBuilderResult {
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS
    */
   alarms: Record<string, Alarm>;
+
+  /**
+   * Subscriptions added to the topic via
+   * {@link ITopicBuilder.addSubscription}, keyed by the name supplied to
+   * that call.
+   *
+   * Always present — `{}` when no subscriptions were added.
+   */
+  subscriptions: Record<string, Subscription>;
 }
 
 /**
@@ -79,9 +100,15 @@ export interface TopicBuilderResult {
  */
 export type ITopicBuilder = IBuilder<TopicBuilderProps, TopicBuilder>;
 
+interface SubscriptionEntry {
+  key: string;
+  subscription: Resolvable<ITopicSubscription>;
+}
+
 class TopicBuilder implements Lifecycle<TopicBuilderResult> {
   props: Partial<TopicBuilderProps> = {};
   private readonly customAlarms: AlarmDefinitionBuilder<ITopic>[] = [];
+  private readonly _subscriptions: SubscriptionEntry[] = [];
 
   addAlarm(
     key: string,
@@ -91,7 +118,24 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
     return this;
   }
 
-  build(scope: IConstruct, id: string): TopicBuilderResult {
+  /**
+   * Register a subscription to be attached to the topic at build time.
+   *
+   * Accepts any `ITopicSubscription` (e.g. `EmailSubscription`,
+   * `LambdaSubscription`, `SqsSubscription`) or a {@link Resolvable} so that
+   * subscriptions wiring cross-component references (such as a Lambda
+   * function built by a sibling component) can be declared at configuration
+   * time.
+   *
+   * The resulting {@link Subscription} construct is exposed on
+   * {@link TopicBuilderResult.subscriptions} under `key`.
+   */
+  addSubscription(key: string, subscription: Resolvable<ITopicSubscription>): this {
+    this._subscriptions.push({ key, subscription });
+    return this;
+  }
+
+  build(scope: IConstruct, id: string, context: Record<string, object> = {}): TopicBuilderResult {
     const { recommendedAlarms: alarmConfig, ...topicProps } = this.props;
 
     const mergedProps = {
@@ -103,7 +147,13 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
 
     const alarms = createTopicAlarms(scope, id, topic, alarmConfig, this.customAlarms);
 
-    return { topic, alarms };
+    const subscriptions: Record<string, Subscription> = {};
+    for (const entry of this._subscriptions) {
+      const resolvedSub = resolve(entry.subscription, context);
+      subscriptions[entry.key] = topic.addSubscription(resolvedSub);
+    }
+
+    return { topic, alarms, subscriptions };
   }
 }
 

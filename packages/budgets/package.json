@@ -1,0 +1,50 @@
+{
+  "name": "@composurecdk/budgets",
+  "version": "0.3.0",
+  "description": "Composable AWS Budgets builder with well-architected defaults and automatic SNS topic policies",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laazyj/composureCDK",
+    "directory": "packages/budgets"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "Jason Duffett (https://github.com/laazyj)",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "peerDependencies": {
+    "@composurecdk/cloudwatch": "^0.3.0",
+    "@composurecdk/core": "^0.3.0",
+    "aws-cdk-lib": "^2.0.0",
+    "constructs": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "aws-cdk-lib": "^2.245.0",
+    "constructs": "^10.6.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}

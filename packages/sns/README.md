@@ -1,8 +1,8 @@
 # @composurecdk/sns
 
-SNS topic builder for [ComposureCDK](../../README.md).
+SNS topic and subscription builders for [ComposureCDK](../../README.md).
 
-This package provides a fluent builder for SNS topics with secure, AWS-recommended defaults. It wraps the CDK [Topic](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Topic.html) construct — refer to the CDK documentation for the full set of configurable properties.
+This package provides fluent builders for SNS topics and subscriptions with secure, AWS-recommended defaults. They wrap the CDK [Topic](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Topic.html) and [Subscription](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Subscription.html) constructs — refer to the CDK documentation for the full set of configurable properties.
 
 ## Topic Builder
 
@@ -121,6 +121,76 @@ for (const alarm of Object.values(result.alarms)) {
   alarm.addAlarmAction(new SnsAction(alertTopic));
 }
 ```
+
+## Subscription Builder
+
+```ts
+import { createSubscriptionBuilder } from "@composurecdk/sns";
+import { SubscriptionProtocol } from "aws-cdk-lib/aws-sns";
+
+const emailAlerts = createSubscriptionBuilder()
+  .topic(budgetTopic)
+  .protocol(SubscriptionProtocol.EMAIL)
+  .endpoint("ops@example.com")
+  .build(stack, "BudgetEmailSubscription");
+```
+
+Every [SubscriptionProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.SubscriptionProps.html) property is available as a fluent setter. `topic` and `deadLetterQueue` additionally accept a `Ref` so the subscription can be composed with a `TopicBuilder` (or any other component) without post-build wiring:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createTopicBuilder, createSubscriptionBuilder } from "@composurecdk/sns";
+import { SubscriptionProtocol } from "aws-cdk-lib/aws-sns";
+
+const system = compose(
+  {
+    budget: createTopicBuilder().topicName("budget-alerts"),
+    email: createSubscriptionBuilder()
+      .topic(ref("budget", (r) => r.topic))
+      .protocol(SubscriptionProtocol.EMAIL)
+      .endpoint("ops@example.com"),
+  },
+  { budget: [], email: ["budget"] },
+);
+```
+
+### Subscription defaults
+
+`createSubscriptionBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
+
+| Property             | Default | Rationale                                                                                                 |
+| -------------------- | ------- | --------------------------------------------------------------------------------------------------------- |
+| `rawMessageDelivery` | `false` | Explicit default; raw delivery is protocol-specific and opt-in (valid for HTTP/S, SQS, Lambda, Firehose). |
+
+Deliberately **not** defaulted:
+
+- **Dead-letter queue.** Attaching a DLQ is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)) but requires a queue resource the caller owns. Pass one via `.deadLetterQueue(queue)` or a `ref`.
+- **HTTPS over HTTP.** `SubscriptionProtocol.HTTP` is allowed for backwards compatibility; prefer `HTTPS` for transport encryption ([SNS security best practices](https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html)).
+
+The defaults are exported as `SUBSCRIPTION_DEFAULTS` for visibility and testing:
+
+```ts
+import { SUBSCRIPTION_DEFAULTS } from "@composurecdk/sns";
+```
+
+### Subscription recommended alarms
+
+When a dead-letter queue is attached, the builder creates the subscription-relevant [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS). Without a DLQ the alarms are skipped — the underlying metrics only emit during a redrive attempt.
+
+| Alarm                                       | Metric                                                 | Default threshold | Created when |
+| ------------------------------------------- | ------------------------------------------------------ | ----------------- | ------------ |
+| `numberOfNotificationsRedrivenToDlq`        | NumberOfNotificationsRedrivenToDlq (Sum, 1 min)        | > 0               | DLQ attached |
+| `numberOfNotificationsFailedToRedriveToDlq` | NumberOfNotificationsFailedToRedriveToDlq (Sum, 1 min) | > 0               | DLQ attached |
+
+Metrics are topic-level (dimension `TopicName`); alarm constructs are scoped under the subscription's id so multiple subscriptions on the same topic do not collide.
+
+The defaults are exported as `SUBSCRIPTION_ALARM_DEFAULTS`:
+
+```ts
+import { SUBSCRIPTION_ALARM_DEFAULTS } from "@composurecdk/sns";
+```
+
+Customization, disabling, and applying actions follow the same pattern as the topic alarms above (`recommendedAlarms({ ... })`, `recommendedAlarms(false)`, iterate the build result's `alarms`).
 
 ## Examples
 

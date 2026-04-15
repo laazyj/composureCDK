@@ -7,6 +7,7 @@ import { createMockApiApp } from "../src/mock-api-app.js";
 import { createMultiStackApp } from "../src/multi-stack-app.js";
 import { createOpenApiPetstoreApp } from "../src/openapi-petstore-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
+import { createCustomDomainWebsiteApp } from "../src/custom-domain-website/app.js";
 import { createStrategyStackApp } from "../src/strategy-stack-app.js";
 
 const app = new App();
@@ -18,6 +19,7 @@ createMockApiApp(app);
 createMultiStackApp(app);
 createOpenApiPetstoreApp(app);
 createStaticWebsiteApp(app);
+createCustomDomainWebsiteApp(app);
 createStrategyStackApp(app);
 
 app.synth();

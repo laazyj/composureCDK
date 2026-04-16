@@ -143,7 +143,19 @@ describe("static-website-app", () => {
       const template = synthTemplate();
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
-          Comment: "Example static website",
+          Comment: "Custom-domain static website",
+        }),
+      });
+    });
+
+    it("exposes both apex and www domain aliases wired to the ACM certificate", () => {
+      const template = synthTemplate();
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          Aliases: ["example.com", "www.example.com"],
+          ViewerCertificate: Match.objectLike({
+            AcmCertificateArn: Match.anyValue(),
+          }),
         }),
       });
     });
@@ -182,10 +194,51 @@ describe("static-website-app", () => {
     });
   });
 
+  describe("Route 53 hosted zone", () => {
+    it("creates exactly one public hosted zone for the apex", () => {
+      const template = synthTemplate();
+      template.resourceCountIs("AWS::Route53::HostedZone", 1);
+      template.hasResourceProperties("AWS::Route53::HostedZone", {
+        Name: "example.com.",
+      });
+    });
+
+    it("creates apex A and AAAA alias records pointing at the CloudFront distribution", () => {
+      const template = synthTemplate();
+      template.resourceCountIs("AWS::Route53::RecordSet", 2);
+      template.hasResourceProperties("AWS::Route53::RecordSet", {
+        Type: "A",
+        AliasTarget: Match.objectLike({
+          DNSName: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["DomainName"]) }),
+        }),
+      });
+      template.hasResourceProperties("AWS::Route53::RecordSet", {
+        Type: "AAAA",
+        AliasTarget: Match.objectLike({
+          DNSName: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["DomainName"]) }),
+        }),
+      });
+    });
+  });
+
+  describe("ACM certificate", () => {
+    it("creates a single DNS-validated certificate covering apex + www", () => {
+      const template = synthTemplate();
+      template.resourceCountIs("AWS::CertificateManager::Certificate", 1);
+      template.hasResourceProperties("AWS::CertificateManager::Certificate", {
+        DomainName: "example.com",
+        SubjectAlternativeNames: ["www.example.com"],
+        ValidationMethod: "DNS",
+      });
+    });
+  });
+
   describe("stack", () => {
     it("has a descriptive stack description", () => {
       const template = synthTemplate();
-      expect(template.toJSON().Description).toBe("Static website hosted on S3 with CloudFront CDN");
+      expect(template.toJSON().Description).toBe(
+        "Static website on S3 + CloudFront with a custom domain and alerting",
+      );
     });
 
     it("matches the expected synthesised template", () => {

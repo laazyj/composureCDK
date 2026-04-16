@@ -2,7 +2,17 @@
 
 exports[`static-website-app > stack > matches the expected synthesised template 1`] = `
 {
-  "Description": "Static website hosted on S3 with CloudFront CDN",
+  "Description": "Static website on S3 + CloudFront with a custom domain and alerting",
+  "Mappings": {
+    "AWSCloudFrontPartitionHostedZoneIdMap": {
+      "aws": {
+        "zoneId": "Z2FDTNDATAQYW2",
+      },
+      "aws-cn": {
+        "zoneId": "Z3RFFRIM2A3IF5",
+      },
+    },
+  },
   "Outputs": {
     "BucketName": {
       "Description": "S3 bucket name for site content",
@@ -10,21 +20,29 @@ exports[`static-website-app > stack > matches the expected synthesised template 
         "Ref": "StaticWebsitesite792D65DA",
       },
     },
-    "DistributionUrl": {
-      "Description": "CloudFront distribution URL",
+    "CertificateArn": {
+      "Description": "ACM certificate ARN",
       "Value": {
-        "Fn::Join": [
-          "",
-          [
-            "https://",
-            {
-              "Fn::GetAtt": [
-                "StaticWebsitecdnDDCEC06E",
-                "DomainName",
-              ],
-            },
-          ],
+        "Ref": "StaticWebsitecertificate67A2D6A3",
+      },
+    },
+    "DistributionDomainName": {
+      "Description": "CloudFront-assigned domain name (alias target)",
+      "Value": {
+        "Fn::GetAtt": [
+          "StaticWebsitecdnDDCEC06E",
+          "DomainName",
         ],
+      },
+    },
+    "DomainUrl": {
+      "Description": "Customer-facing URL",
+      "Value": "https://example.com",
+    },
+    "HostedZoneId": {
+      "Description": "Route 53 hosted zone ID (for NS delegation)",
+      "Value": {
+        "Ref": "StaticWebsitezoneC24C379E",
       },
     },
   },
@@ -296,6 +314,60 @@ exports[`static-website-app > stack > matches the expected synthesised template 
       },
       "Type": "AWS::SNS::TopicPolicy",
     },
+    "StaticWebsiteapexA768FEF46": {
+      "Properties": {
+        "AliasTarget": {
+          "DNSName": {
+            "Fn::GetAtt": [
+              "StaticWebsitecdnDDCEC06E",
+              "DomainName",
+            ],
+          },
+          "HostedZoneId": {
+            "Fn::FindInMap": [
+              "AWSCloudFrontPartitionHostedZoneIdMap",
+              {
+                "Ref": "AWS::Partition",
+              },
+              "zoneId",
+            ],
+          },
+        },
+        "HostedZoneId": {
+          "Ref": "StaticWebsitezoneC24C379E",
+        },
+        "Name": "example.com.",
+        "Type": "A",
+      },
+      "Type": "AWS::Route53::RecordSet",
+    },
+    "StaticWebsiteapexAaaaD088ACA7": {
+      "Properties": {
+        "AliasTarget": {
+          "DNSName": {
+            "Fn::GetAtt": [
+              "StaticWebsitecdnDDCEC06E",
+              "DomainName",
+            ],
+          },
+          "HostedZoneId": {
+            "Fn::FindInMap": [
+              "AWSCloudFrontPartitionHostedZoneIdMap",
+              {
+                "Ref": "AWS::Partition",
+              },
+              "zoneId",
+            ],
+          },
+        },
+        "HostedZoneId": {
+          "Ref": "StaticWebsitezoneC24C379E",
+        },
+        "Name": "example.com.",
+        "Type": "AAAA",
+      },
+      "Type": "AWS::Route53::RecordSet",
+    },
     "StaticWebsitecdnAccessLogsFAE00048": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -375,7 +447,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     "StaticWebsitecdnDDCEC06E": {
       "Properties": {
         "DistributionConfig": {
-          "Comment": "Example static website",
+          "Aliases": [
+            "example.com",
+            "www.example.com",
+          ],
+          "Comment": "Custom-domain static website",
           "CustomErrorResponses": [
             {
               "ErrorCachingMinTTL": 60,
@@ -430,6 +506,13 @@ exports[`static-website-app > stack > matches the expected synthesised template 
             },
           ],
           "PriceClass": "PriceClass_100",
+          "ViewerCertificate": {
+            "AcmCertificateArn": {
+              "Ref": "StaticWebsitecertificate67A2D6A3",
+            },
+            "MinimumProtocolVersion": "TLSv1.2_2021",
+            "SslSupportMethod": "sni-only",
+          },
         },
       },
       "Type": "AWS::CloudFront::Distribution",
@@ -508,6 +591,38 @@ exports[`static-website-app > stack > matches the expected synthesised template 
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
+    },
+    "StaticWebsitecertificate67A2D6A3": {
+      "Properties": {
+        "CertificateTransparencyLoggingPreference": "ENABLED",
+        "DomainName": "example.com",
+        "DomainValidationOptions": [
+          {
+            "DomainName": "example.com",
+            "HostedZoneId": {
+              "Ref": "StaticWebsitezoneC24C379E",
+            },
+          },
+          {
+            "DomainName": "www.example.com",
+            "HostedZoneId": {
+              "Ref": "StaticWebsitezoneC24C379E",
+            },
+          },
+        ],
+        "KeyAlgorithm": "RSA_2048",
+        "SubjectAlternativeNames": [
+          "www.example.com",
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-StaticWebsiteStack/StaticWebsite--certificate",
+          },
+        ],
+        "ValidationMethod": "DNS",
+      },
+      "Type": "AWS::CertificateManager::Certificate",
     },
     "StaticWebsitedeployAwsCliLayer0DAF6098": {
       "Properties": {
@@ -833,6 +948,15 @@ exports[`static-website-app > stack > matches the expected synthesised template 
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
+    },
+    "StaticWebsitezoneC24C379E": {
+      "Properties": {
+        "HostedZoneConfig": {
+          "Comment": "Primary customer-facing domain",
+        },
+        "Name": "example.com.",
+      },
+      "Type": "AWS::Route53::HostedZone",
     },
   },
   "Rules": {

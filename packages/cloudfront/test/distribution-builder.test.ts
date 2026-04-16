@@ -329,5 +329,64 @@ describe("DistributionBuilder", () => {
         }),
       });
     });
+
+    it("resolves certificate from context when using a Ref", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const cert = Certificate.fromCertificateArn(
+        stack,
+        "Cert",
+        "arn:aws:acm:us-east-1:123456789012:certificate/abc",
+      );
+
+      const builder = createDistributionBuilder()
+        .origin(withBucketOrigin(stack))
+        .certificate(ref<{ certificate: typeof cert }>("tls").map((r) => r.certificate))
+        .domainNames(["example.com"])
+        .accessLogging(false);
+
+      const result = builder.build(stack, "TestDistribution", {
+        tls: { certificate: cert },
+      });
+
+      expect(result.distribution).toBeDefined();
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          Aliases: ["example.com"],
+          ViewerCertificate: Match.objectLike({
+            AcmCertificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/abc",
+          }),
+        }),
+      });
+    });
+
+    it("accepts a concrete certificate without a Ref", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const cert = Certificate.fromCertificateArn(
+        stack,
+        "Cert",
+        "arn:aws:acm:us-east-1:123456789012:certificate/abc",
+      );
+
+      const builder = createDistributionBuilder()
+        .origin(withBucketOrigin(stack))
+        .certificate(cert)
+        .domainNames(["example.com"])
+        .accessLogging(false);
+
+      const result = builder.build(stack, "TestDistribution");
+
+      expect(result.distribution).toBeDefined();
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          ViewerCertificate: Match.objectLike({
+            AcmCertificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/abc",
+          }),
+        }),
+      });
+    });
   });
 });

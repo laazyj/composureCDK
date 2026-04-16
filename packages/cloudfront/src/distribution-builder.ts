@@ -4,6 +4,7 @@ import {
   type IOrigin,
   type AddBehaviorOptions,
 } from "aws-cdk-lib/aws-cloudfront";
+import { type ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { RemovalPolicy } from "aws-cdk-lib";
@@ -35,7 +36,7 @@ import { DISTRIBUTION_DEFAULTS } from "./defaults.js";
  */
 export interface DistributionBuilderProps extends Omit<
   DistributionProps,
-  "defaultBehavior" | "enableLogging"
+  "defaultBehavior" | "enableLogging" | "certificate"
 > {
   /**
    * Whether to automatically create an S3 bucket for CloudFront standard
@@ -53,6 +54,15 @@ export interface DistributionBuilderProps extends Omit<
    * bucket takes precedence.
    */
   accessLogging?: boolean;
+
+  /**
+   * The ACM certificate to associate with the distribution for HTTPS.
+   *
+   * Accepts a concrete {@link ICertificate} or a {@link Resolvable} —
+   * typically a {@link Ref} produced by a composed `@composurecdk/acm`
+   * certificate builder. The certificate must be issued in `us-east-1`.
+   */
+  certificate?: Resolvable<ICertificate>;
 
   /**
    * Options for the default cache behavior, excluding `origin`.
@@ -185,10 +195,12 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
 
     const {
       accessLogging,
+      certificate,
       defaultBehavior: userBehavior,
       recommendedAlarms: alarmConfig,
       ...distProps
     } = this.props;
+    const resolvedCertificate = certificate ? resolve(certificate, context ?? {}) : undefined;
     const {
       accessLogging: defaultAccessLogging,
       defaultBehavior: defaultBehavior,
@@ -217,6 +229,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       ...cdkDefaults,
       ...accessLogProps,
       ...distProps,
+      ...(resolvedCertificate ? { certificate: resolvedCertificate } : {}),
       defaultBehavior: {
         ...defaultBehavior,
         ...userBehavior,

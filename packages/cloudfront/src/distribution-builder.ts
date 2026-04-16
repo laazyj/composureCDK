@@ -3,6 +3,9 @@ import {
   type DistributionProps,
   type IOrigin,
   type AddBehaviorOptions,
+  type FunctionAssociation,
+  type FunctionEventType,
+  type IFunctionRef,
 } from "aws-cdk-lib/aws-cloudfront";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
@@ -33,6 +36,30 @@ import { DISTRIBUTION_DEFAULTS } from "./defaults.js";
  * The `enableLogging` CDK prop is replaced by {@link accessLogging}, which
  * auto-creates a logging bucket with secure defaults when enabled.
  */
+/**
+ * A {@link FunctionAssociation} whose `function` may be either a concrete
+ * {@link IFunctionRef} or a {@link Ref} that resolves to one at build time.
+ *
+ * Enables declarative cross-component wiring between a
+ * {@link createFunctionBuilder | CloudFront Function} and a distribution
+ * behavior when composing a system.
+ */
+export interface ResolvableFunctionAssociation {
+  /** The CloudFront function that will be invoked, or a Ref resolving to one. */
+  readonly function: Resolvable<IFunctionRef>;
+  /** The type of event which should invoke the function. */
+  readonly eventType: FunctionEventType;
+}
+
+/**
+ * Variant of {@link AddBehaviorOptions} that allows {@link ResolvableFunctionAssociation}s
+ * in place of concrete {@link FunctionAssociation}s. Concrete values still
+ * work — `resolve()` is a no-op on non-Ref inputs.
+ */
+export type ResolvableAddBehaviorOptions = Omit<AddBehaviorOptions, "functionAssociations"> & {
+  functionAssociations?: ResolvableFunctionAssociation[];
+};
+
 export interface DistributionBuilderProps extends Omit<
   DistributionProps,
   "defaultBehavior" | "enableLogging"
@@ -61,8 +88,12 @@ export interface DistributionBuilderProps extends Omit<
    * method and injected at build time. All other behavior options (cache
    * policy, function associations, viewer protocol policy, etc.) can be
    * configured here.
+   *
+   * Each entry in `functionAssociations.function` may be either a concrete
+   * {@link IFunctionRef} or a {@link Ref} resolved at build time — this
+   * enables composing a CloudFront Function component with the distribution.
    */
-  defaultBehavior?: AddBehaviorOptions;
+  defaultBehavior?: ResolvableAddBehaviorOptions;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -213,6 +244,12 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       };
     }
 
+    const resolvedFunctionAssociations: FunctionAssociation[] | undefined =
+      userBehavior?.functionAssociations?.map((fa) => ({
+        function: resolve(fa.function, context ?? {}),
+        eventType: fa.eventType,
+      }));
+
     const mergedProps = {
       ...cdkDefaults,
       ...accessLogProps,
@@ -220,6 +257,9 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       defaultBehavior: {
         ...defaultBehavior,
         ...userBehavior,
+        ...(resolvedFunctionAssociations
+          ? { functionAssociations: resolvedFunctionAssociations }
+          : {}),
         origin: resolvedOrigin,
       },
     } as DistributionProps;

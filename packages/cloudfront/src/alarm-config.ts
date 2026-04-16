@@ -45,3 +45,60 @@ export interface DistributionAlarmConfig {
    */
   originLatency?: AlarmConfig | false;
 }
+
+/**
+ * Controls which recommended alarms are created for a CloudFront Function.
+ * All alarms are enabled by default with sensible thresholds. Set individual
+ * alarms to `false` to disable them, or provide an {@link AlarmConfig} to
+ * tune thresholds.
+ *
+ * CloudFront Function metrics are emitted in the `us-east-1` region only
+ * (since CloudFront is a global service). The alarms created by the builder
+ * live in the stack's region — if that is not `us-east-1`, the alarms will
+ * not receive data. To monitor CloudFront Functions across regions, deploy
+ * the parent stack to `us-east-1` or create the alarms manually in that
+ * region via a dedicated stack.
+ *
+ * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/monitoring-functions.html
+ */
+export interface FunctionAlarmConfig {
+  /**
+   * Master switch: set to `false` to disable all recommended alarms.
+   * Individual alarms can also be disabled via their own entry.
+   * @default true
+   */
+  enabled?: boolean;
+
+  /**
+   * Alarm when the function raises runtime exceptions while processing a
+   * viewer request or response.
+   *
+   * Metric: `AWS/CloudFront FunctionExecutionErrors`, statistic Sum,
+   * period 1 minute. Default threshold: > 0 errors.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/monitoring-functions.html
+   */
+  executionErrors?: AlarmConfig | false;
+
+  /**
+   * Alarm when the function returns an event object that fails validation
+   * (e.g., malformed headers, unsupported response shape).
+   *
+   * Metric: `AWS/CloudFront FunctionValidationErrors`, statistic Sum,
+   * period 1 minute. Default threshold: > 0 errors.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/monitoring-functions.html
+   */
+  validationErrors?: AlarmConfig | false;
+
+  /**
+   * Alarm when the function is throttled — typically because it exceeded
+   * the 1ms compute-utilization budget.
+   *
+   * Metric: `AWS/CloudFront FunctionThrottles`, statistic Sum,
+   * period 1 minute. Default threshold: > 0 throttles.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-function-restrictions.html
+   */
+  throttles?: AlarmConfig | false;
+}

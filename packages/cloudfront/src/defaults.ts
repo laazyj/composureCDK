@@ -1,4 +1,5 @@
 import {
+  FunctionRuntime,
   HttpVersion,
   PriceClass,
   ResponseHeadersPolicy,
@@ -6,6 +7,7 @@ import {
   ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
 import type { DistributionBuilderProps } from "./distribution-builder.js";
+import type { FunctionBuilderProps } from "./function-builder.js";
 
 /**
  * Secure, AWS-recommended defaults applied to every CloudFront distribution
@@ -66,4 +68,19 @@ export const DISTRIBUTION_DEFAULTS: Partial<DistributionBuilderProps> = {
      */
     responseHeadersPolicy: ResponseHeadersPolicy.SECURITY_HEADERS,
   },
+};
+
+/**
+ * Defaults applied to every CloudFront Function built with
+ * {@link createFunctionBuilder}. Each property can be individually overridden
+ * via the builder's fluent API.
+ */
+export const FUNCTION_DEFAULTS: Partial<FunctionBuilderProps> = {
+  /**
+   * Use the `cloudfront-js-2.0` runtime by default. It is the currently
+   * recommended runtime and is a superset of `cloudfront-js-1.0` features
+   * (async/await, `crypto.subtle`, KeyValueStore support).
+   * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/functions-javascript-runtime-20.html
+   */
+  runtime: FunctionRuntime.JS_2_0,
 };

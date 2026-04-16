@@ -3,11 +3,18 @@ import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
-import { CachePolicy, PriceClass, ViewerProtocolPolicy } from "aws-cdk-lib/aws-cloudfront";
+import {
+  CachePolicy,
+  FunctionCode,
+  FunctionEventType,
+  PriceClass,
+  ViewerProtocolPolicy,
+} from "aws-cdk-lib/aws-cloudfront";
 import { Certificate } from "aws-cdk-lib/aws-certificatemanager";
 import { ref } from "@composurecdk/core";
 import { type BucketBuilderResult } from "@composurecdk/s3";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
+import { createFunctionBuilder, type FunctionBuilderResult } from "../src/function-builder.js";
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) => void,
@@ -326,6 +333,78 @@ describe("DistributionBuilder", () => {
               S3OriginConfig: Match.anyValue(),
             }),
           ]),
+        }),
+      });
+    });
+
+    it("resolves functionAssociations.function from context when using a Ref", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const bucket = new Bucket(stack, "TestBucket");
+
+      const functionResult = createFunctionBuilder()
+        .code(FunctionCode.fromInline("async function handler(e){return e.request}"))
+        .recommendedAlarms(false)
+        .build(stack, "Rewrite");
+
+      const builder = createDistributionBuilder()
+        .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+        .accessLogging(false)
+        .defaultBehavior({
+          functionAssociations: [
+            {
+              function: ref<FunctionBuilderResult>("rewrite").map((r) => r.function),
+              eventType: FunctionEventType.VIEWER_REQUEST,
+            },
+          ],
+        });
+
+      const result = builder.build(stack, "TestDistribution", {
+        rewrite: functionResult,
+      });
+
+      expect(result.distribution).toBeDefined();
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          DefaultCacheBehavior: Match.objectLike({
+            FunctionAssociations: Match.arrayWith([
+              Match.objectLike({
+                EventType: "viewer-request",
+                FunctionARN: Match.anyValue(),
+              }),
+            ]),
+          }),
+        }),
+      });
+    });
+
+    it("accepts a concrete IFunctionRef in functionAssociations (non-Ref)", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const bucket = new Bucket(stack, "TestBucket");
+
+      const { function: fn } = createFunctionBuilder()
+        .code(FunctionCode.fromInline("async function handler(e){return e.request}"))
+        .recommendedAlarms(false)
+        .build(stack, "Rewrite");
+
+      createDistributionBuilder()
+        .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+        .accessLogging(false)
+        .defaultBehavior({
+          functionAssociations: [{ function: fn, eventType: FunctionEventType.VIEWER_RESPONSE }],
+        })
+        .build(stack, "TestDistribution");
+
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          DefaultCacheBehavior: Match.objectLike({
+            FunctionAssociations: Match.arrayWith([
+              Match.objectLike({ EventType: "viewer-response" }),
+            ]),
+          }),
         }),
       });
     });

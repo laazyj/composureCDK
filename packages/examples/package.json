@@ -27,6 +27,7 @@
     "@composurecdk/cloudwatch": "^0.3.0",
     "@composurecdk/cloudfront": "^0.3.0",
     "@composurecdk/core": "^0.3.0",
+    "@composurecdk/ec2": "^0.3.0",
     "@composurecdk/lambda": "^0.3.0",
     "@composurecdk/s3": "^0.3.0",
     "@composurecdk/sns": "^0.3.0"

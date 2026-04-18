@@ -5,6 +5,8 @@ interface TopicAlarmDefaults {
   enabled: true;
   numberOfNotificationsFailed: Required<AlarmConfig>;
   numberOfNotificationsFilteredOutInvalidAttributes: Required<AlarmConfig>;
+  numberOfNotificationsRedrivenToDlq: Required<AlarmConfig>;
+  numberOfNotificationsFailedToRedriveToDlq: Required<AlarmConfig>;
 }
 
 /**
@@ -25,6 +27,22 @@ export const TOPIC_ALARM_DEFAULTS: TopicAlarmDefaults = {
 
   /** Any message filtered due to invalid attributes indicates a configuration issue; threshold 0. */
   numberOfNotificationsFilteredOutInvalidAttributes: {
+    threshold: 0,
+    evaluationPeriods: 1,
+    datapointsToAlarm: 1,
+    treatMissingData: TreatMissingData.NOT_BREACHING,
+  },
+
+  /** Any redrive to a subscription DLQ indicates a delivery failure worth investigating; threshold 0. */
+  numberOfNotificationsRedrivenToDlq: {
+    threshold: 0,
+    evaluationPeriods: 1,
+    datapointsToAlarm: 1,
+    treatMissingData: TreatMissingData.NOT_BREACHING,
+  },
+
+  /** Any failure to redrive to a DLQ means message loss; threshold 0. */
+  numberOfNotificationsFailedToRedriveToDlq: {
     threshold: 0,
     evaluationPeriods: 1,
     datapointsToAlarm: 1,

@@ -1,8 +1,8 @@
 # @composurecdk/sns
 
-SNS topic builder for [ComposureCDK](../../README.md).
+SNS topic and subscription builders for [ComposureCDK](../../README.md).
 
-This package provides a fluent builder for SNS topics with secure, AWS-recommended defaults. It wraps the CDK [Topic](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Topic.html) construct — refer to the CDK documentation for the full set of configurable properties.
+This package provides fluent builders for SNS topics and subscriptions with secure, AWS-recommended defaults. They wrap the CDK [Topic](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Topic.html) and [Subscription](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Subscription.html) constructs — refer to the CDK documentation for the full set of configurable properties.
 
 ## Topic Builder
 
@@ -47,6 +47,10 @@ The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.
 | --------------------------------------------------- | --------------------------------------------------------------- | ----------------- | ------------ |
 | `numberOfNotificationsFailed`                       | NumberOfNotificationsFailed (Sum, 1 min)                        | > 0               | Always       |
 | `numberOfNotificationsFilteredOutInvalidAttributes` | NumberOfNotificationsFilteredOut-InvalidAttributes (Sum, 1 min) | > 0               | Always       |
+| `numberOfNotificationsRedrivenToDlq`                | NumberOfNotificationsRedrivenToDlq (Sum, 1 min)                 | > 0               | Always[^dlq] |
+| `numberOfNotificationsFailedToRedriveToDlq`         | NumberOfNotificationsFailedToRedriveToDlq (Sum, 1 min)          | > 0               | Always[^dlq] |
+
+[^dlq]: Metric only emits when a subscription on the topic has a dead-letter queue attached and SNS attempts redrive. `TreatMissingData` defaults to `notBreaching`, so the alarm stays quiet on topics without DLQs. Attach a DLQ via the `SubscriptionBuilder`'s `.deadLetterQueue(...)` — see [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html).
 
 The defaults are exported as `TOPIC_ALARM_DEFAULTS` for visibility and testing:
 
@@ -121,6 +125,46 @@ for (const alarm of Object.values(result.alarms)) {
   alarm.addAlarmAction(new SnsAction(alertTopic));
 }
 ```
+
+## Subscription Builder
+
+```ts
+import { createSubscriptionBuilder } from "@composurecdk/sns";
+import { SubscriptionProtocol } from "aws-cdk-lib/aws-sns";
+
+const emailAlerts = createSubscriptionBuilder()
+  .topic(budgetTopic)
+  .protocol(SubscriptionProtocol.EMAIL)
+  .endpoint("ops@example.com")
+  .build(stack, "BudgetEmailSubscription");
+```
+
+Every [SubscriptionProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.SubscriptionProps.html) property is available as a fluent setter. `topic` and `deadLetterQueue` additionally accept a `Ref` so the subscription can be composed with a `TopicBuilder` (or any other component) without post-build wiring:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createTopicBuilder, createSubscriptionBuilder } from "@composurecdk/sns";
+import { SubscriptionProtocol } from "aws-cdk-lib/aws-sns";
+
+const system = compose(
+  {
+    budget: createTopicBuilder().topicName("budget-alerts"),
+    email: createSubscriptionBuilder()
+      .topic(ref("budget", (r) => r.topic))
+      .protocol(SubscriptionProtocol.EMAIL)
+      .endpoint("ops@example.com"),
+  },
+  { budget: [], email: ["budget"] },
+);
+```
+
+### Subscription reliability
+
+Attaching a dead-letter queue is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)). Pass a queue via `.deadLetterQueue(queue)` or a `ref` to one; the builder does not create a DLQ automatically because the queue resource needs to be caller-owned.
+
+The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached.
+
+Also note: `SubscriptionProtocol.HTTP` is allowed for compatibility; prefer `HTTPS` for transport encryption ([SNS security best practices](https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html)).
 
 ## Examples
 

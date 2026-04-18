@@ -425,6 +425,10 @@ exports[`static-website-app > stack > matches the expected synthesised template 
       "Type": "AWS::S3::BucketPolicy",
     },
     "StaticWebsitecdnDDCEC06E": {
+      "DependsOn": [
+        "StaticWebsitecdnAccessLogsPolicy6BB3093C",
+        "StaticWebsitecdnAccessLogsFAE00048",
+      ],
       "Properties": {
         "DistributionConfig": {
           "Comment": "Example static website",
@@ -519,6 +523,10 @@ exports[`static-website-app > stack > matches the expected synthesised template 
       "Type": "AWS::CloudWatch::Alarm",
     },
     "StaticWebsitecdnOrigin1S3OriginAccessControl00704AC0": {
+      "DependsOn": [
+        "StaticWebsitecdnAccessLogsPolicy6BB3093C",
+        "StaticWebsitecdnAccessLogsFAE00048",
+      ],
       "Properties": {
         "OriginAccessControlConfig": {
           "Name": "ComposureCDKStaticWebsiteStaOrigin1S3OriginAccessControl82763327",

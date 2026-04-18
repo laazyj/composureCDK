@@ -95,4 +95,45 @@ describe("cleanDeskPolicy", () => {
 
     expect(retainedResources).toEqual([]);
   });
+
+  it("sets CloudFront access logs bucket to Delete when cleanDeskPolicy is applied", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createStaticWebsiteApp(app);
+    const template = Template.fromStack(stack);
+    const buckets = template.findResources("AWS::S3::Bucket");
+
+    // All 3 buckets (site, S3 access logs, CloudFront access logs) should have Delete policy
+    const bucketPolicies = Object.values(buckets).map(
+      (bucket) => (bucket as { DeletionPolicy?: string }).DeletionPolicy,
+    );
+
+    expect(bucketPolicies).toEqual(["Delete", "Delete", "Delete"]);
+  });
+
+  it("creates autoDeleteObjects custom resources for all buckets when cleanDeskPolicy is applied", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createStaticWebsiteApp(app);
+    const template = Template.fromStack(stack);
+
+    const buckets = template.findResources("AWS::S3::Bucket");
+    const autoDeleteResources = template.findResources("Custom::S3AutoDeleteObjects");
+
+    // Should have 3 buckets and 3 autoDelete custom resources
+    expect(Object.keys(buckets).length).toBe(3);
+    expect(Object.keys(autoDeleteResources).length).toBe(3);
+
+    // Each bucket should have a corresponding autoDelete resource
+    const bucketIds = Object.keys(buckets);
+    const autoDeleteBucketRefs = Object.values(autoDeleteResources).map(
+      (resource) =>
+        (resource as { Properties?: { BucketName?: { Ref?: string } } }).Properties?.BucketName
+          ?.Ref,
+    );
+
+    for (const bucketId of bucketIds) {
+      expect(autoDeleteBucketRefs).toContain(bucketId);
+    }
+  });
 });

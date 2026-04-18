@@ -389,4 +389,64 @@ describe("DistributionBuilder", () => {
       });
     });
   });
+
+  describe("access logging", () => {
+    it("creates distribution dependency on access logs bucket for proper deletion order", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const bucket = new Bucket(stack, "TestBucket");
+      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+
+      const builder = createDistributionBuilder().origin(origin).accessLogging(true);
+      builder.build(stack, "TestDistribution");
+
+      const template = Template.fromStack(stack);
+      const resources = template.toJSON().Resources as Record<
+        string,
+        { Type: string; DependsOn?: string[] }
+      >;
+      const distribution = Object.entries(resources).find(
+        ([, r]) => r.Type === "AWS::CloudFront::Distribution",
+      );
+      const accessLogsBucket = Object.entries(resources).find(
+        ([id, r]) => id.includes("AccessLogs") && r.Type === "AWS::S3::Bucket",
+      );
+
+      expect(distribution).toBeDefined();
+      expect(accessLogsBucket).toBeDefined();
+
+      if (!distribution || !accessLogsBucket) return;
+
+      const [, distResource] = distribution;
+      const [bucketId] = accessLogsBucket;
+
+      expect(distResource.DependsOn).toBeDefined();
+      expect(distResource.DependsOn).toContain(bucketId);
+    });
+
+    it("does not create dependency when access logging is disabled", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const bucket = new Bucket(stack, "TestBucket");
+      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+
+      const builder = createDistributionBuilder().origin(origin).accessLogging(false);
+      builder.build(stack, "TestDistribution");
+
+      const template = Template.fromStack(stack);
+      const resources = template.toJSON().Resources as Record<
+        string,
+        { Type: string; DependsOn?: string[] }
+      >;
+      const distribution = Object.entries(resources).find(
+        ([, r]) => r.Type === "AWS::CloudFront::Distribution",
+      );
+
+      expect(distribution).toBeDefined();
+      if (!distribution) return;
+
+      const [, distResource] = distribution;
+      expect(distResource.DependsOn).toBeUndefined();
+    });
+  });
 });

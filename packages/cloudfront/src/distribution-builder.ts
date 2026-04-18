@@ -239,6 +239,12 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
 
     const distribution = new Distribution(scope, id, mergedProps);
 
+    // Ensure CloudFront is deleted before the access logs bucket during stack teardown.
+    // Without this, CloudFront may still be writing logs while the bucket is being emptied/deleted.
+    if (accessLogsBucket) {
+      distribution.node.addDependency(accessLogsBucket);
+    }
+
     const alarms = createDistributionAlarms(
       scope,
       id,

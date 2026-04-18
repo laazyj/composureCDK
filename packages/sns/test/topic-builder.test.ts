@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Queue } from "aws-cdk-lib/aws-sqs";
+import {
+  EmailSubscription,
+  LambdaSubscription,
+  SqsSubscription,
+} from "aws-cdk-lib/aws-sns-subscriptions";
+import { ref } from "@composurecdk/core";
 import { createTopicBuilder } from "../src/topic-builder.js";
 
 function synthTemplate(
@@ -69,6 +77,103 @@ describe("TopicBuilder", () => {
         FifoTopic: true,
         ContentBasedDeduplication: true,
       });
+    });
+  });
+
+  describe("addSubscription", () => {
+    it("returns {} for subscriptions when none are added", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createTopicBuilder().build(stack, "TestTopic");
+
+      expect(result.subscriptions).toEqual({});
+    });
+
+    it("creates a Subscription resource for an EmailSubscription", () => {
+      const template = synthTemplate((b) =>
+        b.addSubscription("ops", new EmailSubscription("ops@example.com")),
+      );
+
+      template.resourceCountIs("AWS::SNS::Subscription", 1);
+      template.hasResourceProperties("AWS::SNS::Subscription", {
+        Protocol: "email",
+        Endpoint: "ops@example.com",
+      });
+    });
+
+    it("wires lambda invoke permission for a LambdaSubscription", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const fn = new LambdaFunction(stack, "Handler", {
+        runtime: Runtime.NODEJS_20_X,
+        handler: "index.handler",
+        code: Code.fromInline("exports.handler = async () => {};"),
+      });
+
+      createTopicBuilder()
+        .addSubscription("handler", new LambdaSubscription(fn))
+        .build(stack, "TestTopic");
+
+      const template = Template.fromStack(stack);
+      template.resourceCountIs("AWS::SNS::Subscription", 1);
+      template.hasResourceProperties("AWS::Lambda::Permission", {
+        Action: "lambda:InvokeFunction",
+        Principal: "sns.amazonaws.com",
+      });
+    });
+
+    it("wires the SQS queue policy for an SqsSubscription", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const queue = new Queue(stack, "Q");
+
+      createTopicBuilder()
+        .addSubscription("queue", new SqsSubscription(queue))
+        .build(stack, "TestTopic");
+
+      const template = Template.fromStack(stack);
+      template.resourceCountIs("AWS::SNS::Subscription", 1);
+      template.hasResourceProperties("AWS::SQS::QueuePolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Effect: "Allow",
+              Action: "sqs:SendMessage",
+              Principal: { Service: "sns.amazonaws.com" },
+            }),
+          ]),
+        }),
+      });
+    });
+
+    it("exposes each subscription in the result keyed by name", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createTopicBuilder()
+        .addSubscription("ops", new EmailSubscription("ops@example.com"))
+        .addSubscription("oncall", new EmailSubscription("oncall@example.com"))
+        .build(stack, "TestTopic");
+
+      expect(Object.keys(result.subscriptions).sort()).toEqual(["oncall", "ops"]);
+    });
+
+    it("resolves a Resolvable<ITopicSubscription> from the compose context", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const fn = new LambdaFunction(stack, "Handler", {
+        runtime: Runtime.NODEJS_20_X,
+        handler: "index.handler",
+        code: Code.fromInline("exports.handler = async () => {};"),
+      });
+
+      createTopicBuilder()
+        .addSubscription(
+          "handler",
+          ref("handler", (r: { function: LambdaFunction }) => new LambdaSubscription(r.function)),
+        )
+        .build(stack, "TestTopic", { handler: { function: fn } });
+
+      Template.fromStack(stack).resourceCountIs("AWS::SNS::Subscription", 1);
     });
   });
 

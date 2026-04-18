@@ -126,6 +126,45 @@ for (const alarm of Object.values(result.alarms)) {
 }
 ```
 
+## Adding Subscriptions to a Topic
+
+For the common case where a topic and its subscriptions are declared together, use `addSubscription` on the topic builder. It accepts any CDK [`ITopicSubscription`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.ITopicSubscription.html) (e.g. `EmailSubscription`, `LambdaSubscription`, `SqsSubscription`) and binds it via `ITopicSubscription.bind(topic)` — the same path CDK uses for `topic.addSubscription(...)`, so endpoint-specific wire-up (Lambda invoke permission, SQS queue policy, KMS decrypt policy) happens automatically.
+
+```ts
+import { createTopicBuilder } from "@composurecdk/sns";
+import { EmailSubscription, LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
+
+const result = createTopicBuilder()
+  .topicName("alerts")
+  .addSubscription("ops", new EmailSubscription("ops@example.com"))
+  .addSubscription("handler", new LambdaSubscription(alertHandler))
+  .build(stack, "Alerts");
+
+result.subscriptions.ops; // AWS SNS Subscription construct
+```
+
+Each subscription is exposed on `result.subscriptions` under the key supplied to `addSubscription`.
+
+Cross-component subscriptions can be declared with `ref(...)` so the subscription's endpoint is resolved from another component's build output:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createTopicBuilder } from "@composurecdk/sns";
+import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
+import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
+
+const system = compose(
+  {
+    handler: createFunctionBuilder()./* ... */,
+    alerts: createTopicBuilder().addSubscription(
+      "handler",
+      ref("handler", (r: FunctionBuilderResult) => new LambdaSubscription(r.function)),
+    ),
+  },
+  { handler: [], alerts: ["handler"] },
+);
+```
+
 ## Subscription Builder
 
 ```ts

@@ -18,7 +18,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "aws-cdk-lib": "^2.245.0",
+    "aws-cdk-lib": "^2.250.0",
     "constructs": "^10.6.0"
   },
   "peerDependencies": {
@@ -32,9 +32,9 @@
     "@composurecdk/sns": "^0.3.0"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "aws-cdk": "^2.1114.1",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.2"
+    "@types/node": "^25.6.0",
+    "aws-cdk": "^2.1118.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
   }
 }

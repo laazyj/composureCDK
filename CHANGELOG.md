@@ -1,3 +1,20 @@
+## 0.3.1 (2026-04-18)
+
+### 🚀 Features
+
+- **iam:** add RoleBuilder, ManagedPolicyBuilder, and StatementBuilder ([#36](https://github.com/laazyj/composureCDK/pull/36), [#28](https://github.com/laazyj/composureCDK/issues/28), [#29](https://github.com/laazyj/composureCDK/issues/29))
+- **sns:** add SubscriptionBuilder ([#19](https://github.com/laazyj/composureCDK/pull/19))
+- **sns:** add TopicBuilder.addSubscription via ITopicSubscription.bind() ([#39](https://github.com/laazyj/composureCDK/pull/39), [#38](https://github.com/laazyj/composureCDK/issues/38))
+
+### 🩹 Fixes
+
+- **ci:** make deploy-test more resilient when destroying stacks ([cc0ccf9](https://github.com/laazyj/composureCDK/commit/cc0ccf9))
+- **s3:** disable versioning on access logging buckets ([4f7473a](https://github.com/laazyj/composureCDK/commit/4f7473a))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.3.0 (2026-04-10)
 
 ### 🚀 Features

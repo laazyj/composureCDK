@@ -15,12 +15,42 @@ function buildResult(configureFn?: (builder: ReturnType<typeof createTopicBuilde
 
 describe("recommended alarms", () => {
   describe("defaults", () => {
-    it("creates numberOfNotificationsFailed and numberOfNotificationsFilteredOutInvalidAttributes alarms by default", () => {
+    it("creates all four recommended alarms by default", () => {
       const { result, template } = buildResult();
 
       expect(result.alarms.numberOfNotificationsFailed).toBeDefined();
       expect(result.alarms.numberOfNotificationsFilteredOutInvalidAttributes).toBeDefined();
-      template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+      expect(result.alarms.numberOfNotificationsRedrivenToDlq).toBeDefined();
+      expect(result.alarms.numberOfNotificationsFailedToRedriveToDlq).toBeDefined();
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 4);
+    });
+
+    it("creates numberOfNotificationsRedrivenToDlq alarm with threshold > 0", () => {
+      const { template } = buildResult();
+
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        MetricName: "NumberOfNotificationsRedrivenToDlq",
+        Namespace: "AWS/SNS",
+        Threshold: 0,
+        ComparisonOperator: "GreaterThanThreshold",
+        EvaluationPeriods: 1,
+        DatapointsToAlarm: 1,
+        TreatMissingData: "notBreaching",
+        Statistic: "Sum",
+        Period: 60,
+        Dimensions: Match.arrayWith([Match.objectLike({ Name: "TopicName" })]),
+      });
+    });
+
+    it("creates numberOfNotificationsFailedToRedriveToDlq alarm with threshold > 0", () => {
+      const { template } = buildResult();
+
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        MetricName: "NumberOfNotificationsFailedToRedriveToDlq",
+        Namespace: "AWS/SNS",
+        Threshold: 0,
+        ComparisonOperator: "GreaterThanThreshold",
+      });
     });
 
     it("creates numberOfNotificationsFailed alarm with threshold > 0", () => {
@@ -140,7 +170,7 @@ describe("recommended alarms", () => {
 
       expect(result.alarms.numberOfNotificationsFailed).toBeUndefined();
       expect(result.alarms.numberOfNotificationsFilteredOutInvalidAttributes).toBeDefined();
-      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 3);
     });
 
     it("disables multiple individual alarms", () => {
@@ -148,11 +178,15 @@ describe("recommended alarms", () => {
         b.recommendedAlarms({
           numberOfNotificationsFailed: false,
           numberOfNotificationsFilteredOutInvalidAttributes: false,
+          numberOfNotificationsRedrivenToDlq: false,
+          numberOfNotificationsFailedToRedriveToDlq: false,
         });
       });
 
       expect(result.alarms.numberOfNotificationsFailed).toBeUndefined();
       expect(result.alarms.numberOfNotificationsFilteredOutInvalidAttributes).toBeUndefined();
+      expect(result.alarms.numberOfNotificationsRedrivenToDlq).toBeUndefined();
+      expect(result.alarms.numberOfNotificationsFailedToRedriveToDlq).toBeUndefined();
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
   });
@@ -193,7 +227,7 @@ describe("addAlarm", () => {
     expect(result.alarms.numberOfNotificationsFailed).toBeDefined();
     expect(result.alarms.numberOfNotificationsFilteredOutInvalidAttributes).toBeDefined();
     expect(result.alarms.numberOfMessagesPublished).toBeDefined();
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 3);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 5);
   });
 
   it("throws on duplicate key with recommended alarm", () => {

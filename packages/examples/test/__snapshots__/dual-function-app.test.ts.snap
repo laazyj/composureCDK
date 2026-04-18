@@ -42,6 +42,32 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
+    "DualFunctionAppalertsNumberOfNotificationsFailedToRedriveToDlqAlarm8C0C4008": {
+      "Properties": {
+        "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "DualFunctionAppalerts6076A01F",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFailedToRedriveToDlq",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "DualFunctionAppalertsNumberOfNotificationsFilteredOutInvalidAttributesAlarm6B04540C": {
       "Properties": {
         "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
@@ -60,6 +86,32 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         ],
         "EvaluationPeriods": 1,
         "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DualFunctionAppalertsNumberOfNotificationsRedrivenToDlqAlarm434BC23F": {
+      "Properties": {
+        "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "DualFunctionAppalerts6076A01F",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsRedrivenToDlq",
         "Namespace": "AWS/SNS",
         "Period": 60,
         "Statistic": "Sum",

@@ -1,4 +1,3 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type ITopic, Subscription, type SubscriptionProps } from "aws-cdk-lib/aws-sns";
 import type { IQueue } from "aws-cdk-lib/aws-sqs";
 import { type IConstruct } from "constructs";
@@ -9,9 +8,6 @@ import {
   type Resolvable,
   resolve,
 } from "@composurecdk/core";
-import type { SubscriptionAlarmConfig } from "./subscription-alarm-config.js";
-import { createSubscriptionAlarms } from "./subscription-alarms.js";
-import { SUBSCRIPTION_DEFAULTS } from "./subscription-defaults.js";
 
 /**
  * Configuration properties for the SNS subscription builder.
@@ -20,10 +16,7 @@ import { SUBSCRIPTION_DEFAULTS } from "./subscription-defaults.js";
  * values for `topic` and `deadLetterQueue` so the builder can be wired to
  * other components via {@link ref} inside a {@link compose}d system.
  */
-export interface SubscriptionBuilderProps extends Omit<
-  SubscriptionProps,
-  "topic" | "deadLetterQueue"
-> {
+interface SubscriptionBuilderProps extends Omit<SubscriptionProps, "topic" | "deadLetterQueue"> {
   /**
    * The topic to subscribe to. Accepts a concrete {@link ITopic} or a
    * {@link Ref} to another component's output (e.g. a `TopicBuilder`).
@@ -36,28 +29,14 @@ export interface SubscriptionBuilderProps extends Omit<
    * {@link Ref} to another component's output.
    *
    * Attaching a DLQ is the primary reliability control for SNS
-   * subscriptions and also enables the recommended redrive alarms.
+   * subscriptions. Redrive and redrive-failure alarms are created on the
+   * subscribed {@link TopicBuilder} since the underlying metrics are
+   * topic-level.
    *
    * @see https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html
    * @default - no dead letter queue
    */
   deadLetterQueue?: Resolvable<IQueue>;
-
-  /**
-   * Configuration for AWS-recommended CloudWatch alarms.
-   *
-   * By default, the builder creates recommended alarms with sensible
-   * thresholds whenever a {@link deadLetterQueue} is attached. Individual
-   * alarms can be customized or disabled. Set to `false` to disable all
-   * alarms.
-   *
-   * No alarm actions are configured by default since notification methods
-   * are user-specific. Access alarms from the build result or use an
-   * `afterBuild` hook to apply actions.
-   *
-   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS
-   */
-  recommendedAlarms?: SubscriptionAlarmConfig | false;
 }
 
 /**
@@ -67,19 +46,6 @@ export interface SubscriptionBuilderProps extends Omit<
 export interface SubscriptionBuilderResult {
   /** The SNS subscription construct created by the builder. */
   subscription: Subscription;
-
-  /**
-   * CloudWatch alarms created for the subscription, keyed by alarm name.
-   *
-   * Only populated when a {@link SubscriptionBuilderProps.deadLetterQueue}
-   * is attached; otherwise this is an empty record.
-   *
-   * No alarm actions are configured — apply them via the result or an
-   * `afterBuild` hook.
-   *
-   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS
-   */
-  alarms: Record<string, Alarm>;
 }
 
 /**
@@ -95,9 +61,9 @@ export interface SubscriptionBuilderResult {
  * `deadLetterQueue` properties accept {@link Resolvable} values so they can
  * be supplied by another component's build output via {@link ref}.
  *
- * When built, it creates an SNS subscription with the configured properties
- * and returns a {@link SubscriptionBuilderResult}. Recommended CloudWatch
- * alarms are created when a dead-letter queue is attached.
+ * Recommended CloudWatch alarms related to subscription delivery (redrive
+ * to DLQ, failed redrive to DLQ) are emitted against topic-level metrics,
+ * so they live on {@link createTopicBuilder} rather than here.
  *
  * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Subscription.html
  *
@@ -119,16 +85,21 @@ class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
     id: string,
     context: Record<string, object> = {},
   ): SubscriptionBuilderResult {
-    const {
-      recommendedAlarms: alarmConfig,
-      topic,
-      deadLetterQueue,
-      ...subscriptionProps
-    } = this.props;
+    const { topic, deadLetterQueue, protocol, endpoint, ...rest } = this.props;
 
     if (topic === undefined) {
       throw new Error(
         `SubscriptionBuilder "${id}": topic is required. Call .topic(...) with an ITopic or a Ref before building.`,
+      );
+    }
+    if (protocol === undefined) {
+      throw new Error(
+        `SubscriptionBuilder "${id}": protocol is required. Call .protocol(...) with a SubscriptionProtocol before building.`,
+      );
+    }
+    if (endpoint === undefined) {
+      throw new Error(
+        `SubscriptionBuilder "${id}": endpoint is required. Call .endpoint(...) with the subscriber endpoint before building.`,
       );
     }
 
@@ -136,18 +107,17 @@ class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
     const resolvedDlq =
       deadLetterQueue !== undefined ? resolve(deadLetterQueue, context) : undefined;
 
-    const mergedProps = {
-      ...SUBSCRIPTION_DEFAULTS,
-      ...subscriptionProps,
+    const subscriptionProps: SubscriptionProps = {
+      ...rest,
+      protocol,
+      endpoint,
       topic: resolvedTopic,
       ...(resolvedDlq !== undefined ? { deadLetterQueue: resolvedDlq } : {}),
-    } as SubscriptionProps;
+    };
 
-    const subscription = new Subscription(scope, id, mergedProps);
+    const subscription = new Subscription(scope, id, subscriptionProps);
 
-    const alarms = createSubscriptionAlarms(scope, id, resolvedTopic, resolvedDlq, alarmConfig);
-
-    return { subscription, alarms };
+    return { subscription };
   }
 }
 
@@ -156,8 +126,8 @@ class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
  * subscription.
  *
  * This is the entry point for defining an SNS subscription component. The
- * returned builder exposes every {@link SubscriptionBuilderProps} property
- * as a fluent setter/getter and implements {@link Lifecycle} for use with
+ * returned builder exposes every {@link SubscriptionProps} property as a
+ * fluent setter/getter and implements {@link Lifecycle} for use with
  * {@link compose}.
  *
  * @returns A fluent builder for an AWS SNS subscription.

@@ -29,14 +29,13 @@ function buildWithTopic(
 
 describe("SubscriptionBuilder", () => {
   describe("build", () => {
-    it("returns a SubscriptionBuilderResult with subscription and alarms", () => {
+    it("returns a SubscriptionBuilderResult with the subscription", () => {
       const { result } = buildWithTopic((b) =>
         b.protocol(SubscriptionProtocol.EMAIL).endpoint("ops@example.com"),
       );
 
       expect(result).toBeDefined();
       expect(result.subscription).toBeDefined();
-      expect(result.alarms).toEqual({});
     });
 
     it("creates exactly one SNS subscription", () => {
@@ -56,6 +55,28 @@ describe("SubscriptionBuilder", () => {
 
       expect(() => builder.build(stack, "Sub")).toThrow(
         /SubscriptionBuilder "Sub": topic is required/,
+      );
+    });
+
+    it("throws a descriptive error when protocol is not set", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const topic = new Topic(stack, "Topic");
+      const builder = createSubscriptionBuilder().topic(topic).endpoint("ops@example.com");
+
+      expect(() => builder.build(stack, "Sub")).toThrow(
+        /SubscriptionBuilder "Sub": protocol is required/,
+      );
+    });
+
+    it("throws a descriptive error when endpoint is not set", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const topic = new Topic(stack, "Topic");
+      const builder = createSubscriptionBuilder().topic(topic).protocol(SubscriptionProtocol.EMAIL);
+
+      expect(() => builder.build(stack, "Sub")).toThrow(
+        /SubscriptionBuilder "Sub": endpoint is required/,
       );
     });
   });
@@ -116,18 +137,6 @@ describe("SubscriptionBuilder", () => {
 
       Template.fromStack(stack).hasResourceProperties("AWS::SNS::Subscription", {
         RawMessageDelivery: true,
-      });
-    });
-  });
-
-  describe("secure defaults", () => {
-    it("pins raw message delivery to false by default", () => {
-      const { template } = buildWithTopic((b) =>
-        b.protocol(SubscriptionProtocol.EMAIL).endpoint("ops@example.com"),
-      );
-
-      template.hasResourceProperties("AWS::SNS::Subscription", {
-        RawMessageDelivery: false,
       });
     });
   });

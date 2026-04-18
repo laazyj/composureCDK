@@ -3,7 +3,7 @@ import { type ITopic, Topic, type TopicProps } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { TopicAlarmConfig } from "./alarm-config.js";
+import type { TopicAlarmConfig } from "./topic-alarm-config.js";
 import { createTopicAlarms } from "./topic-alarms.js";
 import { TOPIC_DEFAULTS } from "./defaults.js";
 

@@ -47,6 +47,10 @@ The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.
 | --------------------------------------------------- | --------------------------------------------------------------- | ----------------- | ------------ |
 | `numberOfNotificationsFailed`                       | NumberOfNotificationsFailed (Sum, 1 min)                        | > 0               | Always       |
 | `numberOfNotificationsFilteredOutInvalidAttributes` | NumberOfNotificationsFilteredOut-InvalidAttributes (Sum, 1 min) | > 0               | Always       |
+| `numberOfNotificationsRedrivenToDlq`                | NumberOfNotificationsRedrivenToDlq (Sum, 1 min)                 | > 0               | Always[^dlq] |
+| `numberOfNotificationsFailedToRedriveToDlq`         | NumberOfNotificationsFailedToRedriveToDlq (Sum, 1 min)          | > 0               | Always[^dlq] |
+
+[^dlq]: Metric only emits when a subscription on the topic has a dead-letter queue attached and SNS attempts redrive. `TreatMissingData` defaults to `notBreaching`, so the alarm stays quiet on topics without DLQs. Attach a DLQ via the `SubscriptionBuilder`'s `.deadLetterQueue(...)` — see [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html).
 
 The defaults are exported as `TOPIC_ALARM_DEFAULTS` for visibility and testing:
 
@@ -154,43 +158,13 @@ const system = compose(
 );
 ```
 
-### Subscription defaults
+### Subscription reliability
 
-`createSubscriptionBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
+Attaching a dead-letter queue is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)). Pass a queue via `.deadLetterQueue(queue)` or a `ref` to one; the builder does not create a DLQ automatically because the queue resource needs to be caller-owned.
 
-| Property             | Default | Rationale                                                                                                 |
-| -------------------- | ------- | --------------------------------------------------------------------------------------------------------- |
-| `rawMessageDelivery` | `false` | Explicit default; raw delivery is protocol-specific and opt-in (valid for HTTP/S, SQS, Lambda, Firehose). |
+The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached.
 
-Deliberately **not** defaulted:
-
-- **Dead-letter queue.** Attaching a DLQ is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)) but requires a queue resource the caller owns. Pass one via `.deadLetterQueue(queue)` or a `ref`.
-- **HTTPS over HTTP.** `SubscriptionProtocol.HTTP` is allowed for backwards compatibility; prefer `HTTPS` for transport encryption ([SNS security best practices](https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html)).
-
-The defaults are exported as `SUBSCRIPTION_DEFAULTS` for visibility and testing:
-
-```ts
-import { SUBSCRIPTION_DEFAULTS } from "@composurecdk/sns";
-```
-
-### Subscription recommended alarms
-
-When a dead-letter queue is attached, the builder creates the subscription-relevant [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS). Without a DLQ the alarms are skipped — the underlying metrics only emit during a redrive attempt.
-
-| Alarm                                       | Metric                                                 | Default threshold | Created when |
-| ------------------------------------------- | ------------------------------------------------------ | ----------------- | ------------ |
-| `numberOfNotificationsRedrivenToDlq`        | NumberOfNotificationsRedrivenToDlq (Sum, 1 min)        | > 0               | DLQ attached |
-| `numberOfNotificationsFailedToRedriveToDlq` | NumberOfNotificationsFailedToRedriveToDlq (Sum, 1 min) | > 0               | DLQ attached |
-
-Metrics are topic-level (dimension `TopicName`); alarm constructs are scoped under the subscription's id so multiple subscriptions on the same topic do not collide.
-
-The defaults are exported as `SUBSCRIPTION_ALARM_DEFAULTS`:
-
-```ts
-import { SUBSCRIPTION_ALARM_DEFAULTS } from "@composurecdk/sns";
-```
-
-Customization, disabling, and applying actions follow the same pattern as the topic alarms above (`recommendedAlarms({ ... })`, `recommendedAlarms(false)`, iterate the build result's `alarms`).
+Also note: `SubscriptionProtocol.HTTP` is allowed for compatibility; prefer `HTTPS` for transport encryption ([SNS security best practices](https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html)).
 
 ## Examples
 

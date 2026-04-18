@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/iam",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Composable IAM role, policy, and statement builders with well-architected defaults",
   "repository": {
     "type": "git",

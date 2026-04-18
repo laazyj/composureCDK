@@ -1,3 +1,17 @@
+## 0.3.2 (2026-04-18)
+
+### 🚀 Features
+
+- **cloudfront:** accept Resolvable<ICertificate> on DistributionBuilder ([#22](https://github.com/laazyj/composureCDK/pull/22))
+
+### 🩹 Fixes
+
+- **cloudfront:** add dependency to control deletion order ([88443a2](https://github.com/laazyj/composureCDK/commit/88443a2))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.3.1 (2026-04-18)
 
 ### 🚀 Features

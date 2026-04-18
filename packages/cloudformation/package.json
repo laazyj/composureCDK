@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/cloudformation",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Composable CloudFormation stack builder and stack assignment strategies",
   "repository": {
     "type": "git",

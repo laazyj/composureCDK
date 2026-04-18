@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/cloudfront",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Composable CloudFront distribution builder with well-architected defaults",
   "repository": {
     "type": "git",

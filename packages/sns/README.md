@@ -145,7 +145,7 @@ result.subscriptions.ops; // AWS SNS Subscription construct
 
 Each subscription is exposed on `result.subscriptions` under the key supplied to `addSubscription`.
 
-Cross-component subscriptions can be declared with `ref(...)` so the subscription's endpoint is resolved from another component's build output:
+Cross-component subscriptions can be declared with `ref(...)` inside a [`compose`](../core/README.md) system, so the subscription's endpoint is resolved from another component's build output at build time:
 
 ```ts
 import { compose, ref } from "@composurecdk/core";

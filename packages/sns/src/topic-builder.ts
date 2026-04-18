@@ -135,11 +135,17 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
    * {@link TopicBuilderResult.subscriptions} under `key`.
    */
   addSubscription(key: string, subscription: Resolvable<ITopicSubscription>): this {
+    if (this._subscriptions.some((s) => s.key === key)) {
+      throw new Error(
+        `TopicBuilder.addSubscription: duplicate key "${key}". ` +
+          `Each subscription must use a unique key.`,
+      );
+    }
     this._subscriptions.push({ key, subscription });
     return this;
   }
 
-  build(scope: IConstruct, id: string, context: Record<string, object> = {}): TopicBuilderResult {
+  build(scope: IConstruct, id: string, context?: Record<string, object>): TopicBuilderResult {
     const { recommendedAlarms: alarmConfig, ...topicProps } = this.props;
 
     const mergedProps = {
@@ -153,9 +159,10 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
 
     const subscriptions: Record<string, Subscription> = {};
     for (const entry of this._subscriptions) {
-      const resolvedSub = resolve(entry.subscription, context);
+      const resolvedSub = resolve(entry.subscription, context ?? {});
       const subscriptionConfig = resolvedSub.bind(topic);
-      subscriptions[entry.key] = new Subscription(scope, `${id}${entry.key}`, {
+      const subscriptionId = `${id}${entry.key[0].toUpperCase()}${entry.key.slice(1)}Subscription`;
+      subscriptions[entry.key] = new Subscription(scope, subscriptionId, {
         topic,
         ...subscriptionConfig,
       });

@@ -157,6 +157,17 @@ describe("TopicBuilder", () => {
       expect(Object.keys(result.subscriptions).sort()).toEqual(["oncall", "ops"]);
     });
 
+    it("throws when the same key is used twice", () => {
+      const builder = createTopicBuilder().addSubscription(
+        "ops",
+        new EmailSubscription("ops@example.com"),
+      );
+
+      expect(() =>
+        builder.addSubscription("ops", new EmailSubscription("other@example.com")),
+      ).toThrow(/duplicate key "ops"/);
+    });
+
     it("resolves a Resolvable<ITopicSubscription> from the compose context", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");

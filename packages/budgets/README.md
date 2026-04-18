@@ -79,17 +79,23 @@ The created `TopicPolicy` constructs are returned on `result.topicPolicies`, key
 
 ## Recommended Alarms
 
-AWS Budgets does not publish per-budget CloudWatch metrics, but the well-architected cost-monitoring pattern combines a budget with a CloudWatch alarm on `AWS/Billing EstimatedCharges`. The builder can create that alarm for you:
+AWS Budgets does not publish per-budget CloudWatch metrics, but the well-architected cost-monitoring pattern combines a budget with a CloudWatch alarm on `AWS/Billing EstimatedCharges`. The builder can create that alarm for you.
+
+> [!IMPORTANT]
+> **The `EstimatedCharges` metric is only emitted in `us-east-1`.** The builder enforces this: opting into `estimatedCharges` throws at synth time unless the surrounding stack is pinned to `us-east-1`. Region-agnostic stacks (no `env.region` set) are rejected too — the region must be concrete so the check is meaningful. Either deploy the stack to `us-east-1` or omit `estimatedCharges`.
 
 ```ts
+const stack = new Stack(app, "BillingStack", { env: { region: "us-east-1" } });
+
 createBudgetBuilder()
   .limit({ amount: 50 })
   .recommendedAlarms({
     estimatedCharges: { threshold: 50, currency: "USD" },
-  });
+  })
+  .build(stack, "AccountBudget");
 ```
 
-`EstimatedCharges` is only emitted in `us-east-1`, so this alarm must be synthesised into a stack deployed to that region. Off by default — callers opt in explicitly.
+The Budget itself is a global service and can be created from any region; only the alarm requires `us-east-1`. Off by default — callers opt in explicitly.
 
 ## Build Result
 

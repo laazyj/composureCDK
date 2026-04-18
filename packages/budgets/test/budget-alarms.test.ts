@@ -3,9 +3,9 @@ import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { createBudgetAlarms } from "../src/budget-alarms.js";
 
-function newStack(): Stack {
+function newStack(region: string | null = "us-east-1"): Stack {
   const app = new App();
-  return new Stack(app, "TestStack");
+  return new Stack(app, "TestStack", region === null ? undefined : { env: { region } });
 }
 
 describe("createBudgetAlarms", () => {
@@ -69,6 +69,34 @@ describe("createBudgetAlarms", () => {
 
     Template.fromStack(stack).hasResourceProperties("AWS::CloudWatch::Alarm", {
       Dimensions: Match.arrayWith([Match.objectLike({ Name: "Currency", Value: "GBP" })]),
+    });
+  });
+
+  describe("region guard", () => {
+    it("throws when the stack is deployed to a region other than us-east-1", () => {
+      const stack = newStack("eu-west-1");
+
+      expect(() =>
+        createBudgetAlarms(stack, "Budget", {
+          estimatedCharges: { threshold: 50 },
+        }),
+      ).toThrow(/us-east-1/);
+    });
+
+    it("throws when the stack has no concrete region pinned", () => {
+      const stack = newStack(null);
+
+      expect(() =>
+        createBudgetAlarms(stack, "Budget", {
+          estimatedCharges: { threshold: 50 },
+        }),
+      ).toThrow(/concrete region/);
+    });
+
+    it("does not run the guard when estimatedCharges is not configured", () => {
+      const stack = newStack("eu-west-1");
+
+      expect(() => createBudgetAlarms(stack, "Budget", { enabled: true })).not.toThrow();
     });
   });
 });

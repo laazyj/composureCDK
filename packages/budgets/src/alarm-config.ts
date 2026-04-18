@@ -6,9 +6,11 @@ import type { AlarmConfig } from "@composurecdk/cloudwatch";
  *
  * The `EstimatedCharges` metric lives in the `AWS/Billing` namespace and
  * is **only emitted in the `us-east-1` region**, regardless of where your
- * resources run. The alarm created by {@link createBudgetBuilder} will
- * therefore only receive datapoints when it is synthesised into a stack
- * deployed to `us-east-1`.
+ * resources run. The builder enforces this: opting in to this alarm
+ * throws at synth time unless the surrounding stack has its region
+ * pinned to `us-east-1`. Region-agnostic stacks (no `env.region`) are
+ * rejected as well — the check is explicit to avoid silently creating an
+ * alarm that can never receive datapoints.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html
  */
@@ -39,7 +41,7 @@ export interface EstimatedChargesAlarmConfig extends AlarmConfig {
  * `AWS/Billing EstimatedCharges` metric that fires when total estimated
  * charges cross a hard threshold.
  *
- * Off by default — the alarm is only useful when the stack is deployed
+ * Off by default — the alarm is only valid when the stack is deployed
  * to `us-east-1`, so callers must opt in explicitly.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html

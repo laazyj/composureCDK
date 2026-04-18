@@ -172,6 +172,8 @@ function createFunctionBuilder(): IFunctionBuilder {
 
 The class must have a `props: Partial<Props>` field (this is how the builder proxy reads and writes configuration) and a no-argument constructor (the `Builder` function calls `new constructor()`).
 
+The `*BuilderProps` type is an internal shape used to derive the fluent interface — users configure builders through the fluent API, never by constructing a props object. It may be `export`ed from its source module so sibling files in the same package (e.g. `defaults.ts`) can type `Partial<Props>` constants against it, but it must not be re-exported from the package barrel (`index.ts`). To keep this boundary enforceable, package barrels use explicit named re-exports rather than `export *`. An ESLint rule (`no-restricted-syntax` scoped to `packages/*/src/index.ts`) fails CI if a `*BuilderProps` re-export or `export *` is added to a barrel.
+
 ## Defaults
 
 Builders apply secure, AWS-recommended defaults to every resource they create. Each builder package exports a `defaults.ts` module containing a constant of type `Partial<Props>` — the set of properties that are applied unless the user explicitly overrides them.

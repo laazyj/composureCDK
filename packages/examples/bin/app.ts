@@ -19,7 +19,13 @@ createMockApiApp(app);
 createMultiStackApp(app);
 createOpenApiPetstoreApp(app);
 createStaticWebsiteApp(app);
-createCustomDomainWebsiteApp(app);
+// Opt-in: only synthesised when a pre-existing delegated hosted zone is
+// supplied via COMPOSURECDK_DOMAIN or --context domain=...; see
+// custom-domain-website/app.ts for the prerequisites.
+const domainContext: unknown = app.node.tryGetContext("domain");
+if (typeof domainContext === "string" || process.env.COMPOSURECDK_DOMAIN) {
+  createCustomDomainWebsiteApp(app);
+}
 createStrategyStackApp(app);
 
 app.synth();

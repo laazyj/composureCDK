@@ -36,6 +36,8 @@ const DEFAULT_RECORD_TTL = Duration.minutes(5);
 
 /**
  * Defaults for {@link createARecordBuilder}. Overridable via the fluent API.
+ * The builder skips the `ttl` default for alias targets — AWS ignores TTL on
+ * alias records and CDK emits a warning when one is set.
  */
 export const A_RECORD_DEFAULTS: Partial<ARecordBuilderProps> = {
   ttl: DEFAULT_RECORD_TTL,
@@ -43,6 +45,7 @@ export const A_RECORD_DEFAULTS: Partial<ARecordBuilderProps> = {
 
 /**
  * Defaults for {@link createAaaaRecordBuilder}. Overridable via the fluent API.
+ * Same alias-target caveat as {@link A_RECORD_DEFAULTS}.
  */
 export const AAAA_RECORD_DEFAULTS: Partial<AaaaRecordBuilderProps> = {
   ttl: DEFAULT_RECORD_TTL,

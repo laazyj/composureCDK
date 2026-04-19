@@ -62,11 +62,13 @@ class AaaaRecordBuilder implements Lifecycle<AaaaRecordBuilderResult> {
     }
 
     const resolvedContext = context ?? {};
+    const resolvedTarget = resolve(target, resolvedContext);
+    const isAlias = resolvedTarget.aliasTarget !== undefined;
     const mergedProps = {
-      ...AAAA_RECORD_DEFAULTS,
+      ...(isAlias ? {} : AAAA_RECORD_DEFAULTS),
       ...rest,
       zone: resolve(zone, resolvedContext),
-      target: resolve(target, resolvedContext),
+      target: resolvedTarget,
     } as AaaaRecordProps;
 
     const record = new AaaaRecord(scope, id, mergedProps);

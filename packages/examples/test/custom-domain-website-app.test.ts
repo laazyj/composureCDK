@@ -13,7 +13,7 @@ describe("custom-domain-website-app", () => {
       const template = synthTemplate();
       template.resourceCountIs("AWS::Route53::HostedZone", 1);
       template.hasResourceProperties("AWS::Route53::HostedZone", {
-        Name: "example.com.",
+        Name: "example.composurecdk.com.",
       });
     });
 
@@ -40,8 +40,8 @@ describe("custom-domain-website-app", () => {
       const template = synthTemplate();
       template.resourceCountIs("AWS::CertificateManager::Certificate", 1);
       template.hasResourceProperties("AWS::CertificateManager::Certificate", {
-        DomainName: "example.com",
-        SubjectAlternativeNames: ["www.example.com"],
+        DomainName: "example.composurecdk.com",
+        SubjectAlternativeNames: ["www.example.composurecdk.com"],
         ValidationMethod: "DNS",
       });
     });
@@ -52,7 +52,7 @@ describe("custom-domain-website-app", () => {
       const template = synthTemplate();
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
-          Aliases: ["example.com", "www.example.com"],
+          Aliases: ["example.composurecdk.com", "www.example.composurecdk.com"],
           ViewerCertificate: Match.objectLike({
             AcmCertificateArn: Match.anyValue(),
           }),

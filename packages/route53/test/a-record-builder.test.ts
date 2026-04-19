@@ -73,6 +73,26 @@ describe("ARecordBuilder", () => {
     });
   });
 
+  it("omits the default TTL on alias targets so CDK does not warn", () => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack");
+    const zone = new PublicHostedZone(stack, "Zone", { zoneName: "example.com" });
+    const distribution = new Distribution(stack, "Dist", {
+      defaultBehavior: { origin: new HttpOrigin("origin.example.net") },
+    });
+
+    createARecordBuilder()
+      .zone(zone)
+      .target(cloudfrontAliasTarget(distribution))
+      .build(stack, "ApexAlias");
+
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "A",
+      TTL: Match.absent(),
+    });
+  });
+
   it("resolves a Ref-based target when used inside compose()", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");

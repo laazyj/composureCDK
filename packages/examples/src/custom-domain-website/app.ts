@@ -37,7 +37,7 @@ export function createCustomDomainWebsiteApp(app = new App()) {
     .description("Static website at a custom domain with Route53 + ACM")
     .build(app, "ComposureCDK-CustomDomainWebsiteStack");
 
-  const apexDomain = "example.com";
+  const apexDomain = "example.composurecdk.com";
   const wwwDomain = `www.${apexDomain}`;
 
   compose(

@@ -74,11 +74,13 @@ class ARecordBuilder implements Lifecycle<ARecordBuilderResult> {
     }
 
     const resolvedContext = context ?? {};
+    const resolvedTarget = resolve(target, resolvedContext);
+    const isAlias = resolvedTarget.aliasTarget !== undefined;
     const mergedProps = {
-      ...A_RECORD_DEFAULTS,
+      ...(isAlias ? {} : A_RECORD_DEFAULTS),
       ...rest,
       zone: resolve(zone, resolvedContext),
-      target: resolve(target, resolvedContext),
+      target: resolvedTarget,
     } as ARecordProps;
 
     const record = new ARecord(scope, id, mergedProps);

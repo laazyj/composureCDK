@@ -64,6 +64,11 @@ jobs:
 
       - name: CDK Deploy
         working-directory: packages/examples
+        env:
+          # Opt-in: when set, enables the custom-domain-website example.
+          # Requires a pre-existing, delegated Route 53 hosted zone in the
+          # target account — see docs/ci.md.
+          COMPOSURECDK_DOMAIN: ${{ vars.COMPOSURECDK_DOMAIN }}
         run: npx cdk deploy --all --require-approval never
 
       - name: Smoke Test
@@ -73,6 +78,8 @@ jobs:
       - name: CDK Destroy
         if: always()
         working-directory: packages/examples
+        env:
+          COMPOSURECDK_DOMAIN: ${{ vars.COMPOSURECDK_DOMAIN }}
         run: |
           # Only destroy if AWS credentials were configured
           if ! aws sts get-caller-identity > /dev/null 2>&1; then

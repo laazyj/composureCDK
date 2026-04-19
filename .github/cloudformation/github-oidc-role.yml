@@ -237,6 +237,71 @@ Resources:
               StringLike:
                 aws:ResourceTag/aws:cloudformation:stack-name: ComposureCDK-*
 
+          # Route 53 — for the custom-domain example. Records are created
+          # in a pre-existing hosted zone brought in via HostedZone.fromLookup,
+          # plus the ACM DNS validation records. ListHostedZonesByName is
+          # required by fromLookup itself and cannot be scoped by zone.
+          - Sid: Route53Lookup
+            Effect: Allow
+            Action:
+              - route53:ListHostedZonesByName
+              - route53:ListHostedZones
+            Resource: "*"
+          - Sid: Route53Zone
+            Effect: Allow
+            Action:
+              - route53:ChangeResourceRecordSets
+              - route53:GetHostedZone
+              - route53:ListResourceRecordSets
+            Resource:
+              - !Sub arn:${AWS::Partition}:route53:::hostedzone/*
+          - Sid: Route53Change
+            Effect: Allow
+            Action:
+              - route53:GetChange
+            Resource:
+              - !Sub arn:${AWS::Partition}:route53:::change/*
+
+          # ACM — for the custom-domain example. Certificate actions do not
+          # support tag-based conditions consistently, so these are scoped
+          # to the sandbox account.
+          - Sid: ACM
+            Effect: Allow
+            Action:
+              - acm:RequestCertificate
+              - acm:DeleteCertificate
+              - acm:DescribeCertificate
+              - acm:GetCertificate
+              - acm:ListCertificates
+              - acm:AddTagsToCertificate
+              - acm:RemoveTagsFromCertificate
+              - acm:ListTagsForCertificate
+              - acm:UpdateCertificateOptions
+            Resource: "*"
+
+          # CloudFront — for the static-website and custom-domain examples.
+          # Distribution APIs largely lack resource-level tag conditions.
+          - Sid: CloudFront
+            Effect: Allow
+            Action:
+              - cloudfront:CreateDistribution
+              - cloudfront:CreateDistributionWithTags
+              - cloudfront:UpdateDistribution
+              - cloudfront:DeleteDistribution
+              - cloudfront:GetDistribution
+              - cloudfront:GetDistributionConfig
+              - cloudfront:ListDistributions
+              - cloudfront:TagResource
+              - cloudfront:UntagResource
+              - cloudfront:ListTagsForResource
+              - cloudfront:CreateOriginAccessControl
+              - cloudfront:DeleteOriginAccessControl
+              - cloudfront:GetOriginAccessControl
+              - cloudfront:GetOriginAccessControlConfig
+              - cloudfront:ListOriginAccessControls
+              - cloudfront:UpdateOriginAccessControl
+            Resource: "*"
+
           # CDK bootstrap roles — assumed by CDK CLI for asset publishing
           # and CloudFormation execution
           - Sid: CDKAssetRoles

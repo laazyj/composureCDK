@@ -218,18 +218,48 @@ aws cloudformation describe-stacks \
 
 ### 3. Configure the GitHub Environment
 
-Create a GitHub Environment called `sandbox` on the repository with two variables:
+Create a GitHub Environment called `sandbox` on the repository with these variables:
 
-| Variable       | Value                                          |
-| -------------- | ---------------------------------------------- |
-| `AWS_ROLE_ARN` | The `RoleArn` output from the OIDC stack       |
-| `AWS_REGION`   | The region you bootstrapped (e.g. `eu-west-1`) |
+| Variable              | Required | Value                                                                         |
+| --------------------- | -------- | ----------------------------------------------------------------------------- |
+| `AWS_ROLE_ARN`        | Yes      | The `RoleArn` output from the OIDC stack                                      |
+| `AWS_REGION`          | Yes      | The region you bootstrapped (e.g. `eu-west-1`)                                |
+| `COMPOSURECDK_DOMAIN` | No       | Enables the custom-domain-website example — see section 5 for the full set-up |
 
 Optionally add protection rules (e.g. required reviewers) to control when deployments run.
 
 ### 4. Trigger the workflow
 
 Go to **Actions > Deploy Test > Run workflow**, select the `sandbox` environment, and run it.
+
+### 5. (Optional) Enable the custom-domain-website example
+
+The `custom-domain-website` example provisions an ACM certificate with DNS validation and wires a CloudFront distribution to apex A/AAAA alias records. ACM validation cannot complete unless the target hosted zone's nameservers are already delegated on the public internet, so the example is opt-in and requires a pre-existing hosted zone in the sandbox account.
+
+1. **Register a domain** you control (e.g. in Route 53, or at any registrar), or carve out a sub-domain of an existing domain (e.g. `sandbox.yourcompany.com`).
+2. **Create a public hosted zone** for the chosen domain in the sandbox AWS account:
+
+   ```sh
+   aws route53 create-hosted-zone \
+     --name sandbox.yourcompany.com \
+     --caller-reference "$(date +%s)"
+   ```
+
+3. **Delegate the nameservers** from the parent zone / registrar to the four NS records Route 53 assigned to the hosted zone. This is a one-time, manual step and must propagate on the public internet before ACM validation will succeed — typically minutes to hours.
+
+4. **Re-deploy the OIDC stack** so the role picks up the Route 53, ACM, and CloudFront permissions the example requires:
+
+   ```sh
+   aws cloudformation deploy \
+     --template-file .github/cloudformation/github-oidc-role.yml \
+     --stack-name github-actions-oidc \
+     --parameter-overrides GitHubOrg=laazyj RepoName=composureCDK \
+     --capabilities CAPABILITY_NAMED_IAM
+   ```
+
+5. **Add `COMPOSURECDK_DOMAIN`** to the `sandbox` GitHub Environment variables, set to the delegated domain (e.g. `sandbox.yourcompany.com`). The workflow threads this through to `cdk deploy`; when unset, the example is skipped entirely and nothing else is affected.
+
+Running locally follows the same contract: export `COMPOSURECDK_DOMAIN` (or pass `--context domain=…`) before `npx nx deploy examples`.
 
 ## Running locally
 

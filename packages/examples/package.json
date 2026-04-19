@@ -22,12 +22,14 @@
     "constructs": "^10.6.0"
   },
   "peerDependencies": {
+    "@composurecdk/acm": "^0.3.0",
     "@composurecdk/apigateway": "^0.3.0",
     "@composurecdk/cloudformation": "^0.3.0",
     "@composurecdk/cloudwatch": "^0.3.0",
     "@composurecdk/cloudfront": "^0.3.0",
     "@composurecdk/core": "^0.3.0",
     "@composurecdk/lambda": "^0.3.0",
+    "@composurecdk/route53": "^0.3.0",
     "@composurecdk/s3": "^0.3.0",
     "@composurecdk/sns": "^0.3.0"
   },

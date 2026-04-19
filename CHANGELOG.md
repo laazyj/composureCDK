@@ -1,3 +1,13 @@
+## 0.3.4 (2026-04-19)
+
+### 🚀 Features
+
+- **route53:** add hosted zone and record builders ([#46](https://github.com/laazyj/composureCDK/pull/46), [#44](https://github.com/laazyj/composureCDK/issues/44), [#45](https://github.com/laazyj/composureCDK/issues/45), [#30](https://github.com/laazyj/composureCDK/issues/30))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.3.3 (2026-04-19)
 
 ### 🚀 Features

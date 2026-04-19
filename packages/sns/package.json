@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/sns",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Composable SNS topic builder with well-architected defaults",
   "repository": {
     "type": "git",

@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/s3",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Composable S3 bucket builder with well-architected defaults",
   "repository": {
     "type": "git",

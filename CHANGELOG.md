@@ -1,3 +1,13 @@
+## 0.3.3 (2026-04-19)
+
+### 🚀 Features
+
+- **acm:** add CertificateBuilder with DaysToExpiry alarm ([#43](https://github.com/laazyj/composureCDK/pull/43), [#31](https://github.com/laazyj/composureCDK/issues/31))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.3.2 (2026-04-18)
 
 ### 🚀 Features

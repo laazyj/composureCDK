@@ -61,13 +61,12 @@ class CnameRecordBuilder implements Lifecycle<CnameRecordBuilderResult> {
       );
     }
 
-    const resolvedContext = context ?? {};
     const mergedProps = {
       ...CNAME_RECORD_DEFAULTS,
       ...rest,
       domainName,
       recordName,
-      zone: resolve(zone, resolvedContext),
+      zone: resolve(zone, context),
     } as CnameRecordProps;
 
     const record = new CnameRecord(scope, id, mergedProps);

@@ -52,12 +52,11 @@ class TxtRecordBuilder implements Lifecycle<TxtRecordBuilderResult> {
       );
     }
 
-    const resolvedContext = context ?? {};
     const mergedProps = {
       ...TXT_RECORD_DEFAULTS,
       ...rest,
       values,
-      zone: resolve(zone, resolvedContext),
+      zone: resolve(zone, context),
     } as TxtRecordProps;
 
     const record = new TxtRecord(scope, id, mergedProps);

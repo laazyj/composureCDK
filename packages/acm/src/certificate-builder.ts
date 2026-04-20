@@ -163,21 +163,17 @@ class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
       );
     }
 
-    const resolvedContext = context ?? {};
     let validation: CertificateValidation;
 
     if (userValidation) {
       validation = userValidation;
     } else if (validationZones) {
       const resolvedZones = Object.fromEntries(
-        Object.entries(validationZones).map(([domain, zone]) => [
-          domain,
-          resolve(zone, resolvedContext),
-        ]),
+        Object.entries(validationZones).map(([domain, zone]) => [domain, resolve(zone, context)]),
       );
       validation = CertificateValidation.fromDnsMultiZone(resolvedZones);
     } else if (validationZone) {
-      validation = CertificateValidation.fromDns(resolve(validationZone, resolvedContext));
+      validation = CertificateValidation.fromDns(resolve(validationZone, context));
     } else {
       throw new Error(
         `CertificateBuilder "${id}" requires DNS validation to be configured. ` +

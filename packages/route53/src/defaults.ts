@@ -4,6 +4,13 @@ import type { ARecordBuilderProps } from "./a-record-builder.js";
 import type { AaaaRecordBuilderProps } from "./aaaa-record-builder.js";
 import type { CnameRecordBuilderProps } from "./cname-record-builder.js";
 import type { TxtRecordBuilderProps } from "./txt-record-builder.js";
+import type { MxRecordBuilderProps } from "./mx-record-builder.js";
+import type { SrvRecordBuilderProps } from "./srv-record-builder.js";
+import type { CaaRecordBuilderProps } from "./caa-record-builder.js";
+import type { NsRecordBuilderProps } from "./ns-record-builder.js";
+import type { DsRecordBuilderProps } from "./ds-record-builder.js";
+import type { HttpsRecordBuilderProps } from "./https-record-builder.js";
+import type { SvcbRecordBuilderProps } from "./svcb-record-builder.js";
 
 /**
  * Secure, AWS-recommended defaults applied to every public hosted zone built
@@ -62,5 +69,61 @@ export const CNAME_RECORD_DEFAULTS: Partial<CnameRecordBuilderProps> = {
  * Defaults for {@link createTxtRecordBuilder}. Overridable via the fluent API.
  */
 export const TXT_RECORD_DEFAULTS: Partial<TxtRecordBuilderProps> = {
+  ttl: DEFAULT_RECORD_TTL,
+};
+
+/**
+ * Defaults for {@link createMxRecordBuilder}. Overridable via the fluent API.
+ */
+export const MX_RECORD_DEFAULTS: Partial<MxRecordBuilderProps> = {
+  ttl: DEFAULT_RECORD_TTL,
+};
+
+/**
+ * Defaults for {@link createSrvRecordBuilder}. Overridable via the fluent API.
+ */
+export const SRV_RECORD_DEFAULTS: Partial<SrvRecordBuilderProps> = {
+  ttl: DEFAULT_RECORD_TTL,
+};
+
+/**
+ * Defaults for {@link createCaaRecordBuilder}. Overridable via the fluent API.
+ */
+export const CAA_RECORD_DEFAULTS: Partial<CaaRecordBuilderProps> = {
+  ttl: DEFAULT_RECORD_TTL,
+};
+
+/**
+ * Defaults for {@link createNsRecordBuilder}. Overridable via the fluent API.
+ *
+ * A longer TTL is appropriate for delegation records — resolvers cache NS
+ * responses, and frequent churn forces parent-side re-delegation lookups.
+ */
+export const NS_RECORD_DEFAULTS: Partial<NsRecordBuilderProps> = {
+  ttl: Duration.hours(24),
+};
+
+/**
+ * Defaults for {@link createDsRecordBuilder}. Overridable via the fluent API.
+ *
+ * DS records change rarely (key-signing rollovers); a long TTL reduces
+ * DNSSEC validation load on resolvers.
+ */
+export const DS_RECORD_DEFAULTS: Partial<DsRecordBuilderProps> = {
+  ttl: Duration.hours(24),
+};
+
+/**
+ * Defaults for {@link createHttpsRecordBuilder}. Overridable via the fluent API.
+ * Same alias-target caveat as {@link A_RECORD_DEFAULTS}.
+ */
+export const HTTPS_RECORD_DEFAULTS: Partial<HttpsRecordBuilderProps> = {
+  ttl: DEFAULT_RECORD_TTL,
+};
+
+/**
+ * Defaults for {@link createSvcbRecordBuilder}. Overridable via the fluent API.
+ */
+export const SVCB_RECORD_DEFAULTS: Partial<SvcbRecordBuilderProps> = {
   ttl: DEFAULT_RECORD_TTL,
 };

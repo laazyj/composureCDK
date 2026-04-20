@@ -2,7 +2,7 @@
 
 Route 53 hosted zone and record builders for [ComposureCDK](../../README.md).
 
-This package provides fluent builders for Route 53 public hosted zones and for the record types most commonly needed when fronting an AWS workload (A/AAAA alias, CNAME, TXT). It wraps the CDK [aws-route53](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_route53-readme.html) constructs — refer to the CDK documentation for the full set of configurable properties.
+This package provides fluent builders for Route 53 public hosted zones and for the record types most commonly needed when fronting an AWS workload (A/AAAA alias, CNAME, TXT, MX, SRV, CAA, NS, DS, HTTPS, SVCB). It wraps the CDK [aws-route53](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_route53-readme.html) constructs — refer to the CDK documentation for the full set of configurable properties.
 
 ## Hosted Zone Builder
 
@@ -73,15 +73,24 @@ Each helper accepts a `Resolvable`, so targets produced by other composed compon
 
 ## Secure Defaults
 
-| Builder                    | Property         | Default               | Rationale                                               |
-| -------------------------- | ---------------- | --------------------- | ------------------------------------------------------- |
-| `createHostedZoneBuilder`  | `addTrailingDot` | `true`                | Matches RFC 1035 and the CDK default; unambiguous apex. |
-| `createARecordBuilder`     | `ttl`            | `Duration.minutes(5)` | Balances propagation latency against DNS cache churn.   |
-| `createAaaaRecordBuilder`  | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                            |
-| `createCnameRecordBuilder` | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                            |
-| `createTxtRecordBuilder`   | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                            |
+| Builder                    | Property         | Default               | Rationale                                                                                |
+| -------------------------- | ---------------- | --------------------- | ---------------------------------------------------------------------------------------- |
+| `createHostedZoneBuilder`  | `addTrailingDot` | `true`                | Matches RFC 1035 and the CDK default; unambiguous apex.                                  |
+| `createARecordBuilder`     | `ttl`            | `Duration.minutes(5)` | Balances propagation latency against DNS cache churn; skipped for alias targets.[^alias] |
+| `createAaaaRecordBuilder`  | `ttl`            | `Duration.minutes(5)` | Same as A records; skipped for alias targets.[^alias]                                    |
+| `createCnameRecordBuilder` | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
+| `createTxtRecordBuilder`   | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
+| `createMxRecordBuilder`    | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
+| `createSrvRecordBuilder`   | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
+| `createCaaRecordBuilder`   | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
+| `createNsRecordBuilder`    | `ttl`            | `Duration.hours(24)`  | Delegation records change rarely; long TTL cuts lookups.                                 |
+| `createDsRecordBuilder`    | `ttl`            | `Duration.hours(24)`  | DNSSEC trust anchors change on key rollover only.                                        |
+| `createHttpsRecordBuilder` | `ttl`            | `Duration.minutes(5)` | Same as A records; skipped for alias targets.[^alias]                                    |
+| `createSvcbRecordBuilder`  | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
 
-The defaults are exported as `HOSTED_ZONE_DEFAULTS`, `A_RECORD_DEFAULTS`, `AAAA_RECORD_DEFAULTS`, `CNAME_RECORD_DEFAULTS`, and `TXT_RECORD_DEFAULTS` for visibility and testing.
+The defaults are exported as `HOSTED_ZONE_DEFAULTS`, `A_RECORD_DEFAULTS`, `AAAA_RECORD_DEFAULTS`, `CNAME_RECORD_DEFAULTS`, `TXT_RECORD_DEFAULTS`, `MX_RECORD_DEFAULTS`, `SRV_RECORD_DEFAULTS`, `CAA_RECORD_DEFAULTS`, `NS_RECORD_DEFAULTS`, `DS_RECORD_DEFAULTS`, `HTTPS_RECORD_DEFAULTS`, and `SVCB_RECORD_DEFAULTS` for visibility and testing.
+
+[^alias]: AWS ignores TTL on alias records and CDK emits a warning when one is set, so `A`, `AAAA`, and `HTTPS` builders skip the default TTL whenever the target is an alias.
 
 ## Recommended Alarms
 

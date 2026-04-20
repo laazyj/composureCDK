@@ -1,3 +1,13 @@
+## 0.3.5 (2026-04-20)
+
+### 🚀 Features
+
+- **route53:** add support for additional record types ([2a5a23a](https://github.com/laazyj/composureCDK/commit/2a5a23a))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.3.4 (2026-04-19)
 
 ### 🚀 Features

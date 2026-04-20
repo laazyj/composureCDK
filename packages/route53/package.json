@@ -13,6 +13,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./zone": {
+      "import": "./dist/zone/index.js",
+      "types": "./dist/zone/index.d.ts"
     }
   },
   "files": [

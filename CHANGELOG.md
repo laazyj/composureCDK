@@ -1,3 +1,14 @@
+## 0.3.6 (2026-04-21)
+
+### 🚀 Features
+
+- **core:** add constructId sanitizer ([#54](https://github.com/laazyj/composureCDK/pull/54))
+- **route53:** add BIND-style zone DSL ([#50](https://github.com/laazyj/composureCDK/pull/50))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.3.5 (2026-04-20)
 
 ### 🚀 Features

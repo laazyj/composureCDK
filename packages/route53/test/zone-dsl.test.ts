@@ -281,4 +281,53 @@ describe("zoneRecords", () => {
       ResourceRecords: [`0 issuewild "letsencrypt.org"`],
     });
   });
+
+  it("rejects an empty address array", () => {
+    const { stack, zone } = setup();
+    expect(() =>
+      zoneRecords([A("api", [])])
+        .zone(zone)
+        .build(stack, "DNS"),
+    ).toThrow(/at least one address/);
+  });
+
+  it("rejects an empty TXT value array", () => {
+    const { stack, zone } = setup();
+    expect(() =>
+      zoneRecords([TXT("dmarc", [])])
+        .zone(zone)
+        .build(stack, "DNS"),
+    ).toThrow(/at least one value/);
+  });
+
+  it("de-duplicates identical address values on merge", () => {
+    const { stack, zone } = setup();
+    zoneRecords([A("api", "203.0.113.20"), A("api", "203.0.113.20"), A("api", "203.0.113.21")])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "A",
+      ResourceRecords: ["203.0.113.20", "203.0.113.21"],
+    });
+  });
+
+  it("nests record resources under the builder id in the construct tree", () => {
+    const { stack, zone } = setup();
+    const result = zoneRecords([A(APEX, "1.2.3.4")])
+      .zone(zone)
+      .build(stack, "DNS");
+    // Path should be TestStack/DNS/a/@ — no '/' sanitized to '--'.
+    expect(result.a["@"].record.node.path).toBe("TestStack/DNS/a/@");
+  });
+
+  it("uses the APEX sentinel as the result key so it cannot collide with a literal 'apex' label", () => {
+    const { stack, zone } = setup();
+    const result = zoneRecords([A(APEX, "1.2.3.4"), A("apex", "5.6.7.8")])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    expect(Object.keys(result.a).sort()).toEqual(["@", "apex"]);
+    Template.fromStack(stack).resourceCountIs("AWS::Route53::RecordSet", 2);
+  });
 });

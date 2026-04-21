@@ -20,8 +20,11 @@ import {
 } from "@composurecdk/route53/zone";
 
 /**
- * A production-like public DNS zone for `example.com`, expressed in the
- * BIND-style zone DSL.
+ * A production-like public DNS zone, expressed in the BIND-style zone DSL.
+ *
+ * The zone name (`composurecdk-zone-dsl-demo.com`) is a non-registered
+ * placeholder — `example.com` is IANA-reserved and Route 53 refuses to create
+ * a hosted zone for it, even though the domain is fine as a record value.
  *
  * Demonstrates:
  * - Apex + service A/AAAA records, including a multi-address pool
@@ -36,13 +39,13 @@ import {
  */
 export function createDnsZoneApp(app = new App()): void {
   const { stack } = createStackBuilder()
-    .description("Public DNS zone for example.com (DSL example)")
+    .description("Public DNS zone (DSL example)")
     .build(app, "ComposureCDK-DnsZoneStack");
 
   compose(
     {
       zone: createHostedZoneBuilder()
-        .zoneName("example.com")
+        .zoneName("composurecdk-zone-dsl-demo.com")
         .comment("Customer-facing zone managed by ComposureCDK"),
 
       records: zoneRecords([

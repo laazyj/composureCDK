@@ -1,6 +1,6 @@
 import { type IHostedZone, RecordTarget } from "aws-cdk-lib/aws-route53";
 import { Construct, type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { constructId, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type AaaaRecordBuilderResult, createAaaaRecordBuilder } from "../aaaa-record-builder.js";
 import { type ARecordBuilderResult, createARecordBuilder } from "../a-record-builder.js";
 import { type CaaRecordBuilderResult, createCaaRecordBuilder } from "../caa-record-builder.js";
@@ -37,8 +37,8 @@ import {
 
 /**
  * Build output of {@link zoneRecords}, split per record type. Each sub-map is
- * keyed by the record's DNS name (the apex uses `"apex"`, matching the
- * construct id).
+ * keyed by the record's DNS name; the apex uses the {@link APEX} sentinel
+ * (`"@"`) so it never collides with a user-supplied label.
  */
 export interface ZoneRecordsBuilderResult {
   readonly a: Record<string, ARecordBuilderResult>;
@@ -92,6 +92,19 @@ export function zoneRecords(specs: readonly RecordSpec[]): IZoneRecordsBuilder {
   return new ZoneRecordsBuilder(specs);
 }
 
+/**
+ * Structural bound shared by every per-type record builder: exposes the three
+ * optional fields the DSL treats uniformly. Kept as an interface rather than
+ * an inline generic bound so type errors point at a named contract.
+ */
+interface HasCommonRecordOptions<Self> {
+  ttl(d: NonNullable<RecordOptions["ttl"]>): Self;
+  comment(c: string): Self;
+  recordName(n: string): Self;
+}
+
+type BucketName = keyof ZoneRecordsBuilderResult;
+
 class ZoneRecordsBuilder implements IZoneRecordsBuilder {
   private _zone?: Resolvable<IHostedZone>;
 
@@ -106,6 +119,7 @@ class ZoneRecordsBuilder implements IZoneRecordsBuilder {
     if (!this._zone) {
       throw new Error(`zoneRecords "${id}" requires a zone. Call .zone() with an IHostedZone.`);
     }
+    validateSpecs(this.specs);
     const zone = resolve(this._zone, context ?? {});
     const result: Mutable<ZoneRecordsBuilderResult> = {
       a: {},
@@ -120,61 +134,97 @@ class ZoneRecordsBuilder implements IZoneRecordsBuilder {
       https: {},
       svcb: {},
     };
-    const subScopes = new Map<keyof ZoneRecordsBuilderResult, Construct>();
-    const subScope = (bucket: keyof ZoneRecordsBuilderResult): Construct => {
+    const root = new Construct(scope, id);
+    const subScopes = new Map<BucketName, Construct>();
+    const subScope = (bucket: BucketName): Construct => {
       let s = subScopes.get(bucket);
       if (!s) {
-        s = new Construct(scope, `${id}/${bucket}`);
+        s = new Construct(root, bucket);
         subScopes.set(bucket, s);
       }
       return s;
     };
     for (const group of groupRecords(this.specs)) {
       const head = group[0];
-      const name = head.name === APEX ? "apex" : head.name;
+      // Use the APEX sentinel ("@") as the key/id so it cannot collide with a
+      // user-supplied label spelled "apex".
+      const key = head.name;
+      const childId = constructId(key);
       switch (head.type) {
         case "A":
-          result.a[name] = buildA(subScope("a"), name, group as ARecordSpec[], zone);
+          result.a[key] = buildA(subScope("a"), childId, group as ARecordSpec[], zone, context);
           break;
         case "AAAA":
-          result.aaaa[name] = buildAaaa(subScope("aaaa"), name, group as AaaaRecordSpec[], zone);
+          result.aaaa[key] = buildAaaa(
+            subScope("aaaa"),
+            childId,
+            group as AaaaRecordSpec[],
+            zone,
+            context,
+          );
           break;
         case "CNAME":
-          result.cname[name] = buildCname(
+          result.cname[key] = buildCname(
             subScope("cname"),
-            name,
+            childId,
             group as CnameRecordSpec[],
             zone,
+            context,
           );
           break;
         case "TXT":
-          result.txt[name] = buildTxt(subScope("txt"), name, group as TxtRecordSpec[], zone);
+          result.txt[key] = buildTxt(
+            subScope("txt"),
+            childId,
+            group as TxtRecordSpec[],
+            zone,
+            context,
+          );
           break;
         case "MX":
-          result.mx[name] = buildMx(subScope("mx"), name, group as MxRecordSpec[], zone);
+          result.mx[key] = buildMx(subScope("mx"), childId, group as MxRecordSpec[], zone, context);
           break;
         case "SRV":
-          result.srv[name] = buildSrv(subScope("srv"), name, group as SrvRecordSpec[], zone);
+          result.srv[key] = buildSrv(
+            subScope("srv"),
+            childId,
+            group as SrvRecordSpec[],
+            zone,
+            context,
+          );
           break;
         case "CAA":
-          result.caa[name] = buildCaa(subScope("caa"), name, group as CaaRecordSpec[], zone);
+          result.caa[key] = buildCaa(
+            subScope("caa"),
+            childId,
+            group as CaaRecordSpec[],
+            zone,
+            context,
+          );
           break;
         case "NS":
-          result.ns[name] = buildNs(subScope("ns"), name, group as NsRecordSpec[], zone);
+          result.ns[key] = buildNs(subScope("ns"), childId, group as NsRecordSpec[], zone, context);
           break;
         case "DS":
-          result.ds[name] = buildDs(subScope("ds"), name, group as DsRecordSpec[], zone);
+          result.ds[key] = buildDs(subScope("ds"), childId, group as DsRecordSpec[], zone, context);
           break;
         case "HTTPS":
-          result.https[name] = buildHttps(
+          result.https[key] = buildHttps(
             subScope("https"),
-            name,
+            childId,
             group as HttpsRecordSpec[],
             zone,
+            context,
           );
           break;
         case "SVCB":
-          result.svcb[name] = buildSvcb(subScope("svcb"), name, group as SvcbRecordSpec[], zone);
+          result.svcb[key] = buildSvcb(
+            subScope("svcb"),
+            childId,
+            group as SvcbRecordSpec[],
+            zone,
+            context,
+          );
           break;
         default: {
           const _exhaustive: never = head;
@@ -190,6 +240,38 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /** CDK-style record-name convention: apex is `undefined`. */
 const sub = (name: string) => (name === APEX ? undefined : name);
+
+/** Preserve insertion order while dropping duplicates. */
+const dedupe = <T>(xs: readonly T[]): T[] => [...new Set(xs)];
+
+function validateSpecs(specs: readonly RecordSpec[]): void {
+  for (const spec of specs) {
+    switch (spec.type) {
+      case "A":
+      case "AAAA":
+        if (spec.addresses.length === 0) {
+          throw new Error(`${spec.type}("${spec.name}") must supply at least one address.`);
+        }
+        break;
+      case "TXT":
+      case "MX":
+      case "SRV":
+      case "CAA":
+      case "NS":
+      case "DS":
+      case "HTTPS":
+      case "SVCB":
+        if (spec.values.length === 0) {
+          throw new Error(`${spec.type}("${spec.name}") must supply at least one value.`);
+        }
+        break;
+      case "CNAME":
+        // CNAME carries a single `target` string; the DSL factory cannot
+        // produce an empty one.
+        break;
+    }
+  }
+}
 
 /** Group records by `(type, name)`, preserving the insertion order of groups. */
 function groupRecords(specs: readonly RecordSpec[]): RecordSpec[][] {
@@ -212,13 +294,11 @@ function pickOption<K extends keyof RecordOptions>(
   return undefined;
 }
 
-function applyCommon<
-  B extends {
-    ttl(d: NonNullable<RecordOptions["ttl"]>): B;
-    comment(c: string): B;
-    recordName(n: string): B;
-  },
->(builder: B, specs: readonly RecordOptions[], name: string | undefined): B {
+function applyCommon<B extends HasCommonRecordOptions<B>>(
+  builder: B,
+  specs: readonly RecordOptions[],
+  name: string | undefined,
+): B {
   let b = builder;
   if (name) b = b.recordName(name);
   const ttl = pickOption(specs, "ttl");
@@ -233,8 +313,9 @@ function buildA(
   id: string,
   specs: ARecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): ARecordBuilderResult {
-  const addresses = specs.flatMap((s) => [...s.addresses]);
+  const addresses = dedupe(specs.flatMap((s) => [...s.addresses]));
   const b = applyCommon(
     createARecordBuilder()
       .zone(zone)
@@ -242,7 +323,7 @@ function buildA(
     specs,
     sub(specs[0].name),
   );
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildAaaa(
@@ -250,8 +331,9 @@ function buildAaaa(
   id: string,
   specs: AaaaRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): AaaaRecordBuilderResult {
-  const addresses = specs.flatMap((s) => [...s.addresses]);
+  const addresses = dedupe(specs.flatMap((s) => [...s.addresses]));
   const b = applyCommon(
     createAaaaRecordBuilder()
       .zone(zone)
@@ -259,7 +341,7 @@ function buildAaaa(
     specs,
     sub(specs[0].name),
   );
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildCname(
@@ -267,6 +349,7 @@ function buildCname(
   id: string,
   specs: CnameRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): CnameRecordBuilderResult {
   if (specs.length > 1) {
     throw new Error(
@@ -280,7 +363,7 @@ function buildCname(
   let b = createCnameRecordBuilder().zone(zone).recordName(name).domainName(spec.target);
   if (spec.ttl) b = b.ttl(spec.ttl);
   if (spec.comment) b = b.comment(spec.comment);
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildTxt(
@@ -288,14 +371,15 @@ function buildTxt(
   id: string,
   specs: TxtRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): TxtRecordBuilderResult {
-  const values = specs.flatMap((s) => [...s.values]);
+  const values = dedupe(specs.flatMap((s) => [...s.values]));
   const b = applyCommon(
     createTxtRecordBuilder().zone(zone).values(values),
     specs,
     sub(specs[0].name),
   );
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildMx(
@@ -303,6 +387,7 @@ function buildMx(
   id: string,
   specs: MxRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): MxRecordBuilderResult {
   const values = specs.flatMap((s) =>
     s.values.map((v) => ({ priority: v.priority, hostName: v.hostName })),
@@ -312,7 +397,7 @@ function buildMx(
     specs,
     sub(specs[0].name),
   );
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildSrv(
@@ -320,6 +405,7 @@ function buildSrv(
   id: string,
   specs: SrvRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): SrvRecordBuilderResult {
   const values = specs.flatMap((s) =>
     s.values.map((v) => ({
@@ -334,7 +420,7 @@ function buildSrv(
     specs,
     sub(specs[0].name),
   );
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildCaa(
@@ -342,6 +428,7 @@ function buildCaa(
   id: string,
   specs: CaaRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): CaaRecordBuilderResult {
   const values = specs.flatMap((s) =>
     s.values.map((v) => ({ flag: v.flag, tag: v.tag, value: v.value })),
@@ -351,7 +438,7 @@ function buildCaa(
     specs,
     sub(specs[0].name),
   );
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildNs(
@@ -359,6 +446,7 @@ function buildNs(
   id: string,
   specs: NsRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): NsRecordBuilderResult {
   const name = sub(specs[0].name);
   if (!name) {
@@ -366,9 +454,9 @@ function buildNs(
       `NS records cannot live at the zone apex. The apex NS set is managed by Route 53.`,
     );
   }
-  const values = specs.flatMap((s) => [...s.values]);
+  const values = dedupe(specs.flatMap((s) => [...s.values]));
   const b = applyCommon(createNsRecordBuilder().zone(zone).values(values), specs, name);
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildDs(
@@ -376,14 +464,15 @@ function buildDs(
   id: string,
   specs: DsRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): DsRecordBuilderResult {
-  const values = specs.flatMap((s) => [...s.values]);
+  const values = dedupe(specs.flatMap((s) => [...s.values]));
   const b = applyCommon(
     createDsRecordBuilder().zone(zone).values(values),
     specs,
     sub(specs[0].name),
   );
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildHttps(
@@ -391,6 +480,7 @@ function buildHttps(
   id: string,
   specs: HttpsRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): HttpsRecordBuilderResult {
   const values = specs.flatMap((s) => [...s.values]);
   const b = applyCommon(
@@ -398,7 +488,7 @@ function buildHttps(
     specs,
     sub(specs[0].name),
   );
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }
 
 function buildSvcb(
@@ -406,6 +496,7 @@ function buildSvcb(
   id: string,
   specs: SvcbRecordSpec[],
   zone: IHostedZone,
+  context?: Record<string, object>,
 ): SvcbRecordBuilderResult {
   const values = specs.flatMap((s) => [...s.values]);
   const b = applyCommon(
@@ -413,5 +504,5 @@ function buildSvcb(
     specs,
     sub(specs[0].name),
   );
-  return b.build(scope, id);
+  return b.build(scope, id, context);
 }

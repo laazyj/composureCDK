@@ -159,7 +159,16 @@ compose(
 | `HTTPS(name, value \| values, opts?)`        | RFC 9460 HTTPS record | Accepts `HttpsRecordValue.alias()`/`.service()` from the CDK |
 | `SVCB(name, value \| values, opts?)`         | RFC 9460 generic SVCB | As `HTTPS`; for web traffic prefer `HTTPS`                   |
 
-The trailing `opts` argument is `{ ttl?, comment? }`. When records with the same `(type, name)` are merged, the first defined `ttl`/`comment` in declaration order wins.
+The trailing `opts` argument is `{ ttl?, comment? }`. When records with the same `(type, name)` are merged, the **first defined** `ttl`/`comment` in declaration order wins — so to give a merged group a TTL or comment, attach it to the first call:
+
+```ts
+// TTL of 10m applies to the whole merged RR-set. The later calls inherit it.
+A("api", "203.0.113.20", { ttl: Duration.minutes(10), comment: "primary" }),
+A("api", "203.0.113.21"),
+A("api", "203.0.113.22"),
+```
+
+Putting the TTL on a later call is silently ignored if an earlier call in the group already has one — this keeps merge output deterministic regardless of how the list is reordered.
 
 ### APEX sentinel
 
@@ -168,6 +177,8 @@ The trailing `opts` argument is `{ ttl?, comment? }`. When records with the same
 ### RR-set merge semantics
 
 DNS resolvers see one record set per `(type, name)`, so the DSL groups every call sharing `(type, name)` into a single CDK record. Repeated `A`, `AAAA`, `TXT`, `MX`, `SRV`, `CAA`, `NS`, `DS`, `HTTPS`, and `SVCB` calls for the same name are merged; the order of values within the merged set matches the order of the DSL calls.
+
+Exact-duplicate string values (same IP appearing twice in an `A` merge, the same TXT string, the same NS hostname) are de-duplicated during merge — DNS RR-sets never want identical values and CDK rejects them with an opaque error. Structured values (MX `(priority, host)` pairs, SRV, CAA, HTTPS/SVCB) are passed through as given.
 
 ### Errors surfaced at build time
 

@@ -1,11 +1,12 @@
 import {
+  FunctionRuntime,
   HttpVersion,
   PriceClass,
   ResponseHeadersPolicy,
   SecurityPolicyProtocol,
   ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
-import type { DistributionBuilderProps } from "./distribution-builder.js";
+import type { DistributionBuilderProps, InlineFunctionDefinition } from "./distribution-builder.js";
 
 /**
  * Secure, AWS-recommended defaults applied to every CloudFront distribution
@@ -66,4 +67,17 @@ export const DISTRIBUTION_DEFAULTS: Partial<DistributionBuilderProps> = {
      */
     responseHeadersPolicy: ResponseHeadersPolicy.SECURITY_HEADERS,
   },
+};
+
+/**
+ * Defaults applied to every inline CloudFront Function declared on a cache
+ * behavior. User-provided properties take precedence.
+ */
+export const INLINE_FUNCTION_DEFAULTS: Partial<InlineFunctionDefinition> = {
+  /**
+   * Use the `cloudfront-js-2.0` runtime by default. It is a superset of
+   * `cloudfront-js-1.0` (async/await, `crypto.subtle`, KeyValueStore support).
+   * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/functions-javascript-runtime-20.html
+   */
+  runtime: FunctionRuntime.JS_2_0,
 };

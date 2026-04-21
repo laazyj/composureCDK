@@ -1,4 +1,5 @@
 export { Builder, type IBuilder } from "./builder.js";
+export { constructId, sanitizeConstructId } from "./construct-id.js";
 export {
   compose,
   type ComposedSystem,

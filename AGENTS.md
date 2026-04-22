@@ -1,5 +1,9 @@
 # Project Instructions
 
+## Architecture
+
+Read [docs/architecture.md](docs/architecture.md) first — it's the primary guide to the library's shape: lifecycle, builders, composition, refs, defaults. For decisions that amend or add detail (and the rationale behind non-obvious patterns), see [docs/adr/](docs/adr/). Non-trivial changes that introduce a new pattern or reverse an existing one should ship with an ADR.
+
 ## After making changes
 
 Always run lint and format checks after each task, before presenting work for review:

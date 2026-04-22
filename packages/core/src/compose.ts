@@ -55,10 +55,15 @@ function buildDependencyGraph<Components extends Record<string, Lifecycle>>(
 
 /**
  * A callback invoked after all components in a composed system have been
- * built. Receives the scope, system id, and the fully-typed build results
- * of every component. Use this to create additional constructs that depend
- * on the composed system's outputs — CloudFormation outputs, tags, alarms,
- * dashboards, etc.
+ * built. Receives the top-level scope, system id, the fully-typed build
+ * results of every component, and a record mapping each component key to
+ * the scope it was built into.
+ *
+ * `componentScopes` makes per-component scopes visible to hooks so they can
+ * attach additional constructs to the same stack a given component was
+ * routed to — useful under {@link ComposedSystem.withStacks} or
+ * {@link ComposedSystem.withStackStrategy}, where different components may
+ * live in different stacks.
  *
  * Domain-specific packages provide helper functions that return hooks. For
  * example, `@composurecdk/cloudformation` exports {@link outputs} which
@@ -74,7 +79,12 @@ function buildDependencyGraph<Components extends Record<string, Lifecycle>>(
  *   };
  * ```
  */
-export type AfterBuildHook<T extends object> = (scope: IConstruct, id: string, results: T) => void;
+export type AfterBuildHook<T extends object> = (
+  scope: IConstruct,
+  id: string,
+  results: T,
+  componentScopes: { readonly [K in keyof T]: IConstruct },
+) => void;
 
 /**
  * A {@link Lifecycle} produced by {@link compose}, extended with methods
@@ -226,25 +236,35 @@ class ComposedLifecycle<
   }
 
   build(scope: IConstruct, id: string): BuildResult<Components> {
-    return this.#buildWith(scope, id);
+    return this.#buildWith(scope, id).results;
   }
 
   #buildWith(
     scope: IConstruct,
     id: string,
     stacks?: { [K in keyof Components]?: IConstruct },
-  ): BuildResult<Components> {
+  ): BuildOutcome<Components> {
     const results: Record<string, object> = {};
+    const componentScopes: Record<string, IConstruct> = {};
 
     for (const key of alg.topsort(this.#graph)) {
       const componentScope = stacks?.[key] ?? scope;
+      componentScopes[key] = componentScope;
       const deps = (this.#dependencies[key] ?? []) as string[];
       const context = Object.fromEntries(deps.map((dep) => [dep, results[dep]]));
       results[key] = this.#components[key].build(componentScope, `${id}/${key}`, context);
     }
 
-    return results as BuildResult<Components>;
+    return {
+      results: results as BuildResult<Components>,
+      componentScopes: componentScopes as { [K in keyof Components]: IConstruct },
+    };
   }
+}
+
+interface BuildOutcome<Components extends Record<string, Lifecycle>> {
+  readonly results: BuildResult<Components>;
+  readonly componentScopes: { readonly [K in keyof Components]: IConstruct };
 }
 
 /**
@@ -257,9 +277,9 @@ class ConfiguredLifecycle<
   Components extends Record<string, Lifecycle>,
 > implements ConfiguredSystem<Components> {
   readonly #hooks: AfterBuildHook<BuildResult<Components>>[] = [];
-  readonly #buildFn: (scope: IConstruct, id: string) => BuildResult<Components>;
+  readonly #buildFn: (scope: IConstruct, id: string) => BuildOutcome<Components>;
 
-  constructor(buildFn: (scope: IConstruct, id: string) => BuildResult<Components>) {
+  constructor(buildFn: (scope: IConstruct, id: string) => BuildOutcome<Components>) {
     this.#buildFn = buildFn;
   }
 
@@ -269,9 +289,9 @@ class ConfiguredLifecycle<
   }
 
   build(scope: IConstruct, id: string): BuildResult<Components> {
-    const results = this.#buildFn(scope, id);
+    const { results, componentScopes } = this.#buildFn(scope, id);
     for (const hook of this.#hooks) {
-      hook(scope, id, results);
+      hook(scope, id, results, componentScopes);
     }
     return results;
   }

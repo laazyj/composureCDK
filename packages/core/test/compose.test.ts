@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Construct } from "constructs";
-import { compose } from "../src/compose.js";
+import { compose, type AfterBuildHook } from "../src/compose.js";
 import { groupedStacks } from "../src/stack-strategy.js";
 import { CyclicDependencyError } from "../src/cyclic-dependency-error.js";
 import { type Lifecycle } from "../src/lifecycle.js";
@@ -363,7 +363,7 @@ describe("compose", () => {
       expect(hookFn).toHaveBeenCalledOnce();
     });
 
-    it("passes scope, id, and build results to the hook", () => {
+    it("passes scope, id, build results, and component scopes to the hook", () => {
       const hookFn = vi.fn();
       const scope = createScope();
 
@@ -371,10 +371,12 @@ describe("compose", () => {
         .afterBuild(hookFn)
         .build(scope, "sys");
 
-      expect(hookFn).toHaveBeenCalledWith(scope, "sys", {
-        a: { x: 1 },
-        b: { y: 2 },
-      });
+      expect(hookFn).toHaveBeenCalledWith(
+        scope,
+        "sys",
+        { a: { x: 1 }, b: { y: 2 } },
+        { a: scope, b: scope },
+      );
     });
 
     it("returns the original build results", () => {
@@ -434,11 +436,16 @@ describe("compose", () => {
         .build(createScope(), "test");
 
       expect(hookFn).toHaveBeenCalledOnce();
-      expect(hookFn).toHaveBeenCalledWith(expect.anything(), "test", { a: { x: 1 } });
+      expect(hookFn).toHaveBeenCalledWith(
+        expect.anything(),
+        "test",
+        { a: { x: 1 } },
+        { a: customScope },
+      );
     });
 
     it("chains afterBuild after withStackStrategy", () => {
-      const hookFn = vi.fn();
+      const hookFn = vi.fn<AfterBuildHook<{ a: { x: number }; b: { y: number } }>>();
       const scope = createScope();
 
       compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: [], b: ["a"] })
@@ -452,7 +459,13 @@ describe("compose", () => {
         .build(scope, "sys");
 
       expect(hookFn).toHaveBeenCalledOnce();
-      expect(hookFn).toHaveBeenCalledWith(scope, "sys", { a: { x: 1 }, b: { y: 2 } });
+      const [hookScope, hookId, hookResults, hookComponentScopes] = hookFn.mock.calls[0];
+      expect(hookScope).toBe(scope);
+      expect(hookId).toBe("sys");
+      expect(hookResults).toEqual({ a: { x: 1 }, b: { y: 2 } });
+      expect(hookComponentScopes.a).toBeInstanceOf(Construct);
+      expect(hookComponentScopes.b).toBeInstanceOf(Construct);
+      expect(hookComponentScopes.a).not.toBe(hookComponentScopes.b);
     });
 
     it("chains multiple afterBuild hooks after withStacks", () => {
@@ -480,6 +493,56 @@ describe("compose", () => {
         .build(createScope(), "test");
 
       expect(aBuild.mock.calls[0][0]).toBe(customScope);
+    });
+  });
+
+  describe("componentScopes", () => {
+    it("maps every component to the base scope when no stack routing is used", () => {
+      const hookFn = vi.fn<AfterBuildHook<{ a: { x: number }; b: { y: number } }>>();
+      const scope = createScope();
+
+      compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: [], b: ["a"] })
+        .afterBuild(hookFn)
+        .build(scope, "sys");
+
+      const componentScopes = hookFn.mock.calls[0][3];
+      expect(componentScopes).toEqual({ a: scope, b: scope });
+    });
+
+    it("reflects withStacks routing, falling back to the base scope", () => {
+      const hookFn = vi.fn<AfterBuildHook<{ a: { x: number }; b: { y: number } }>>();
+      const base = createScope();
+      const customA = new Construct(undefined as never, "customA");
+
+      compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: [], b: ["a"] })
+        .withStacks({ a: customA })
+        .afterBuild(hookFn)
+        .build(base, "sys");
+
+      const componentScopes = hookFn.mock.calls[0][3];
+      expect(componentScopes.a).toBe(customA);
+      expect(componentScopes.b).toBe(base);
+    });
+
+    it("reflects the scopes produced by a stack strategy", () => {
+      const hookFn = vi.fn<AfterBuildHook<{ a: { x: number }; b: { y: number } }>>();
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
+      const scope = createScope();
+
+      compose({ a, b }, { a: [], b: ["a"] })
+        .withStackStrategy(
+          groupedStacks(
+            (key) => (key === "a" ? "groupA" : "groupB"),
+            (parent, id) => new Construct(parent, id),
+          ),
+        )
+        .afterBuild(hookFn)
+        .build(scope, "sys");
+
+      const componentScopes = hookFn.mock.calls[0][3];
+      expect(componentScopes.a).toBe(aBuild.mock.calls[0][0]);
+      expect(componentScopes.b).toBe(bBuild.mock.calls[0][0]);
     });
   });
 });

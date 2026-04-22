@@ -46,13 +46,13 @@ export type ISpecRestApiBuilder = IBuilder<SpecRestApiBuilderProps, SpecRestApiB
 
 class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
   props: Partial<SpecRestApiBuilderProps> = {};
-  private readonly customAlarms: AlarmDefinitionBuilder<RestApiBase>[] = [];
+  readonly #customAlarms: AlarmDefinitionBuilder<RestApiBase>[] = [];
 
   addAlarm(
     key: string,
     configure: (alarm: AlarmDefinitionBuilder<RestApiBase>) => AlarmDefinitionBuilder<RestApiBase>,
   ): this {
-    this.customAlarms.push(configure(new AlarmDefinitionBuilder<RestApiBase>(key)));
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<RestApiBase>(key)));
     return this;
   }
 
@@ -71,7 +71,7 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
       deployOptions,
     } as SpecRestApiProps);
 
-    const alarms = createRestApiAlarms(scope, id, api, alarmConfig, this.customAlarms);
+    const alarms = createRestApiAlarms(scope, id, api, alarmConfig, this.#customAlarms);
 
     return { api, accessLogGroup, alarms };
   }

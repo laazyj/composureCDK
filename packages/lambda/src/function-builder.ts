@@ -110,7 +110,7 @@ export type IFunctionBuilder = IBuilder<FunctionBuilderProps, FunctionBuilder>;
 
 class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   props: Partial<FunctionBuilderProps> = {};
-  private readonly customAlarms: AlarmDefinitionBuilder<LambdaFunction>[] = [];
+  readonly #customAlarms: AlarmDefinitionBuilder<LambdaFunction>[] = [];
 
   addAlarm(
     key: string,
@@ -118,7 +118,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       alarm: AlarmDefinitionBuilder<LambdaFunction>,
     ) => AlarmDefinitionBuilder<LambdaFunction>,
   ): this {
-    this.customAlarms.push(configure(new AlarmDefinitionBuilder<LambdaFunction>(key)));
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<LambdaFunction>(key)));
     return this;
   }
 
@@ -141,7 +141,14 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
 
     const fn = new LambdaFunction(scope, id, mergedProps);
 
-    const alarms = createFunctionAlarms(scope, id, fn, alarmConfig, mergedProps, this.customAlarms);
+    const alarms = createFunctionAlarms(
+      scope,
+      id,
+      fn,
+      alarmConfig,
+      mergedProps,
+      this.#customAlarms,
+    );
 
     return { function: fn, logGroup, alarms };
   }

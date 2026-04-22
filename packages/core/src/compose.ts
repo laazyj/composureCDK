@@ -193,50 +193,54 @@ export interface ConfiguredSystem<Components extends Record<string, Lifecycle>> 
 class ComposedLifecycle<
   Components extends Record<string, Lifecycle>,
 > implements ComposedSystem<Components> {
-  private readonly graph: Graph;
+  readonly #graph: Graph;
+  readonly #components: Components;
+  readonly #dependencies: { [Property in keyof Components]: Dependency<Components> };
 
   constructor(
-    private readonly components: Components,
-    private readonly dependencies: { [Property in keyof Components]: Dependency<Components> },
+    components: Components,
+    dependencies: { [Property in keyof Components]: Dependency<Components> },
   ) {
-    this.graph = buildDependencyGraph(components, dependencies);
+    this.#components = components;
+    this.#dependencies = dependencies;
+    this.#graph = buildDependencyGraph(components, dependencies);
   }
 
   withStacks(stacks: { [K in keyof Components]?: IConstruct }): ConfiguredSystem<Components> {
-    return new ConfiguredLifecycle((scope, id) => this.buildWith(scope, id, stacks));
+    return new ConfiguredLifecycle((scope, id) => this.#buildWith(scope, id, stacks));
   }
 
   withStackStrategy(strategy: StackStrategy): ConfiguredSystem<Components> {
     return new ConfiguredLifecycle((scope, id) => {
       const stacks = Object.fromEntries(
-        Object.keys(this.components).map((key) => [key, strategy.resolve(scope, id, key)]),
+        Object.keys(this.#components).map((key) => [key, strategy.resolve(scope, id, key)]),
       ) as { [K in keyof Components]?: IConstruct };
-      return this.buildWith(scope, id, stacks);
+      return this.#buildWith(scope, id, stacks);
     });
   }
 
   afterBuild(hook: AfterBuildHook<BuildResult<Components>>): ConfiguredSystem<Components> {
-    return new ConfiguredLifecycle<Components>((scope, id) => this.buildWith(scope, id)).afterBuild(
-      hook,
-    );
+    return new ConfiguredLifecycle<Components>((scope, id) =>
+      this.#buildWith(scope, id),
+    ).afterBuild(hook);
   }
 
   build(scope: IConstruct, id: string): BuildResult<Components> {
-    return this.buildWith(scope, id);
+    return this.#buildWith(scope, id);
   }
 
-  private buildWith(
+  #buildWith(
     scope: IConstruct,
     id: string,
     stacks?: { [K in keyof Components]?: IConstruct },
   ): BuildResult<Components> {
     const results: Record<string, object> = {};
 
-    for (const key of alg.topsort(this.graph)) {
+    for (const key of alg.topsort(this.#graph)) {
       const componentScope = stacks?.[key] ?? scope;
-      const deps = (this.dependencies[key] ?? []) as string[];
+      const deps = (this.#dependencies[key] ?? []) as string[];
       const context = Object.fromEntries(deps.map((dep) => [dep, results[dep]]));
-      results[key] = this.components[key].build(componentScope, `${id}/${key}`, context);
+      results[key] = this.#components[key].build(componentScope, `${id}/${key}`, context);
     }
 
     return results as BuildResult<Components>;
@@ -252,20 +256,21 @@ class ComposedLifecycle<
 class ConfiguredLifecycle<
   Components extends Record<string, Lifecycle>,
 > implements ConfiguredSystem<Components> {
-  private readonly hooks: AfterBuildHook<BuildResult<Components>>[] = [];
+  readonly #hooks: AfterBuildHook<BuildResult<Components>>[] = [];
+  readonly #buildFn: (scope: IConstruct, id: string) => BuildResult<Components>;
 
-  constructor(
-    private readonly buildFn: (scope: IConstruct, id: string) => BuildResult<Components>,
-  ) {}
+  constructor(buildFn: (scope: IConstruct, id: string) => BuildResult<Components>) {
+    this.#buildFn = buildFn;
+  }
 
   afterBuild(hook: AfterBuildHook<BuildResult<Components>>): ConfiguredSystem<Components> {
-    this.hooks.push(hook);
+    this.#hooks.push(hook);
     return this;
   }
 
   build(scope: IConstruct, id: string): BuildResult<Components> {
-    const results = this.buildFn(scope, id);
-    for (const hook of this.hooks) {
+    const results = this.#buildFn(scope, id);
+    for (const hook of this.#hooks) {
       hook(scope, id, results);
     }
     return results;

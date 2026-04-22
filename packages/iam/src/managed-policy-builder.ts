@@ -42,7 +42,7 @@ export type IManagedPolicyBuilder = IBuilder<ManagedPolicyBuilderProps, ManagedP
 
 class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
   props: Partial<ManagedPolicyBuilderProps> = {};
-  private readonly _extraStatements: (PolicyStatement | StatementBuilder)[] = [];
+  readonly #extraStatements: (PolicyStatement | StatementBuilder)[] = [];
 
   /**
    * Append policy statements to the managed policy.
@@ -52,12 +52,12 @@ class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
    * validation runs at the composition boundary.
    */
   addStatements(statements: (PolicyStatement | StatementBuilder)[]): this {
-    this._extraStatements.push(...statements);
+    this.#extraStatements.push(...statements);
     return this;
   }
 
   build(scope: IConstruct, id: string): ManagedPolicyBuilderResult {
-    const resolvedExtras = this._extraStatements.map((s) =>
+    const resolvedExtras = this.#extraStatements.map((s) =>
       s instanceof StatementBuilder ? s.build() : s,
     );
 

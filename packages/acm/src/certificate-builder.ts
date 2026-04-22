@@ -128,7 +128,7 @@ export type ICertificateBuilder = IBuilder<CertificateBuilderProps, CertificateB
 
 class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
   props: Partial<CertificateBuilderProps> = {};
-  private readonly customAlarms: AlarmDefinitionBuilder<ICertificate>[] = [];
+  readonly #customAlarms: AlarmDefinitionBuilder<ICertificate>[] = [];
 
   addAlarm(
     key: string,
@@ -136,7 +136,7 @@ class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
       alarm: AlarmDefinitionBuilder<ICertificate>,
     ) => AlarmDefinitionBuilder<ICertificate>,
   ): this {
-    this.customAlarms.push(configure(new AlarmDefinitionBuilder<ICertificate>(key)));
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<ICertificate>(key)));
     return this;
   }
 
@@ -192,7 +192,7 @@ class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
 
     const certificate = new Certificate(scope, id, mergedProps);
 
-    const alarms = createCertificateAlarms(scope, id, certificate, alarmConfig, this.customAlarms);
+    const alarms = createCertificateAlarms(scope, id, certificate, alarmConfig, this.#customAlarms);
 
     return { certificate, alarms };
   }

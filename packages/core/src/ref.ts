@@ -26,7 +26,11 @@
  * ```
  */
 export class Ref<T> {
-  private constructor(private readonly _resolver: (context: Record<string, object>) => T) {}
+  readonly #resolver: (context: Record<string, object>) => T;
+
+  private constructor(resolver: (context: Record<string, object>) => T) {
+    this.#resolver = resolver;
+  }
 
   /**
    * Creates a `Ref` that resolves to a component's full build output.
@@ -53,7 +57,7 @@ export class Ref<T> {
    * @returns A new `Ref` to the selected property.
    */
   get<K extends keyof T>(key: K): Ref<T[K]> {
-    return new Ref<T[K]>((context) => this._resolver(context)[key]);
+    return new Ref<T[K]>((context) => this.#resolver(context)[key]);
   }
 
   /**
@@ -67,7 +71,7 @@ export class Ref<T> {
    * @returns A new `Ref` whose resolved value is the result of `fn`.
    */
   map<U>(fn: (value: T) => U): Ref<U> {
-    return new Ref<U>((context) => fn(this._resolver(context)));
+    return new Ref<U>((context) => fn(this.#resolver(context)));
   }
 
   /**
@@ -79,7 +83,7 @@ export class Ref<T> {
    * @returns The resolved value.
    */
   resolve(context: Record<string, object>): T {
-    return this._resolver(context);
+    return this.#resolver(context);
   }
 }
 

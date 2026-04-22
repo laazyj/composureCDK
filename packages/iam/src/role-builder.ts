@@ -100,7 +100,7 @@ interface InlinePolicyEntry {
 
 class RoleBuilder implements Lifecycle<RoleBuilderResult> {
   props: Partial<RoleBuilderProps> = {};
-  private readonly _inlinePolicies: InlinePolicyEntry[] = [];
+  readonly #inlinePolicies: InlinePolicyEntry[] = [];
 
   /**
    * Append an inline policy to the role, embedded in the underlying
@@ -117,7 +117,7 @@ class RoleBuilder implements Lifecycle<RoleBuilderResult> {
     name: string,
     statements: (PolicyStatement | StatementBuilder)[],
   ): this {
-    this._inlinePolicies.push({ name, statements });
+    this.#inlinePolicies.push({ name, statements });
     return this;
   }
 
@@ -141,7 +141,7 @@ class RoleBuilder implements Lifecycle<RoleBuilderResult> {
       : undefined;
 
     const addedInlinePolicies: Record<string, PolicyDocument> = {};
-    for (const entry of this._inlinePolicies) {
+    for (const entry of this.#inlinePolicies) {
       const resolvedStatements = entry.statements.map((s) =>
         s instanceof StatementBuilder ? s.build() : s,
       );

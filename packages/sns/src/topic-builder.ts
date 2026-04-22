@@ -107,14 +107,14 @@ interface SubscriptionEntry {
 
 class TopicBuilder implements Lifecycle<TopicBuilderResult> {
   props: Partial<TopicBuilderProps> = {};
-  private readonly customAlarms: AlarmDefinitionBuilder<ITopic>[] = [];
-  private readonly _subscriptions: SubscriptionEntry[] = [];
+  readonly #customAlarms: AlarmDefinitionBuilder<ITopic>[] = [];
+  readonly #subscriptions: SubscriptionEntry[] = [];
 
   addAlarm(
     key: string,
     configure: (alarm: AlarmDefinitionBuilder<ITopic>) => AlarmDefinitionBuilder<ITopic>,
   ): this {
-    this.customAlarms.push(configure(new AlarmDefinitionBuilder<ITopic>(key)));
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<ITopic>(key)));
     return this;
   }
 
@@ -135,13 +135,13 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
    * {@link TopicBuilderResult.subscriptions} under `key`.
    */
   addSubscription(key: string, subscription: Resolvable<ITopicSubscription>): this {
-    if (this._subscriptions.some((s) => s.key === key)) {
+    if (this.#subscriptions.some((s) => s.key === key)) {
       throw new Error(
         `TopicBuilder.addSubscription: duplicate key "${key}". ` +
           `Each subscription must use a unique key.`,
       );
     }
-    this._subscriptions.push({ key, subscription });
+    this.#subscriptions.push({ key, subscription });
     return this;
   }
 
@@ -155,10 +155,10 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
 
     const topic = new Topic(scope, id, mergedProps);
 
-    const alarms = createTopicAlarms(scope, id, topic, alarmConfig, this.customAlarms);
+    const alarms = createTopicAlarms(scope, id, topic, alarmConfig, this.#customAlarms);
 
     const subscriptions: Record<string, Subscription> = {};
-    for (const entry of this._subscriptions) {
+    for (const entry of this.#subscriptions) {
       const resolvedSub = resolve(entry.subscription, context ?? {});
       const subscriptionConfig = resolvedSub.bind(topic);
       const subscriptionId = `${id}${entry.key[0].toUpperCase()}${entry.key.slice(1)}Subscription`;

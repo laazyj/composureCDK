@@ -57,14 +57,14 @@ export type IRestApiBuilder = IBuilder<RestApiBuilderProps, RestApiBuilder>;
 
 class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
   props: Partial<RestApiBuilderProps> = {};
-  private readonly root = new ResourceBuilder();
-  private readonly customAlarms: AlarmDefinitionBuilder<RestApiBase>[] = [];
+  readonly #root = new ResourceBuilder();
+  readonly #customAlarms: AlarmDefinitionBuilder<RestApiBase>[] = [];
 
   addAlarm(
     key: string,
     configure: (alarm: AlarmDefinitionBuilder<RestApiBase>) => AlarmDefinitionBuilder<RestApiBase>,
   ): this {
-    this.customAlarms.push(configure(new AlarmDefinitionBuilder<RestApiBase>(key)));
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<RestApiBase>(key)));
     return this;
   }
 
@@ -82,7 +82,7 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
     integration?: Resolvable<Integration>,
     options?: MethodOptions,
   ): this {
-    this.root.addMethod(httpMethod, integration, options);
+    this.#root.addMethod(httpMethod, integration, options);
     return this;
   }
 
@@ -94,7 +94,7 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
    * @returns This builder for chaining.
    */
   addResource(pathPart: string, configure?: (resource: ResourceBuilder) => void): this {
-    this.root.addResource(pathPart, configure);
+    this.#root.addResource(pathPart, configure);
     return this;
   }
 
@@ -112,9 +112,9 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
       ...restApiProps,
       deployOptions,
     } as RestApiProps);
-    this.root.applyTo(api.root, context ?? {});
+    this.#root.applyTo(api.root, context ?? {});
 
-    const alarms = createRestApiAlarms(scope, id, api, alarmConfig, this.customAlarms);
+    const alarms = createRestApiAlarms(scope, id, api, alarmConfig, this.#customAlarms);
 
     return { api, accessLogGroup, alarms };
   }

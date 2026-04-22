@@ -152,8 +152,8 @@ export type IDistributionBuilder = IBuilder<DistributionBuilderProps, Distributi
 
 class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
   props: Partial<DistributionBuilderProps> = {};
-  private _origin?: Resolvable<IOrigin>;
-  private readonly customAlarms: AlarmDefinitionBuilder<Distribution>[] = [];
+  #origin?: Resolvable<IOrigin>;
+  readonly #customAlarms: AlarmDefinitionBuilder<Distribution>[] = [];
 
   addAlarm(
     key: string,
@@ -161,7 +161,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       alarm: AlarmDefinitionBuilder<Distribution>,
     ) => AlarmDefinitionBuilder<Distribution>,
   ): this {
-    this.customAlarms.push(configure(new AlarmDefinitionBuilder<Distribution>(key)));
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Distribution>(key)));
     return this;
   }
 
@@ -175,7 +175,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
    * @returns This builder for chaining.
    */
   origin(origin: Resolvable<IOrigin>): this {
-    this._origin = origin;
+    this.#origin = origin;
     return this;
   }
 
@@ -184,7 +184,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
     id: string,
     context?: Record<string, object>,
   ): DistributionBuilderResult {
-    const resolvedOrigin = this._origin ? resolve(this._origin, context ?? {}) : undefined;
+    const resolvedOrigin = this.#origin ? resolve(this.#origin, context ?? {}) : undefined;
 
     if (!resolvedOrigin) {
       throw new Error(
@@ -250,7 +250,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       id,
       distribution,
       alarmConfig,
-      this.customAlarms,
+      this.#customAlarms,
     );
 
     return {

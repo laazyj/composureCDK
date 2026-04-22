@@ -53,69 +53,69 @@ export class WildcardResourceError extends Error {
  * ```
  */
 export class StatementBuilder {
-  private _sid?: string;
-  private _effect: Effect = Effect.ALLOW;
-  private _actions: string[] = [];
-  private _notActions: string[] = [];
-  private _resources: string[] = [];
-  private _notResources: string[] = [];
-  private _principals: IPrincipal[] = [];
-  private _notPrincipals: IPrincipal[] = [];
-  private _conditions?: Record<string, Record<string, unknown>>;
-  private _allowWildcardResources = false;
+  #sid?: string;
+  #effect: Effect = Effect.ALLOW;
+  #actions: string[] = [];
+  #notActions: string[] = [];
+  #resources: string[] = [];
+  #notResources: string[] = [];
+  #principals: IPrincipal[] = [];
+  #notPrincipals: IPrincipal[] = [];
+  #conditions?: Record<string, Record<string, unknown>>;
+  #allowWildcardResources = false;
 
   sid(sid: string): this {
-    this._sid = sid;
+    this.#sid = sid;
     return this;
   }
 
   allow(): this {
-    this._effect = Effect.ALLOW;
+    this.#effect = Effect.ALLOW;
     return this;
   }
 
   deny(): this {
-    this._effect = Effect.DENY;
+    this.#effect = Effect.DENY;
     return this;
   }
 
   effect(effect: Effect): this {
-    this._effect = effect;
+    this.#effect = effect;
     return this;
   }
 
   actions(actions: string[]): this {
-    this._actions = [...actions];
+    this.#actions = [...actions];
     return this;
   }
 
   notActions(actions: string[]): this {
-    this._notActions = [...actions];
+    this.#notActions = [...actions];
     return this;
   }
 
   resources(resources: string[]): this {
-    this._resources = [...resources];
+    this.#resources = [...resources];
     return this;
   }
 
   notResources(resources: string[]): this {
-    this._notResources = [...resources];
+    this.#notResources = [...resources];
     return this;
   }
 
   principals(principals: IPrincipal[]): this {
-    this._principals = [...principals];
+    this.#principals = [...principals];
     return this;
   }
 
   notPrincipals(principals: IPrincipal[]): this {
-    this._notPrincipals = [...principals];
+    this.#notPrincipals = [...principals];
     return this;
   }
 
   conditions(conditions: Record<string, Record<string, unknown>>): this {
-    this._conditions = { ...conditions };
+    this.#conditions = { ...conditions };
     return this;
   }
 
@@ -131,7 +131,7 @@ export class StatementBuilder {
    * @see https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_actions-resources-contextkeys.html
    */
   allowWildcardResources(allow = true): this {
-    this._allowWildcardResources = allow;
+    this.#allowWildcardResources = allow;
     return this;
   }
 
@@ -143,23 +143,23 @@ export class StatementBuilder {
    */
   build(): PolicyStatement {
     if (
-      this._effect === Effect.ALLOW &&
-      !this._allowWildcardResources &&
-      this._resources.some((r) => r === "*")
+      this.#effect === Effect.ALLOW &&
+      !this.#allowWildcardResources &&
+      this.#resources.some((r) => r === "*")
     ) {
-      throw new WildcardResourceError(this._sid);
+      throw new WildcardResourceError(this.#sid);
     }
 
     const props: PolicyStatementProps = {
-      sid: this._sid,
-      effect: this._effect,
-      actions: this._actions.length > 0 ? this._actions : undefined,
-      notActions: this._notActions.length > 0 ? this._notActions : undefined,
-      resources: this._resources.length > 0 ? this._resources : undefined,
-      notResources: this._notResources.length > 0 ? this._notResources : undefined,
-      principals: this._principals.length > 0 ? this._principals : undefined,
-      notPrincipals: this._notPrincipals.length > 0 ? this._notPrincipals : undefined,
-      conditions: this._conditions,
+      sid: this.#sid,
+      effect: this.#effect,
+      actions: this.#actions.length > 0 ? this.#actions : undefined,
+      notActions: this.#notActions.length > 0 ? this.#notActions : undefined,
+      resources: this.#resources.length > 0 ? this.#resources : undefined,
+      notResources: this.#notResources.length > 0 ? this.#notResources : undefined,
+      principals: this.#principals.length > 0 ? this.#principals : undefined,
+      notPrincipals: this.#notPrincipals.length > 0 ? this.#notPrincipals : undefined,
+      conditions: this.#conditions,
     };
 
     return new PolicyStatement(props);

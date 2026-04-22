@@ -31,7 +31,7 @@ import { CERTIFICATE_DEFAULTS } from "./defaults.js";
  * the builder fails fast — falling back to ACM's email-based validation would
  * stall stack creation waiting on a human to click a link.
  */
-interface CertificateBuilderProps extends CertificateProps {
+export interface CertificateBuilderProps extends CertificateProps {
   /**
    * The hosted zone used to automatically create DNS validation records
    * for every domain on the certificate. Accepts a {@link Resolvable} so

@@ -16,7 +16,10 @@ import {
  * values for `topic` and `deadLetterQueue` so the builder can be wired to
  * other components via {@link ref} inside a {@link compose}d system.
  */
-interface SubscriptionBuilderProps extends Omit<SubscriptionProps, "topic" | "deadLetterQueue"> {
+export interface SubscriptionBuilderProps extends Omit<
+  SubscriptionProps,
+  "topic" | "deadLetterQueue"
+> {
   /**
    * The topic to subscribe to. Accepts a concrete {@link ITopic} or a
    * {@link Ref} to another component's output (e.g. a `TopicBuilder`).

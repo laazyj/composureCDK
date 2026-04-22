@@ -1,5 +1,6 @@
 export {
   createLogGroupBuilder,
+  type LogGroupBuilderProps,
   type LogGroupBuilderResult,
   type ILogGroupBuilder,
 } from "./log-group-builder.js";

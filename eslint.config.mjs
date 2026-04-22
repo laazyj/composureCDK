@@ -33,23 +33,5 @@ export default defineConfig(
       },
     },
   },
-  {
-    files: ["packages/*/src/index.ts"],
-    rules: {
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "ExportSpecifier[exported.name=/BuilderProps$/]",
-          message:
-            "*BuilderProps types are internal to their package — do not re-export them from the package barrel.",
-        },
-        {
-          selector: "ExportAllDeclaration",
-          message:
-            "Package barrels must use explicit named re-exports so internal types (e.g. *BuilderProps) cannot leak.",
-        },
-      ],
-    },
-  },
   eslintConfigPrettier,
 );

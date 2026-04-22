@@ -24,7 +24,7 @@ import { StatementBuilder } from "./statement-builder.js";
  * so boundary policies built by sibling components can be referenced at
  * configuration time.
  */
-interface RoleBuilderProps extends Omit<RoleProps, "permissionsBoundary"> {
+export interface RoleBuilderProps extends Omit<RoleProps, "permissionsBoundary"> {
   /**
    * A permissions boundary that caps the maximum permissions this role
    * can ever grant, regardless of inline or managed policies attached.

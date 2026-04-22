@@ -1,5 +1,6 @@
 export {
   createDistributionBuilder,
+  type DistributionBuilderProps,
   type DistributionBuilderResult,
   type IDistributionBuilder,
 } from "./distribution-builder.js";

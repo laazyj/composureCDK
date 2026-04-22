@@ -1,5 +1,6 @@
 export {
   createCertificateBuilder,
+  type CertificateBuilderProps,
   type CertificateBuilderResult,
   type ICertificateBuilder,
 } from "./certificate-builder.js";

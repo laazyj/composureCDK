@@ -127,3 +127,4 @@ Each output definition accepts:
 - **`value`** — A concrete string or a `Ref` that resolves against the build results.
 - **`description`** — Optional description for the CloudFormation output.
 - **`exportName`** — Optional export name for cross-stack references.
+- **`scope`** — Optional Stack to attach the output to. Either an `IConstruct` (a direct Stack reference, typical with `.withStacks()`) or a component key string typed against the composed system (typical with `.withStackStrategy()`, where stacks are created dynamically). When omitted, the output falls back to the hook's `scope` — the top-level scope given to `build()`. See [Per-Output Stack Routing](./stack-management.md#per-output-stack-routing).

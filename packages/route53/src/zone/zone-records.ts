@@ -149,10 +149,13 @@ class ZoneRecordsBuilder implements IZoneRecordsBuilder {
     };
     for (const group of groupRecords(this.#specs)) {
       const head = group[0];
-      // Use the APEX sentinel ("@") as the key/id so it cannot collide with a
-      // user-supplied label spelled "apex".
+      // Use the APEX sentinel ("@") as the result-map key, but a readable
+      // "Apex" as the construct id so the synthesised logical ID keeps a
+      // human-visible marker. ("@" sanitises to empty and produces opaque
+      // logical IDs like `DNSrecordsa85669662`.) CDK's duplicate-id check
+      // catches the rare case of a user-supplied label also spelled "Apex".
       const key = head.name;
-      const childId = constructId(key);
+      const childId = key === APEX ? "Apex" : constructId(key);
       switch (head.type) {
         case "A":
           result.a[key] = buildA(subScope("a"), childId, group as ARecordSpec[], zone, context);

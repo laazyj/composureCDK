@@ -317,8 +317,9 @@ describe("zoneRecords", () => {
     const result = zoneRecords([A(APEX, "1.2.3.4")])
       .zone(zone)
       .build(stack, "DNS");
-    // Path should be TestStack/DNS/a/@ — no '/' sanitized to '--'.
-    expect(result.a["@"].record.node.path).toBe("TestStack/DNS/a/@");
+    // Apex records use the readable "Apex" construct id (keyed by APEX ("@")
+    // in the result map) so synthesised logical IDs keep a human-visible marker.
+    expect(result.a["@"].record.node.path).toBe("TestStack/DNS/a/Apex");
   });
 
   it("uses the APEX sentinel as the result key so it cannot collide with a literal 'apex' label", () => {

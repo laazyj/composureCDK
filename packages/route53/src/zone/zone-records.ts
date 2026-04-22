@@ -21,6 +21,7 @@ import { type TxtRecordBuilderResult, createTxtRecordBuilder } from "../txt-reco
 import {
   APEX,
   type AaaaRecordSpec,
+  type AliasRecordSpec,
   type ARecordSpec,
   type CaaRecordSpec,
   type CnameRecordSpec,
@@ -232,6 +233,23 @@ class ZoneRecordsBuilder implements IZoneRecordsBuilder {
             context,
           );
           break;
+        case "ALIAS": {
+          const aliasGroup = group as AliasRecordSpec[];
+          if (aliasGroup.length > 1) {
+            throw new Error(
+              `ALIAS for "${head.name}" (${head.ipv6 ? "AAAA" : "A"}) declared ` +
+                `${String(aliasGroup.length)} times. ` +
+                `DNS allows only one alias record per (type, name).`,
+            );
+          }
+          const spec = aliasGroup[0];
+          if (spec.ipv6) {
+            result.aaaa[key] = buildAliasAaaa(subScope("aaaa"), childId, spec, zone, context);
+          } else {
+            result.a[key] = buildAliasA(subScope("a"), childId, spec, zone, context);
+          }
+          break;
+        }
         default: {
           const _exhaustive: never = head;
           throw new Error(`Unhandled record type: ${(_exhaustive as RecordSpec).type}`);
@@ -251,12 +269,35 @@ const sub = (name: string) => (name === APEX ? undefined : name);
 const dedupe = <T>(xs: readonly T[]): T[] => [...new Set(xs)];
 
 function validateSpecs(specs: readonly RecordSpec[]): void {
+  const aliasNames = { a: new Set<string>(), aaaa: new Set<string>() };
+  for (const spec of specs) {
+    if (spec.type === "ALIAS") {
+      const bucket = spec.ipv6 ? aliasNames.aaaa : aliasNames.a;
+      bucket.add(spec.name);
+    }
+  }
   for (const spec of specs) {
     switch (spec.type) {
       case "A":
+        if (spec.addresses.length === 0) {
+          throw new Error(`${spec.type}("${spec.name}") must supply at least one address.`);
+        }
+        if (aliasNames.a.has(spec.name)) {
+          throw new Error(
+            `A("${spec.name}") cannot coexist with ALIAS("${spec.name}"). ` +
+              `DNS allows only one record set per (type, name).`,
+          );
+        }
+        break;
       case "AAAA":
         if (spec.addresses.length === 0) {
           throw new Error(`${spec.type}("${spec.name}") must supply at least one address.`);
+        }
+        if (aliasNames.aaaa.has(spec.name)) {
+          throw new Error(
+            `AAAA("${spec.name}") cannot coexist with ALIAS("${spec.name}", { ipv6: true }). ` +
+              `DNS allows only one record set per (type, name).`,
+          );
         }
         break;
       case "TXT":
@@ -272,18 +313,24 @@ function validateSpecs(specs: readonly RecordSpec[]): void {
         }
         break;
       case "CNAME":
+      case "ALIAS":
         // CNAME carries a single `target` string; the DSL factory cannot
-        // produce an empty one.
+        // produce an empty one. ALIAS carries a single target value and is
+        // checked for duplicates during grouping.
         break;
     }
   }
 }
 
-/** Group records by `(type, name)`, preserving the insertion order of groups. */
+/**
+ * Group records by `(type, name)`, preserving the insertion order of groups.
+ * `ALIAS` specs are split further by `ipv6` so an A-alias and an AAAA-alias at
+ * the same name land in separate groups (they emit distinct record types).
+ */
 function groupRecords(specs: readonly RecordSpec[]): RecordSpec[][] {
   const groups = new Map<string, RecordSpec[]>();
   for (const s of specs) {
-    const k = `${s.type}/${s.name}`;
+    const k = s.type === "ALIAS" ? `ALIAS/${s.ipv6 ? "6" : "4"}/${s.name}` : `${s.type}/${s.name}`;
     const existing = groups.get(k);
     if (existing) existing.push(s);
     else groups.set(k, [s]);
@@ -509,6 +556,36 @@ function buildSvcb(
     createSvcbRecordBuilder().zone(zone).values(values),
     specs,
     sub(specs[0].name),
+  );
+  return b.build(scope, id, context);
+}
+
+function buildAliasA(
+  scope: IConstruct,
+  id: string,
+  spec: AliasRecordSpec,
+  zone: IHostedZone,
+  context?: Record<string, object>,
+): ARecordBuilderResult {
+  const b = applyCommon(
+    createARecordBuilder().zone(zone).target(spec.target),
+    [spec],
+    sub(spec.name),
+  );
+  return b.build(scope, id, context);
+}
+
+function buildAliasAaaa(
+  scope: IConstruct,
+  id: string,
+  spec: AliasRecordSpec,
+  zone: IHostedZone,
+  context?: Record<string, object>,
+): AaaaRecordBuilderResult {
+  const b = applyCommon(
+    createAaaaRecordBuilder().zone(zone).target(spec.target),
+    [spec],
+    sub(spec.name),
   );
   return b.build(scope, id, context);
 }

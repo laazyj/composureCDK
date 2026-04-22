@@ -4,15 +4,16 @@ Example applications demonstrating ComposureCDK patterns. Each example is a self
 
 All example stacks use the `ComposureCDK-` name prefix. This convention enables the CI deploy-test pipeline to scope IAM permissions and discover stacks automatically — see [CI documentation](../../docs/ci.md#stack-naming-convention) for details. **New examples must follow this prefix.**
 
-| Stack                                                                                               | Description                                                                     |
-| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [`ComposureCDK-DualFunctionStack`](src/dual-function-app.ts)                                        | Two Lambda functions (API handler + async worker) with different configurations |
-| [`ComposureCDK-LambdaApiStack`](src/lambda-api-app.ts)                                              | REST API backed by a Lambda function, wired with `ref`                          |
-| [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations                                            |
-| [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                   |
-| [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment    |
-| [`ComposureCDK-OpenApiPetstoreStack`](src/openapi-petstore-app.ts)                                  | PetStore REST API defined by an inline OpenAPI 3.0 specification                |
-| [`ComposureCDK-StrategyStackApp-*`](src/strategy-stack-app.ts)                                      | REST API + Lambda split across stacks via `.withStackStrategy()`                |
+| Stack                                                                                               | Description                                                                                      |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [`ComposureCDK-DualFunctionStack`](src/dual-function-app.ts)                                        | Two Lambda functions (API handler + async worker) with different configurations                  |
+| [`ComposureCDK-LambdaApiStack`](src/lambda-api-app.ts)                                              | REST API backed by a Lambda function, wired with `ref`                                           |
+| [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations                                                             |
+| [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                                    |
+| [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment                     |
+| [`ComposureCDK-OpenApiPetstoreStack`](src/openapi-petstore-app.ts)                                  | PetStore REST API defined by an inline OpenAPI 3.0 specification                                 |
+| [`ComposureCDK-StrategyStackApp-*`](src/strategy-stack-app.ts)                                      | REST API + Lambda split across stacks via `.withStackStrategy()`                                 |
+| [`ComposureCDK-DnsZoneStack`](src/dns-zone-app.ts)                                                  | Public Route 53 zone built with the BIND-style zone DSL, including a CloudFront `ALIAS` at `www` |
 
 ## Prerequisites
 

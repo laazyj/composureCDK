@@ -102,10 +102,16 @@ Individual builders are convenient for AWS-service records wired to other constr
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
-import { createHostedZoneBuilder, type HostedZoneBuilderResult } from "@composurecdk/route53";
+import type { DistributionBuilderResult } from "@composurecdk/cloudfront";
+import {
+  cloudfrontAliasTarget,
+  createHostedZoneBuilder,
+  type HostedZoneBuilderResult,
+} from "@composurecdk/route53";
 import {
   A,
   AAAA,
+  ALIAS,
   APEX,
   CAA_ISSUE,
   CAA_ISSUEWILD,
@@ -123,6 +129,18 @@ compose(
       A(APEX, "203.0.113.10"),
       AAAA(APEX, "2001:db8::10"),
       A("api", ["203.0.113.20", "203.0.113.21"]),
+
+      ALIAS(
+        "www",
+        cloudfrontAliasTarget(ref<DistributionBuilderResult>("cdn").get("distribution")),
+      ),
+      ALIAS(
+        "www",
+        cloudfrontAliasTarget(ref<DistributionBuilderResult>("cdn").get("distribution")),
+        {
+          ipv6: true,
+        },
+      ),
 
       MX(APEX, 10, "mail1.example.com."),
       MX(APEX, 20, "mail2.example.com."),
@@ -142,22 +160,23 @@ compose(
 
 ### Helpers
 
-| Helper                                       | Shape                 | Notes                                                        |
-| -------------------------------------------- | --------------------- | ------------------------------------------------------------ |
-| `A(name, addr \| addrs, opts?)`              | IPv4 addresses        | Repeat calls merge; use `APEX` for `@`                       |
-| `AAAA(name, addr \| addrs, opts?)`           | IPv6 addresses        | As `A`                                                       |
-| `CNAME(name, target, opts?)`                 | One canonical target  | Duplicate or apex CNAME is rejected                          |
-| `TXT(name, value \| values, opts?)`          | One or more strings   | Repeat calls merge                                           |
-| `MX(name, prio, host, opts?)`                | Mail exchanger        | Repeat calls merge `(priority, hostName)` pairs              |
-| `SRV(name, prio, weight, port, host, opts?)` | Service locator       | BIND order; repeat calls merge                               |
-| `CAA(name, flag, tag, value, opts?)`         | Raw CAA               | Prefer the wrappers below                                    |
-| `CAA_ISSUE(name, ca, opts?)`                 | `0 issue "ca"`        | Authorize a CA                                               |
-| `CAA_ISSUEWILD(name, ca, opts?)`             | `0 issuewild "ca"`    | Authorize a CA for wildcards                                 |
-| `CAA_IODEF(name, url, opts?)`                | `0 iodef "url"`       | Report policy violations                                     |
-| `NS(name, host \| hosts, opts?)`             | Delegation            | Apex NS is rejected (managed by Route 53)                    |
-| `DS(name, rdata \| rdatas, opts?)`           | DNSSEC chain-of-trust | Each value is a full `keyTag alg digestType digest` rdata    |
-| `HTTPS(name, value \| values, opts?)`        | RFC 9460 HTTPS record | Accepts `HttpsRecordValue.alias()`/`.service()` from the CDK |
-| `SVCB(name, value \| values, opts?)`         | RFC 9460 generic SVCB | As `HTTPS`; for web traffic prefer `HTTPS`                   |
+| Helper                                       | Shape                 | Notes                                                                                                                                              |
+| -------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `A(name, addr \| addrs, opts?)`              | IPv4 addresses        | Repeat calls merge; use `APEX` for `@`                                                                                                             |
+| `AAAA(name, addr \| addrs, opts?)`           | IPv6 addresses        | As `A`                                                                                                                                             |
+| `ALIAS(name, target, opts?)`                 | A/AAAA alias record   | `opts.ipv6: true` emits AAAA; pair with helpers from [Alias targets](#alias-targets); cannot coexist with address-mode `A`/`AAAA` at the same name |
+| `CNAME(name, target, opts?)`                 | One canonical target  | Duplicate or apex CNAME is rejected                                                                                                                |
+| `TXT(name, value \| values, opts?)`          | One or more strings   | Repeat calls merge                                                                                                                                 |
+| `MX(name, prio, host, opts?)`                | Mail exchanger        | Repeat calls merge `(priority, hostName)` pairs                                                                                                    |
+| `SRV(name, prio, weight, port, host, opts?)` | Service locator       | BIND order; repeat calls merge                                                                                                                     |
+| `CAA(name, flag, tag, value, opts?)`         | Raw CAA               | Prefer the wrappers below                                                                                                                          |
+| `CAA_ISSUE(name, ca, opts?)`                 | `0 issue "ca"`        | Authorize a CA                                                                                                                                     |
+| `CAA_ISSUEWILD(name, ca, opts?)`             | `0 issuewild "ca"`    | Authorize a CA for wildcards                                                                                                                       |
+| `CAA_IODEF(name, url, opts?)`                | `0 iodef "url"`       | Report policy violations                                                                                                                           |
+| `NS(name, host \| hosts, opts?)`             | Delegation            | Apex NS is rejected (managed by Route 53)                                                                                                          |
+| `DS(name, rdata \| rdatas, opts?)`           | DNSSEC chain-of-trust | Each value is a full `keyTag alg digestType digest` rdata                                                                                          |
+| `HTTPS(name, value \| values, opts?)`        | RFC 9460 HTTPS record | Accepts `HttpsRecordValue.alias()`/`.service()` from the CDK                                                                                       |
+| `SVCB(name, value \| values, opts?)`         | RFC 9460 generic SVCB | As `HTTPS`; for web traffic prefer `HTTPS`                                                                                                         |
 
 The trailing `opts` argument is `{ ttl?, comment? }`. When records with the same `(type, name)` are merged, the **first defined** `ttl`/`comment` in declaration order wins — so to give a merged group a TTL or comment, attach it to the first call:
 
@@ -185,6 +204,8 @@ Exact-duplicate string values (same IP appearing twice in an `A` merge, the same
 - `CNAME` at the apex — DNS forbids CNAMEs from coexisting with the mandatory apex SOA/NS records. Use an A/AAAA alias instead.
 - More than one `CNAME` for the same name — DNS allows at most one CNAME per name.
 - `NS` at the apex — Route 53 manages the apex NS set itself; recreating it clashes with the zone's delegation.
+- `ALIAS` mixed with address-mode `A`/`AAAA` at the same name — DNS allows only one record set per `(type, name)`. Pick alias or addresses, not both.
+- More than one `ALIAS` for the same `(type, name)` — DNS allows one alias record per name+type. To dual-stack, call `ALIAS` once and once more with `{ ipv6: true }`.
 - `zoneRecords(...).build(...)` without a `.zone(...)` call.
 
 ### HTTPS / SVCB alias mode
@@ -205,11 +226,11 @@ import {
   type DistributionBuilderResult,
 } from "@composurecdk/cloudfront";
 import {
-  createHostedZoneBuilder,
-  createARecordBuilder,
   cloudfrontAliasTarget,
+  createHostedZoneBuilder,
   type HostedZoneBuilderResult,
 } from "@composurecdk/route53";
+import { ALIAS, APEX, zoneRecords } from "@composurecdk/route53/zone";
 
 compose(
   {
@@ -221,10 +242,17 @@ compose(
       .domainNames(["example.com"])
       .certificate(ref("cert", (r: CertificateBuilderResult) => r.certificate))
       .origin(/* ... */),
-    apex: createARecordBuilder()
-      .zone(ref("zone", (r: HostedZoneBuilderResult) => r.hostedZone))
-      .target(cloudfrontAliasTarget(ref("cdn", (r: DistributionBuilderResult) => r.distribution))),
+    records: zoneRecords([
+      ALIAS(APEX, cloudfrontAliasTarget(ref<DistributionBuilderResult>("cdn").get("distribution"))),
+      ALIAS(
+        APEX,
+        cloudfrontAliasTarget(ref<DistributionBuilderResult>("cdn").get("distribution")),
+        {
+          ipv6: true,
+        },
+      ),
+    ]).zone(ref<HostedZoneBuilderResult>("zone").get("hostedZone")),
   },
-  { zone: [], cert: ["zone"], cdn: ["cert"], apex: ["zone", "cdn"] },
+  { zone: [], cert: ["zone"], cdn: ["cert"], records: ["zone", "cdn"] },
 ).build(stack, "Site");
 ```

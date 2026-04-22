@@ -1,11 +1,21 @@
 import { App, Duration, Fn } from "aws-cdk-lib";
+import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { Alpn, HttpsRecordValue } from "aws-cdk-lib/aws-route53";
 import { compose, ref } from "@composurecdk/core";
 import { createStackBuilder, outputs } from "@composurecdk/cloudformation";
-import { createHostedZoneBuilder, type HostedZoneBuilderResult } from "@composurecdk/route53";
+import {
+  createDistributionBuilder,
+  type DistributionBuilderResult,
+} from "@composurecdk/cloudfront";
+import {
+  cloudfrontAliasTarget,
+  createHostedZoneBuilder,
+  type HostedZoneBuilderResult,
+} from "@composurecdk/route53";
 import {
   A,
   AAAA,
+  ALIAS,
   APEX,
   CAA_IODEF,
   CAA_ISSUE,
@@ -28,6 +38,8 @@ import {
  *
  * Demonstrates:
  * - Apex + service A/AAAA records, including a multi-address pool
+ * - `ALIAS` records at `www` pointing at a CloudFront distribution resolved
+ *   via {@link ref} from a sibling compose component
  * - MX/TXT records for SPF + DMARC + MTA-STS
  * - DKIM CNAMEs pointing at an ESP
  * - SRV record for a SIP service
@@ -48,14 +60,30 @@ export function createDnsZoneApp(app = new App()): void {
         .zoneName("composurecdk-zone-dsl-demo.com")
         .comment("Customer-facing zone managed by ComposureCDK"),
 
+      // Minimal CloudFront distribution standing in for a web front-door, so
+      // the www alias records below have something to point at. In a real
+      // app you would bring your own origin (ALB, S3, etc.).
+      cdn: createDistributionBuilder()
+        .comment("Front door for www.composurecdk-zone-dsl-demo.com")
+        .origin(new HttpOrigin("origin.composurecdk-zone-dsl-demo.com")),
+
       records: zoneRecords([
         // ------------------------------------------------------------
         // Apex & web front-door
         // ------------------------------------------------------------
         A(APEX, "203.0.113.10"),
         AAAA(APEX, "2001:db8::10"),
-        A("www", "203.0.113.10"),
-        AAAA("www", "2001:db8::10"),
+        // www is an alias to the CloudFront distribution — one ALIAS call per
+        // record type gives full dual-stack reach.
+        ALIAS(
+          "www",
+          cloudfrontAliasTarget(ref<DistributionBuilderResult>("cdn").get("distribution")),
+        ),
+        ALIAS(
+          "www",
+          cloudfrontAliasTarget(ref<DistributionBuilderResult>("cdn").get("distribution")),
+          { ipv6: true },
+        ),
 
         // HA pool behind round-robin DNS. The two calls merge into one RR-set.
         A("api", "203.0.113.20"),
@@ -118,7 +146,7 @@ export function createDnsZoneApp(app = new App()): void {
         ]),
       ]).zone(ref<HostedZoneBuilderResult>("zone").get("hostedZone")),
     },
-    { zone: [], records: ["zone"] },
+    { zone: [], cdn: [], records: ["zone", "cdn"] },
   )
     .afterBuild(
       outputs({

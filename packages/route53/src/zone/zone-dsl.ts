@@ -1,5 +1,11 @@
 import type { Duration } from "aws-cdk-lib";
-import { CaaTag, type HttpsRecordValue, type SvcbRecordValue } from "aws-cdk-lib/aws-route53";
+import {
+  CaaTag,
+  type HttpsRecordValue,
+  type RecordTarget,
+  type SvcbRecordValue,
+} from "aws-cdk-lib/aws-route53";
+import type { Resolvable } from "@composurecdk/core";
 
 /**
  * Sentinel name representing the zone apex (the zone-file `@`).
@@ -96,6 +102,14 @@ export interface SvcbRecordSpec extends RecordOptions {
   readonly values: readonly SvcbRecordValue[];
 }
 
+export interface AliasRecordSpec extends RecordOptions {
+  readonly type: "ALIAS";
+  readonly name: string;
+  readonly target: Resolvable<RecordTarget>;
+  /** `false` emits an A alias (default); `true` emits an AAAA alias. */
+  readonly ipv6: boolean;
+}
+
 export type RecordSpec =
   | ARecordSpec
   | AaaaRecordSpec
@@ -107,7 +121,8 @@ export type RecordSpec =
   | NsRecordSpec
   | DsRecordSpec
   | HttpsRecordSpec
-  | SvcbRecordSpec;
+  | SvcbRecordSpec
+  | AliasRecordSpec;
 
 /** Record type discriminators surfaced by {@link RecordSpec}. */
 export type RecordType = RecordSpec["type"];
@@ -362,4 +377,49 @@ export function SVCB(
   options: RecordOptions = {},
 ): SvcbRecordSpec {
   return { type: "SVCB", name, values: toArray(value), ...options };
+}
+
+/**
+ * Options for {@link ALIAS}. Extends {@link RecordOptions} with `ipv6` to pick
+ * between A-alias (default) and AAAA-alias output.
+ */
+export interface AliasRecordOptions extends RecordOptions {
+  /** When `true`, emit an AAAA alias record instead of an A alias. */
+  readonly ipv6?: boolean;
+}
+
+/**
+ * Route 53 alias record — compiles to an A record (or AAAA when
+ * `options.ipv6` is `true`) whose target is an `aliasTarget` rather than a
+ * list of IP addresses. Use {@link APEX} (`"@"`) as `name` for the zone apex.
+ *
+ * Pair with the alias-target helpers in `@composurecdk/route53` —
+ * `cloudfrontAliasTarget`, `apiGatewayAliasTarget`, or
+ * `apiGatewayDomainAliasTarget` — which return `Resolvable<RecordTarget>`.
+ *
+ * Because DNS permits only one record set per `(type, name)`, an `ALIAS`
+ * cannot coexist with address-mode `A`/`AAAA` at the same name, and two
+ * `ALIAS` calls for the same `(type, name)` are a configuration error. Both
+ * cases are rejected at build time.
+ *
+ * TTL defaults do not apply to alias records — AWS ignores TTL on aliases and
+ * CDK warns if one is set — so the underlying builder suppresses them.
+ *
+ * @example
+ * ```ts
+ * ALIAS("@", cloudfrontAliasTarget(
+ *   ref<DistributionBuilderResult>("cdn").get("distribution"),
+ * ))
+ * ALIAS("@", cloudfrontAliasTarget(
+ *   ref<DistributionBuilderResult>("cdn").get("distribution"),
+ * ), { ipv6: true })
+ * ```
+ */
+export function ALIAS(
+  name: string,
+  target: Resolvable<RecordTarget>,
+  options: AliasRecordOptions = {},
+): AliasRecordSpec {
+  const { ipv6 = false, ...rest } = options;
+  return { type: "ALIAS", name, target, ipv6, ...rest };
 }

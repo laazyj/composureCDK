@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { Distribution } from "aws-cdk-lib/aws-cloudfront";
+import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import {
   Alpn,
   CaaTag,
@@ -9,6 +11,7 @@ import {
   SvcbRecordValue,
 } from "aws-cdk-lib/aws-route53";
 import { compose, ref } from "@composurecdk/core";
+import { cloudfrontAliasTarget } from "../src/alias-targets.js";
 import {
   createHostedZoneBuilder,
   type HostedZoneBuilderResult,
@@ -16,6 +19,7 @@ import {
 import {
   A,
   AAAA,
+  ALIAS,
   APEX,
   CAA,
   CAA_IODEF,
@@ -330,5 +334,140 @@ describe("zoneRecords", () => {
 
     expect(Object.keys(result.a).sort()).toEqual(["@", "apex"]);
     Template.fromStack(stack).resourceCountIs("AWS::Route53::RecordSet", 2);
+  });
+
+  it("emits an A alias record at the apex via ALIAS and suppresses TTL defaults", () => {
+    const { stack, zone } = setup();
+    const distribution = new Distribution(stack, "Dist", {
+      defaultBehavior: { origin: new HttpOrigin("origin.example.net") },
+    });
+
+    const result = zoneRecords([ALIAS(APEX, cloudfrontAliasTarget(distribution))])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "A",
+      Name: "example.com.",
+      AliasTarget: Match.objectLike({
+        DNSName: Match.objectLike({ "Fn::GetAtt": ["DistB3B78991", "DomainName"] }),
+      }),
+      TTL: Match.absent(),
+    });
+    expect(result.a["@"].record.node.path).toBe("TestStack/DNS/a/Apex");
+  });
+
+  it("emits an AAAA alias record when ipv6: true is passed", () => {
+    const { stack, zone } = setup();
+    const distribution = new Distribution(stack, "Dist", {
+      defaultBehavior: { origin: new HttpOrigin("origin.example.net") },
+    });
+
+    const result = zoneRecords([ALIAS("www", cloudfrontAliasTarget(distribution), { ipv6: true })])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "AAAA",
+      Name: "www.example.com.",
+      AliasTarget: Match.objectLike({
+        DNSName: Match.objectLike({ "Fn::GetAtt": ["DistB3B78991", "DomainName"] }),
+      }),
+      TTL: Match.absent(),
+    });
+    expect(Object.keys(result.aaaa)).toEqual(["www"]);
+    expect(Object.keys(result.a)).toEqual([]);
+  });
+
+  it("emits both A and AAAA aliases at the apex when ALIAS is called twice", () => {
+    const { stack, zone } = setup();
+    const distribution = new Distribution(stack, "Dist", {
+      defaultBehavior: { origin: new HttpOrigin("origin.example.net") },
+    });
+
+    zoneRecords([
+      ALIAS(APEX, cloudfrontAliasTarget(distribution)),
+      ALIAS(APEX, cloudfrontAliasTarget(distribution), { ipv6: true }),
+    ])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    const template = Template.fromStack(stack);
+    template.resourceCountIs("AWS::Route53::RecordSet", 2);
+    template.hasResourceProperties("AWS::Route53::RecordSet", { Type: "A" });
+    template.hasResourceProperties("AWS::Route53::RecordSet", { Type: "AAAA" });
+  });
+
+  it("resolves a Ref-based ALIAS target via compose()", () => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack");
+    const distribution = new Distribution(stack, "Dist", {
+      defaultBehavior: { origin: new HttpOrigin("origin.example.net") },
+    });
+
+    compose(
+      {
+        zone: createHostedZoneBuilder().zoneName("example.com"),
+        records: zoneRecords([ALIAS(APEX, cloudfrontAliasTarget(distribution))]).zone(
+          ref<HostedZoneBuilderResult>("zone").get("hostedZone"),
+        ),
+      },
+      { zone: [], records: ["zone"] },
+    ).build(stack, "Site");
+
+    const template = Template.fromStack(stack);
+    template.resourceCountIs("AWS::Route53::HostedZone", 1);
+    template.hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "A",
+      AliasTarget: Match.objectLike({
+        DNSName: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["DomainName"]) }),
+      }),
+    });
+  });
+
+  it("rejects ALIAS mixed with address-mode A at the same name", () => {
+    const { stack, zone } = setup();
+    const distribution = new Distribution(stack, "Dist", {
+      defaultBehavior: { origin: new HttpOrigin("origin.example.net") },
+    });
+
+    expect(() =>
+      zoneRecords([A("api", "1.2.3.4"), ALIAS("api", cloudfrontAliasTarget(distribution))])
+        .zone(zone)
+        .build(stack, "DNS"),
+    ).toThrow(/cannot coexist/);
+  });
+
+  it("rejects ALIAS mixed with address-mode AAAA at the same name", () => {
+    const { stack, zone } = setup();
+    const distribution = new Distribution(stack, "Dist", {
+      defaultBehavior: { origin: new HttpOrigin("origin.example.net") },
+    });
+
+    expect(() =>
+      zoneRecords([
+        AAAA("api", "2001:db8::1"),
+        ALIAS("api", cloudfrontAliasTarget(distribution), { ipv6: true }),
+      ])
+        .zone(zone)
+        .build(stack, "DNS"),
+    ).toThrow(/cannot coexist/);
+  });
+
+  it("rejects two ALIAS calls for the same (type, name)", () => {
+    const { stack, zone } = setup();
+    const distribution = new Distribution(stack, "Dist", {
+      defaultBehavior: { origin: new HttpOrigin("origin.example.net") },
+    });
+
+    expect(() =>
+      zoneRecords([
+        ALIAS(APEX, cloudfrontAliasTarget(distribution)),
+        ALIAS(APEX, cloudfrontAliasTarget(distribution)),
+      ])
+        .zone(zone)
+        .build(stack, "DNS"),
+    ).toThrow(/only one alias record/);
   });
 });

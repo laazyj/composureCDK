@@ -1,3 +1,13 @@
+## 0.4.1 (2026-04-22)
+
+### 🩹 Fixes
+
+- **release:** include @composurecdk/examples in the release group ([58b5d69](https://github.com/laazyj/composureCDK/commit/58b5d69))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.4.0 (2026-04-22)
 
 ### 🚀 Features

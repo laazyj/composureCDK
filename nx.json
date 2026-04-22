@@ -24,7 +24,7 @@
   },
   "release": {
     "projectsRelationship": "fixed",
-    "projects": ["packages/*", "!@composurecdk/examples"],
+    "projects": ["packages/*"],
     "version": {
       "conventionalCommits": true,
       "fallbackCurrentVersionResolver": "disk",

@@ -50,9 +50,9 @@ This workflow uses a GitHub Environment (`npm`) and [npm trusted publishers](htt
 
 ## Versioning
 
-All publishable packages share a single version number (fixed versioning). When any package changes, all are bumped and published together. This guarantees compatibility — `@composurecdk/apigateway@0.5.0` always works with `@composurecdk/core@0.5.0`.
+All packages share a single version number (fixed versioning). When any package changes, all are bumped together. This guarantees compatibility — `@composurecdk/apigateway@0.5.0` always works with `@composurecdk/core@0.5.0`.
 
-The `@composurecdk/examples` package is excluded from releases because it is `"private": true` — it exists for reference, not as an installable library.
+The `@composurecdk/examples` package is versioned alongside the rest so its internal peer-dependency ranges stay in sync, but `"private": true` in its `package.json` prevents `nx release publish` from pushing it to npm — it exists for reference, not as an installable library.
 
 Version bumps are determined automatically from conventional commit messages:
 

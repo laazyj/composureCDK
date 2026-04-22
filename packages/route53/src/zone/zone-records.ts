@@ -106,21 +106,24 @@ interface HasCommonRecordOptions<Self> {
 type BucketName = keyof ZoneRecordsBuilderResult;
 
 class ZoneRecordsBuilder implements IZoneRecordsBuilder {
-  private _zone?: Resolvable<IHostedZone>;
+  #zone?: Resolvable<IHostedZone>;
+  readonly #specs: readonly RecordSpec[];
 
-  constructor(private readonly specs: readonly RecordSpec[]) {}
+  constructor(specs: readonly RecordSpec[]) {
+    this.#specs = specs;
+  }
 
   zone(zone: Resolvable<IHostedZone>): this {
-    this._zone = zone;
+    this.#zone = zone;
     return this;
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): ZoneRecordsBuilderResult {
-    if (!this._zone) {
+    if (!this.#zone) {
       throw new Error(`zoneRecords "${id}" requires a zone. Call .zone() with an IHostedZone.`);
     }
-    validateSpecs(this.specs);
-    const zone = resolve(this._zone, context ?? {});
+    validateSpecs(this.#specs);
+    const zone = resolve(this.#zone, context ?? {});
     const result: Mutable<ZoneRecordsBuilderResult> = {
       a: {},
       aaaa: {},
@@ -144,7 +147,7 @@ class ZoneRecordsBuilder implements IZoneRecordsBuilder {
       }
       return s;
     };
-    for (const group of groupRecords(this.specs)) {
+    for (const group of groupRecords(this.#specs)) {
       const head = group[0];
       // Use the APEX sentinel ("@") as the key/id so it cannot collide with a
       // user-supplied label spelled "apex".

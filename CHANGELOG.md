@@ -1,3 +1,13 @@
+## 0.4.2 (2026-04-22)
+
+### 🚀 Features
+
+- **route53:** add ALIAS helper to the zone DSL ([59dddb7](https://github.com/laazyj/composureCDK/commit/59dddb7))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.4.1 (2026-04-22)
 
 ### 🩹 Fixes

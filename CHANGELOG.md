@@ -1,3 +1,30 @@
+## 0.4.0 (2026-04-22)
+
+### 🚀 Features
+
+- **cloudformation:** route outputs per-stack via OutputDefinition.scope ([6dcf748](https://github.com/laazyj/composureCDK/commit/6dcf748))
+- ⚠️ **core:** pass per-component scopes to afterBuild hooks ([f08a7fa](https://github.com/laazyj/composureCDK/commit/f08a7fa))
+
+### 🩹 Fixes
+
+- re-export \*BuilderProps from package barrels ([364926d](https://github.com/laazyj/composureCDK/commit/364926d))
+- use ECMAScript private fields in builder classes ([ec79283](https://github.com/laazyj/composureCDK/commit/ec79283))
+- **route53:** bump @composurecdk/core peer dep to ^0.3.6 ([e5538e8](https://github.com/laazyj/composureCDK/commit/e5538e8))
+- **route53:** use ECMAScript private fields in ZoneRecordsBuilder ([84c01e8](https://github.com/laazyj/composureCDK/commit/84c01e8))
+- **route53:** use readable "Apex" as apex record construct id ([05b7345](https://github.com/laazyj/composureCDK/commit/05b7345))
+
+### ⚠️ Breaking Changes
+
+- **core:** pass per-component scopes to afterBuild hooks ([f08a7fa](https://github.com/laazyj/composureCDK/commit/f08a7fa))
+  AfterBuildHook<T> now requires a fourth parameter
+  componentScopes: { readonly [K in keyof T]: IConstruct }. Custom
+  hook implementations must add this parameter to their signature;
+  hooks that do not need it can accept it as \_componentScopes.
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.3.6 (2026-04-21)
 
 ### 🚀 Features

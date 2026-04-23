@@ -59,6 +59,39 @@ const alarms = createAlarms(scope, "MyFunction", definitions);
 
 Construct IDs follow the pattern `${id}${Capitalize(key)}Alarm` (e.g., `MyFunctionErrorsAlarm`).
 
+## alarmActionsPolicy
+
+A [Policy](../../docs/adr/0002-policies.md) that routes CloudWatch alarm actions (e.g. SNS notifications) to every `Alarm` and `CompositeAlarm` in a construct subtree. Install it once on an `App` or `Stack` and it applies to every alarm the subtree produces — including alarms created later by builders or nested composed systems.
+
+```ts
+import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
+import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
+
+alarmActionsPolicy(app, {
+  defaults: { alarmActions: [new SnsAction(alertsTopic)] },
+});
+```
+
+Per-alarm routing is expressed as rules. Matchers can be a substring (tested against both the alarm's `id` and `path`), a `RegExp` (tested against `path`), or a predicate receiving the full match context. Rules append actions on top of `defaults`; set `replaceDefaults: true` on a rule to suppress defaults for its matched alarms.
+
+```ts
+alarmActionsPolicy(app, {
+  defaults: { alarmActions: [new SnsAction(standardTopic)] },
+  rules: [
+    { match: "HighSev", alarmActions: [new SnsAction(pagerTopic)] },
+    { match: /Composite$/, compositeOnly: true, alarmActions: [new SnsAction(execTopic)] },
+  ],
+});
+```
+
+All three action states are supported: `alarmActions`, `okActions`, and `insufficientDataActions`.
+
+The policy is implemented as a CDK [Aspect](https://docs.aws.amazon.com/cdk/v2/guide/aspects.html) — it has no dependency on `@composurecdk/core` and works in any CDK app. Because aspects fire during synth, the policy can be registered before or after the alarms it targets. The only constraint is that any `IAlarmAction` instances in the config (e.g. `new SnsAction(topic)`) must reference constructs that already exist when the policy is called.
+
+### Limitation: L2 alarms only
+
+Only L2 `Alarm` and `CompositeAlarm` constructs are covered. Bare `CfnAlarm` / `CfnCompositeAlarm` nodes (created directly without the L2 wrapper) are silently skipped. In practice this is rare — the ComposureCDK alarm builders and aws-cdk-lib's own L2 APIs always create the wrapper — but if you hand-write L1 alarms, actions must be attached manually.
+
 ## AlarmDefinition
 
 The fully-resolved alarm descriptor consumed by `createAlarms`. All fields are required — this is the canonical form after defaults and overrides have been merged.

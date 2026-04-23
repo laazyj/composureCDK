@@ -100,6 +100,15 @@ function assertUniqueEventTypes(
   }
 }
 
+function omit<T extends object, K extends keyof T>(obj: T, ...keys: K[]): Omit<T, K> {
+  const skip = new Set<PropertyKey>(keys);
+  const out: Record<PropertyKey, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (!skip.has(k)) out[k] = v;
+  }
+  return out as Omit<T, K>;
+}
+
 function assertKeyValueStoreRuntime(
   def: InlineFunctionDefinition,
   pathPattern: string | null,
@@ -138,24 +147,28 @@ export function resolveBehaviors(input: ResolveBehaviorsInput): ResolveBehaviors
     const associations: FunctionAssociation[] = [];
     for (const def of definitions) {
       assertKeyValueStoreRuntime(def, pathPattern);
-      const { eventType, recommendedAlarms, ...rest } = def;
+      const { eventType } = def;
       const fnId = `${id}${scopeId}${eventTypePascal(eventType)}Fn`;
       const fn = new CfFunction(scope, fnId, {
         ...INLINE_FUNCTION_DEFAULTS,
-        ...rest,
+        ...omit(def, "eventType", "recommendedAlarms"),
       } as FunctionProps);
       functions[behaviorFunctionKeyPrefix(pathPattern, eventType)] = fn;
       associations.push({ function: fn, eventType });
       alarmDefinitions.push(
-        ...resolveBehaviorFunctionAlarmDefinitions(pathPattern, eventType, fn, recommendedAlarms),
+        ...resolveBehaviorFunctionAlarmDefinitions(
+          pathPattern,
+          eventType,
+          fn,
+          def.recommendedAlarms,
+        ),
       );
     }
     return associations;
   };
 
   const defaultAssociations = buildInlineFunctions(null, defaultBehavior?.functions);
-  const { functions: _defaultInlineFns, ...userDefaultBehavior } = defaultBehavior ?? {};
-  void _defaultInlineFns;
+  const userDefaultBehavior = omit(defaultBehavior ?? {}, "functions");
 
   const resolvedDefaultBehavior: BehaviorOptions = {
     ...defaultBehaviorDefaults,
@@ -168,11 +181,8 @@ export function resolveBehaviors(input: ResolveBehaviorsInput): ResolveBehaviors
   for (const [pathPattern, config] of input.additionalBehaviors) {
     const resolvedOrigin = resolve(config.origin, context);
     const associations = buildInlineFunctions(pathPattern, config.functions);
-    const { functions: _inlineFns, origin: _origin, ...rest } = config;
-    void _inlineFns;
-    void _origin;
     resolvedAdditionalBehaviors[pathPattern] = {
-      ...rest,
+      ...omit(config, "functions", "origin"),
       origin: resolvedOrigin,
       ...(associations.length > 0 ? { functionAssociations: associations } : {}),
     };

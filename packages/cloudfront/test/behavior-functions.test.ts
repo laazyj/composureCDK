@@ -404,6 +404,43 @@ describe("additional path-pattern behaviors", () => {
     ).toThrow(/behavior for path pattern "\/api\/\*" is already defined/);
   });
 
+  it("throws when two path patterns produce the same alarm/construct slug", () => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack");
+    const builder = createDistributionBuilder()
+      .origin(withBucketOrigin(stack))
+      .accessLogging(false)
+      .recommendedAlarms(false)
+      .behavior("/*.html", { origin: new HttpOrigin("pages.example.com") });
+
+    // `/*.html` and `*.html` both slug to "StarHtml"; the collision must be
+    // surfaced at registration time, not deferred to createAlarms.
+    expect(() =>
+      builder.behavior("*.html", { origin: new HttpOrigin("pages-2.example.com") }),
+    ).toThrow(/produces the same alarm\/construct slug \("StarHtml"\)/);
+  });
+
+  it("applies an explicit functionName when provided", () => {
+    const { template } = synthTemplate((b, stack) => {
+      b.origin(withBucketOrigin(stack))
+        .accessLogging(false)
+        .recommendedAlarms(false)
+        .defaultBehavior({
+          functions: [
+            {
+              eventType: FunctionEventType.VIEWER_REQUEST,
+              code: FunctionCode.fromInline(INLINE_CODE),
+              functionName: "example-redirect-fn",
+            },
+          ],
+        });
+    });
+
+    template.hasResourceProperties("AWS::CloudFront::Function", {
+      Name: "example-redirect-fn",
+    });
+  });
+
   it("throws when two functions on the same additional behavior share an eventType", () => {
     expect(() =>
       synthTemplate((b, stack) => {

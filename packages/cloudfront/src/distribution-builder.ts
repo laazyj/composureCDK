@@ -29,6 +29,7 @@ import type { DistributionAlarmConfig, FunctionAlarmConfig } from "./alarm-confi
 import { resolveDistributionAlarmDefinitions } from "./distribution-alarms.js";
 import { DISTRIBUTION_DEFAULTS } from "./defaults.js";
 import { resolveBehaviors } from "./resolve-behaviors.js";
+import { pathPatternSlug } from "./behavior-function-alarms.js";
 
 /**
  * A CloudFront Function declared inline on a cache behavior. The distribution
@@ -50,6 +51,13 @@ export interface InlineFunctionDefinition {
 
   /** The source for the function — `FunctionCode.fromInline()` or `.fromFile()`. */
   code: FunctionCode;
+
+  /**
+   * Explicit physical name for the function. Useful when operators search
+   * CloudWatch logs or metrics by function name rather than by ARN. If omitted,
+   * CDK generates a name derived from the construct path.
+   */
+  functionName?: string;
 
   /**
    * JavaScript runtime.
@@ -311,6 +319,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
   props: Partial<DistributionBuilderProps> = {};
   #origin?: Resolvable<IOrigin>;
   readonly #additionalBehaviors = new Map<string, AdditionalBehaviorConfig>();
+  readonly #behaviorSlugs = new Map<string, string>();
   readonly #customAlarms: AlarmDefinitionBuilder<Distribution>[] = [];
 
   addAlarm(
@@ -351,6 +360,19 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
         `DistributionBuilder: behavior for path pattern "${pathPattern}" is already defined.`,
       );
     }
+    // Alarm keys and Function construct ids are derived from a PascalCase slug
+    // of the path pattern. Patterns that differ only by stripped characters
+    // (e.g. `/*.html` vs `*.html`) would collide downstream at createAlarms() —
+    // surface the collision here with the patterns named.
+    const slug = pathPatternSlug(pathPattern);
+    const existingPattern = this.#behaviorSlugs.get(slug);
+    if (existingPattern !== undefined) {
+      throw new Error(
+        `DistributionBuilder: path pattern "${pathPattern}" produces the same alarm/construct ` +
+          `slug ("${slug}") as "${existingPattern}". Pick distinct patterns.`,
+      );
+    }
+    this.#behaviorSlugs.set(slug, pathPattern);
     this.#additionalBehaviors.set(pathPattern, config);
     return this;
   }

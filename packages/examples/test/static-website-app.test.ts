@@ -148,6 +148,36 @@ describe("static-website-app", () => {
       });
     });
 
+    it("creates a viewer-response function on the default behavior", () => {
+      const template = synthTemplate();
+      template.resourceCountIs("AWS::CloudFront::Function", 2);
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          DefaultCacheBehavior: Match.objectLike({
+            FunctionAssociations: Match.arrayWith([
+              Match.objectLike({ EventType: "viewer-response" }),
+            ]),
+          }),
+        }),
+      });
+    });
+
+    it("creates an additional /api/* behavior with its own viewer-request function", () => {
+      const template = synthTemplate();
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          CacheBehaviors: Match.arrayWith([
+            Match.objectLike({
+              PathPattern: "/api/*",
+              FunctionAssociations: Match.arrayWith([
+                Match.objectLike({ EventType: "viewer-request" }),
+              ]),
+            }),
+          ]),
+        }),
+      });
+    });
+
     it("configures custom error responses for 403 and 404", () => {
       const template = synthTemplate();
       template.hasResourceProperties("AWS::CloudFront::Distribution", {

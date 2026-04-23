@@ -1,7 +1,8 @@
 import { App, Duration } from "aws-cdk-lib";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Source } from "aws-cdk-lib/aws-s3-deployment";
-import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { HttpOrigin, S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { CachePolicy, FunctionCode, FunctionEventType } from "aws-cdk-lib/aws-cloudfront";
 import { compose, ref } from "@composurecdk/core";
 import { createTopicBuilder } from "@composurecdk/sns";
 import { createStackBuilder, outputs } from "@composurecdk/cloudformation";
@@ -22,6 +23,11 @@ import {
  * - S3 bucket configured for private access (no public website hosting)
  * - CloudFront distribution with Origin Access Control (OAC) for secure S3 access
  * - Cross-component reference using {@link ref} to wire the bucket as a CloudFront origin
+ * - An inline CloudFront Function on the default behavior (viewer-response
+ *   header injection) and a path-pattern behavior (`/api/*` → HTTP origin)
+ *   with its own viewer-request function. Both functions get path-scoped
+ *   recommended alarms (FunctionExecutionErrors / ValidationErrors / Throttles)
+ *   emitted automatically by the builder.
  * - Automatic content deployment with CloudFront cache invalidation
  * - Custom error responses for 403/404 handling
  * - Cost-optimised defaults (PriceClass 100, HTTP→HTTPS redirect)
@@ -60,6 +66,49 @@ export function createStaticWebsiteApp(app = new App()) {
         .origin(
           ref("site", (r: BucketBuilderResult) => S3BucketOrigin.withOriginAccessControl(r.bucket)),
         )
+        // Inline CloudFront Function on the default behavior: add a
+        // permissive-but-informative `x-served-by` response header on every
+        // response from the origin. The builder creates the Function construct,
+        // wires it into FunctionAssociations, and emits
+        // FunctionExecutionErrors/ValidationErrors/Throttles alarms keyed by
+        // `defaultBehaviorViewerResponse*`.
+        .defaultBehavior({
+          functions: [
+            {
+              eventType: FunctionEventType.VIEWER_RESPONSE,
+              code: FunctionCode.fromInline(`
+                function handler(event) {
+                  var response = event.response;
+                  response.headers["x-served-by"] = { value: "composurecdk-example" };
+                  return response;
+                }
+              `),
+              comment: "Add x-served-by header",
+            },
+          ],
+        })
+        // Path-pattern behavior: `/api/*` routes to a separate HTTP origin with
+        // caching disabled. Its own viewer-request function strips any inbound
+        // `authorization` header before the request reaches the origin.
+        // Alarms for this function are keyed by `behaviorApiSlashStar*`, so
+        // they page independently of the default behavior's function.
+        .behavior("/api/*", {
+          origin: new HttpOrigin("api.example.com"),
+          cachePolicy: CachePolicy.CACHING_DISABLED,
+          functions: [
+            {
+              eventType: FunctionEventType.VIEWER_REQUEST,
+              code: FunctionCode.fromInline(`
+                function handler(event) {
+                  var request = event.request;
+                  delete request.headers["authorization"];
+                  return request;
+                }
+              `),
+              comment: "Strip Authorization header before forwarding to API origin",
+            },
+          ],
+        })
         .errorResponses([
           {
             httpStatus: 403,

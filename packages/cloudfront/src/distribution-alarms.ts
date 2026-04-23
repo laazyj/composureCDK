@@ -1,9 +1,8 @@
 import { Duration } from "aws-cdk-lib";
-import { type Alarm, ComparisonOperator, Metric, Stats } from "aws-cdk-lib/aws-cloudwatch";
+import { ComparisonOperator, Metric, Stats } from "aws-cdk-lib/aws-cloudwatch";
 import type { Distribution } from "aws-cdk-lib/aws-cloudfront";
-import type { IConstruct } from "constructs";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
-import { AlarmDefinitionBuilder, createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
+import { resolveAlarmConfig } from "@composurecdk/cloudwatch";
 import type { DistributionAlarmConfig } from "./alarm-config.js";
 import { DISTRIBUTION_ALARM_DEFAULTS } from "./alarm-defaults.js";
 
@@ -75,35 +74,4 @@ export function resolveDistributionAlarmDefinitions(
   }
 
   return definitions;
-}
-
-/**
- * Creates AWS-recommended CloudWatch alarms for a CloudFront distribution,
- * merging recommended definitions with any custom alarm builders.
- *
- * @param scope - CDK construct scope for creating alarm constructs.
- * @param id - Base identifier for alarm construct ids.
- * @param distribution - The CloudFront distribution to create alarms for.
- * @param config - User-provided alarm configuration, or `false` to disable all.
- * @param customAlarms - Custom alarm builders added via `addAlarm()`.
- * @returns A record mapping alarm keys to their created Alarm constructs.
- *
- * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront
- */
-export function createDistributionAlarms(
-  scope: IConstruct,
-  id: string,
-  distribution: Distribution,
-  config: DistributionAlarmConfig | false | undefined,
-  customAlarms: AlarmDefinitionBuilder<Distribution>[] = [],
-): Record<string, Alarm> {
-  if (config === false) return {};
-
-  const enabled = config?.enabled ?? DISTRIBUTION_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveDistributionAlarmDefinitions(distribution, config);
-  const custom = customAlarms.map((b) => b.resolve(distribution));
-
-  return createAlarms(scope, id, [...recommended, ...custom]);
 }

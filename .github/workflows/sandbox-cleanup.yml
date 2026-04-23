@@ -6,12 +6,10 @@ name: Sandbox Cleanup
 
 on:
   workflow_run:
-    workflows: [Deploy Test]
+    workflows: [Deploy Test, Release]
     types: [completed]
   schedule:
-    # Daily safety net at 06:00 UTC. Catches orphans from release-path runs,
-    # which don't fire workflow_run because deploy-test was invoked as a
-    # reusable workflow.
+    # Daily safety net at 06:00 UTC.
     - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:

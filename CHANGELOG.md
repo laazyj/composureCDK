@@ -1,3 +1,17 @@
+## 0.4.3 (2026-04-23)
+
+### 🚀 Features
+
+- **cloudwatch:** add alarmActionsPolicy helper ([37cb0f2](https://github.com/laazyj/composureCDK/commit/37cb0f2))
+
+### 🩹 Fixes
+
+- **ci:** grant ListStackResources to sandbox cleanup role ([1aee8ee](https://github.com/laazyj/composureCDK/commit/1aee8ee))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.4.2 (2026-04-22)
 
 ### 🚀 Features

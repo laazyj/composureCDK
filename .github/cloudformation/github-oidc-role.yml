@@ -119,6 +119,7 @@ Resources:
               - cloudformation:ExecuteChangeSet
               - cloudformation:DeleteChangeSet
               - cloudformation:GetTemplateSummary
+              - cloudformation:ListStackResources
             Resource:
               - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/ComposureCDK-*
           # ListStacks is read-only (names and statuses only) and cannot

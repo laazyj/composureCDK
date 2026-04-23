@@ -4,6 +4,7 @@ import { Source } from "aws-cdk-lib/aws-s3-deployment";
 import { HttpOrigin, S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { CachePolicy, FunctionCode, FunctionEventType } from "aws-cdk-lib/aws-cloudfront";
 import { compose, ref } from "@composurecdk/core";
+import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
 import { createTopicBuilder } from "@composurecdk/sns";
 import { createStackBuilder, outputs } from "@composurecdk/cloudformation";
 import {
@@ -34,7 +35,7 @@ import {
  * - Recommended CloudWatch alarms for CloudFront (5xx error rate, origin latency)
  * - S3 bucket alarms (5xx/4xx errors) with request metrics filter
  * - Using TopicBuilder for the alert topic with recommended alarms
- * - Applying alarm actions via afterBuild hook
+ * - Routing every alarm to the alert topic via `alarmActionsPolicy`
  *
  * Architecture:
  * ```
@@ -49,7 +50,7 @@ export function createStaticWebsiteApp(app = new App()) {
     .description("Static website hosted on S3 with CloudFront CDN")
     .build(app, "ComposureCDK-StaticWebsiteStack");
 
-  compose(
+  const { alerts } = compose(
     {
       alerts: createTopicBuilder().displayName("Static Website Alerts"),
 
@@ -135,16 +136,6 @@ export function createStaticWebsiteApp(app = new App()) {
     },
     { alerts: [], site: [], cdn: ["site"], deploy: ["site", "cdn"] },
   )
-    .afterBuild((_scope, _id, results) => {
-      // Apply SNS actions to all alarms across S3 and CloudFront components
-      const allAlarms = [results.site.alarms, results.cdn.alarms].flatMap((alarms) =>
-        Object.values(alarms),
-      );
-      const action = new SnsAction(results.alerts.topic);
-      for (const alarm of allAlarms) {
-        alarm.addAlarmAction(action);
-      }
-    })
     .afterBuild(
       outputs({
         DistributionUrl: {
@@ -161,6 +152,10 @@ export function createStaticWebsiteApp(app = new App()) {
       }),
     )
     .build(stack, "StaticWebsite");
+
+  alarmActionsPolicy(stack, {
+    defaults: { alarmActions: [new SnsAction(alerts.topic)] },
+  });
 
   return { stack };
 }

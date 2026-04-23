@@ -217,6 +217,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitealertsNumberOfNotificationsFailedAlarmDBF19693": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -243,6 +248,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitealertsNumberOfNotificationsFailedToRedriveToDlqAlarmE9EDE3B8": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -269,6 +279,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitealertsNumberOfNotificationsFilteredOutInvalidAttributesAlarmD7DE960B": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -295,6 +310,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitealertsNumberOfNotificationsRedrivenToDlqAlarm6A74E13A": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,

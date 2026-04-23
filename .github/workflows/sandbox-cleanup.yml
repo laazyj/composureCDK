@@ -1,0 +1,122 @@
+name: Sandbox Cleanup
+
+# Tears down ComposureCDK-* example stacks in the sandbox account.
+# Runs out-of-band so the deploy-test critical path doesn't pay for
+# CloudFront teardown (~15 min per distribution).
+
+on:
+  workflow_run:
+    workflows: [Deploy Test]
+    types: [completed]
+  schedule:
+    # Daily safety net at 06:00 UTC. Catches orphans from release-path runs,
+    # which don't fire workflow_run because deploy-test was invoked as a
+    # reusable workflow.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: sandbox
+        type: choice
+        options:
+          - sandbox
+
+permissions:
+  contents: read
+  id-token: write # AWS OIDC
+
+concurrency:
+  group: sandbox-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Destroy ComposureCDK example stacks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment || 'sandbox' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NX_DAEMON: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: CDK Destroy (current app)
+        working-directory: packages/examples
+        run: |
+          for attempt in 1 2 3; do
+            echo "=== Destroy attempt $attempt ==="
+            if npx cdk destroy --all --force --concurrency 5 2>&1; then
+              echo "All stacks in the current app destroyed successfully."
+              exit 0
+            fi
+            echo "Attempt $attempt failed — retrying in 10s..."
+            sleep 10
+          done
+          echo "::warning::cdk destroy --all did not fully succeed; orphan sweep will catch what remains."
+
+      - name: Orphan sweep (delete any leftover ComposureCDK-* stacks)
+        run: |
+          # Catches stacks from removed examples (e.g. lambda-api-app,
+          # strategy-stack-app) that are no longer in the current cdk app.
+          orphans=$(aws cloudformation list-stacks \
+            --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE CREATE_FAILED UPDATE_FAILED DELETE_FAILED \
+            --query "StackSummaries[?starts_with(StackName, 'ComposureCDK-')].StackName" \
+            --output text)
+          if [ -z "$orphans" ]; then
+            echo "No orphan ComposureCDK-* stacks remain."
+            exit 0
+          fi
+          echo "Found orphan stacks: $orphans"
+          deletable=()
+          skipped_cloudfront=()
+          for stack in $orphans; do
+            # Raw delete-stack on a CloudFront-bearing stack would leave it
+            # stuck in DELETE_FAILED (distribution must be disabled first,
+            # then propagated globally). Surface and skip; CDK destroy
+            # handles the disable-then-delete dance for in-app stacks.
+            cf=$(aws cloudformation list-stack-resources \
+              --stack-name "$stack" \
+              --query "StackResourceSummaries[?ResourceType=='AWS::CloudFront::Distribution'].LogicalResourceId" \
+              --output text)
+            if [ -n "$cf" ]; then
+              echo "::error::Stack $stack contains CloudFront distribution(s) [$cf]; skipping raw delete. Disable the distribution(s) manually (or re-run cdk destroy from a branch where $stack is defined) before re-triggering sandbox-cleanup."
+              skipped_cloudfront+=("$stack")
+              continue
+            fi
+            deletable+=("$stack")
+          done
+          for stack in "${deletable[@]}"; do
+            echo "Deleting $stack..."
+            aws cloudformation delete-stack --stack-name "$stack"
+          done
+          for stack in "${deletable[@]}"; do
+            echo "Waiting for $stack to delete..."
+            aws cloudformation wait stack-delete-complete --stack-name "$stack" || \
+              echo "::warning::$stack did not finish deleting cleanly; check the AWS console."
+          done
+          if [ ${#skipped_cloudfront[@]} -ne 0 ]; then
+            echo "::error::Skipped ${#skipped_cloudfront[@]} CloudFront-bearing orphan stack(s); manual cleanup required."
+            exit 1
+          fi

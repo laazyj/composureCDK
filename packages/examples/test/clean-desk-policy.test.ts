@@ -5,7 +5,7 @@ import { Bucket } from "aws-cdk-lib/aws-s3";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { MockIntegration, RestApi } from "aws-cdk-lib/aws-apigateway";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
-import { createLambdaApiApp } from "../src/lambda-api-app.js";
+import { createMockApiApp } from "../src/mock-api-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
 
 function buildWithPolicy(buildFn: (stack: Stack) => void): Template {
@@ -71,7 +71,7 @@ describe("cleanDeskPolicy", () => {
   it("sets all resources to Delete in a full example stack", () => {
     const app = new App();
     cleanDeskPolicy(app);
-    const { stack } = createLambdaApiApp(app);
+    const { stack } = createMockApiApp(app);
     const template = Template.fromStack(stack);
     const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
 

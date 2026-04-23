@@ -146,7 +146,5 @@ for (const alarm of Object.values(result.alarms)) {
 
 ## Examples
 
-- [LambdaApiStack](../examples/src/lambda-api-app.ts) — REST API backed by a Lambda function, wired with `ref`
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with recommended alarms, custom alarms, and SNS alarm actions
-- [MultiStackApp](../examples/src/multi-stack-app.ts) — Lambda split across stacks via `.withStacks()`
-- [StrategyStackApp](../examples/src/strategy-stack-app.ts) — Lambda split across stacks via `.withStackStrategy()`
+- [MultiStackApp](../examples/src/multi-stack-app.ts) — Lambda split across stacks via `.withStacks()`, wired with `ref`

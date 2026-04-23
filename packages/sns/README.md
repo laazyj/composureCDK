@@ -207,6 +207,5 @@ Also note: `SubscriptionProtocol.HTTP` is allowed for compatibility; prefer `HTT
 
 ## Examples
 
-- [LambdaApiStack](../examples/src/lambda-api-app.ts) — REST API with TopicBuilder for alarm actions
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with TopicBuilder for alarm actions
 - [StaticWebsiteStack](../examples/src/static-website/app.ts) — Static website with TopicBuilder for alarm actions

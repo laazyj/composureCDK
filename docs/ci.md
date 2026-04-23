@@ -158,7 +158,7 @@ After that, the release workflow handles all future publishes automatically.
 
 ## Stack naming convention
 
-All example stacks use the `ComposureCDK-` prefix (e.g. `ComposureCDK-LambdaApiStack`, `ComposureCDK-MockApiStack`). This convention serves two purposes:
+All example stacks use the `ComposureCDK-` prefix (e.g. `ComposureCDK-MockApiStack`, `ComposureCDK-StaticWebsiteStack`). This convention serves two purposes:
 
 1. **IAM scoping** — The deploy-test IAM role restricts access to resources tagged with `aws:cloudformation:stack-name: ComposureCDK-*`. New examples are automatically covered by the policy as long as they follow the prefix.
 2. **Smoke test discovery** — The smoke test finds stacks by prefix rather than enumerating names, so new examples are tested without script changes.

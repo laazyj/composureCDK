@@ -97,11 +97,9 @@ function getRegion() {
 const region = getRegion();
 
 const exampleApiPaths = {
-  LambdaApi: "/",
   MockApi: "/",
   MultiStackApi: "/",
   PetStore: "/pets",
-  StrategyApi: "/",
 };
 
 const exampleApis = (apis ?? []).filter((api) => api.name in exampleApiPaths);

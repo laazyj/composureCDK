@@ -62,37 +62,27 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Check for in-progress ComposureCDK stacks
+        run: |
+          in_progress=$(aws cloudformation list-stacks \
+            --stack-status-filter CREATE_IN_PROGRESS UPDATE_IN_PROGRESS DELETE_IN_PROGRESS UPDATE_ROLLBACK_IN_PROGRESS ROLLBACK_IN_PROGRESS REVIEW_IN_PROGRESS \
+            --query "StackSummaries[?starts_with(StackName, 'ComposureCDK-')].StackName" \
+            --output text)
+          if [ -n "$in_progress" ]; then
+            echo "::error::CloudFormation operations in progress on ComposureCDK-* stacks: $in_progress"
+            echo "Wait for sandbox-cleanup to complete or trigger it manually before retrying."
+            exit 1
+          fi
+
       - name: CDK Deploy
         working-directory: packages/examples
-        run: npx cdk deploy --all --require-approval never
+        run: npx cdk deploy --all --require-approval never --concurrency 5
 
       - name: Smoke Test
         working-directory: packages/examples
         run: node ../../scripts/smoke-test.mjs
 
-      - name: CDK Destroy
-        if: always()
-        working-directory: packages/examples
-        run: |
-          # Only destroy if AWS credentials were configured
-          if ! aws sts get-caller-identity > /dev/null 2>&1; then
-            echo "Skipping destroy — no AWS credentials available"
-            exit 0
-          fi
-
-          # Attempt destroy up to 3 times. A single stack failure (e.g.
-          # non-empty S3 bucket) causes CDK to abort before reaching the
-          # remaining stacks. Retrying gives CloudFormation a chance to
-          # finish async cleanup and proceed with the rest.
-          for attempt in 1 2 3; do
-            echo "=== Destroy attempt $attempt ==="
-            if npx cdk destroy --all --force 2>&1; then
-              echo "All stacks destroyed successfully."
-              exit 0
-            fi
-            echo "Attempt $attempt failed — retrying in 10s..."
-            sleep 10
-          done
-
-          echo "::warning::Some stacks could not be destroyed after 3 attempts. Check the AWS console for orphaned ComposureCDK-* stacks."
-          exit 1
+      # Destroy runs in a separate sandbox-cleanup workflow (triggered by
+      # workflow_run on this workflow plus a nightly cron safety net). Keeping
+      # destroy off the critical path lets developer feedback land in ~10 min
+      # instead of waiting for CloudFront propagation during teardown.

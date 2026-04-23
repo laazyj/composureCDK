@@ -103,5 +103,4 @@ compose(
 ## Examples
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`
-- [StrategyStackApp](../examples/src/strategy-stack-app.ts) — REST API + Lambda split across stacks via `.withStackStrategy()`
 - [StaticWebsiteStack](../examples/src/static-website/app.ts) — CloudFormation outputs with `afterBuild` and `outputs`

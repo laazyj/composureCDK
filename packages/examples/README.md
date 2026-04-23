@@ -7,12 +7,10 @@ All example stacks use the `ComposureCDK-` name prefix. This convention enables 
 | Stack                                                                                               | Description                                                                                      |
 | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | [`ComposureCDK-DualFunctionStack`](src/dual-function-app.ts)                                        | Two Lambda functions (API handler + async worker) with different configurations                  |
-| [`ComposureCDK-LambdaApiStack`](src/lambda-api-app.ts)                                              | REST API backed by a Lambda function, wired with `ref`                                           |
-| [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations                                                             |
+| [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations and recommended alarms                                      |
 | [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                                    |
 | [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment                     |
 | [`ComposureCDK-OpenApiPetstoreStack`](src/openapi-petstore-app.ts)                                  | PetStore REST API defined by an inline OpenAPI 3.0 specification                                 |
-| [`ComposureCDK-StrategyStackApp-*`](src/strategy-stack-app.ts)                                      | REST API + Lambda split across stacks via `.withStackStrategy()`                                 |
 | [`ComposureCDK-DnsZoneStack`](src/dns-zone-app.ts)                                                  | Public Route 53 zone built with the BIND-style zone DSL, including a CloudFront `ALIAS` at `www` |
 
 ## Prerequisites
@@ -28,7 +26,7 @@ npx nx build examples                                                        # b
 npx nx synth examples -- --list                                               # list available stacks
 npx nx synth examples -- ComposureCDK-DualFunctionStack                       # synthesise a stack to cdk.out/
 npx nx deploy examples -- ComposureCDK-DualFunctionStack                      # deploy a stack
-npx nx deploy examples -- ComposureCDK-DualFunctionStack ComposureCDK-LambdaApiStack  # deploy multiple stacks
+npx nx deploy examples -- ComposureCDK-DualFunctionStack ComposureCDK-MockApiStack    # deploy multiple stacks
 npx nx cdk examples -- destroy ComposureCDK-DualFunctionStack                 # tear down a stack
 npx nx cdk examples -- destroy --all                                          # tear down all example stacks
 ```

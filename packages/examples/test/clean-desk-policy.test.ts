@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
-import { Template } from "aws-cdk-lib/assertions";
+import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { MockIntegration, RestApi } from "aws-cdk-lib/aws-apigateway";
@@ -135,5 +135,85 @@ describe("cleanDeskPolicy", () => {
     for (const bucketId of bucketIds) {
       expect(autoDeleteBucketRefs).toContain(bucketId);
     }
+  });
+
+  describe("disable-logging-on-delete aspect", () => {
+    let template: Template;
+
+    beforeAll(() => {
+      const app = new App();
+      cleanDeskPolicy(app);
+      const { stack } = createStaticWebsiteApp(app);
+      template = Template.fromStack(stack);
+    });
+
+    it("creates a Custom::DisableBucketLogging for each bucket that is a server-access-logging source", () => {
+      // Only the site bucket has serverAccessLogsBucket wired in the static
+      // website stack (the S3 access-logs bucket and the CloudFront logs
+      // bucket are destinations, not sources).
+      template.resourceCountIs("Custom::DisableBucketLogging", 1);
+    });
+
+    it("scopes the IAM policy to s3:PutBucketLogging on the source bucket only", () => {
+      template.hasResourceProperties(
+        "AWS::IAM::Policy",
+        Match.objectLike({
+          PolicyDocument: Match.objectLike({
+            Statement: Match.arrayWith([
+              Match.objectLike({
+                Action: "s3:PutBucketLogging",
+                Effect: "Allow",
+                Resource: Match.objectLike({
+                  "Fn::GetAtt": Match.arrayWith([Match.stringLikeRegexp("StaticWebsitesite")]),
+                }),
+              }),
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it("encodes putBucketLogging with empty BucketLoggingStatus in the onDelete payload", () => {
+      const resources = template.findResources("Custom::DisableBucketLogging");
+      const [cr] = Object.values(resources);
+      const deletePayload = (cr as { Properties: { Delete?: unknown } }).Properties.Delete;
+      expect(deletePayload).toBeDefined();
+
+      // AwsCustomResource inlines the SDK call as a JSON-stringified blob;
+      // because `Bucket` is a Ref token, it's rendered as a `Fn::Join` whose
+      // string segments contain the literal JSON. Serialise once and regex
+      // to tolerate token interpolation.
+      const serialized = JSON.stringify(deletePayload);
+      expect(serialized).toContain("putBucketLogging");
+      expect(serialized).toContain("BucketLoggingStatus");
+    });
+
+    it("orders the disable-logging CR before the source bucket's autoDelete CR", () => {
+      // The disable-logging CR DependsOn the source's autoDelete CR. CFN
+      // reverses create order on delete, so disableLoggingCR.onDelete fires
+      // BEFORE source.autoDelete empties the source bucket — which is what
+      // prevents the source-deletion DELETE calls from emitting access logs
+      // that would race the logs-bucket teardown.
+      const disableCrs = template.findResources("Custom::DisableBucketLogging");
+      const [, disableCrResource] = Object.entries(disableCrs)[0] as [
+        string,
+        { DependsOn?: string[] },
+      ];
+      const autoDeletes = template.findResources("Custom::S3AutoDeleteObjects");
+      const sourceAutoDeleteId = Object.keys(autoDeletes).find((logicalId) =>
+        logicalId.startsWith("StaticWebsitesiteAutoDelete"),
+      );
+      expect(sourceAutoDeleteId).toBeDefined();
+      expect(disableCrResource.DependsOn).toContain(sourceAutoDeleteId);
+    });
+
+    it("adds no disable-logging CR for stacks without server access logging", () => {
+      const app = new App();
+      cleanDeskPolicy(app);
+      const { stack } = createMockApiApp(app);
+      const mockApiTemplate = Template.fromStack(stack);
+
+      mockApiTemplate.resourceCountIs("Custom::DisableBucketLogging", 0);
+    });
   });
 });

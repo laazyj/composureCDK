@@ -217,32 +217,39 @@ class ComposedLifecycle<
   }
 
   withStacks(stacks: { [K in keyof Components]?: IConstruct }): ConfiguredSystem<Components> {
-    return new ConfiguredLifecycle((scope, id) => this.#buildWith(scope, id, stacks));
+    return new ConfiguredLifecycle((scope, id, parentContext) =>
+      this.#buildWith(scope, id, stacks, parentContext),
+    );
   }
 
   withStackStrategy(strategy: StackStrategy): ConfiguredSystem<Components> {
-    return new ConfiguredLifecycle((scope, id) => {
+    return new ConfiguredLifecycle((scope, id, parentContext) => {
       const stacks = Object.fromEntries(
         Object.keys(this.#components).map((key) => [key, strategy.resolve(scope, id, key)]),
       ) as { [K in keyof Components]?: IConstruct };
-      return this.#buildWith(scope, id, stacks);
+      return this.#buildWith(scope, id, stacks, parentContext);
     });
   }
 
   afterBuild(hook: AfterBuildHook<BuildResult<Components>>): ConfiguredSystem<Components> {
-    return new ConfiguredLifecycle<Components>((scope, id) =>
-      this.#buildWith(scope, id),
+    return new ConfiguredLifecycle<Components>((scope, id, parentContext) =>
+      this.#buildWith(scope, id, undefined, parentContext),
     ).afterBuild(hook);
   }
 
-  build(scope: IConstruct, id: string): BuildResult<Components> {
-    return this.#buildWith(scope, id).results;
+  build(
+    scope: IConstruct,
+    id: string,
+    parentContext?: Record<string, object>,
+  ): BuildResult<Components> {
+    return this.#buildWith(scope, id, undefined, parentContext).results;
   }
 
   #buildWith(
     scope: IConstruct,
     id: string,
     stacks?: { [K in keyof Components]?: IConstruct },
+    parentContext?: Record<string, object>,
   ): BuildOutcome<Components> {
     const results: Record<string, object> = {};
     const componentScopes: Record<string, IConstruct> = {};
@@ -251,7 +258,9 @@ class ComposedLifecycle<
       const componentScope = stacks?.[key] ?? scope;
       componentScopes[key] = componentScope;
       const deps = (this.#dependencies[key] ?? []) as string[];
-      const context = Object.fromEntries(deps.map((dep) => [dep, results[dep]]));
+      // Inner deps shadow parent context on key collision.
+      const innerContext = Object.fromEntries(deps.map((dep) => [dep, results[dep]]));
+      const context = { ...parentContext, ...innerContext };
       results[key] = this.#components[key].build(componentScope, `${id}/${key}`, context);
     }
 
@@ -267,6 +276,12 @@ interface BuildOutcome<Components extends Record<string, Lifecycle>> {
   readonly componentScopes: { readonly [K in keyof Components]: IConstruct };
 }
 
+type BuildFn<Components extends Record<string, Lifecycle>> = (
+  scope: IConstruct,
+  id: string,
+  parentContext?: Record<string, object>,
+) => BuildOutcome<Components>;
+
 /**
  * A configured lifecycle that accumulates post-build hooks and applies them
  * after the underlying build function completes. Returned by
@@ -277,9 +292,9 @@ class ConfiguredLifecycle<
   Components extends Record<string, Lifecycle>,
 > implements ConfiguredSystem<Components> {
   readonly #hooks: AfterBuildHook<BuildResult<Components>>[] = [];
-  readonly #buildFn: (scope: IConstruct, id: string) => BuildOutcome<Components>;
+  readonly #buildFn: BuildFn<Components>;
 
-  constructor(buildFn: (scope: IConstruct, id: string) => BuildOutcome<Components>) {
+  constructor(buildFn: BuildFn<Components>) {
     this.#buildFn = buildFn;
   }
 
@@ -288,8 +303,12 @@ class ConfiguredLifecycle<
     return this;
   }
 
-  build(scope: IConstruct, id: string): BuildResult<Components> {
-    const { results, componentScopes } = this.#buildFn(scope, id);
+  build(
+    scope: IConstruct,
+    id: string,
+    parentContext?: Record<string, object>,
+  ): BuildResult<Components> {
+    const { results, componentScopes } = this.#buildFn(scope, id, parentContext);
     for (const hook of this.#hooks) {
       hook(scope, id, results, componentScopes);
     }

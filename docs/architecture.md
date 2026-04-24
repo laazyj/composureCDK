@@ -72,7 +72,7 @@ Cycle detection happens at composition time, not build time. This means structur
 
 ### The result is a Lifecycle
 
-`compose` returns a `Lifecycle`. This means a composed system can itself be used as a component in a larger system. Composition is recursive — systems can be nested without special handling.
+`compose` returns a `Lifecycle`. This means a composed system can itself be used as a component in a larger system. Composition is recursive — systems can be nested without special handling. When a composed system is nested, the parent context flows through: components inside the nested system can `ref("outerKey")` to reach siblings of the nested system, provided the outer `compose` declares the corresponding dependency. Inner dependency values shadow the parent context on key collision, matching lexical scoping ([ADR-0003](adr/0003-nested-compose-context-propagation.md)).
 
 ### Dependency declarations are exhaustive
 

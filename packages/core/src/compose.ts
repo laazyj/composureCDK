@@ -258,9 +258,7 @@ class ComposedLifecycle<
       const componentScope = stacks?.[key] ?? scope;
       componentScopes[key] = componentScope;
       const deps = (this.#dependencies[key] ?? []) as string[];
-      // Merge parent context (outer siblings visible when this system is nested)
-      // with inner dependency outputs. Inner deps shadow on key collision —
-      // local bindings take precedence over the enclosing scope.
+      // Inner deps shadow parent context on key collision.
       const innerContext = Object.fromEntries(deps.map((dep) => [dep, results[dep]]));
       const context = { ...parentContext, ...innerContext };
       results[key] = this.#components[key].build(componentScope, `${id}/${key}`, context);
@@ -278,6 +276,12 @@ interface BuildOutcome<Components extends Record<string, Lifecycle>> {
   readonly componentScopes: { readonly [K in keyof Components]: IConstruct };
 }
 
+type BuildFn<Components extends Record<string, Lifecycle>> = (
+  scope: IConstruct,
+  id: string,
+  parentContext?: Record<string, object>,
+) => BuildOutcome<Components>;
+
 /**
  * A configured lifecycle that accumulates post-build hooks and applies them
  * after the underlying build function completes. Returned by
@@ -288,19 +292,9 @@ class ConfiguredLifecycle<
   Components extends Record<string, Lifecycle>,
 > implements ConfiguredSystem<Components> {
   readonly #hooks: AfterBuildHook<BuildResult<Components>>[] = [];
-  readonly #buildFn: (
-    scope: IConstruct,
-    id: string,
-    parentContext?: Record<string, object>,
-  ) => BuildOutcome<Components>;
+  readonly #buildFn: BuildFn<Components>;
 
-  constructor(
-    buildFn: (
-      scope: IConstruct,
-      id: string,
-      parentContext?: Record<string, object>,
-    ) => BuildOutcome<Components>,
-  ) {
+  constructor(buildFn: BuildFn<Components>) {
     this.#buildFn = buildFn;
   }
 

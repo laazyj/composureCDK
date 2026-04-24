@@ -38,6 +38,7 @@ const lifecycleContextParamRule = {
             member.key.name === "build",
         );
         if (!build) return;
+        // Lifecycle.build(scope, id, context?) — 3rd param is context.
         if (build.value.params.length >= 3) return;
 
         const classText = sourceCode.getText(node);

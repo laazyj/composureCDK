@@ -499,11 +499,8 @@ describe("compose", () => {
 
   describe("nested compose", () => {
     it("propagates parent context into inner components so refs can reach outer siblings", () => {
-      const dns: Lifecycle<{ zone: { name: string } }> = {
-        build: () => ({ zone: { name: "example.com" } }),
-      };
+      const dns = stubComponent({ zone: { name: "example.com" } });
 
-      // Inner component capable of resolving a Ref against its received context.
       interface CertResult {
         certFor: string;
       }
@@ -528,12 +525,8 @@ describe("compose", () => {
     });
 
     it("inner dep shadows parent context on key collision", () => {
-      const outerFoo: Lifecycle<{ from: string }> = {
-        build: () => ({ from: "outer" }),
-      };
-      const innerFoo: Lifecycle<{ from: string }> = {
-        build: () => ({ from: "inner" }),
-      };
+      const outerFoo = stubComponent({ from: "outer" });
+      const innerFoo = stubComponent({ from: "inner" });
       const reader = spyComponent({ read: true });
 
       const inner = compose(
@@ -561,9 +554,7 @@ describe("compose", () => {
     });
 
     it("propagates parent context through a nested .withStacks()-configured system", () => {
-      const dns: Lifecycle<{ zone: { name: string } }> = {
-        build: () => ({ zone: { name: "example.com" } }),
-      };
+      const dns = stubComponent({ zone: { name: "example.com" } });
       const reader = spyComponent({ ok: true });
       const siteStack = new Construct(undefined as never, "siteStack");
 

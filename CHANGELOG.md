@@ -1,3 +1,18 @@
+## 0.4.4 (2026-04-24)
+
+### 🚀 Features
+
+- **cloudfront:** first-class cache behaviors and inline functions ([#53](https://github.com/laazyj/composureCDK/pull/53), [#32](https://github.com/laazyj/composureCDK/issues/32))
+
+### 🩹 Fixes
+
+- **ci:** trigger sandbox-cleanup after Release workflow ([1e60f1b](https://github.com/laazyj/composureCDK/commit/1e60f1b))
+- **examples:** close access-logs teardown race ([d7f1bab](https://github.com/laazyj/composureCDK/commit/d7f1bab))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.4.3 (2026-04-23)
 
 ### 🚀 Features

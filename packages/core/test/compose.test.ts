@@ -4,6 +4,7 @@ import { compose, type AfterBuildHook } from "../src/compose.js";
 import { groupedStacks } from "../src/stack-strategy.js";
 import { CyclicDependencyError } from "../src/cyclic-dependency-error.js";
 import { type Lifecycle } from "../src/lifecycle.js";
+import { ref, resolve, type Resolvable } from "../src/ref.js";
 
 function createScope(): Construct {
   return new Construct(undefined as never, "root");
@@ -493,6 +494,89 @@ describe("compose", () => {
         .build(createScope(), "test");
 
       expect(aBuild.mock.calls[0][0]).toBe(customScope);
+    });
+  });
+
+  describe("nested compose", () => {
+    it("propagates parent context into inner components so refs can reach outer siblings", () => {
+      const dns: Lifecycle<{ zone: { name: string } }> = {
+        build: () => ({ zone: { name: "example.com" } }),
+      };
+
+      // Inner component capable of resolving a Ref against its received context.
+      interface CertResult {
+        certFor: string;
+      }
+      const certComponent = (zoneRef: Resolvable<{ name: string }>): Lifecycle<CertResult> => ({
+        build: (_scope, _id, context) => {
+          const zone = resolve(zoneRef, context);
+          return { certFor: zone.name };
+        },
+      });
+
+      const site = compose(
+        {
+          cert: certComponent(ref<{ zone: { name: string } }>("dns").get("zone")),
+        },
+        { cert: [] },
+      );
+
+      const system = compose({ dns, site }, { dns: [], site: ["dns"] });
+      const result = system.build(createScope(), "app");
+
+      expect(result.site.cert).toEqual({ certFor: "example.com" });
+    });
+
+    it("inner dep shadows parent context on key collision", () => {
+      const outerFoo: Lifecycle<{ from: string }> = {
+        build: () => ({ from: "outer" }),
+      };
+      const innerFoo: Lifecycle<{ from: string }> = {
+        build: () => ({ from: "inner" }),
+      };
+      const reader = spyComponent({ read: true });
+
+      const inner = compose(
+        { foo: innerFoo, reader: reader.lifecycle },
+        { foo: [], reader: ["foo"] },
+      );
+
+      compose({ foo: outerFoo, sub: inner }, { foo: [], sub: ["foo"] }).build(createScope(), "app");
+
+      expect(reader.build.mock.calls[0][2]).toEqual({ foo: { from: "inner" } });
+    });
+
+    it("still throws when an inner ref cannot be resolved in either inner deps or parent context", () => {
+      const dangling: Lifecycle = {
+        build: (_scope, _id, context) => {
+          resolve(ref<{ x: number }>("missing"), context);
+          return {};
+        },
+      };
+
+      const inner = compose({ dangling }, { dangling: [] });
+      const system = compose({ a: stubComponent({ y: 1 }), sub: inner }, { a: [], sub: ["a"] });
+
+      expect(() => system.build(createScope(), "app")).toThrow(/"missing"/);
+    });
+
+    it("propagates parent context through a nested .withStacks()-configured system", () => {
+      const dns: Lifecycle<{ zone: { name: string } }> = {
+        build: () => ({ zone: { name: "example.com" } }),
+      };
+      const reader = spyComponent({ ok: true });
+      const siteStack = new Construct(undefined as never, "siteStack");
+
+      const site = compose({ reader: reader.lifecycle }, { reader: [] }).withStacks({
+        reader: siteStack,
+      });
+
+      compose({ dns, site }, { dns: [], site: ["dns"] }).build(createScope(), "app");
+
+      expect(reader.build.mock.calls[0][0]).toBe(siteStack);
+      expect(reader.build.mock.calls[0][2]).toEqual({
+        dns: { zone: { name: "example.com" } },
+      });
     });
   });
 

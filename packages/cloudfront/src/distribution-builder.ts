@@ -13,7 +13,7 @@ import {
 import { type ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
-import { Annotations, RemovalPolicy, Stack, Token } from "aws-cdk-lib";
+import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -22,14 +22,41 @@ import {
   resolve,
   type Resolvable,
 } from "@composurecdk/core";
-import type { AlarmDefinition } from "@composurecdk/cloudwatch";
-import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createBucketBuilder } from "@composurecdk/s3";
 import type { DistributionAlarmConfig, FunctionAlarmConfig } from "./alarm-config.js";
-import { resolveDistributionAlarmDefinitions } from "./distribution-alarms.js";
 import { DISTRIBUTION_DEFAULTS } from "./defaults.js";
 import { resolveBehaviors } from "./resolve-behaviors.js";
 import { pathPatternSlug } from "./behavior-function-alarms.js";
+import { buildCloudFrontAlarms } from "./cloudfront-alarm-builder.js";
+
+/**
+ * Per-function metadata exposed on {@link DistributionBuilderResult.functions}.
+ * Bundles the CDK construct with the behavior context the builder used to
+ * create it. Consumers (notably {@link createCloudFrontAlarmBuilder}) use the
+ * `pathPattern`, `eventType`, and `recommendedAlarms` fields to reproduce the
+ * same recommended alarms in a different stack.
+ */
+export interface FunctionEntry {
+  /** The CloudFront Function created by the distribution builder. */
+  function: CfFunction;
+
+  /**
+   * The behavior the function is attached to. `null` for the default behavior;
+   * otherwise the path pattern (e.g. `"/api/*"`).
+   */
+  pathPattern: string | null;
+
+  /** The viewer event the function handles. */
+  eventType: FunctionEventType;
+
+  /**
+   * The {@link InlineFunctionDefinition.recommendedAlarms} value the user
+   * supplied for this function. Omitted entirely when the user did not
+   * provide one — consumers should treat that as "use defaults".
+   */
+  recommendedAlarms?: FunctionAlarmConfig | false;
+}
 
 /**
  * A CloudFront Function declared inline on a cache behavior. The distribution
@@ -183,40 +210,44 @@ export interface DistributionBuilderProps extends Omit<
    * Configuration for AWS-recommended CloudWatch alarms at the **distribution**
    * level (5xx error rate, origin latency).
    *
-   * Scope: this setting controls *distribution-level* alarms only. Per-function
-   * alarms (`FunctionExecutionErrors`, `FunctionValidationErrors`,
-   * `FunctionThrottles`) are configured independently via each
-   * {@link InlineFunctionDefinition.recommendedAlarms}, because their
-   * correct disposition depends on the behavior the function is attached to.
+   * Per-function alarm shapes (`FunctionExecutionErrors`,
+   * `FunctionValidationErrors`, `FunctionThrottles`) are configured per
+   * function via {@link InlineFunctionDefinition.recommendedAlarms}, because
+   * their correct disposition depends on the behavior the function is
+   * attached to. The kill switch below (`recommendedAlarms: false`) still
+   * applies to function alarms — see below.
    *
    * **Region requirement:** CloudFront metrics are emitted in `us-east-1`
-   * only. CloudWatch alarms are regional, so *every* alarm created by this
-   * builder (distribution-level and per-function) will only fire if the
-   * containing stack is deployed in `us-east-1`. The builder emits a
-   * synth-time warning if this isn't the case.
+   * only. CloudWatch alarms are regional, so every alarm created by this
+   * builder will only fire if the containing stack is deployed in
+   * `us-east-1`. The builder emits a synth-time warning if this isn't the
+   * case. For multi-region deployments, set `recommendedAlarms: false` here
+   * and use {@link createCloudFrontAlarmBuilder} routed to a `us-east-1`
+   * stack via `compose().withStacks()`.
    *
-   * By default, the builder creates recommended distribution alarms.
-   * Individual alarms can be customized or disabled; set to `false` to
-   * disable all distribution-level alarms — **function alarms remain
-   * enabled**. To disable function alarms, set `recommendedAlarms: false`
-   * on the corresponding {@link InlineFunctionDefinition}.
+   * Set to `false` to disable all recommended alarms (both distribution-level
+   * and per-function). Custom alarms added via
+   * {@link IDistributionBuilder.addAlarm} are unaffected. To disable a single
+   * function's alarms, set `recommendedAlarms: false` on the corresponding
+   * {@link InlineFunctionDefinition}.
    *
    * No alarm actions are configured by default since notification methods
    * are user-specific. Access alarms from the build result or use an
    * `afterBuild` hook to apply actions.
    *
-   * @example
+   * @example Tighter dist-level threshold; function alarms unchanged.
    * ```ts
    * createDistributionBuilder()
    *   .origin(siteOrigin)
-   *   .recommendedAlarms(false)          // disables distribution alarms only
-   *   .defaultBehavior({
-   *     functions: [{
-   *       eventType: FunctionEventType.VIEWER_REQUEST,
-   *       code,
-   *       recommendedAlarms: false,      // must also disable function alarms explicitly
-   *     }],
-   *   });
+   *   .recommendedAlarms({ errorRate: { threshold: 2 } });
+   * ```
+   *
+   * @example Multi-region setup — suppress all alarms here, recreate them in
+   * a `us-east-1` stack via {@link createCloudFrontAlarmBuilder}.
+   * ```ts
+   * createDistributionBuilder()
+   *   .origin(siteOrigin)
+   *   .recommendedAlarms(false);
    * ```
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront
@@ -242,10 +273,11 @@ export interface DistributionBuilderResult {
    * CloudFront Functions created by the builder for inline function
    * definitions, keyed by `<behaviorScope><EventType>` —
    * e.g. `defaultBehaviorViewerRequest`, `behaviorApiStarViewerRequest`.
-   *
-   * Empty if no inline functions were declared.
+   * Each entry bundles the {@link CfFunction} with the behavior context
+   * (`pathPattern`, `eventType`) and the per-function `recommendedAlarms`
+   * config the user supplied. Empty if no inline functions were declared.
    */
-  functions: Record<string, CfFunction>;
+  functions: Record<string, FunctionEntry>;
 
   /**
    * CloudWatch alarms created for the distribution and its inline functions,
@@ -254,7 +286,8 @@ export interface DistributionBuilderResult {
    * e.g. `defaultBehaviorViewerRequestExecutionErrors`.
    *
    * Includes both recommended alarms and custom alarms added via
-   * {@link IDistributionBuilder.addAlarm}. No alarm actions are configured.
+   * {@link IDistributionBuilder.addAlarm}. Empty when `recommendedAlarms` is
+   * `false` and no custom alarms were added. No alarm actions are configured.
    */
   alarms: Record<string, Alarm>;
 }
@@ -294,26 +327,6 @@ export interface DistributionBuilderResult {
  * ```
  */
 export type IDistributionBuilder = IBuilder<DistributionBuilderProps, DistributionBuilder>;
-
-/**
- * CloudFront metrics are emitted in `us-east-1` only. CloudWatch alarms are
- * regional, so alarms created in any other region will never receive data
- * and will never fire. Warn (don't error) the user if this builder is used
- * from a stack deployed outside `us-east-1`, unless the region is an
- * unresolved token (env-agnostic stack — user knows best).
- */
-function warnIfNotUsEast1(scope: IConstruct): void {
-  const region = Stack.of(scope).region;
-  if (Token.isUnresolved(region)) return;
-  if (region === "us-east-1") return;
-  Annotations.of(scope).addWarningV2(
-    "@composurecdk/cloudfront:alarm-region",
-    `CloudFront metrics are emitted in us-east-1 only, but this stack is deployed ` +
-      `in "${region}". CloudWatch alarms created here will not fire. Deploy the ` +
-      `stack in us-east-1, or disable recommended alarms and wire up a cross-region ` +
-      `alarm pattern yourself.`,
-  );
-}
 
 class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
   props: Partial<DistributionBuilderProps> = {};
@@ -452,23 +465,12 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       distribution.node.addDependency(accessLogsBucket);
     }
 
-    const distributionAlarmDefs: AlarmDefinition[] =
-      alarmConfig === false || alarmConfig?.enabled === false
-        ? []
-        : resolveDistributionAlarmDefinitions(distribution, alarmConfig);
-    const customAlarmDefs = this.#customAlarms.map((b) => b.resolve(distribution));
-
-    const allAlarmDefs = [
-      ...distributionAlarmDefs,
-      ...behaviors.alarmDefinitions,
-      ...customAlarmDefs,
-    ];
-
-    if (allAlarmDefs.length > 0) {
-      warnIfNotUsEast1(scope);
-    }
-
-    const alarms = createAlarms(scope, id, allAlarmDefs);
+    const alarms = buildCloudFrontAlarms(
+      scope,
+      id,
+      { distribution, functions: behaviors.functions },
+      { recommendedAlarms: alarmConfig, customAlarms: this.#customAlarms },
+    );
 
     return {
       distribution,

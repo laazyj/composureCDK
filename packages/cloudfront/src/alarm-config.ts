@@ -59,8 +59,12 @@ export interface DistributionAlarmConfig {
  */
 export interface FunctionAlarmConfig {
   /**
-   * Master switch: set to `false` to disable all recommended alarms for
-   * this function. Individual alarms can also be disabled via their own entry.
+   * Per-function switch: set to `false` to disable all recommended alarms
+   * for this one function. Individual alarms can also be disabled via their
+   * own entry. The global kill switch is
+   * {@link DistributionBuilderProps.recommendedAlarms} `: false` on the
+   * surrounding distribution builder, which suppresses every recommended
+   * alarm regardless of per-function settings.
    * @default true
    */
   enabled?: boolean;

@@ -10,17 +10,16 @@ import {
 } from "aws-cdk-lib/aws-cloudfront";
 import type { IConstruct } from "constructs";
 import { resolve } from "@composurecdk/core";
-import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import {
   behaviorFunctionKeyPrefix,
   eventTypePascal,
   pathPatternSlug,
-  resolveBehaviorFunctionAlarmDefinitions,
 } from "./behavior-function-alarms.js";
 import { INLINE_FUNCTION_DEFAULTS } from "./defaults.js";
 import type {
   AdditionalBehaviorConfig,
   DefaultBehaviorConfig,
+  FunctionEntry,
   InlineFunctionDefinition,
 } from "./distribution-builder.js";
 
@@ -67,13 +66,14 @@ export interface ResolveBehaviorsResult {
   additionalBehaviors: Record<string, BehaviorOptions>;
 
   /**
-   * Owned inline CloudFront Functions, keyed by
-   * `<behaviorScope><EventType>` — e.g. `defaultBehaviorViewerRequest`.
+   * Owned inline CloudFront Functions plus the behavior context the builder
+   * used to create each one, keyed by `<behaviorScope><EventType>` —
+   * e.g. `defaultBehaviorViewerRequest`. Consumed by the alarm-creation code
+   * path (in {@link DistributionBuilder} and
+   * {@link createCloudFrontAlarmBuilder}) to materialize per-function
+   * recommended alarms.
    */
-  functions: Record<string, CfFunction>;
-
-  /** Alarm definitions for the owned inline functions. */
-  alarmDefinitions: AlarmDefinition[];
+  functions: Record<string, FunctionEntry>;
 }
 
 function scopeLabel(pathPattern: string | null): string {
@@ -134,8 +134,7 @@ function assertKeyValueStoreRuntime(
 export function resolveBehaviors(input: ResolveBehaviorsInput): ResolveBehaviorsResult {
   const { scope, id, context, defaultOrigin, defaultBehavior, defaultBehaviorDefaults } = input;
 
-  const functions: Record<string, CfFunction> = {};
-  const alarmDefinitions: AlarmDefinition[] = [];
+  const functions: Record<string, FunctionEntry> = {};
 
   const buildInlineFunctions = (
     pathPattern: string | null,
@@ -153,16 +152,13 @@ export function resolveBehaviors(input: ResolveBehaviorsInput): ResolveBehaviors
         ...INLINE_FUNCTION_DEFAULTS,
         ...omit(def, "eventType", "recommendedAlarms"),
       } as FunctionProps);
-      functions[behaviorFunctionKeyPrefix(pathPattern, eventType)] = fn;
+      functions[behaviorFunctionKeyPrefix(pathPattern, eventType)] = {
+        function: fn,
+        pathPattern,
+        eventType,
+        recommendedAlarms: def.recommendedAlarms,
+      };
       associations.push({ function: fn, eventType });
-      alarmDefinitions.push(
-        ...resolveBehaviorFunctionAlarmDefinitions(
-          pathPattern,
-          eventType,
-          fn,
-          def.recommendedAlarms,
-        ),
-      );
     }
     return associations;
   };
@@ -192,6 +188,5 @@ export function resolveBehaviors(input: ResolveBehaviorsInput): ResolveBehaviors
     defaultBehavior: resolvedDefaultBehavior,
     additionalBehaviors: resolvedAdditionalBehaviors,
     functions,
-    alarmDefinitions,
   };
 }

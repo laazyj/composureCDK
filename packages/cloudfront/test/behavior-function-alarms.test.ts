@@ -29,7 +29,10 @@ function withOrigin(builder: ReturnType<typeof createDistributionBuilder>, stack
   builder
     .origin(S3BucketOrigin.withOriginAccessControl(bucket))
     .accessLogging(false)
-    .recommendedAlarms(false);
+    // Suppress only the distribution-level alarms so each test can focus on
+    // function alarms. Note: `.recommendedAlarms(false)` would also disable
+    // function alarms (master switch), which isn't what these tests want.
+    .recommendedAlarms({ errorRate: false, originLatency: false });
 }
 
 describe("function alarms on default behavior", () => {

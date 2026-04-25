@@ -177,6 +177,59 @@ for (const alarm of Object.values(result.alarms)) {
 }
 ```
 
+## Cross-region alarm builder
+
+CloudFront emits all metrics to `us-east-1` only. CloudWatch alarms are regional, so alarms created in any other region never fire — they exist but receive no data. When the distribution lives in a stack outside `us-east-1`, use `createCloudFrontAlarmBuilder` to put the alarms in a separate `us-east-1` stack.
+
+The standalone builder reads the distribution's result (including the inline-function entries) and produces the same alarm surface — distribution-level recommended alarms, per-function recommended alarms, and any custom `addAlarm` alarms.
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createDistributionBuilder,
+  createCloudFrontAlarmBuilder,
+  type DistributionBuilderResult,
+} from "@composurecdk/cloudfront";
+
+compose(
+  {
+    cdn: createDistributionBuilder()
+      .origin(siteOrigin)
+      .defaultBehavior({
+        functions: [{ eventType: FunctionEventType.VIEWER_REQUEST, code }],
+      })
+      .recommendedAlarms(false), // suppress all alarms in the dist's own stack
+
+    cdnAlarms: createCloudFrontAlarmBuilder()
+      .distribution(ref<DistributionBuilderResult>("cdn"))
+      .recommendedAlarms({ errorRate: { threshold: 2 } })
+      .addAlarm("custom4xx", (a) =>
+        a
+          .metric(
+            () =>
+              new Metric({
+                namespace: "AWS/CloudFront",
+                metricName: "4xxErrorRate",
+                statistic: "Average",
+              }),
+          )
+          .threshold(5)
+          .greaterThan(),
+      ),
+  },
+  { cdn: [], cdnAlarms: ["cdn"] },
+)
+  .withStacks({
+    cdn: siteStack, // e.g. eu-west-2
+    cdnAlarms: usEast1Stack, // typically your existing certStack
+  })
+  .build(app, "App");
+```
+
+Set `crossRegionReferences: true` on both stacks so CDK can export `DistributionId` from the site stack and import it in the alarm stack.
+
+`recommendedAlarms: false` on `createDistributionBuilder` is the master kill switch for both distribution-level and per-function recommended alarms. Custom alarms added via `addAlarm` are unaffected — call `.addAlarm()` on the standalone alarm builder if you want those to live in the us-east-1 stack too.
+
 ## Examples
 
 - [StaticWebsiteStack](../examples/src/static-website/app.ts) — S3 + CloudFront static website with OAC, error pages, and content deployment

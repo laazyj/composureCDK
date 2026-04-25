@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/cloudwatch",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "Composable CloudWatch alarm primitives for composureCDK resource packages",
   "repository": {
     "type": "git",

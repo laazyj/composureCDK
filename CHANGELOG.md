@@ -1,3 +1,17 @@
+## 0.4.5 (2026-04-25)
+
+### 🚀 Features
+
+- **cloudfront:** standalone alarm builder ([#58](https://github.com/laazyj/composureCDK/pull/58), [#55](https://github.com/laazyj/composureCDK/issues/55))
+
+### 🩹 Fixes
+
+- **core:** propagate parent context into nested compose ([#57](https://github.com/laazyj/composureCDK/pull/57), [#51](https://github.com/laazyj/composureCDK/issues/51))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.4.4 (2026-04-24)
 
 ### 🚀 Features

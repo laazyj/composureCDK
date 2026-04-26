@@ -71,6 +71,20 @@ export {
   type ISvcbRecordBuilder,
 } from "./svcb-record-builder.js";
 export {
+  createHealthCheckBuilder,
+  type HealthCheckBuilderProps,
+  type HealthCheckBuilderResult,
+  type IHealthCheckBuilder,
+} from "./health-check-builder.js";
+export {
+  createHealthCheckAlarmBuilder,
+  type HealthCheckAlarmBuilderProps,
+  type HealthCheckAlarmBuilderResult,
+  type IHealthCheckAlarmBuilder,
+} from "./health-check-alarm-builder.js";
+export type { HealthCheckAlarmConfig } from "./health-check-alarm-config.js";
+export { HEALTH_CHECK_ALARM_DEFAULTS } from "./health-check-alarm-defaults.js";
+export {
   cloudfrontAliasTarget,
   apiGatewayAliasTarget,
   apiGatewayDomainAliasTarget,
@@ -88,4 +102,5 @@ export {
   DS_RECORD_DEFAULTS,
   HTTPS_RECORD_DEFAULTS,
   SVCB_RECORD_DEFAULTS,
+  HEALTH_CHECK_DEFAULTS,
 } from "./defaults.js";

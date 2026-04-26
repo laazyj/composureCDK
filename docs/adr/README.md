@@ -30,3 +30,6 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 ## Index
 
 - [ADR-0001: Builder type emission — export `*BuilderProps`, use `#` private fields](0001-builder-type-emission.md)
+- [ADR-0002: Policies — cross-cutting helpers applied to a construct subtree](0002-policies.md)
+- [ADR-0003: Nested `compose()` — propagate parent context into inner components](0003-nested-compose-context-propagation.md)
+- [ADR-0004: Split-alarm builder pattern for AWS services with fixed-region metrics](0004-split-alarm-builder-for-fixed-region-metrics.md)

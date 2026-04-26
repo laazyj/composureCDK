@@ -11,6 +11,7 @@ import type { NsRecordBuilderProps } from "./ns-record-builder.js";
 import type { DsRecordBuilderProps } from "./ds-record-builder.js";
 import type { HttpsRecordBuilderProps } from "./https-record-builder.js";
 import type { SvcbRecordBuilderProps } from "./svcb-record-builder.js";
+import type { HealthCheckBuilderProps } from "./health-check-builder.js";
 
 /**
  * Secure, AWS-recommended defaults applied to every public hosted zone built
@@ -126,4 +127,23 @@ export const HTTPS_RECORD_DEFAULTS: Partial<HttpsRecordBuilderProps> = {
  */
 export const SVCB_RECORD_DEFAULTS: Partial<SvcbRecordBuilderProps> = {
   ttl: DEFAULT_RECORD_TTL,
+};
+
+/**
+ * Defaults for {@link createHealthCheckBuilder}. Overridable via the fluent API.
+ *
+ * `failureThreshold` and `requestInterval` match CDK's defaults but are set
+ * explicitly so the values are surfaced in the package's defaults table and
+ * can be reasoned about without consulting CDK source. `measureLatency` is
+ * defaulted ON to align with the AWS Well-Architected operational-excellence
+ * pillar (per-region latency visibility on the Route 53 Health Checks
+ * console). It carries a small additional cost — disable explicitly via
+ * `.measureLatency(false)` if cost is a concern.
+ *
+ * @see https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover-determining-health-of-endpoints.html
+ */
+export const HEALTH_CHECK_DEFAULTS: Partial<HealthCheckBuilderProps> = {
+  failureThreshold: 3,
+  requestInterval: Duration.seconds(30),
+  measureLatency: true,
 };

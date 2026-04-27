@@ -43,6 +43,7 @@ export function resolveRestApiAlarmDefinitions(
     const cfg = resolveAlarmConfig(config?.clientError, REST_API_ALARM_DEFAULTS.clientError);
     definitions.push({
       key: "clientError",
+      alarmName: cfg.alarmName,
       metric: apiMetric(api, "4XXError", Stats.AVERAGE),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -57,6 +58,7 @@ export function resolveRestApiAlarmDefinitions(
     const cfg = resolveAlarmConfig(config?.serverError, REST_API_ALARM_DEFAULTS.serverError);
     definitions.push({
       key: "serverError",
+      alarmName: cfg.alarmName,
       metric: apiMetric(api, "5XXError", Stats.AVERAGE),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -71,6 +73,7 @@ export function resolveRestApiAlarmDefinitions(
     const cfg = resolveAlarmConfig(config?.latency, REST_API_ALARM_DEFAULTS.latency);
     definitions.push({
       key: "latency",
+      alarmName: cfg.alarmName,
       metric: apiMetric(api, "Latency", Stats.percentile(90)),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,

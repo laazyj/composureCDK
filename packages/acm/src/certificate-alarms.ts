@@ -25,6 +25,7 @@ export function resolveCertificateAlarmDefinitions(
     const cfg = resolveAlarmConfig(config?.daysToExpiry, CERTIFICATE_ALARM_DEFAULTS.daysToExpiry);
     definitions.push({
       key: "daysToExpiry",
+      alarmName: cfg.alarmName,
       metric: certificate.metricDaysToExpiry({ period: METRIC_PERIOD }),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,

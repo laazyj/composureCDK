@@ -33,6 +33,7 @@ export function resolveHealthCheckAlarmDefinitions(
     );
     definitions.push({
       key: "healthCheckStatus",
+      alarmName: cfg.alarmName,
       metric: new Metric({
         namespace: "AWS/Route53",
         metricName: "HealthCheckStatus",

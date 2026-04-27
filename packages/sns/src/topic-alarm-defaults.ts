@@ -1,12 +1,12 @@
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import type { AlarmConfig } from "@composurecdk/cloudwatch";
+import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
 
 interface TopicAlarmDefaults {
   enabled: true;
-  numberOfNotificationsFailed: Required<AlarmConfig>;
-  numberOfNotificationsFilteredOutInvalidAttributes: Required<AlarmConfig>;
-  numberOfNotificationsRedrivenToDlq: Required<AlarmConfig>;
-  numberOfNotificationsFailedToRedriveToDlq: Required<AlarmConfig>;
+  numberOfNotificationsFailed: AlarmConfigDefaults;
+  numberOfNotificationsFilteredOutInvalidAttributes: AlarmConfigDefaults;
+  numberOfNotificationsRedrivenToDlq: AlarmConfigDefaults;
+  numberOfNotificationsFailedToRedriveToDlq: AlarmConfigDefaults;
 }
 
 /**

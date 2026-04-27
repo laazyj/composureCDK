@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Duration } from "aws-cdk-lib";
 import { ComparisonOperator, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { AlarmDefinitionBuilder } from "../src/alarm-definition-builder.js";
+import { alarmName } from "../src/alarm-name.js";
 
 describe("AlarmDefinitionBuilder", () => {
   it("produces a correct definition with all fields set", () => {
@@ -101,6 +102,25 @@ describe("AlarmDefinitionBuilder", () => {
       .resolve("unused");
 
     expect(definition.description).toBe("Alert when count >= 42");
+  });
+
+  it("propagates alarmName when set", () => {
+    const metric = new Metric({ namespace: "Test", metricName: "Count" });
+    const definition = new AlarmDefinitionBuilder<string>("custom")
+      .metric(() => metric)
+      .alarmName(alarmName("payments-prod-errors"))
+      .resolve("unused");
+
+    expect(definition.alarmName).toBe("payments-prod-errors");
+  });
+
+  it("leaves alarmName undefined by default", () => {
+    const metric = new Metric({ namespace: "Test", metricName: "Count" });
+    const definition = new AlarmDefinitionBuilder<string>("noName")
+      .metric(() => metric)
+      .resolve("unused");
+
+    expect(definition.alarmName).toBeUndefined();
   });
 
   it("supports all comparison operators", () => {

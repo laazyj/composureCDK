@@ -1,9 +1,9 @@
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import type { AlarmConfig } from "@composurecdk/cloudwatch";
+import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
 
 interface CertificateAlarmDefaults {
   enabled: true;
-  daysToExpiry: Required<AlarmConfig>;
+  daysToExpiry: AlarmConfigDefaults;
 }
 
 /**

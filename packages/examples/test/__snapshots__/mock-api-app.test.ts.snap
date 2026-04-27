@@ -73,6 +73,7 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
     "MockApiAppapiClientErrorAlarmFE89E37D": {
       "Properties": {
         "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "AlarmName": "composure-cdk-mock-api-stack/mock-api-app/api/client-error",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,
         "Dimensions": [
@@ -224,6 +225,7 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
     "MockApiAppapiLatencyAlarmBB38671F": {
       "Properties": {
         "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
+        "AlarmName": "composure-cdk-mock-api-stack/mock-api-app/api/latency",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 5,
         "Dimensions": [
@@ -251,6 +253,7 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
     "MockApiAppapiServerErrorAlarm6503E5FE": {
       "Properties": {
         "AlarmDescription": "REST API server error rate is elevated. Threshold: > 2% of requests in 1 minute.",
+        "AlarmName": "composure-cdk-mock-api-stack/mock-api-app/api/server-error",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 3,
         "Dimensions": [

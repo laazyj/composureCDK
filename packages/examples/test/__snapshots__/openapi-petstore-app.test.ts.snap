@@ -203,6 +203,7 @@ exports[`openapi-petstore-app > matches the expected synthesised template 1`] = 
     "OpenApiPetstoreAppapiClientErrorAlarm755B4262": {
       "Properties": {
         "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "AlarmName": "composure-cdk-open-api-petstore-stack/open-api-petstore-app/api/client-error",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,
         "Dimensions": [
@@ -308,6 +309,7 @@ exports[`openapi-petstore-app > matches the expected synthesised template 1`] = 
     "OpenApiPetstoreAppapiLatencyAlarm28B7B0BF": {
       "Properties": {
         "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
+        "AlarmName": "composure-cdk-open-api-petstore-stack/open-api-petstore-app/api/latency",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 5,
         "Dimensions": [
@@ -335,6 +337,7 @@ exports[`openapi-petstore-app > matches the expected synthesised template 1`] = 
     "OpenApiPetstoreAppapiServerErrorAlarm5B7B1B44": {
       "Properties": {
         "AlarmDescription": "REST API server error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "AlarmName": "composure-cdk-open-api-petstore-stack/open-api-petstore-app/api/server-error",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 3,
         "Dimensions": [

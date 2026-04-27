@@ -1,5 +1,6 @@
 import { ComparisonOperator, type Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { AlarmDefinition } from "./alarm-definition.js";
+import type { AlarmName } from "./alarm-name.js";
 
 /**
  * Fluent builder for constructing deferred {@link AlarmDefinition}s.
@@ -12,6 +13,7 @@ import type { AlarmDefinition } from "./alarm-definition.js";
  */
 export class AlarmDefinitionBuilder<TConstruct> {
   readonly #key: string;
+  #alarmName?: AlarmName;
   #metricFactory?: (construct: TConstruct) => Metric;
   #threshold = 0;
   #comparisonOperator = ComparisonOperator.GREATER_THAN_THRESHOLD;
@@ -26,6 +28,16 @@ export class AlarmDefinitionBuilder<TConstruct> {
 
   metric(factory: (construct: TConstruct) => Metric): this {
     this.#metricFactory = factory;
+    return this;
+  }
+
+  /**
+   * Sets an explicit CloudWatch alarm name. When unset, {@link createAlarms}
+   * derives a default from the stack name, builder id, and alarm key. Use
+   * the {@link alarmName} helper to construct branded values.
+   */
+  alarmName(name: AlarmName): this {
+    this.#alarmName = name;
     return this;
   }
 
@@ -89,6 +101,7 @@ export class AlarmDefinitionBuilder<TConstruct> {
 
     const definition: AlarmDefinition = {
       key: this.#key,
+      alarmName: this.#alarmName,
       metric: this.#metricFactory(construct),
       threshold: this.#threshold,
       comparisonOperator: this.#comparisonOperator,

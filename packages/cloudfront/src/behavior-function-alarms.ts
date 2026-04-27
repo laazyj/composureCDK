@@ -121,6 +121,7 @@ export function resolveBehaviorFunctionAlarmDefinitions(
     );
     definitions.push({
       key: `${keyPrefix}ExecutionErrors`,
+      alarmName: cfg.alarmName,
       metric: functionMetric(fn, "FunctionExecutionErrors"),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -138,6 +139,7 @@ export function resolveBehaviorFunctionAlarmDefinitions(
     );
     definitions.push({
       key: `${keyPrefix}ValidationErrors`,
+      alarmName: cfg.alarmName,
       metric: functionMetric(fn, "FunctionValidationErrors"),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -152,6 +154,7 @@ export function resolveBehaviorFunctionAlarmDefinitions(
     const cfg = resolveAlarmConfig(config?.throttles, FUNCTION_ALARM_DEFAULTS.throttles);
     definitions.push({
       key: `${keyPrefix}Throttles`,
+      alarmName: cfg.alarmName,
       metric: functionMetric(fn, "FunctionThrottles"),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,

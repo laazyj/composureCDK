@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { ComparisonOperator, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Template } from "aws-cdk-lib/assertions";
+import { alarmName } from "../src/alarm-name.js";
 import { createAlarms } from "../src/create-alarms.js";
 import type { AlarmDefinition } from "../src/alarm-definition.js";
 
@@ -64,6 +65,25 @@ describe("createAlarms", () => {
     const alarms = template.findResources("AWS::CloudWatch::Alarm");
     const logicalIds = Object.keys(alarms);
     expect(logicalIds.some((id) => id.startsWith("MyFuncErrorsAlarm"))).toBe(true);
+  });
+
+  it("derives a default AlarmName from stack/id/key when none is supplied", () => {
+    const stack = new Stack(new App(), "MyServiceStack");
+    createAlarms(stack, "siteAlerts", [makeDefinition({ key: "errors" })]);
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "my-service-stack/site-alerts/errors",
+    });
+  });
+
+  it("uses an explicit alarmName verbatim when supplied on the definition", () => {
+    const stack = new Stack(new App(), "MyServiceStack");
+    createAlarms(stack, "siteAlerts", [
+      makeDefinition({ key: "errors", alarmName: alarmName("custom-name") }),
+    ]);
+    Template.fromStack(stack).hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "custom-name",
+    });
   });
 
   it("applies all definition properties to the alarm", () => {

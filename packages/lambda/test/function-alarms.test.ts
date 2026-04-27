@@ -3,6 +3,7 @@ import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
+import { alarmName } from "@composurecdk/cloudwatch";
 import { createFunctionBuilder } from "../src/function-builder.js";
 
 function buildResult(configureFn: (builder: ReturnType<typeof createFunctionBuilder>) => void) {
@@ -155,6 +156,27 @@ describe("recommended alarms", () => {
         MetricName: "Throttles",
         EvaluationPeriods: 5,
         DatapointsToAlarm: 3,
+      });
+    });
+
+    it("allows overriding alarmName on a recommended alarm", () => {
+      const { template } = buildResult((b) => {
+        minimalFunction(b);
+        b.recommendedAlarms({ errors: { alarmName: alarmName("checkout-fn-errors") } });
+      });
+
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        MetricName: "Errors",
+        AlarmName: "checkout-fn-errors",
+      });
+    });
+
+    it("derives a default AlarmName when not overridden", () => {
+      const { template } = buildResult(minimalFunction);
+
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        MetricName: "Errors",
+        AlarmName: "test-stack/test-function/errors",
       });
     });
 
@@ -365,6 +387,22 @@ describe("addAlarm", () => {
     expect(result.alarms.lowInvocations).toBeDefined();
     // 2 recommended (errors, throttles) + 2 custom
     template.resourceCountIs("AWS::CloudWatch::Alarm", 4);
+  });
+
+  it("propagates alarmName from .addAlarm to the rendered alarm", () => {
+    const { template } = buildResult((b) => {
+      minimalFunction(b);
+      b.addAlarm("invocations", (alarm) =>
+        alarm
+          .metric((fn) => fn.metricInvocations({ period: Duration.minutes(1) }))
+          .alarmName(alarmName("checkout-fn-invocations"))
+          .threshold(1),
+      );
+    });
+
+    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "checkout-fn-invocations",
+    });
   });
 
   it("throws on duplicate key with recommended alarm", () => {

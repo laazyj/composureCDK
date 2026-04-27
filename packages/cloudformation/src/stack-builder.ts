@@ -65,16 +65,16 @@ export type IStackBuilder = IBuilder<StackProps, StackBuilder> & {
 
 class StackBuilder implements Lifecycle<StackBuilderResult> {
   props: Partial<StackProps> = {};
-  private readonly tags: [string, string][] = [];
+  readonly #tags: [string, string][] = [];
 
   tag(key: string, value: string): this {
-    this.tags.push([key, value]);
+    this.#tags.push([key, value]);
     return this;
   }
 
   toScopeFactory(): ScopeFactory {
     const props = { ...this.props };
-    const tags = [...this.tags];
+    const tags = [...this.#tags];
     return (scope: IConstruct, id: string) => {
       const stack = new Stack(scope, id, props);
       tags.forEach(([key, value]) => {
@@ -86,7 +86,7 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
 
   build(scope: IConstruct, id: string): StackBuilderResult {
     const stack = new Stack(scope, id, this.props as StackProps);
-    this.tags.forEach(([key, value]) => {
+    this.#tags.forEach(([key, value]) => {
       Tags.of(stack).add(key, value);
     });
     return { stack };

@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/cloudformation",
-  "version": "0.3.0",
+  "version": "0.4.6",
   "description": "Composable CloudFormation stack builder and stack assignment strategies",
   "repository": {
     "type": "git",
@@ -35,15 +35,15 @@
   },
   "type": "module",
   "peerDependencies": {
-    "@composurecdk/core": "^0.3.0",
+    "@composurecdk/core": "^0.4.0",
     "aws-cdk-lib": "^2.0.0",
     "constructs": "^10.0.0"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "aws-cdk-lib": "^2.245.0",
+    "@types/node": "^25.6.0",
+    "aws-cdk-lib": "^2.250.0",
     "constructs": "^10.6.0",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.2"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
   }
 }

@@ -113,13 +113,13 @@ export type IBucketBuilder = IBuilder<BucketBuilderProps, BucketBuilder>;
 
 class BucketBuilder implements Lifecycle<BucketBuilderResult> {
   props: Partial<BucketBuilderProps> = {};
-  private readonly customAlarms: AlarmDefinitionBuilder<Bucket>[] = [];
+  readonly #customAlarms: AlarmDefinitionBuilder<Bucket>[] = [];
 
   addAlarm(
     key: string,
     configure: (alarm: AlarmDefinitionBuilder<Bucket>) => AlarmDefinitionBuilder<Bucket>,
   ): this {
-    this.customAlarms.push(configure(new AlarmDefinitionBuilder<Bucket>(key)));
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Bucket>(key)));
     return this;
   }
 
@@ -176,7 +176,7 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
       bucket,
       alarmConfig,
       bucketProps.metrics ?? [],
-      this.customAlarms,
+      this.#customAlarms,
     );
 
     return {

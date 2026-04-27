@@ -217,6 +217,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitealertsNumberOfNotificationsFailedAlarmDBF19693": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -243,6 +248,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitealertsNumberOfNotificationsFailedToRedriveToDlqAlarmE9EDE3B8": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -269,6 +279,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitealertsNumberOfNotificationsFilteredOutInvalidAttributesAlarmD7DE960B": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -295,6 +310,11 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     },
     "StaticWebsitealertsNumberOfNotificationsRedrivenToDlqAlarm6A74E13A": {
       "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
         "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -424,9 +444,181 @@ exports[`static-website-app > stack > matches the expected synthesised template 
       },
       "Type": "AWS::S3::BucketPolicy",
     },
+    "StaticWebsitecdnBehaviorApiSlashStarViewerRequestExecutionErrorsAlarmE949C7D3": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
+        "AlarmDescription": "CloudFront Function on behavior "/api/*" (viewer-request) is raising execution errors. Threshold: > 0 errors in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  "ComposureCDK-StarViewerRequestFnFB835158",
+                ],
+              ],
+            },
+          },
+          {
+            "Name": "Region",
+            "Value": "Global",
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FunctionExecutionErrors",
+        "Namespace": "AWS/CloudFront",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "StaticWebsitecdnBehaviorApiSlashStarViewerRequestFnC65BFFAF": {
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "
+                function handler(event) {
+                  var request = event.request;
+                  delete request.headers["authorization"];
+                  return request;
+                }
+              ",
+        "FunctionConfig": {
+          "Comment": "Strip Authorization header before forwarding to API origin",
+          "Runtime": "cloudfront-js-2.0",
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region",
+              },
+              "ComposureCDK-StarViewerRequestFnFB835158",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::CloudFront::Function",
+    },
+    "StaticWebsitecdnBehaviorApiSlashStarViewerRequestThrottlesAlarmBB314E05": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
+        "AlarmDescription": "CloudFront Function on behavior "/api/*" (viewer-request) is being throttled — likely exceeding its 1ms compute budget. Threshold: > 0 throttles in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  "ComposureCDK-StarViewerRequestFnFB835158",
+                ],
+              ],
+            },
+          },
+          {
+            "Name": "Region",
+            "Value": "Global",
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FunctionThrottles",
+        "Namespace": "AWS/CloudFront",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "StaticWebsitecdnBehaviorApiSlashStarViewerRequestValidationErrorsAlarm26A0559D": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
+        "AlarmDescription": "CloudFront Function on behavior "/api/*" (viewer-request) is producing validation errors. Threshold: > 0 errors in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  "ComposureCDK-StarViewerRequestFnFB835158",
+                ],
+              ],
+            },
+          },
+          {
+            "Name": "Region",
+            "Value": "Global",
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FunctionValidationErrors",
+        "Namespace": "AWS/CloudFront",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "StaticWebsitecdnDDCEC06E": {
+      "DependsOn": [
+        "StaticWebsitecdnAccessLogsPolicy6BB3093C",
+        "StaticWebsitecdnAccessLogsFAE00048",
+      ],
       "Properties": {
         "DistributionConfig": {
+          "CacheBehaviors": [
+            {
+              "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+              "Compress": true,
+              "FunctionAssociations": [
+                {
+                  "EventType": "viewer-request",
+                  "FunctionARN": {
+                    "Fn::GetAtt": [
+                      "StaticWebsitecdnBehaviorApiSlashStarViewerRequestFnC65BFFAF",
+                      "FunctionARN",
+                    ],
+                  },
+                },
+              ],
+              "PathPattern": "/api/*",
+              "TargetOriginId": "ComposureCDKStaticWebsiteStackStaticWebsitecdnOrigin2388BF2F9",
+              "ViewerProtocolPolicy": "allow-all",
+            },
+          ],
           "Comment": "Example static website",
           "CustomErrorResponses": [
             {
@@ -445,6 +637,17 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           "DefaultCacheBehavior": {
             "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
             "Compress": true,
+            "FunctionAssociations": [
+              {
+                "EventType": "viewer-response",
+                "FunctionARN": {
+                  "Fn::GetAtt": [
+                    "StaticWebsitecdnDefaultBehaviorViewerResponseFn0F6C5DA4",
+                    "FunctionARN",
+                  ],
+                },
+              },
+            ],
             "ResponseHeadersPolicyId": "67f7725c-6f97-4210-82d7-5512b31e9d03",
             "TargetOriginId": "ComposureCDKStaticWebsiteStackStaticWebsitecdnOrigin168F4EAEC",
             "ViewerProtocolPolicy": "redirect-to-https",
@@ -480,11 +683,169 @@ exports[`static-website-app > stack > matches the expected synthesised template 
                 "OriginAccessIdentity": "",
               },
             },
+            {
+              "CustomOriginConfig": {
+                "OriginProtocolPolicy": "https-only",
+                "OriginSSLProtocols": [
+                  "TLSv1.2",
+                ],
+              },
+              "DomainName": "api.example.com",
+              "Id": "ComposureCDKStaticWebsiteStackStaticWebsitecdnOrigin2388BF2F9",
+            },
           ],
           "PriceClass": "PriceClass_100",
         },
       },
       "Type": "AWS::CloudFront::Distribution",
+    },
+    "StaticWebsitecdnDefaultBehaviorViewerResponseExecutionErrorsAlarm0ABFC962": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
+        "AlarmDescription": "CloudFront Function on default behavior (viewer-response) is raising execution errors. Threshold: > 0 errors in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  "ComposureCDK-StaViewerResponseFn21894680",
+                ],
+              ],
+            },
+          },
+          {
+            "Name": "Region",
+            "Value": "Global",
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FunctionExecutionErrors",
+        "Namespace": "AWS/CloudFront",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "StaticWebsitecdnDefaultBehaviorViewerResponseFn0F6C5DA4": {
+      "Properties": {
+        "AutoPublish": true,
+        "FunctionCode": "
+                function handler(event) {
+                  var response = event.response;
+                  response.headers["x-served-by"] = { value: "composurecdk-example" };
+                  return response;
+                }
+              ",
+        "FunctionConfig": {
+          "Comment": "Add x-served-by header",
+          "Runtime": "cloudfront-js-2.0",
+        },
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "AWS::Region",
+              },
+              "ComposureCDK-StaViewerResponseFn21894680",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::CloudFront::Function",
+    },
+    "StaticWebsitecdnDefaultBehaviorViewerResponseThrottlesAlarmBE826DA3": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
+        "AlarmDescription": "CloudFront Function on default behavior (viewer-response) is being throttled — likely exceeding its 1ms compute budget. Threshold: > 0 throttles in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  "ComposureCDK-StaViewerResponseFn21894680",
+                ],
+              ],
+            },
+          },
+          {
+            "Name": "Region",
+            "Value": "Global",
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FunctionThrottles",
+        "Namespace": "AWS/CloudFront",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "StaticWebsitecdnDefaultBehaviorViewerResponseValidationErrorsAlarmD4E6BE39": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "StaticWebsitealertsBD655E35",
+          },
+        ],
+        "AlarmDescription": "CloudFront Function on default behavior (viewer-response) is producing validation errors. Threshold: > 0 errors in 1 minute.",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  "ComposureCDK-StaViewerResponseFn21894680",
+                ],
+              ],
+            },
+          },
+          {
+            "Name": "Region",
+            "Value": "Global",
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FunctionValidationErrors",
+        "Namespace": "AWS/CloudFront",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
     "StaticWebsitecdnErrorRateAlarmEDAC30D6": {
       "Properties": {
@@ -519,6 +880,10 @@ exports[`static-website-app > stack > matches the expected synthesised template 
       "Type": "AWS::CloudWatch::Alarm",
     },
     "StaticWebsitecdnOrigin1S3OriginAccessControl00704AC0": {
+      "DependsOn": [
+        "StaticWebsitecdnAccessLogsPolicy6BB3093C",
+        "StaticWebsitecdnAccessLogsFAE00048",
+      ],
       "Properties": {
         "OriginAccessControlConfig": {
           "Name": "ComposureCDKStaticWebsiteStaOrigin1S3OriginAccessControl82763327",

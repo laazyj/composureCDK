@@ -34,6 +34,7 @@ function jsonMock(statusCode: string, body: Record<string, unknown>): [Integrati
  * - Multiple HTTP methods per resource
  * - Mock integrations returning static JSON responses
  * - Building the composed system into a CDK Stack
+ * - Recommended alarms for API Gateway with a customised server-error threshold
  *
  * Resource tree:
  * ```
@@ -58,6 +59,10 @@ export function createMockApiApp(app = new App()) {
       api: createRestApiBuilder()
         .restApiName("MockApi")
         .description("A mock CRUD API for demonstration")
+        .recommendedAlarms({
+          // Tighter server error threshold for a production API
+          serverError: { threshold: 0.02 },
+        })
         .addMethod("GET", ...jsonMock("200", { service: "mock-api", status: "healthy" }))
         .addResource("users", (users) =>
           users

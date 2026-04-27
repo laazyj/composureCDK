@@ -1,5 +1,6 @@
 export {
   createTopicBuilder,
+  type TopicBuilderProps,
   type TopicBuilderResult,
   type ITopicBuilder,
 } from "./topic-builder.js";
@@ -9,5 +10,6 @@ export { TOPIC_ALARM_DEFAULTS } from "./topic-alarm-defaults.js";
 export {
   createSubscriptionBuilder,
   type ISubscriptionBuilder,
+  type SubscriptionBuilderProps,
   type SubscriptionBuilderResult,
 } from "./subscription-builder.js";

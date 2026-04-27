@@ -1,3 +1,175 @@
+## 0.4.6 (2026-04-27)
+
+### 🚀 Features
+
+- **route53:** add health check builder with recommended alarm ([#59](https://github.com/laazyj/composureCDK/pull/59), [#58](https://github.com/laazyj/composureCDK/issues/58), [#45](https://github.com/laazyj/composureCDK/issues/45))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.4.5 (2026-04-25)
+
+### 🚀 Features
+
+- **cloudfront:** standalone alarm builder ([#58](https://github.com/laazyj/composureCDK/pull/58), [#55](https://github.com/laazyj/composureCDK/issues/55))
+
+### 🩹 Fixes
+
+- **core:** propagate parent context into nested compose ([#57](https://github.com/laazyj/composureCDK/pull/57), [#51](https://github.com/laazyj/composureCDK/issues/51))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.4.4 (2026-04-24)
+
+### 🚀 Features
+
+- **cloudfront:** first-class cache behaviors and inline functions ([#53](https://github.com/laazyj/composureCDK/pull/53), [#32](https://github.com/laazyj/composureCDK/issues/32))
+
+### 🩹 Fixes
+
+- **ci:** trigger sandbox-cleanup after Release workflow ([1e60f1b](https://github.com/laazyj/composureCDK/commit/1e60f1b))
+- **examples:** close access-logs teardown race ([d7f1bab](https://github.com/laazyj/composureCDK/commit/d7f1bab))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.4.3 (2026-04-23)
+
+### 🚀 Features
+
+- **cloudwatch:** add alarmActionsPolicy helper ([37cb0f2](https://github.com/laazyj/composureCDK/commit/37cb0f2))
+
+### 🩹 Fixes
+
+- **ci:** grant ListStackResources to sandbox cleanup role ([1aee8ee](https://github.com/laazyj/composureCDK/commit/1aee8ee))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.4.2 (2026-04-22)
+
+### 🚀 Features
+
+- **route53:** add ALIAS helper to the zone DSL ([59dddb7](https://github.com/laazyj/composureCDK/commit/59dddb7))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.4.1 (2026-04-22)
+
+### 🩹 Fixes
+
+- **release:** include @composurecdk/examples in the release group ([58b5d69](https://github.com/laazyj/composureCDK/commit/58b5d69))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.4.0 (2026-04-22)
+
+### 🚀 Features
+
+- **cloudformation:** route outputs per-stack via OutputDefinition.scope ([6dcf748](https://github.com/laazyj/composureCDK/commit/6dcf748))
+- ⚠️ **core:** pass per-component scopes to afterBuild hooks ([f08a7fa](https://github.com/laazyj/composureCDK/commit/f08a7fa))
+
+### 🩹 Fixes
+
+- re-export \*BuilderProps from package barrels ([364926d](https://github.com/laazyj/composureCDK/commit/364926d))
+- use ECMAScript private fields in builder classes ([ec79283](https://github.com/laazyj/composureCDK/commit/ec79283))
+- **route53:** bump @composurecdk/core peer dep to ^0.3.6 ([e5538e8](https://github.com/laazyj/composureCDK/commit/e5538e8))
+- **route53:** use ECMAScript private fields in ZoneRecordsBuilder ([84c01e8](https://github.com/laazyj/composureCDK/commit/84c01e8))
+- **route53:** use readable "Apex" as apex record construct id ([05b7345](https://github.com/laazyj/composureCDK/commit/05b7345))
+
+### ⚠️ Breaking Changes
+
+- **core:** pass per-component scopes to afterBuild hooks ([f08a7fa](https://github.com/laazyj/composureCDK/commit/f08a7fa))
+  AfterBuildHook<T> now requires a fourth parameter
+  componentScopes: { readonly [K in keyof T]: IConstruct }. Custom
+  hook implementations must add this parameter to their signature;
+  hooks that do not need it can accept it as \_componentScopes.
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.3.6 (2026-04-21)
+
+### 🚀 Features
+
+- **core:** add constructId sanitizer ([#54](https://github.com/laazyj/composureCDK/pull/54))
+- **route53:** add BIND-style zone DSL ([#50](https://github.com/laazyj/composureCDK/pull/50))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.3.5 (2026-04-20)
+
+### 🚀 Features
+
+- **route53:** add support for additional record types ([2a5a23a](https://github.com/laazyj/composureCDK/commit/2a5a23a))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.3.4 (2026-04-19)
+
+### 🚀 Features
+
+- **route53:** add hosted zone and record builders ([#46](https://github.com/laazyj/composureCDK/pull/46), [#44](https://github.com/laazyj/composureCDK/issues/44), [#45](https://github.com/laazyj/composureCDK/issues/45), [#30](https://github.com/laazyj/composureCDK/issues/30))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.3.3 (2026-04-19)
+
+### 🚀 Features
+
+- **acm:** add CertificateBuilder with DaysToExpiry alarm ([#43](https://github.com/laazyj/composureCDK/pull/43), [#31](https://github.com/laazyj/composureCDK/issues/31))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.3.2 (2026-04-18)
+
+### 🚀 Features
+
+- **cloudfront:** accept Resolvable<ICertificate> on DistributionBuilder ([#22](https://github.com/laazyj/composureCDK/pull/22))
+
+### 🩹 Fixes
+
+- **cloudfront:** add dependency to control deletion order ([88443a2](https://github.com/laazyj/composureCDK/commit/88443a2))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
+## 0.3.1 (2026-04-18)
+
+### 🚀 Features
+
+- **iam:** add RoleBuilder, ManagedPolicyBuilder, and StatementBuilder ([#36](https://github.com/laazyj/composureCDK/pull/36), [#28](https://github.com/laazyj/composureCDK/issues/28), [#29](https://github.com/laazyj/composureCDK/issues/29))
+- **sns:** add SubscriptionBuilder ([#19](https://github.com/laazyj/composureCDK/pull/19))
+- **sns:** add TopicBuilder.addSubscription via ITopicSubscription.bind() ([#39](https://github.com/laazyj/composureCDK/pull/39), [#38](https://github.com/laazyj/composureCDK/issues/38))
+
+### 🩹 Fixes
+
+- **ci:** make deploy-test more resilient when destroying stacks ([cc0ccf9](https://github.com/laazyj/composureCDK/commit/cc0ccf9))
+- **s3:** disable versioning on access logging buckets ([4f7473a](https://github.com/laazyj/composureCDK/commit/4f7473a))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.3.0 (2026-04-10)
 
 ### 🚀 Features

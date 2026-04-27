@@ -6,17 +6,23 @@ This guide covers how to extend a composed system with post-build behaviour — 
 
 `compose` builds components in dependency order and returns their combined outputs. But many concerns sit _outside_ the component graph: stack outputs summarise the system, tags apply across all resources, monitoring dashboards reference multiple components. These are not components themselves — they are cross-cutting behaviour that runs after the system is built.
 
-`afterBuild` is the extension point for this. It accepts a hook — a function that receives the scope, system id, and fully-typed build results — and runs it after all components have been built.
+`afterBuild` is the extension point for this. It accepts a hook — a function that receives the scope, system id, fully-typed build results, and per-component scopes — and runs it after all components have been built.
 
 ## AfterBuildHook
 
 ```ts
-type AfterBuildHook<T extends object> = (scope: IConstruct, id: string, results: T) => void;
+type AfterBuildHook<T extends object> = (
+  scope: IConstruct,
+  id: string,
+  results: T,
+  componentScopes: { readonly [K in keyof T]: IConstruct },
+) => void;
 ```
 
-- **`scope`** — The construct scope passed to `build`. Hooks create constructs here.
+- **`scope`** — The construct scope passed to `build`. Hooks that create a single shared construct typically attach it here.
 - **`id`** — The system id passed to `build`.
 - **`results`** — The combined build outputs of all components, keyed by component name.
+- **`componentScopes`** — The scope each component was built into, keyed by component name. Under `.withStacks()` or `.withStackStrategy()` these differ per component; otherwise they all equal `scope`. Hooks use this to attach per-component constructs (e.g. outputs) to the Stack that owns the underlying resource.
 
 ## Using afterBuild
 
@@ -121,3 +127,4 @@ Each output definition accepts:
 - **`value`** — A concrete string or a `Ref` that resolves against the build results.
 - **`description`** — Optional description for the CloudFormation output.
 - **`exportName`** — Optional export name for cross-stack references.
+- **`scope`** — Optional Stack to attach the output to. Either an `IConstruct` (a direct Stack reference, typical with `.withStacks()`) or a component key string typed against the composed system (typical with `.withStackStrategy()`, where stacks are created dynamically). When omitted, the output falls back to the hook's `scope` — the top-level scope given to `build()`. See [Per-Output Stack Routing](./stack-management.md#per-output-stack-routing).

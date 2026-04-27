@@ -3,6 +3,7 @@ import { App, Stack } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { compose, Ref, type Lifecycle } from "@composurecdk/core";
 import { outputs } from "../src/outputs.js";
+import { groupedStacks } from "../src/strategies.js";
 
 function createStack(): Stack {
   return new Stack(new App(), "TestStack");
@@ -178,5 +179,158 @@ describe("outputs", () => {
     const template = Template.fromStack(stack);
     const found = template.findOutputs("*");
     expect(Object.keys(found).length).toBe(0);
+  });
+
+  describe("per-output scope", () => {
+    it("routes outputs to a directly-supplied Stack via an IConstruct scope", () => {
+      const app = new App();
+      const hookStack = new Stack(app, "Hook");
+      const other = new Stack(app, "Other");
+
+      compose({ x: stubComponent({}) }, { x: [] })
+        .afterBuild(
+          outputs({
+            OnHook: { value: "h" },
+            OnOther: { value: "o", scope: other },
+          }),
+        )
+        .build(hookStack, "System");
+
+      expect(Object.keys(Template.fromStack(hookStack).findOutputs("*"))).toEqual(["OnHook"]);
+      expect(Object.keys(Template.fromStack(other).findOutputs("*"))).toEqual(["OnOther"]);
+    });
+
+    it("routes outputs to a directly-supplied Stack under .withStacks()", () => {
+      const app = new App();
+      const siteStack = new Stack(app, "Site");
+      const dnsStack = new Stack(app, "Dns");
+
+      compose(
+        { site: stubComponent({ url: "example.com" }), dns: stubComponent({ zone: "z123" }) },
+        { site: [], dns: [] },
+      )
+        .withStacks({ site: siteStack, dns: dnsStack })
+        .afterBuild(
+          outputs({
+            SiteUrl: { value: "https://example.com", scope: siteStack },
+            NameServers: { value: "ns1", scope: dnsStack },
+          }),
+        )
+        .build(app, "System");
+
+      expect(Object.keys(Template.fromStack(siteStack).findOutputs("*"))).toEqual(["SiteUrl"]);
+      expect(Object.keys(Template.fromStack(dnsStack).findOutputs("*"))).toEqual(["NameServers"]);
+    });
+
+    it("routes outputs via a component key under .withStacks()", () => {
+      const app = new App();
+      const siteStack = new Stack(app, "Site");
+      const dnsStack = new Stack(app, "Dns");
+
+      compose(
+        { site: stubComponent({ url: "example.com" }), dns: stubComponent({ zone: "z123" }) },
+        { site: [], dns: [] },
+      )
+        .withStacks({ site: siteStack, dns: dnsStack })
+        .afterBuild(
+          outputs({
+            SiteUrl: { value: "https://example.com", scope: "site" },
+            NameServers: { value: "ns1", scope: "dns" },
+          }),
+        )
+        .build(app, "System");
+
+      expect(Object.keys(Template.fromStack(siteStack).findOutputs("*"))).toEqual(["SiteUrl"]);
+      expect(Object.keys(Template.fromStack(dnsStack).findOutputs("*"))).toEqual(["NameServers"]);
+    });
+
+    it("routes outputs via a component key under .withStackStrategy()", () => {
+      const app = new App();
+      const classify = (k: string) => (k === "data" ? "data" : "compute");
+
+      compose(
+        { data: stubComponent({ name: "t1" }), api: stubComponent({ route: "/" }) },
+        { data: [], api: ["data"] },
+      )
+        .withStackStrategy(groupedStacks(classify, (parent, id) => new Stack(parent as App, id)))
+        .afterBuild(
+          outputs({
+            TableName: { value: "tbl", scope: "data" },
+            ApiRoute: { value: "/v1", scope: "api" },
+          }),
+        )
+        .build(app, "System");
+
+      const stacks = app.node.children.filter((c): c is Stack => c instanceof Stack);
+      const dataStack = stacks.find((s) => s.node.id === "System-data");
+      const computeStack = stacks.find((s) => s.node.id === "System-compute");
+      if (dataStack === undefined || computeStack === undefined) {
+        throw new Error("strategy did not create expected stacks");
+      }
+
+      expect(Object.keys(Template.fromStack(dataStack).findOutputs("*"))).toEqual(["TableName"]);
+      expect(Object.keys(Template.fromStack(computeStack).findOutputs("*"))).toEqual(["ApiRoute"]);
+    });
+
+    it("resolves a Ref value into the chosen scope's template", () => {
+      const app = new App();
+      const siteStack = new Stack(app, "Site");
+      const dnsStack = new Stack(app, "Dns");
+
+      compose(
+        { site: stubComponent({ url: "example.com" }), dns: stubComponent({ zone: "z123" }) },
+        { site: [], dns: [] },
+      )
+        .withStacks({ site: siteStack, dns: dnsStack })
+        .afterBuild(
+          outputs({
+            SiteUrl: {
+              value: Ref.to<{ url: string }>("site").map((r) => `https://${r.url}`),
+              scope: "site",
+            },
+          }),
+        )
+        .build(app, "System");
+
+      const output = Object.values(Template.fromStack(siteStack).findOutputs("*"))[0] as {
+        Value: string;
+      };
+      expect(output.Value).toBe("https://example.com");
+    });
+
+    it("creates the CloudFormation Export on the target stack when combined with exportName", () => {
+      const app = new App();
+      const siteStack = new Stack(app, "Site");
+      const dnsStack = new Stack(app, "Dns");
+
+      compose({ site: stubComponent({}), dns: stubComponent({}) }, { site: [], dns: [] })
+        .withStacks({ site: siteStack, dns: dnsStack })
+        .afterBuild(
+          outputs({
+            NameServers: { value: "ns1", scope: "dns", exportName: "ZoneServers" },
+          }),
+        )
+        .build(app, "System");
+
+      expect(Object.keys(Template.fromStack(siteStack).findOutputs("*"))).toEqual([]);
+      const dnsOutputs = Template.fromStack(dnsStack).findOutputs("*");
+      const output = dnsOutputs.NameServers as { Export: { Name: string } };
+      expect(output.Export.Name).toBe("ZoneServers");
+    });
+
+    it("throws a clear error when scope references an unknown component key", () => {
+      const app = new App();
+      const siteStack = new Stack(app, "Site");
+      const badDefs = {
+        Broken: { value: "x", scope: "missing" },
+      } as unknown as Parameters<typeof outputs>[0];
+
+      expect(() =>
+        compose({ site: stubComponent({}) }, { site: [] })
+          .withStacks({ site: siteStack })
+          .afterBuild(outputs(badDefs))
+          .build(app, "System"),
+      ).toThrow(/unknown component "missing"/);
+    });
   });
 });

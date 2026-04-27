@@ -250,7 +250,7 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
     },
     "MockApiAppapiServerErrorAlarm6503E5FE": {
       "Properties": {
-        "AlarmDescription": "REST API server error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "AlarmDescription": "REST API server error rate is elevated. Threshold: > 2% of requests in 1 minute.",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 3,
         "Dimensions": [
@@ -270,7 +270,7 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
         "Namespace": "AWS/ApiGateway",
         "Period": 60,
         "Statistic": "Average",
-        "Threshold": 0.05,
+        "Threshold": 0.02,
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",

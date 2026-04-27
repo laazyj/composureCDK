@@ -92,7 +92,5 @@ ref<FunctionBuilderResult>("handler", (r) => new LambdaIntegration(r.function));
 
 ## Examples
 
-- [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing
-- [StrategyStackApp](../examples/src/strategy-stack-app.ts) — System composed with `withStackStrategy`
-- [LambdaApiStack](../examples/src/lambda-api-app.ts) — Cross-component wiring with `ref`
+- [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`
 - [StaticWebsiteStack](../examples/src/static-website/app.ts) — S3 + CloudFront composed system with `ref` and `afterBuild`

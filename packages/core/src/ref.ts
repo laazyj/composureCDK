@@ -26,7 +26,11 @@
  * ```
  */
 export class Ref<T> {
-  private constructor(private readonly _resolver: (context: Record<string, object>) => T) {}
+  readonly #resolver: (context: Record<string, object>) => T;
+
+  private constructor(resolver: (context: Record<string, object>) => T) {
+    this.#resolver = resolver;
+  }
 
   /**
    * Creates a `Ref` that resolves to a component's full build output.
@@ -53,7 +57,7 @@ export class Ref<T> {
    * @returns A new `Ref` to the selected property.
    */
   get<K extends keyof T>(key: K): Ref<T[K]> {
-    return new Ref<T[K]>((context) => this._resolver(context)[key]);
+    return new Ref<T[K]>((context) => this.#resolver(context)[key]);
   }
 
   /**
@@ -67,7 +71,7 @@ export class Ref<T> {
    * @returns A new `Ref` whose resolved value is the result of `fn`.
    */
   map<U>(fn: (value: T) => U): Ref<U> {
-    return new Ref<U>((context) => fn(this._resolver(context)));
+    return new Ref<U>((context) => fn(this.#resolver(context)));
   }
 
   /**
@@ -79,7 +83,7 @@ export class Ref<T> {
    * @returns The resolved value.
    */
   resolve(context: Record<string, object>): T {
-    return this._resolver(context);
+    return this.#resolver(context);
   }
 }
 
@@ -137,12 +141,15 @@ export function isRef<T>(value: Resolvable<T>): value is Ref<T> {
 
 /**
  * Resolves a {@link Resolvable} value. If it is a {@link Ref}, resolves it
- * against the provided context. Otherwise returns the value as-is.
+ * against the provided context (or an empty context if none is given).
+ * Otherwise returns the value as-is.
  *
  * @param value - A concrete value or a `Ref`.
  * @param context - The resolved dependency outputs, keyed by component name.
+ *   Omit for standalone builds where no refs are in use — a `Ref` resolved
+ *   against an empty context will throw "component not found".
  * @returns The concrete value.
  */
-export function resolve<T>(value: Resolvable<T>, context: Record<string, object>): T {
-  return isRef(value) ? value.resolve(context) : value;
+export function resolve<T>(value: Resolvable<T>, context?: Record<string, object>): T {
+  return isRef(value) ? value.resolve(context ?? {}) : value;
 }

@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/examples",
-  "version": "0.1.0",
+  "version": "0.4.6",
   "description": "Example applications exercising the ComposureCDK public API",
   "private": true,
   "scripts": {
@@ -18,23 +18,24 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "aws-cdk-lib": "^2.245.0",
+    "aws-cdk-lib": "^2.250.0",
     "constructs": "^10.6.0"
   },
   "peerDependencies": {
-    "@composurecdk/apigateway": "^0.3.0",
-    "@composurecdk/cloudformation": "^0.3.0",
-    "@composurecdk/cloudwatch": "^0.3.0",
-    "@composurecdk/cloudfront": "^0.3.0",
-    "@composurecdk/core": "^0.3.0",
-    "@composurecdk/lambda": "^0.3.0",
-    "@composurecdk/s3": "^0.3.0",
-    "@composurecdk/sns": "^0.3.0"
+    "@composurecdk/apigateway": "^0.4.0",
+    "@composurecdk/cloudformation": "^0.4.0",
+    "@composurecdk/cloudwatch": "^0.4.0",
+    "@composurecdk/cloudfront": "^0.4.0",
+    "@composurecdk/core": "^0.4.0",
+    "@composurecdk/lambda": "^0.4.0",
+    "@composurecdk/route53": "^0.4.0",
+    "@composurecdk/s3": "^0.4.0",
+    "@composurecdk/sns": "^0.4.0"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "aws-cdk": "^2.1114.1",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.2"
+    "@types/node": "^25.6.0",
+    "aws-cdk": "^2.1118.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
   }
 }

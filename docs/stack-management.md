@@ -148,6 +148,33 @@ When components in different Stacks reference each other (via `ref`), CDK automa
 - **Deploy order matters.** The exporting Stack must be deployed before the importing Stack. CDK Pipelines handles this automatically; manual deploys require careful ordering.
 - **Avoid unnecessary cross-stack references.** Co-locate components that are tightly coupled. Use cross-stack references for stable interfaces between loosely coupled groups.
 
+## Per-Output Stack Routing
+
+When a system spans multiple Stacks, `outputs()` can route individual entries to specific Stacks via the optional `scope` field on each definition. This preserves the declarative single-map form while keeping each output in the Stack that owns its resource.
+
+`scope` accepts either an `IConstruct` (a direct Stack reference) or a component key string. Component keys are statically typed against the composed system's components, so typos are compile errors.
+
+```ts
+compose(
+  { site: siteBuilder, cdn: cdnBuilder, dns: dnsBuilder },
+  { site: [], cdn: ["site"], dns: [] },
+)
+  .withStacks({ site: siteStack, cdn: siteStack, dns: dnsStack })
+  .afterBuild(
+    outputs({
+      SiteUrl: { value: ref("cdn", (r) => r.distribution.domainName), scope: "cdn" },
+      BucketArn: { value: ref("site", (r) => r.bucket.bucketArn), scope: siteStack },
+      NameServers: {
+        value: ref("dns", (r) => Fn.join(",", r.zone.hostedZoneNameServers!)),
+        scope: "dns",
+      },
+    }),
+  )
+  .build(app, "StaticWebsite");
+```
+
+When `scope` is omitted, the output falls back to the scope passed to `build()` — typically the app under `.withStacks()` or `.withStackStrategy()`, which means CDK will fail at synth if no owning Stack is reachable. Either omit `scope` only in the single-Stack case, or set it on every entry.
+
 ## Package Structure
 
 Stack management is split across two packages:

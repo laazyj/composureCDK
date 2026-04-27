@@ -1,0 +1,50 @@
+{
+  "name": "@composurecdk/acm",
+  "version": "0.4.6",
+  "description": "Composable AWS Certificate Manager builder with well-architected defaults",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laazyj/composureCDK",
+    "directory": "packages/acm"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "Jason Duffett (https://github.com/laazyj)",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "peerDependencies": {
+    "@composurecdk/cloudwatch": "^0.4.0",
+    "@composurecdk/core": "^0.4.0",
+    "aws-cdk-lib": "^2.0.0",
+    "constructs": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "aws-cdk-lib": "^2.250.0",
+    "constructs": "^10.6.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
+  }
+}

@@ -6,9 +6,8 @@ import type { AlarmConfig } from "@composurecdk/cloudwatch";
  * Set individual alarms to `false` to disable them, or provide an
  * {@link AlarmConfig} to tune thresholds.
  *
- * Function-level alarms (FunctionValidationErrors, FunctionExecutionErrors,
- * FunctionThrottles) require per-function dimensions and are not created
- * automatically. Use {@link IDistributionBuilder.addAlarm} to add them.
+ * Function-level alarms are created automatically for every inline function
+ * declared on a behavior — see {@link FunctionAlarmConfig} to tune them.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront
  */
@@ -44,4 +43,62 @@ export interface DistributionAlarmConfig {
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront
    */
   originLatency?: AlarmConfig | false;
+}
+
+/**
+ * Controls which recommended alarms are created for a CloudFront Function
+ * declared inline on a cache behavior. All alarms are enabled by default
+ * with AWS-recommended thresholds. Set individual alarms to `false` to
+ * disable them, or provide an {@link AlarmConfig} to tune thresholds.
+ *
+ * CloudFront Function metrics are emitted in the `us-east-1` region only
+ * (CloudFront is a global service). The alarms live in the stack's region —
+ * if that is not `us-east-1`, the alarms will not receive data.
+ *
+ * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/monitoring-functions.html
+ */
+export interface FunctionAlarmConfig {
+  /**
+   * Per-function switch: set to `false` to disable all recommended alarms
+   * for this one function. Individual alarms can also be disabled via their
+   * own entry. The global kill switch is
+   * {@link DistributionBuilderProps.recommendedAlarms} `: false` on the
+   * surrounding distribution builder, which suppresses every recommended
+   * alarm regardless of per-function settings.
+   * @default true
+   */
+  enabled?: boolean;
+
+  /**
+   * Alarm when the function raises runtime exceptions while processing a
+   * viewer request or response.
+   *
+   * Metric: `AWS/CloudFront FunctionExecutionErrors`, statistic Sum,
+   * period 1 minute. Default threshold: > 0 errors.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/monitoring-functions.html
+   */
+  executionErrors?: AlarmConfig | false;
+
+  /**
+   * Alarm when the function returns an event object that fails validation
+   * (e.g. malformed headers, unsupported response shape).
+   *
+   * Metric: `AWS/CloudFront FunctionValidationErrors`, statistic Sum,
+   * period 1 minute. Default threshold: > 0 errors.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/monitoring-functions.html
+   */
+  validationErrors?: AlarmConfig | false;
+
+  /**
+   * Alarm when the function is throttled — typically because it exceeded
+   * the 1ms compute-utilization budget.
+   *
+   * Metric: `AWS/CloudFront FunctionThrottles`, statistic Sum,
+   * period 1 minute. Default threshold: > 0 throttles.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-function-restrictions.html
+   */
+  throttles?: AlarmConfig | false;
 }

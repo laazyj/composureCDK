@@ -11,66 +11,66 @@ import type { AlarmDefinition } from "./alarm-definition.js";
  * @typeParam TConstruct - The construct type the metric factory receives.
  */
 export class AlarmDefinitionBuilder<TConstruct> {
-  private readonly _key: string;
-  private _metricFactory?: (construct: TConstruct) => Metric;
-  private _threshold = 0;
-  private _comparisonOperator = ComparisonOperator.GREATER_THAN_THRESHOLD;
-  private _evaluationPeriods = 1;
-  private _datapointsToAlarm = 1;
-  private _treatMissingData = TreatMissingData.NOT_BREACHING;
-  private _description: string | ((definition: AlarmDefinition) => string) = "";
+  readonly #key: string;
+  #metricFactory?: (construct: TConstruct) => Metric;
+  #threshold = 0;
+  #comparisonOperator = ComparisonOperator.GREATER_THAN_THRESHOLD;
+  #evaluationPeriods = 1;
+  #datapointsToAlarm = 1;
+  #treatMissingData = TreatMissingData.NOT_BREACHING;
+  #description: string | ((definition: AlarmDefinition) => string) = "";
 
   constructor(key: string) {
-    this._key = key;
+    this.#key = key;
   }
 
   metric(factory: (construct: TConstruct) => Metric): this {
-    this._metricFactory = factory;
+    this.#metricFactory = factory;
     return this;
   }
 
   threshold(value: number): this {
-    this._threshold = value;
+    this.#threshold = value;
     return this;
   }
 
   greaterThan(): this {
-    this._comparisonOperator = ComparisonOperator.GREATER_THAN_THRESHOLD;
+    this.#comparisonOperator = ComparisonOperator.GREATER_THAN_THRESHOLD;
     return this;
   }
 
   greaterThanOrEqual(): this {
-    this._comparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD;
+    this.#comparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD;
     return this;
   }
 
   lessThan(): this {
-    this._comparisonOperator = ComparisonOperator.LESS_THAN_THRESHOLD;
+    this.#comparisonOperator = ComparisonOperator.LESS_THAN_THRESHOLD;
     return this;
   }
 
   lessThanOrEqual(): this {
-    this._comparisonOperator = ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD;
+    this.#comparisonOperator = ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD;
     return this;
   }
 
   evaluationPeriods(n: number): this {
-    this._evaluationPeriods = n;
+    this.#evaluationPeriods = n;
     return this;
   }
 
   datapointsToAlarm(n: number): this {
-    this._datapointsToAlarm = n;
+    this.#datapointsToAlarm = n;
     return this;
   }
 
   treatMissingData(treatment: TreatMissingData): this {
-    this._treatMissingData = treatment;
+    this.#treatMissingData = treatment;
     return this;
   }
 
   description(text: string | ((definition: AlarmDefinition) => string)): this {
-    this._description = text;
+    this.#description = text;
     return this;
   }
 
@@ -81,25 +81,25 @@ export class AlarmDefinitionBuilder<TConstruct> {
    * @throws If {@link metric} was not called before resolve.
    */
   resolve(construct: TConstruct): AlarmDefinition {
-    if (!this._metricFactory) {
+    if (!this.#metricFactory) {
       throw new Error(
-        `AlarmDefinitionBuilder "${this._key}": metric() must be called before resolve()`,
+        `AlarmDefinitionBuilder "${this.#key}": metric() must be called before resolve()`,
       );
     }
 
     const definition: AlarmDefinition = {
-      key: this._key,
-      metric: this._metricFactory(construct),
-      threshold: this._threshold,
-      comparisonOperator: this._comparisonOperator,
-      evaluationPeriods: this._evaluationPeriods,
-      datapointsToAlarm: this._datapointsToAlarm,
-      treatMissingData: this._treatMissingData,
+      key: this.#key,
+      metric: this.#metricFactory(construct),
+      threshold: this.#threshold,
+      comparisonOperator: this.#comparisonOperator,
+      evaluationPeriods: this.#evaluationPeriods,
+      datapointsToAlarm: this.#datapointsToAlarm,
+      treatMissingData: this.#treatMissingData,
       description: "",
     };
 
     definition.description =
-      typeof this._description === "function" ? this._description(definition) : this._description;
+      typeof this.#description === "function" ? this.#description(definition) : this.#description;
 
     return definition;
   }

@@ -50,9 +50,9 @@ This workflow uses a GitHub Environment (`npm`) and [npm trusted publishers](htt
 
 ## Versioning
 
-All publishable packages share a single version number (fixed versioning). When any package changes, all are bumped and published together. This guarantees compatibility — `@composurecdk/apigateway@0.5.0` always works with `@composurecdk/core@0.5.0`.
+All packages share a single version number (fixed versioning). When any package changes, all are bumped together. This guarantees compatibility — `@composurecdk/apigateway@0.5.0` always works with `@composurecdk/core@0.5.0`.
 
-The `@composurecdk/examples` package is excluded from releases because it is `"private": true` — it exists for reference, not as an installable library.
+The `@composurecdk/examples` package is versioned alongside the rest so its internal peer-dependency ranges stay in sync, but `"private": true` in its `package.json` prevents `nx release publish` from pushing it to npm — it exists for reference, not as an installable library.
 
 Version bumps are determined automatically from conventional commit messages:
 
@@ -158,7 +158,7 @@ After that, the release workflow handles all future publishes automatically.
 
 ## Stack naming convention
 
-All example stacks use the `ComposureCDK-` prefix (e.g. `ComposureCDK-LambdaApiStack`, `ComposureCDK-MockApiStack`). This convention serves two purposes:
+All example stacks use the `ComposureCDK-` prefix (e.g. `ComposureCDK-MockApiStack`, `ComposureCDK-StaticWebsiteStack`). This convention serves two purposes:
 
 1. **IAM scoping** — The deploy-test IAM role restricts access to resources tagged with `aws:cloudformation:stack-name: ComposureCDK-*`. New examples are automatically covered by the policy as long as they follow the prefix.
 2. **Smoke test discovery** — The smoke test finds stacks by prefix rather than enumerating names, so new examples are tested without script changes.

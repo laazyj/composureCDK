@@ -40,10 +40,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
           cache: npm
@@ -57,42 +57,32 @@ jobs:
           NX_DAEMON: false
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Check for in-progress ComposureCDK stacks
+        run: |
+          in_progress=$(aws cloudformation list-stacks \
+            --stack-status-filter CREATE_IN_PROGRESS UPDATE_IN_PROGRESS DELETE_IN_PROGRESS UPDATE_ROLLBACK_IN_PROGRESS ROLLBACK_IN_PROGRESS REVIEW_IN_PROGRESS \
+            --query "StackSummaries[?starts_with(StackName, 'ComposureCDK-')].StackName" \
+            --output text)
+          if [ -n "$in_progress" ]; then
+            echo "::error::CloudFormation operations in progress on ComposureCDK-* stacks: $in_progress"
+            echo "Wait for sandbox-cleanup to complete or trigger it manually before retrying."
+            exit 1
+          fi
+
       - name: CDK Deploy
         working-directory: packages/examples
-        run: npx cdk deploy --all --require-approval never
+        run: npx cdk deploy --all --require-approval never --concurrency 5
 
       - name: Smoke Test
         working-directory: packages/examples
         run: node ../../scripts/smoke-test.mjs
 
-      - name: CDK Destroy
-        if: always()
-        working-directory: packages/examples
-        run: |
-          # Only destroy if AWS credentials were configured
-          if ! aws sts get-caller-identity > /dev/null 2>&1; then
-            echo "Skipping destroy — no AWS credentials available"
-            exit 0
-          fi
-
-          # Attempt destroy up to 3 times. A single stack failure (e.g.
-          # non-empty S3 bucket) causes CDK to abort before reaching the
-          # remaining stacks. Retrying gives CloudFormation a chance to
-          # finish async cleanup and proceed with the rest.
-          for attempt in 1 2 3; do
-            echo "=== Destroy attempt $attempt ==="
-            if npx cdk destroy --all --force 2>&1; then
-              echo "All stacks destroyed successfully."
-              exit 0
-            fi
-            echo "Attempt $attempt failed — retrying in 10s..."
-            sleep 10
-          done
-
-          echo "::warning::Some stacks could not be destroyed after 3 attempts. Check the AWS console for orphaned ComposureCDK-* stacks."
-          exit 1
+      # Destroy runs in a separate sandbox-cleanup workflow (triggered by
+      # workflow_run on this workflow plus a nightly cron safety net). Keeping
+      # destroy off the critical path lets developer feedback land in ~10 min
+      # instead of waiting for CloudFront propagation during teardown.

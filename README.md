@@ -73,6 +73,8 @@ If two components depend on each other, that is an architectural problem to be s
 | `@composurecdk/iam`        | IAM role and policy components                              |
 | `@composurecdk/apigateway` | API Gateway components                                      |
 | `@composurecdk/ec2`        | EC2 and VPC components                                      |
+| `@composurecdk/acm`        | ACM certificate components with DNS validation              |
+| `@composurecdk/route53`    | Route 53 hosted zones, records, and alias target helpers    |
 
 ## License
 

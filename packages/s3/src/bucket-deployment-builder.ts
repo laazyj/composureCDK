@@ -65,8 +65,8 @@ export type IBucketDeploymentBuilder = IBuilder<
 
 class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult> {
   props: Partial<BucketDeploymentBuilderProps> = {};
-  private _destinationBucket?: Resolvable<IBucket>;
-  private _distribution?: Resolvable<IDistribution>;
+  #destinationBucket?: Resolvable<IBucket>;
+  #distribution?: Resolvable<IDistribution>;
 
   /**
    * Sets the destination bucket for the deployment.
@@ -78,7 +78,7 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
    * @returns This builder for chaining.
    */
   destinationBucket(bucket: Resolvable<IBucket>): this {
-    this._destinationBucket = bucket;
+    this.#destinationBucket = bucket;
     return this;
   }
 
@@ -93,7 +93,7 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
    * @returns This builder for chaining.
    */
   distribution(distribution: Resolvable<IDistribution>): this {
-    this._distribution = distribution;
+    this.#distribution = distribution;
     return this;
   }
 
@@ -104,8 +104,8 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
   ): BucketDeploymentBuilderResult {
     const ctx = context ?? {};
 
-    const resolvedBucket = this._destinationBucket
-      ? resolve(this._destinationBucket, ctx)
+    const resolvedBucket = this.#destinationBucket
+      ? resolve(this.#destinationBucket, ctx)
       : undefined;
 
     if (!resolvedBucket) {
@@ -124,7 +124,7 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
       );
     }
 
-    const resolvedDistribution = this._distribution ? resolve(this._distribution, ctx) : undefined;
+    const resolvedDistribution = this.#distribution ? resolve(this.#distribution, ctx) : undefined;
 
     // Auto-create a managed LogGroup for the deployment's backing Lambda
     // unless the user supplied their own, matching the Lambda builder pattern.

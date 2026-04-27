@@ -2,7 +2,7 @@ import { Aspects, Stack } from "aws-cdk-lib";
 import { CfnAlarm, CfnCompositeAlarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IConstruct } from "constructs";
 import { type AlarmName, alarmName as brandAlarmName } from "../alarm-name.js";
-import type { AlarmMatchContext, AlarmMatcher } from "./alarm-actions-policy.js";
+import { type AlarmMatchContext, type AlarmRuleScope, ruleMatches } from "./policy-matcher.js";
 
 /** Context passed to {@link AlarmNameRule.transform}. */
 export interface AlarmNameTransformContext extends AlarmMatchContext {
@@ -23,9 +23,7 @@ export interface AlarmNameTransformContext extends AlarmMatchContext {
  *   when both are set on the same rule.
  * - Multiple matched rules layer in declaration order.
  */
-export interface AlarmNameRule {
-  /** Matcher(s). A rule matches when **any** supplied matcher matches. */
-  match: AlarmMatcher | AlarmMatcher[];
+export interface AlarmNameRule extends AlarmRuleScope {
   /** Prepended to the current name with the configured separator. */
   prefix?: string;
   /** Appended to the current name with the configured separator. */
@@ -34,10 +32,6 @@ export interface AlarmNameRule {
   transform?: (ctx: AlarmNameTransformContext) => AlarmName;
   /** When `true`, this rule's `prefix`/`suffix` replace `defaults` rather than layering on top. */
   replaceDefaults?: boolean;
-  /** Apply only to single (non-composite) alarms. */
-  singleOnly?: boolean;
-  /** Apply only to composite alarms. */
-  compositeOnly?: boolean;
 }
 
 /** Configuration for {@link alarmNamePolicy}. */
@@ -51,19 +45,6 @@ export interface AlarmNamePolicyConfig {
    * @default "-"
    */
   separator?: string;
-}
-
-function matchesOne(matcher: AlarmMatcher, ctx: AlarmMatchContext): boolean {
-  if (typeof matcher === "function") return matcher(ctx);
-  if (matcher instanceof RegExp) return matcher.test(ctx.path);
-  return ctx.id.includes(matcher) || ctx.path.includes(matcher);
-}
-
-function ruleMatches(rule: AlarmNameRule, ctx: AlarmMatchContext): boolean {
-  if (rule.singleOnly === true && ctx.isComposite) return false;
-  if (rule.compositeOnly === true && !ctx.isComposite) return false;
-  const matchers = Array.isArray(rule.match) ? rule.match : [rule.match];
-  return matchers.some((m) => matchesOne(m, ctx));
 }
 
 function decorate(

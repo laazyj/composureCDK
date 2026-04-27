@@ -1,3 +1,13 @@
+## 0.4.6 (2026-04-27)
+
+### 🚀 Features
+
+- **route53:** add health check builder with recommended alarm ([#59](https://github.com/laazyj/composureCDK/pull/59), [#58](https://github.com/laazyj/composureCDK/issues/58), [#45](https://github.com/laazyj/composureCDK/issues/45))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.4.5 (2026-04-25)
 
 ### 🚀 Features

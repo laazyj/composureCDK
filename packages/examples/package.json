@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/examples",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "Example applications exercising the ComposureCDK public API",
   "private": true,
   "scripts": {

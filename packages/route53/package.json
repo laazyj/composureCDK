@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/route53",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "Composable Route53 hosted zone and record builders with well-architected defaults",
   "repository": {
     "type": "git",

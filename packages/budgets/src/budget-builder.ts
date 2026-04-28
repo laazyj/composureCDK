@@ -1,10 +1,11 @@
 import { CfnBudget, type CfnBudgetProps } from "aws-cdk-lib/aws-budgets";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import type { TopicPolicy } from "aws-cdk-lib/aws-sns";
+import type { ITopic, TopicPolicy } from "aws-cdk-lib/aws-sns";
 import type { IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BudgetAlarmConfig } from "./alarm-config.js";
-import { createBudgetAlarms } from "./budget-alarms.js";
+import { buildBudgetAlarms } from "./budget-alarm-builder.js";
 import { BUDGET_DEFAULTS } from "./defaults.js";
 import {
   type BudgetSubscriber,
@@ -54,8 +55,22 @@ export interface BudgetBuilderProps {
   /** CloudFormation `CostTypes` passthrough. */
   costTypes?: CfnBudget.CostTypesProperty;
   /**
-   * Configuration for the opt-in billing alarm.
+   * Configuration for the AWS-recommended billing alarm.
+   *
+   * Off by default — pass an
+   * {@link BudgetAlarmConfig.estimatedCharges} entry to opt in. Set to
+   * `false` to suppress recommended alarms entirely; custom alarms added
+   * via {@link IBudgetBuilder.addAlarm} are unaffected.
+   *
+   * Note: `AWS/Billing EstimatedCharges` is emitted in `us-east-1` only.
+   * If this builder is used outside `us-east-1`, the synthesised alarm
+   * will never receive data — the builder emits a synth-time warning.
+   * For non-`us-east-1` stacks, suppress this builder's alarms with
+   * `recommendedAlarms: false` and create alarms in a `us-east-1` stack
+   * via {@link createBudgetAlarmBuilder}.
+   *
    * @see BudgetAlarmConfig
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html
    */
   recommendedAlarms?: BudgetAlarmConfig | false;
 }
@@ -76,9 +91,15 @@ export interface BudgetBuilderResult {
    */
   topicPolicies: Record<string, TopicPolicy>;
   /**
-   * CloudWatch alarms created for the budget (currently only the
-   * optional `estimatedCharges` billing alarm). Empty unless the caller
-   * opts in via `recommendedAlarms`.
+   * CloudWatch alarms created for the budget.
+   *
+   * Includes both AWS-recommended alarms (`estimatedCharges`, off by
+   * default) and any custom alarms added via
+   * {@link IBudgetBuilder.addAlarm}. Empty unless the caller opts in via
+   * `recommendedAlarms` or `addAlarm`.
+   *
+   * No alarm actions are configured — apply them via the result or an
+   * `afterBuild` hook.
    */
   alarms: Record<string, Alarm>;
 }
@@ -90,6 +111,11 @@ export interface BudgetBuilderResult {
  * for Budgets) with well-architected defaults, helpers for the
  * percentage-threshold notification shape, and automatic
  * `AWS::SNS::TopicPolicy` wiring for SNS subscribers.
+ *
+ * The builder can also create the AWS-recommended `EstimatedCharges`
+ * billing alarm; opt in via `recommendedAlarms`. For non-`us-east-1`
+ * stacks, route the alarms separately via
+ * {@link createBudgetAlarmBuilder}.
  *
  * @example
  * ```ts
@@ -105,7 +131,8 @@ export type IBudgetBuilder = IBuilder<BudgetBuilderProps, BudgetBuilder>;
 
 class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
   props: Partial<BudgetBuilderProps> = {};
-  private readonly _notifications: NotificationEntry[] = [];
+  readonly #notifications: NotificationEntry[] = [];
+  readonly #customAlarms: AlarmDefinitionBuilder<CfnBudget>[] = [];
 
   /**
    * Add a notification that fires when ACTUAL spend crosses the given
@@ -117,7 +144,7 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
    *   {@link Resolvable} refs to topics).
    */
   notifyOnActual(thresholdPercent: number, ...subscribers: BudgetSubscriber[]): this {
-    return this._addPercentageNotification("ACTUAL", thresholdPercent, subscribers);
+    return this.#addPercentageNotification("ACTUAL", thresholdPercent, subscribers);
   }
 
   /**
@@ -128,7 +155,7 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
    *   For absolute-value thresholds, use {@link addNotification} directly.
    */
   notifyOnForecasted(thresholdPercent: number, ...subscribers: BudgetSubscriber[]): this {
-    return this._addPercentageNotification("FORECASTED", thresholdPercent, subscribers);
+    return this.#addPercentageNotification("FORECASTED", thresholdPercent, subscribers);
   }
 
   /**
@@ -136,7 +163,7 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
    * CloudFormation surface (e.g. absolute-value thresholds).
    */
   addNotification(entry: NotificationEntry): this {
-    this._notifications.push(entry);
+    this.#notifications.push(entry);
     return this;
   }
 
@@ -158,10 +185,32 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
       );
     }
     const { actualPercent, forecastedPercent } = BUDGET_DEFAULTS.recommendedThresholds;
-    this._notifications.push(
+    this.#notifications.push(
       { notificationType: "ACTUAL", threshold: actualPercent, subscribers },
       { notificationType: "FORECASTED", threshold: forecastedPercent, subscribers },
     );
+    return this;
+  }
+
+  /**
+   * Adds a custom CloudWatch alarm against the budget. The configure
+   * callback receives a fresh {@link AlarmDefinitionBuilder} pre-set with
+   * the alarm's key; configure metric, threshold, comparison and any
+   * other options.
+   *
+   * Custom alarms are materialised in this builder's stack alongside any
+   * recommended alarms. Like the recommended `EstimatedCharges` alarm,
+   * custom alarms on `AWS/Billing` metrics will only fire when this
+   * stack is in `us-east-1` — the builder emits the same synth-time
+   * warning (`@composurecdk/budgets:alarm-region`) when used elsewhere.
+   * For non-`us-east-1` stacks, route alarms via
+   * {@link createBudgetAlarmBuilder} into a `us-east-1` stack.
+   */
+  addAlarm(
+    key: string,
+    configure: (alarm: AlarmDefinitionBuilder<CfnBudget>) => AlarmDefinitionBuilder<CfnBudget>,
+  ): this {
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<CfnBudget>(key)));
     return this;
   }
 
@@ -178,7 +227,7 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
       );
     }
 
-    const { notificationsWithSubscribers, snsTopics } = this._buildNotifications(context);
+    const { notificationsWithSubscribers, snsTopics } = this.#buildNotifications(context);
 
     const budgetData: CfnBudget.BudgetDataProperty = {
       budgetName: budgetProps.budgetName,
@@ -204,12 +253,20 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
     const budget = new CfnBudget(scope, id, cfnProps);
 
     const topicPolicies = createBudgetsTopicPolicies(scope, id, snsTopics);
-    const alarms = createBudgetAlarms(scope, id, alarmConfig);
+    const alarms = buildBudgetAlarms(
+      scope,
+      id,
+      { budget },
+      {
+        recommendedAlarms: alarmConfig,
+        customAlarms: this.#customAlarms,
+      },
+    );
 
     return { budget, topicPolicies, alarms };
   }
 
-  private _addPercentageNotification(
+  #addPercentageNotification(
     notificationType: NotificationType,
     thresholdPercent: number,
     subscribers: BudgetSubscriber[],
@@ -219,18 +276,18 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
         `BudgetBuilder: ${notificationType} notification at ${String(thresholdPercent)}% requires at least one subscriber.`,
       );
     }
-    this._notifications.push({ notificationType, threshold: thresholdPercent, subscribers });
+    this.#notifications.push({ notificationType, threshold: thresholdPercent, subscribers });
     return this;
   }
 
-  private _buildNotifications(context: Record<string, object>): {
+  #buildNotifications(context: Record<string, object>): {
     notificationsWithSubscribers: CfnBudget.NotificationWithSubscribersProperty[];
-    snsTopics: import("aws-cdk-lib/aws-sns").ITopic[];
+    snsTopics: ITopic[];
   } {
     const notificationsWithSubscribers: CfnBudget.NotificationWithSubscribersProperty[] = [];
-    const allSnsTopics: import("aws-cdk-lib/aws-sns").ITopic[] = [];
+    const allSnsTopics: ITopic[] = [];
 
-    for (const entry of this._notifications) {
+    for (const entry of this.#notifications) {
       const resolved = resolveSubscribers(entry.subscribers, context);
       notificationsWithSubscribers.push(toCfnNotificationWithSubscribers(entry, resolved.cfn));
       allSnsTopics.push(...resolved.snsTopics);

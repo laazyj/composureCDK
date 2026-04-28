@@ -79,10 +79,13 @@ The created `TopicPolicy` constructs are returned on `result.topicPolicies`, key
 
 ## Recommended Alarms
 
-AWS Budgets does not publish per-budget CloudWatch metrics, but the well-architected cost-monitoring pattern combines a budget with a CloudWatch alarm on `AWS/Billing EstimatedCharges`. The builder can create that alarm for you.
+AWS Budgets does not publish per-budget CloudWatch metrics, but the well-architected cost-monitoring pattern combines a budget with a CloudWatch alarm on `AWS/Billing EstimatedCharges`. The builder can create that alarm for you, but it is **off by default** — pass an `estimatedCharges` config to opt in.
 
-> [!IMPORTANT]
-> **The `EstimatedCharges` metric is only emitted in `us-east-1`.** The builder enforces this: opting into `estimatedCharges` throws at synth time unless the surrounding stack is pinned to `us-east-1`. Region-agnostic stacks (no `env.region` set) are rejected too — the region must be concrete so the check is meaningful. Either deploy the stack to `us-east-1` or omit `estimatedCharges`.
+| Alarm              | Metric                              | Default behaviour |
+| ------------------ | ----------------------------------- | ----------------- |
+| `estimatedCharges` | EstimatedCharges (Maximum, 6 hours) | off               |
+
+`treatMissingData` defaults to `notBreaching`: missing datapoints from a quiet account are not treated as a breach.
 
 ```ts
 const stack = new Stack(app, "BillingStack", { env: { region: "us-east-1" } });
@@ -95,7 +98,88 @@ createBudgetBuilder()
   .build(stack, "AccountBudget");
 ```
 
-The Budget itself is a global service and can be created from any region; only the alarm requires `us-east-1`. Off by default — callers opt in explicitly.
+The Budget itself is a global service and can be created from any region; only the alarm requires `us-east-1` (see below).
+
+### Customising thresholds
+
+```ts
+createBudgetBuilder()
+  .limit({ amount: 1000 })
+  .recommendedAlarms({
+    estimatedCharges: {
+      threshold: 1000,
+      currency: "USD",
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+    },
+  });
+```
+
+### Disabling alarms
+
+Disable the recommended alarm with `recommendedAlarms({ estimatedCharges: false })`, or disable all recommended alarms with `recommendedAlarms(false)`. Custom alarms attached via `addAlarm` are unaffected by either form.
+
+### Custom alarms
+
+```ts
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+
+createBudgetBuilder()
+  .limit({ amount: 1000 })
+  .addAlarm("ec2EstimatedCharges", (a) =>
+    a
+      .metric(
+        () =>
+          new Metric({
+            namespace: "AWS/Billing",
+            metricName: "EstimatedCharges",
+            dimensionsMap: { Currency: "USD", ServiceName: "AmazonEC2" },
+            statistic: "Maximum",
+          }),
+      )
+      .threshold(500)
+      .greaterThan()
+      .description("EC2 estimated charges exceeded $500."),
+  );
+```
+
+### Applying alarm actions
+
+No alarm actions are configured by default. Wire SNS or other actions via [`alarmActionsPolicy`](../cloudwatch/README.md#alarm-actions-policy) (or an `afterBuild` hook) — for cross-region deployments, the policy applied to the `us-east-1` monitoring stack covers both recommended and custom alarms.
+
+### Cross-region: `AWS/Billing EstimatedCharges` lives in `us-east-1` only
+
+The `AWS/Billing EstimatedCharges` metric is emitted in `us-east-1` only, regardless of where your budgets and resources live. CloudWatch alarms are regional, so an alarm in any other region will never receive data. The combined builder emits a synth-time warning (`@composurecdk/budgets:alarm-region`) when used outside `us-east-1`, but the better approach is to route the alarm into a `us-east-1` stack via `createBudgetAlarmBuilder` and `compose().withStacks()`:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createBudgetBuilder,
+  createBudgetAlarmBuilder,
+  type BudgetBuilderResult,
+} from "@composurecdk/budgets";
+
+compose(
+  {
+    account: createBudgetBuilder()
+      .budgetName("Account")
+      .limit({ amount: 1000 })
+      .recommendedAlarms(false), // suppress alarms in the budget's own stack
+
+    accountAlarms: createBudgetAlarmBuilder()
+      .budget(ref<BudgetBuilderResult>("account"))
+      .recommendedAlarms({ estimatedCharges: { threshold: 1000, currency: "USD" } }),
+  },
+  { account: [], accountAlarms: ["account"] },
+)
+  .withStacks({
+    account: appStack, //         any region — AWS::Budgets::Budget is global
+    accountAlarms: monitoringStack, // us-east-1 — where AWS/Billing metrics live
+  })
+  .build(app, "App");
+```
+
+If your custom `addAlarm` definitions reference the budget construct, set `crossRegionReferences: true` on both stacks so CDK can export the budget's properties from the app stack and import them in the alarm stack. The same pattern is documented for CloudFront and Route 53 alarms, and codified in [ADR-0004](../../docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md).
 
 ## Build Result
 

@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/core",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Composable CDK component system — lifecycle, dependency resolution, and builder pattern",
   "repository": {
     "type": "git",

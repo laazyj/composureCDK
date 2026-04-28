@@ -1,3 +1,13 @@
+## 0.4.7 (2026-04-28)
+
+### 🚀 Features
+
+- **cloudwatch:** explicit, readable alarm names with override seam ([#62](https://github.com/laazyj/composureCDK/pull/62))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.4.6 (2026-04-27)
 
 ### 🚀 Features

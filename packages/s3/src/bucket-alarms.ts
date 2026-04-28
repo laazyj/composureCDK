@@ -55,6 +55,7 @@ export function resolveBucketAlarmDefinitions(
       const cfg = resolveAlarmConfig(config?.serverErrors, BUCKET_ALARM_DEFAULTS.serverErrors);
       definitions.push({
         key: `serverErrors:${filterId}`,
+        alarmName: cfg.alarmName,
         metric: s3RequestMetric(bucket, filterId, "5xxErrors", Stats.SUM),
         threshold: cfg.threshold,
         comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -69,6 +70,7 @@ export function resolveBucketAlarmDefinitions(
       const cfg = resolveAlarmConfig(config?.clientErrors, BUCKET_ALARM_DEFAULTS.clientErrors);
       definitions.push({
         key: `clientErrors:${filterId}`,
+        alarmName: cfg.alarmName,
         metric: s3RequestMetric(bucket, filterId, "4xxErrors", Stats.SUM),
         threshold: cfg.threshold,
         comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,

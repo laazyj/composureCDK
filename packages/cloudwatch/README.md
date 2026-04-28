@@ -59,6 +59,57 @@ const alarms = createAlarms(scope, "MyFunction", definitions);
 
 Construct IDs follow the pattern `${id}${Capitalize(key)}Alarm` (e.g., `MyFunctionErrorsAlarm`).
 
+### Alarm names
+
+Each alarm receives an explicit, hierarchical name of the form `${stackName}/${kebab(id)}/${kebab(key)}` (e.g. `payments-prod/checkout-fn/errors`) instead of CloudFormation's hash-suffixed default. Slashes render hierarchy in the console; segments are kebab-cased so names scan cleanly in dashboards, oncall pages, and email subjects, where word separation matters more than in code.
+
+Per-alarm overrides go through [`alarmName()`][alarm-name-src] — a validating constructor for the branded [`AlarmName`][alarm-name-src] type — and cross-cutting decoration through [alarmNamePolicy](#alarmnamepolicy). The default fallback lives in [`defaultAlarmName`][default-alarm-name-src].
+
+[alarm-name-src]: ./src/alarm-name.ts
+[default-alarm-name-src]: ./src/default-alarm-name.ts
+
+## alarmNamePolicy
+
+A [Policy](../../docs/adr/0002-policies.md) that decorates CloudWatch alarm names across an entire scope. Mirrors the shape of `alarmActionsPolicy` — install it once on an `App` or `Stack` and it applies to every alarm the subtree produces, including alarms created later by builders or nested composed systems.
+
+```ts
+import { alarmNamePolicy } from "@composurecdk/cloudwatch";
+
+alarmNamePolicy(app, {
+  defaults: { prefix: "prod" },
+  rules: [
+    { match: /Errors$/, suffix: "critical" },
+    { match: "throttles", suffix: "warning" },
+    { match: (ctx) => ctx.path.includes("payments"), prefix: "payments" },
+  ],
+});
+```
+
+For each alarm the policy reads the existing name (from `defaultAlarmName` or a per-alarm override), applies `defaults.prefix` / `defaults.suffix`, then layers each matching rule in declaration order. The result is validated via `alarmName()` and written back to the CFN resource.
+
+Rules support `prefix`, `suffix`, and `transform`. `transform` produces a new name from scratch and wins over `prefix`/`suffix` on the same rule. `replaceDefaults: true` on a matched rule suppresses the `defaults` decoration for that alarm.
+
+```ts
+alarmNamePolicy(app, {
+  defaults: { prefix: "prod" },
+  rules: [
+    { match: "team-x", prefix: "team-x", replaceDefaults: true },
+    {
+      match: /payments/,
+      transform: (ctx) => alarmName(`payments/${ctx.id}`),
+    },
+  ],
+});
+```
+
+Matchers use the same shape as `alarmActionsPolicy`: substring (tested against both `id` and `path`), `RegExp` (tested against `path`), or a predicate receiving the full match context. `singleOnly` / `compositeOnly` scope rules to one alarm kind.
+
+The separator between `prefix` / current-name / `suffix` segments defaults to `-`; pass `separator` to override.
+
+### Limitation: L1 reads only
+
+The policy reads `cfn.alarmName` and writes the decorated value back. If a name is set as an unresolved CDK token that doesn't resolve to a string at synth time, the alarm is skipped and the original name is left in place. In practice every alarm produced by ComposureCDK builders (and aws-cdk-lib's L2 `Alarm`) sets a resolvable string, so this is rare.
+
 ## alarmActionsPolicy
 
 A [Policy](../../docs/adr/0002-policies.md) that routes CloudWatch alarm actions (e.g. SNS notifications) to every `Alarm` and `CompositeAlarm` in a construct subtree. Install it once on an `App` or `Stack` and it applies to every alarm the subtree produces — including alarms created later by builders or nested composed systems.

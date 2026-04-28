@@ -21,6 +21,12 @@ export type PercentageAlarmConfig = Omit<AlarmConfig, "threshold"> & {
 };
 
 /**
+ * Type for percentage-based defaults. Mirrors {@link AlarmConfigDefaults}:
+ * every tunable field is required, but `alarmName` is intentionally not.
+ */
+export type PercentageAlarmConfigDefaults = Required<Omit<PercentageAlarmConfig, "alarmName">>;
+
+/**
  * Controls which recommended alarms are created for a Lambda function.
  * All alarms are enabled by default with AWS-recommended thresholds.
  * Set individual alarms to `false` to disable them, or provide an

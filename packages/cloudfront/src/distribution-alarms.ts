@@ -46,6 +46,7 @@ export function resolveDistributionAlarmDefinitions(
     const cfg = resolveAlarmConfig(config?.errorRate, DISTRIBUTION_ALARM_DEFAULTS.errorRate);
     definitions.push({
       key: "errorRate",
+      alarmName: cfg.alarmName,
       metric: distributionMetric(distribution, "5xxErrorRate", Stats.AVERAGE),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -63,6 +64,7 @@ export function resolveDistributionAlarmDefinitions(
     );
     definitions.push({
       key: "originLatency",
+      alarmName: cfg.alarmName,
       metric: distributionMetric(distribution, "OriginLatency", Stats.percentile(90)),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,

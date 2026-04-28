@@ -1,17 +1,17 @@
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import type { AlarmConfig } from "@composurecdk/cloudwatch";
+import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
 
 interface DistributionAlarmDefaults {
   enabled: true;
-  errorRate: Required<AlarmConfig>;
-  originLatency: Required<AlarmConfig>;
+  errorRate: AlarmConfigDefaults;
+  originLatency: AlarmConfigDefaults;
 }
 
 interface FunctionAlarmDefaults {
   enabled: true;
-  executionErrors: Required<AlarmConfig>;
-  validationErrors: Required<AlarmConfig>;
-  throttles: Required<AlarmConfig>;
+  executionErrors: AlarmConfigDefaults;
+  validationErrors: AlarmConfigDefaults;
+  throttles: AlarmConfigDefaults;
 }
 
 /**

@@ -223,6 +223,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/alerts/number-of-notifications-failed",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -254,6 +255,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/alerts/number-of-notifications-failed-to-redrive-to-dlq",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -285,6 +287,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/alerts/number-of-notifications-filtered-out-invalid-attributes",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -316,6 +319,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/alerts/number-of-notifications-redriven-to-dlq",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -452,6 +456,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "CloudFront Function on behavior "/api/*" (viewer-request) is raising execution errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/cdn/behavior-api-slash-star-viewer-request-execution-errors",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -520,6 +525,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "CloudFront Function on behavior "/api/*" (viewer-request) is being throttled — likely exceeding its 1ms compute budget. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/cdn/behavior-api-slash-star-viewer-request-throttles",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -560,6 +566,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "CloudFront Function on behavior "/api/*" (viewer-request) is producing validation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/cdn/behavior-api-slash-star-viewer-request-validation-errors",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -707,6 +714,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "CloudFront Function on default behavior (viewer-response) is raising execution errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/cdn/default-behavior-viewer-response-execution-errors",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -775,6 +783,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "CloudFront Function on default behavior (viewer-response) is being throttled — likely exceeding its 1ms compute budget. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/cdn/default-behavior-viewer-response-throttles",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -815,6 +824,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "CloudFront Function on default behavior (viewer-response) is producing validation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/cdn/default-behavior-viewer-response-validation-errors",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -855,6 +865,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "CloudFront distribution 5xx error rate is elevated. Threshold: > 2% in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/cdn/error-rate",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,
         "Dimensions": [
@@ -902,6 +913,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "CloudFront origin latency is elevated. Threshold: > 5000ms p90 in 1 minute.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/cdn/origin-latency",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,
         "Dimensions": [
@@ -1104,6 +1116,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "S3 bucket is returning client-side errors (filter: EntireBucket). Threshold: > 50 4xx errors in 5 minutes.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/site/client-errors:entire-bucket",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -1227,6 +1240,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "AlarmDescription": "S3 bucket is returning server-side errors (filter: EntireBucket). Threshold: > 0 5xx errors in 5 minutes.",
+        "AlarmName": "composure-cdk-static-website-stack/static-website/site/server-errors:entire-bucket",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [

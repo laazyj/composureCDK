@@ -1,11 +1,11 @@
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import type { AlarmConfig } from "@composurecdk/cloudwatch";
+import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
 
 interface RestApiAlarmDefaults {
   enabled: true;
-  clientError: Required<AlarmConfig>;
-  serverError: Required<AlarmConfig>;
-  latency: Required<AlarmConfig>;
+  clientError: AlarmConfigDefaults;
+  serverError: AlarmConfigDefaults;
+  latency: AlarmConfigDefaults;
 }
 
 /**

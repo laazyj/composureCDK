@@ -29,6 +29,7 @@ export function resolveTopicAlarmDefinitions(
     );
     definitions.push({
       key: "numberOfNotificationsFailed",
+      alarmName: cfg.alarmName,
       metric: topic.metricNumberOfNotificationsFailed({ period: METRIC_PERIOD }),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -46,6 +47,7 @@ export function resolveTopicAlarmDefinitions(
     );
     definitions.push({
       key: "numberOfNotificationsFilteredOutInvalidAttributes",
+      alarmName: cfg.alarmName,
       metric: topic.metricNumberOfNotificationsFilteredOutInvalidAttributes({
         period: METRIC_PERIOD,
       }),
@@ -65,6 +67,7 @@ export function resolveTopicAlarmDefinitions(
     );
     definitions.push({
       key: "numberOfNotificationsRedrivenToDlq",
+      alarmName: cfg.alarmName,
       metric: topic.metric("NumberOfNotificationsRedrivenToDlq", {
         period: METRIC_PERIOD,
         statistic: "Sum",
@@ -85,6 +88,7 @@ export function resolveTopicAlarmDefinitions(
     );
     definitions.push({
       key: "numberOfNotificationsFailedToRedriveToDlq",
+      alarmName: cfg.alarmName,
       metric: topic.metric("NumberOfNotificationsFailedToRedriveToDlq", {
         period: METRIC_PERIOD,
         statistic: "Sum",

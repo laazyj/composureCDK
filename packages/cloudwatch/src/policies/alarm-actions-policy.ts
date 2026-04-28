@@ -6,29 +6,10 @@ import {
   type IAlarmAction,
 } from "aws-cdk-lib/aws-cloudwatch";
 import { type IConstruct } from "constructs";
+import { type AlarmRuleScope, ruleMatches } from "./policy-matcher.js";
+import type { AlarmMatchContext } from "./policy-matcher.js";
 
-/**
- * Selects which alarms a rule applies to.
- *
- * - `string` — substring match against the alarm's `id` OR `path`.
- * - `RegExp` — tested against `path`.
- * - predicate — receives the full {@link AlarmMatchContext}.
- */
-export type AlarmMatcher = string | RegExp | ((ctx: AlarmMatchContext) => boolean);
-
-/**
- * Context passed to matcher predicates and derived for every visited alarm.
- *
- * `id` and `path` come from the L2 alarm when one is present, otherwise from
- * the L1 `CfnAlarm` / `CfnCompositeAlarm`.
- */
-export interface AlarmMatchContext {
-  readonly alarm: IAlarm | undefined;
-  readonly cfn: CfnAlarm | CfnCompositeAlarm;
-  readonly id: string;
-  readonly path: string;
-  readonly isComposite: boolean;
-}
+export type { AlarmMatchContext, AlarmMatcher } from "./policy-matcher.js";
 
 /** A set of actions, one array per alarm state. All arrays are optional. */
 export interface AlarmActionSet {
@@ -38,15 +19,9 @@ export interface AlarmActionSet {
 }
 
 /** A rule: a matcher (or matchers) plus an action set, with optional scoping flags. */
-export interface AlarmActionRule extends AlarmActionSet {
-  /** Matcher(s). A rule matches when **any** supplied matcher matches. */
-  match: AlarmMatcher | AlarmMatcher[];
+export interface AlarmActionRule extends AlarmActionSet, AlarmRuleScope {
   /** When this rule matches, suppress `defaults` for the alarm. */
   replaceDefaults?: boolean;
-  /** Apply only to single (non-composite) alarms. */
-  singleOnly?: boolean;
-  /** Apply only to composite alarms. */
-  compositeOnly?: boolean;
 }
 
 /** Configuration for {@link alarmActionsPolicy}. */
@@ -84,19 +59,6 @@ function isAlreadyConfigured(cfn: CfnAlarm | CfnCompositeAlarm): boolean {
   if (resolved === undefined || resolved === null) return false;
   if (Array.isArray(resolved)) return resolved.length > 0;
   return true;
-}
-
-function matchesOne(matcher: AlarmMatcher, ctx: AlarmMatchContext): boolean {
-  if (typeof matcher === "function") return matcher(ctx);
-  if (matcher instanceof RegExp) return matcher.test(ctx.path);
-  return ctx.id.includes(matcher) || ctx.path.includes(matcher);
-}
-
-function ruleMatches(rule: AlarmActionRule, ctx: AlarmMatchContext): boolean {
-  if (rule.singleOnly === true && ctx.isComposite) return false;
-  if (rule.compositeOnly === true && !ctx.isComposite) return false;
-  const matchers = Array.isArray(rule.match) ? rule.match : [rule.match];
-  return matchers.some((m) => matchesOne(m, ctx));
 }
 
 function dedupe<T>(items: readonly T[]): T[] {

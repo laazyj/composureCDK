@@ -66,6 +66,7 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
     "MultiStackAppapiClientErrorAlarmEB102EFC": {
       "Properties": {
         "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "AlarmName": "composure-cdk-multi-stack-api-stack/multi-stack-app/api/client-error",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,
         "Dimensions": [
@@ -293,6 +294,7 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
     "MultiStackAppapiLatencyAlarm8D8FBA0C": {
       "Properties": {
         "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
+        "AlarmName": "composure-cdk-multi-stack-api-stack/multi-stack-app/api/latency",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 5,
         "Dimensions": [
@@ -320,6 +322,7 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
     "MultiStackAppapiServerErrorAlarm04133ED9": {
       "Properties": {
         "AlarmDescription": "REST API server error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "AlarmName": "composure-cdk-multi-stack-api-stack/multi-stack-app/api/server-error",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 3,
         "Dimensions": [
@@ -433,6 +436,7 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
     "MultiStackApphandlerDurationAlarm94B3212A": {
       "Properties": {
         "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 27000ms (90% of 30000ms timeout).",
+        "AlarmName": "composure-cdk-multi-stack-service-stack/multi-stack-app/handler/duration",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 3,
         "Dimensions": [
@@ -456,6 +460,7 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
     "MultiStackApphandlerErrorsAlarm7A72223A": {
       "Properties": {
         "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-multi-stack-service-stack/multi-stack-app/handler/errors",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -542,6 +547,7 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
     "MultiStackApphandlerThrottlesAlarm959649F7": {
       "Properties": {
         "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-multi-stack-service-stack/multi-stack-app/handler/throttles",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [

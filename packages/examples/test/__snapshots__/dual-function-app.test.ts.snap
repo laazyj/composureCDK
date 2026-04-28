@@ -24,6 +24,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/alerts/number-of-notifications-failed",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -55,6 +56,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/alerts/number-of-notifications-failed-to-redrive-to-dlq",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -86,6 +88,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/alerts/number-of-notifications-filtered-out-invalid-attributes",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -117,6 +120,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/alerts/number-of-notifications-redriven-to-dlq",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -209,6 +213,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 27000ms (90% of 30000ms timeout).",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/api/duration",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 3,
         "Dimensions": [
@@ -237,6 +242,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/api/errors",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -265,6 +271,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "API receiving unusually high traffic. Threshold: >= 1000 invocations per minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/api/high-invocations",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -356,6 +363,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/api/throttles",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [
@@ -417,6 +425,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "Lambda function concurrent executions approaching reserved concurrency limit. Threshold: >= 40 (80% of 50 reserved).",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker/concurrent-executions",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "DatapointsToAlarm": 3,
         "Dimensions": [
@@ -445,6 +454,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 270000ms (90% of 300000ms timeout).",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker/duration",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 3,
         "Dimensions": [
@@ -473,6 +483,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 5 errors in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker/errors",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 2,
         "Dimensions": [
@@ -564,6 +575,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
           },
         ],
         "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker/throttles",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
         "Dimensions": [

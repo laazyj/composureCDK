@@ -7,9 +7,13 @@ import {
 } from "aws-cdk-lib/aws-cloudwatch";
 import type { Function as LambdaFunction, FunctionProps } from "aws-cdk-lib/aws-lambda";
 import type { IConstruct } from "constructs";
-import type { AlarmDefinition } from "@composurecdk/cloudwatch";
+import type { AlarmDefinition, AlarmName } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
-import type { FunctionAlarmConfig, PercentageAlarmConfig } from "./alarm-config.js";
+import type {
+  FunctionAlarmConfig,
+  PercentageAlarmConfig,
+  PercentageAlarmConfigDefaults,
+} from "./alarm-config.js";
 import { FUNCTION_ALARM_DEFAULTS } from "./alarm-defaults.js";
 
 const METRIC_PERIOD = Duration.minutes(1);
@@ -33,6 +37,7 @@ export function resolveFunctionAlarmDefinitions(
     const cfg = resolveAlarmConfig(config?.errors, FUNCTION_ALARM_DEFAULTS.errors);
     definitions.push({
       key: "errors",
+      alarmName: cfg.alarmName,
       metric: fn.metricErrors({ period: METRIC_PERIOD }),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -47,6 +52,7 @@ export function resolveFunctionAlarmDefinitions(
     const cfg = resolveAlarmConfig(config?.throttles, FUNCTION_ALARM_DEFAULTS.throttles);
     definitions.push({
       key: "throttles",
+      alarmName: cfg.alarmName,
       metric: fn.metricThrottles({ period: METRIC_PERIOD }),
       threshold: cfg.threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -63,6 +69,7 @@ export function resolveFunctionAlarmDefinitions(
     const threshold = Math.round(timeoutMs * cfg.thresholdPercent);
     definitions.push({
       key: "duration",
+      alarmName: cfg.alarmName,
       metric: fn.metricDuration({ period: METRIC_PERIOD, statistic: Stats.percentile(99) }),
       threshold,
       comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
@@ -82,6 +89,7 @@ export function resolveFunctionAlarmDefinitions(
     const threshold = Math.round(reservedConcurrency * cfg.thresholdPercent);
     definitions.push({
       key: "concurrentExecutions",
+      alarmName: cfg.alarmName,
       metric: fn.metric("ConcurrentExecutions", {
         period: METRIC_PERIOD,
         statistic: Stats.MAXIMUM,
@@ -132,6 +140,7 @@ export function createFunctionAlarms(
 }
 
 interface ResolvedPercentageAlarmConfig {
+  alarmName?: AlarmName;
   thresholdPercent: number;
   evaluationPeriods: number;
   datapointsToAlarm: number;
@@ -144,7 +153,7 @@ interface ResolvedPercentageAlarmConfig {
  */
 function resolvePercentageAlarmConfig(
   userConfig: PercentageAlarmConfig | undefined,
-  defaults: Required<PercentageAlarmConfig>,
+  defaults: PercentageAlarmConfigDefaults,
 ): ResolvedPercentageAlarmConfig {
   const thresholdPercent = userConfig?.thresholdPercent ?? defaults.thresholdPercent;
 
@@ -155,6 +164,7 @@ function resolvePercentageAlarmConfig(
   }
 
   return {
+    alarmName: userConfig?.alarmName,
     thresholdPercent,
     evaluationPeriods: userConfig?.evaluationPeriods ?? defaults.evaluationPeriods,
     datapointsToAlarm: userConfig?.datapointsToAlarm ?? defaults.datapointsToAlarm,

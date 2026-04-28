@@ -1,13 +1,13 @@
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import type { AlarmConfig } from "@composurecdk/cloudwatch";
-import type { PercentageAlarmConfig } from "./alarm-config.js";
+import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
+import type { PercentageAlarmConfigDefaults } from "./alarm-config.js";
 
 interface FunctionAlarmDefaults {
   enabled: true;
-  errors: Required<AlarmConfig>;
-  throttles: Required<AlarmConfig>;
-  duration: Required<PercentageAlarmConfig>;
-  concurrentExecutions: Required<PercentageAlarmConfig>;
+  errors: AlarmConfigDefaults;
+  throttles: AlarmConfigDefaults;
+  duration: PercentageAlarmConfigDefaults;
+  concurrentExecutions: PercentageAlarmConfigDefaults;
 }
 
 /**

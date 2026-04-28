@@ -48,9 +48,6 @@ export function joinAlarmName(segments: readonly string[], sep = "/"): AlarmName
 /**
  * Lower-cases and hyphenates a string: splits camelCase / PascalCase /
  * snake_case / dotted boundaries into hyphen-separated lowercase words.
- *
- * Exported so consumers can compose names with the same convention used
- * by {@link defaultAlarmName}.
  */
 export function kebab(input: string): string {
   return input

@@ -1,3 +1,13 @@
+## 0.4.8 (2026-04-29)
+
+### 🚀 Features
+
+- **budgets:** add BudgetBuilder with recommended thresholds and alarms ([#40](https://github.com/laazyj/composureCDK/pull/40))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.4.7 (2026-04-28)
 
 ### 🚀 Features

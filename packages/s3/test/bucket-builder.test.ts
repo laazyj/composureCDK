@@ -171,6 +171,53 @@ describe("BucketBuilder", () => {
       // When versioned is false, CDK does not emit VersioningConfiguration
       template.hasResourceProperties("AWS::S3::Bucket", {});
     });
+
+    it("aborts incomplete multipart uploads after 7 days by default", () => {
+      const template = synthTemplate((b) => withoutLogging(b));
+
+      template.hasResourceProperties("AWS::S3::Bucket", {
+        LifecycleConfiguration: {
+          Rules: Match.arrayWith([
+            Match.objectLike({
+              Status: "Enabled",
+              AbortIncompleteMultipartUpload: { DaysAfterInitiation: 7 },
+            }),
+          ]),
+        },
+      });
+    });
+
+    it("expires noncurrent object versions after 365 days by default", () => {
+      const template = synthTemplate((b) => withoutLogging(b));
+
+      template.hasResourceProperties("AWS::S3::Bucket", {
+        LifecycleConfiguration: {
+          Rules: Match.arrayWith([
+            Match.objectLike({
+              Status: "Enabled",
+              NoncurrentVersionExpiration: { NoncurrentDays: 365 },
+            }),
+          ]),
+        },
+      });
+    });
+
+    it("allows the user to replace the default lifecycle rules", () => {
+      const template = synthTemplate((b) =>
+        withoutLogging(b).lifecycleRules([{ id: "CustomExpire", expiration: Duration.days(30) }]),
+      );
+
+      template.hasResourceProperties("AWS::S3::Bucket", {
+        LifecycleConfiguration: {
+          Rules: [
+            Match.objectLike({
+              Id: "CustomExpire",
+              ExpirationInDays: 30,
+            }),
+          ],
+        },
+      });
+    });
   });
 
   describe("access logging", () => {
@@ -270,6 +317,32 @@ describe("BucketBuilder", () => {
         RestrictPublicBuckets: true,
       });
       expect(logBucket.DeletionPolicy).toBe("Retain");
+    });
+
+    it("expires access log objects after 2 years on the auto-created logging bucket", () => {
+      const template = synthTemplate((b) => b.bucketName("main"));
+
+      const buckets = template.findResources("AWS::S3::Bucket", {
+        Properties: {
+          LoggingConfiguration: Match.absent(),
+        },
+      });
+      const logBucket = Object.values(buckets)[0] as {
+        Properties: { LifecycleConfiguration?: { Rules: Record<string, unknown>[] } };
+      };
+      const rules = logBucket.Properties.LifecycleConfiguration?.Rules ?? [];
+
+      const expirationRule = rules.find((r) => r.ExpirationInDays !== undefined);
+      expect(expirationRule).toBeDefined();
+      expect(expirationRule?.ExpirationInDays).toBe(731);
+
+      const abortRule = rules.find((r) => r.AbortIncompleteMultipartUpload !== undefined);
+      expect(abortRule).toBeDefined();
+      expect(abortRule?.AbortIncompleteMultipartUpload).toEqual({ DaysAfterInitiation: 7 });
+
+      // Logging bucket is not versioned, so the noncurrent-version rule should not apply.
+      const noncurrentRule = rules.find((r) => r.NoncurrentVersionExpiration !== undefined);
+      expect(noncurrentRule).toBeUndefined();
     });
   });
 

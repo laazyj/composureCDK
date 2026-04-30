@@ -23,7 +23,11 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import { createBucketBuilder, type IBucketBuilder } from "@composurecdk/s3";
+import {
+  DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES,
+  createBucketBuilder,
+  type IBucketBuilder,
+} from "@composurecdk/s3";
 import type { DistributionAlarmConfig, FunctionAlarmConfig } from "./alarm-config.js";
 import { DISTRIBUTION_DEFAULTS } from "./defaults.js";
 import { resolveBehaviors } from "./resolve-behaviors.js";
@@ -555,7 +559,8 @@ function resolveAccessLogs(
     .versioned(false)
     // CloudFront standard logging writes via ACLs, which requires BucketOwnerPreferred.
     .objectOwnership(ObjectOwnership.BUCKET_OWNER_PREFERRED)
-    .removalPolicy(RemovalPolicy.RETAIN);
+    .removalPolicy(RemovalPolicy.RETAIN)
+    .lifecycleRules(DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES);
   if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }

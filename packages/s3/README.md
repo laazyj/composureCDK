@@ -18,14 +18,15 @@ Every [BucketProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_
 
 `createBucketBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
 
-| Property            | Default               | Rationale                                                                                     |
-| ------------------- | --------------------- | --------------------------------------------------------------------------------------------- |
-| `serverAccessLogs`  | `{ prefix: "logs/" }` | Auto-creates a logging bucket for the server access log audit trail under the `logs/` prefix. |
-| `blockPublicAccess` | `BLOCK_ALL`           | Prevents public access unless explicitly required.                                            |
-| `encryption`        | `S3_MANAGED`          | Enables server-side encryption with S3-managed keys (SSE-S3).                                 |
-| `enforceSSL`        | `true`                | Requires SSL/TLS for all requests to the bucket.                                              |
-| `versioned`         | `true`                | Protects against accidental deletions and supports rollback.                                  |
-| `removalPolicy`     | `RETAIN`              | Retains the bucket on stack deletion to prevent data loss.                                    |
+| Property            | Default                          | Rationale                                                                                             |
+| ------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `serverAccessLogs`  | `{ prefix: "logs/" }`            | Auto-creates a logging bucket for the server access log audit trail under the `logs/` prefix.         |
+| `blockPublicAccess` | `BLOCK_ALL`                      | Prevents public access unless explicitly required.                                                    |
+| `encryption`        | `S3_MANAGED`                     | Enables server-side encryption with S3-managed keys (SSE-S3).                                         |
+| `enforceSSL`        | `true`                           | Requires SSL/TLS for all requests to the bucket.                                                      |
+| `versioned`         | `true`                           | Protects against accidental deletions and supports rollback.                                          |
+| `removalPolicy`     | `RETAIN`                         | Retains the bucket on stack deletion to prevent data loss.                                            |
+| `lifecycleRules`    | `DEFAULT_BUCKET_LIFECYCLE_RULES` | Aborts incomplete multipart uploads after 7 days and expires noncurrent object versions after 1 year. |
 
 These defaults are guided by the [AWS Well-Architected Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-at-rest.html).
 

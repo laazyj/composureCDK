@@ -113,6 +113,8 @@ createDistributionBuilder()
 
 The config object replaces the default wholesale rather than merging with it. For example, `.accessLogs({ includeCookies: true })` does **not** preserve the default `prefix: "logs/"` — restate any default you want to keep.
 
+The auto-created logging bucket uses `DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES` from `@composurecdk/s3`: incomplete multipart uploads are aborted after 7 days and access log objects expire after 2 years (matching the default `LogGroup` retention so the audit window is consistent across log destinations). CloudFront never deletes its own logs, so this lifecycle is the only thing that bounds the bucket's growth.
+
 ## Recommended Alarms
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

@@ -5,7 +5,11 @@ export {
   type IBucketBuilder,
   type ServerAccessLogsConfig,
 } from "./bucket-builder.js";
-export { BUCKET_DEFAULTS } from "./defaults.js";
+export {
+  BUCKET_DEFAULTS,
+  DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES,
+  DEFAULT_BUCKET_LIFECYCLE_RULES,
+} from "./defaults.js";
 export { type BucketAlarmConfig } from "./alarm-config.js";
 export { BUCKET_ALARM_DEFAULTS } from "./alarm-defaults.js";
 export {

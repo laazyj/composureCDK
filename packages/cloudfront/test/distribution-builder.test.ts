@@ -208,6 +208,31 @@ describe("DistributionBuilder", () => {
       });
     });
 
+    it("expires access log objects after 2 years on the auto-created logging bucket", () => {
+      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+
+      template.hasResourceProperties("AWS::S3::Bucket", {
+        LifecycleConfiguration: {
+          Rules: Match.arrayWith([
+            Match.objectLike({
+              Status: "Enabled",
+              ExpirationInDays: 731,
+            }),
+          ]),
+        },
+      });
+      template.hasResourceProperties("AWS::S3::Bucket", {
+        LifecycleConfiguration: {
+          Rules: Match.arrayWith([
+            Match.objectLike({
+              Status: "Enabled",
+              AbortIncompleteMultipartUpload: { DaysAfterInitiation: 7 },
+            }),
+          ]),
+        },
+      });
+    });
+
     it("returns the access logs bucket in the build result", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");

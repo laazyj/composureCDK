@@ -384,6 +384,22 @@ exports[`static-website-app > stack > matches the expected synthesised template 
             },
           ],
         },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7,
+              },
+              "Id": "AbortIncompleteMultipartUploadAfter7Days",
+              "Status": "Enabled",
+            },
+            {
+              "ExpirationInDays": 731,
+              "Id": "ExpireAccessLogsAfter2Years",
+              "Status": "Enabled",
+            },
+          ],
+        },
         "OwnershipControls": {
           "Rules": [
             {
@@ -1005,6 +1021,24 @@ exports[`static-website-app > stack > matches the expected synthesised template 
             },
           ],
         },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7,
+              },
+              "Id": "AbortIncompleteMultipartUploadAfter7Days",
+              "Status": "Enabled",
+            },
+            {
+              "Id": "ExpireNoncurrentVersionsAfter365Days",
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 365,
+              },
+              "Status": "Enabled",
+            },
+          ],
+        },
         "LoggingConfiguration": {
           "DestinationBucketName": {
             "Ref": "StaticWebsitesiteAccessLogsC30B6C68",
@@ -1042,6 +1076,22 @@ exports[`static-website-app > stack > matches the expected synthesised template 
               "ServerSideEncryptionByDefault": {
                 "SSEAlgorithm": "AES256",
               },
+            },
+          ],
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7,
+              },
+              "Id": "AbortIncompleteMultipartUploadAfter7Days",
+              "Status": "Enabled",
+            },
+            {
+              "ExpirationInDays": 731,
+              "Id": "ExpireAccessLogsAfter2Years",
+              "Status": "Enabled",
             },
           ],
         },

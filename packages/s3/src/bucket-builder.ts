@@ -6,7 +6,7 @@ import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BucketAlarmConfig } from "./alarm-config.js";
 import { createBucketAlarms } from "./bucket-alarms.js";
-import { BUCKET_DEFAULTS } from "./defaults.js";
+import { DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES, BUCKET_DEFAULTS } from "./defaults.js";
 
 /**
  * Configures how server access logs are handled. Pass `false` to disable
@@ -179,7 +179,8 @@ function resolveAccessLogs(
   let subBuilder = createBucketBuilder()
     .serverAccessLogs(false)
     .versioned(false)
-    .removalPolicy(RemovalPolicy.RETAIN);
+    .removalPolicy(RemovalPolicy.RETAIN)
+    .lifecycleRules(DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES);
   if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }

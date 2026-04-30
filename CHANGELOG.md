@@ -1,3 +1,43 @@
+## 0.5.0 (2026-04-30)
+
+### 🚀 Features
+
+- ⚠️ **cloudfront:** collapse access-log props into accessLogs config ([#63](https://github.com/laazyj/composureCDK/pull/63))
+- ⚠️ **s3:** collapse access-log props into serverAccessLogs config ([7d01550](https://github.com/laazyj/composureCDK/commit/7d01550))
+- ⚠️ **s3,cloudfront:** add default bucket lifecycle rules ([e82dff0](https://github.com/laazyj/composureCDK/commit/e82dff0))
+
+### ⚠️ Breaking Changes
+
+- **s3,cloudfront:** add default bucket lifecycle rules ([e82dff0](https://github.com/laazyj/composureCDK/commit/e82dff0))
+  buckets created with createBucketBuilder now have
+  LifecycleConfiguration applied by default. Consumers upgrading with
+  existing versioned buckets will start expiring noncurrent versions
+  older than 365 days on the next lifecycle pass; pass an explicit
+  .lifecycleRules([...]) to opt out or supply different rules.
+- **cloudfront:** collapse access-log props into accessLogs config ([#63](https://github.com/laazyj/composureCDK/pull/63))
+  DistributionBuilder no longer accepts accessLogging,
+  logBucket, logFilePrefix, or logIncludesCookies. Migration:
+  .accessLogging(true) -> (remove; default)
+  .accessLogging(false) -> .accessLogs(false)
+  .logBucket(b) -> .accessLogs({ destination: b })
+  .logBucket(b).logFilePrefix("x/") -> .accessLogs({ destination: b, prefix: "x/" })
+  .logFilePrefix("x/") -> .accessLogs({ prefix: "x/" })
+  .logIncludesCookies(true) -> .accessLogs({ includeCookies: true })
+- **s3:** collapse access-log props into serverAccessLogs config ([7d01550](https://github.com/laazyj/composureCDK/commit/7d01550))
+  BucketBuilder no longer accepts accessLogging,
+  accessLogsPrefix, serverAccessLogsBucket, or serverAccessLogsPrefix.
+  Migration:
+  .accessLogging(false) -> .serverAccessLogs(false)
+  .accessLogging(true) -> (remove; default)
+  .accessLogsPrefix("x/") -> .serverAccessLogs({ prefix: "x/" })
+  .serverAccessLogsBucket(b) -> .serverAccessLogs({ destination: b })
+  .serverAccessLogsBucket(b)
+  .serverAccessLogsPrefix("x/") -> .serverAccessLogs({ destination: b, prefix: "x/" })
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.4.8 (2026-04-29)
 
 ### 🚀 Features

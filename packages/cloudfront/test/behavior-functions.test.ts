@@ -41,7 +41,7 @@ describe("default behavior inline functions", () => {
   it("creates a CloudFront Function for an inline function on the default behavior", () => {
     const { template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
           functions: [
@@ -59,7 +59,7 @@ describe("default behavior inline functions", () => {
   it("wires the function into the default behavior's FunctionAssociations", () => {
     const { template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
           functions: [
@@ -88,7 +88,7 @@ describe("default behavior inline functions", () => {
   it("returns the CfFunction in the build result under the behavior+event key", () => {
     const { result } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
           functions: [
@@ -106,7 +106,7 @@ describe("default behavior inline functions", () => {
   it("defaults the runtime to cloudfront-js-2.0", () => {
     const { template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
           functions: [
@@ -128,7 +128,7 @@ describe("default behavior inline functions", () => {
   it("honours a user-provided runtime", () => {
     const { template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
           functions: [
@@ -151,7 +151,7 @@ describe("default behavior inline functions", () => {
   it("applies a provided comment to the Function", () => {
     const { template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
           functions: [
@@ -178,7 +178,7 @@ describe("default behavior inline functions", () => {
 
     createDistributionBuilder()
       .origin(withBucketOrigin(stack))
-      .accessLogging(false)
+      .accessLogs(false)
       .recommendedAlarms(false)
       .defaultBehavior({
         functions: [
@@ -204,7 +204,7 @@ describe("default behavior inline functions", () => {
   it("supports functions on both viewer-request and viewer-response", () => {
     const { template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
           functions: [
@@ -237,7 +237,7 @@ describe("default behavior inline functions", () => {
     expect(() =>
       synthTemplate((b, stack) => {
         b.origin(withBucketOrigin(stack))
-          .accessLogging(false)
+          .accessLogs(false)
           .recommendedAlarms(false)
           .defaultBehavior({
             functions: [
@@ -258,7 +258,7 @@ describe("default behavior inline functions", () => {
   it("creates no function resources when functions is omitted or empty", () => {
     const { result, template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({ functions: [] });
     });
@@ -269,7 +269,7 @@ describe("default behavior inline functions", () => {
 
   it("emits no FunctionAssociations on the default behavior when functions is omitted", () => {
     const { template } = synthTemplate((b, stack) => {
-      b.origin(withBucketOrigin(stack)).accessLogging(false).recommendedAlarms(false);
+      b.origin(withBucketOrigin(stack)).accessLogs(false).recommendedAlarms(false);
     });
 
     template.hasResourceProperties("AWS::CloudFront::Distribution", {
@@ -288,7 +288,7 @@ describe("default behavior inline functions", () => {
           source: ImportSource.fromInline(JSON.stringify({ data: [{ key: "a", value: "b" }] })),
         });
         b.origin(withBucketOrigin(stack))
-          .accessLogging(false)
+          .accessLogs(false)
           .recommendedAlarms(false)
           .defaultBehavior({
             functions: [
@@ -309,7 +309,7 @@ describe("additional path-pattern behaviors", () => {
   it("creates an additional cache behavior with its own origin", () => {
     const { template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .behavior("/api/*", {
           origin: new HttpOrigin("api.example.com"),
@@ -331,7 +331,7 @@ describe("additional path-pattern behaviors", () => {
   it("creates an inline function on an additional behavior", () => {
     const { result, template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .behavior("/api/*", {
           origin: new HttpOrigin("api.example.com"),
@@ -363,7 +363,7 @@ describe("additional path-pattern behaviors", () => {
   it("supports multiple additional behaviors with independent functions", () => {
     const { result, template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .behavior("/api/*", {
           origin: new HttpOrigin("api.example.com"),
@@ -395,7 +395,7 @@ describe("additional path-pattern behaviors", () => {
     const stack = new Stack(app, "TestStack");
     const builder = createDistributionBuilder()
       .origin(withBucketOrigin(stack))
-      .accessLogging(false)
+      .accessLogs(false)
       .recommendedAlarms(false)
       .behavior("/api/*", { origin: new HttpOrigin("api.example.com") });
 
@@ -409,7 +409,7 @@ describe("additional path-pattern behaviors", () => {
     const stack = new Stack(app, "TestStack");
     const builder = createDistributionBuilder()
       .origin(withBucketOrigin(stack))
-      .accessLogging(false)
+      .accessLogs(false)
       .recommendedAlarms(false)
       .behavior("/*.html", { origin: new HttpOrigin("pages.example.com") });
 
@@ -423,7 +423,7 @@ describe("additional path-pattern behaviors", () => {
   it("applies an explicit functionName when provided", () => {
     const { template } = synthTemplate((b, stack) => {
       b.origin(withBucketOrigin(stack))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
           functions: [
@@ -445,7 +445,7 @@ describe("additional path-pattern behaviors", () => {
     expect(() =>
       synthTemplate((b, stack) => {
         b.origin(withBucketOrigin(stack))
-          .accessLogging(false)
+          .accessLogs(false)
           .recommendedAlarms(false)
           .behavior("/api/*", {
             origin: new HttpOrigin("api.example.com"),
@@ -471,7 +471,7 @@ describe("additional path-pattern behaviors", () => {
 
     const result = createDistributionBuilder()
       .origin(withBucketOrigin(stack))
-      .accessLogging(false)
+      .accessLogs(false)
       .recommendedAlarms(false)
       .behavior("/api/*", {
         origin: ref<BucketBuilderResult>("api").map((r) =>
@@ -493,7 +493,7 @@ describe("additional path-pattern behaviors", () => {
 
   it("creates no CacheBehaviors when no additional behaviors are added", () => {
     const { template } = synthTemplate((b, stack) => {
-      b.origin(withBucketOrigin(stack)).accessLogging(false).recommendedAlarms(false);
+      b.origin(withBucketOrigin(stack)).accessLogs(false).recommendedAlarms(false);
     });
 
     template.hasResourceProperties("AWS::CloudFront::Distribution", {

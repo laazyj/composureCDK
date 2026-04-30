@@ -28,7 +28,7 @@ function withOrigin(builder: ReturnType<typeof createDistributionBuilder>, stack
   const bucket = new Bucket(stack, "TestBucket");
   builder
     .origin(S3BucketOrigin.withOriginAccessControl(bucket))
-    .accessLogging(false)
+    .accessLogs(false)
     // Suppress only the distribution-level alarms so each test can focus on
     // function alarms. Note: `.recommendedAlarms(false)` would also disable
     // function alarms (master switch), which isn't what these tests want.
@@ -354,7 +354,7 @@ describe("region signposting", () => {
     const stack = buildInRegion("us-west-2", (b, stack) => {
       const bucket = new Bucket(stack, "TestBucket");
       b.origin(S3BucketOrigin.withOriginAccessControl(bucket))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false);
     });
 

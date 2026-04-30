@@ -20,7 +20,7 @@ function buildResult(
 
 function withOrigin(builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) {
   const bucket = new Bucket(stack, "TestBucket");
-  builder.origin(S3BucketOrigin.withOriginAccessControl(bucket)).accessLogging(false);
+  builder.origin(S3BucketOrigin.withOriginAccessControl(bucket)).accessLogs(false);
 }
 
 describe("recommended alarms", () => {

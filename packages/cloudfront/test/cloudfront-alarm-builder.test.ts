@@ -33,7 +33,7 @@ function buildDistribution(
   const stack = new Stack(app, "TestStack");
   const builder = createDistributionBuilder().recommendedAlarms(false);
   const bucket = new Bucket(stack, "TestBucket");
-  builder.origin(S3BucketOrigin.withOriginAccessControl(bucket)).accessLogging(false);
+  builder.origin(S3BucketOrigin.withOriginAccessControl(bucket)).accessLogs(false);
   configureFn?.(builder);
   const result = builder.build(stack, "TestDistribution");
   return { app, stack, result };
@@ -175,7 +175,7 @@ describe("createCloudFrontAlarmBuilder", () => {
       const bucket = new Bucket(distStack, "TestBucket");
       const result = createDistributionBuilder()
         .origin(S3BucketOrigin.withOriginAccessControl(bucket))
-        .accessLogging(false)
+        .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
           functions: [viewerRequestFn],
@@ -231,7 +231,7 @@ describe("createCloudFrontAlarmBuilder", () => {
         {
           cdn: createDistributionBuilder()
             .origin(S3BucketOrigin.withOriginAccessControl(bucket))
-            .accessLogging(false)
+            .accessLogs(false)
             .recommendedAlarms(false)
             .defaultBehavior({
               functions: [viewerRequestFn],
@@ -280,7 +280,7 @@ describe("createCloudFrontAlarmBuilder", () => {
         {
           cdn: createDistributionBuilder()
             .origin(S3BucketOrigin.withOriginAccessControl(bucket))
-            .accessLogging(false)
+            .accessLogs(false)
             .recommendedAlarms(false)
             .defaultBehavior({
               functions: [viewerRequestFn],
@@ -326,7 +326,7 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     const bucket = new Bucket(stack, "TestBucket");
     const result = createDistributionBuilder()
       .origin(S3BucketOrigin.withOriginAccessControl(bucket))
-      .accessLogging(false)
+      .accessLogs(false)
       .defaultBehavior({
         functions: [viewerRequestFn],
       })
@@ -344,7 +344,7 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     const bucket = new Bucket(stack, "TestBucket");
     const result = createDistributionBuilder()
       .origin(S3BucketOrigin.withOriginAccessControl(bucket))
-      .accessLogging(false)
+      .accessLogs(false)
       .recommendedAlarms(false)
       .defaultBehavior({
         functions: [viewerRequestFn],
@@ -361,7 +361,7 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     const bucket = new Bucket(stack, "TestBucket");
     const result = createDistributionBuilder()
       .origin(S3BucketOrigin.withOriginAccessControl(bucket))
-      .accessLogging(false)
+      .accessLogs(false)
       .recommendedAlarms(false)
       .addAlarm("custom4xx", (a) =>
         a
@@ -388,7 +388,7 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     const bucket = new Bucket(stack, "TestBucket");
     const result = createDistributionBuilder()
       .origin(S3BucketOrigin.withOriginAccessControl(bucket))
-      .accessLogging(false)
+      .accessLogs(false)
       .recommendedAlarms(false)
       .defaultBehavior({
         functions: [viewerRequestFn],

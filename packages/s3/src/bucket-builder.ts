@@ -1,6 +1,6 @@
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { Bucket, type BucketProps } from "aws-cdk-lib/aws-s3";
+import { Bucket, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
 import { type IConstruct } from "constructs";
 import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
@@ -9,40 +9,36 @@ import { createBucketAlarms } from "./bucket-alarms.js";
 import { BUCKET_DEFAULTS } from "./defaults.js";
 
 /**
- * Configuration properties for the S3 bucket builder.
+ * Configures how server access logs are handled. Pass `false` to disable
+ * logging; pass an object to wire a destination, prefix, or customize the
+ * auto-created sub-builder.
  *
- * Extends the CDK {@link BucketProps} with additional builder-specific options.
+ * `configure` cannot be combined with `destination` — a user-managed
+ * destination is not built by this builder.
  */
-export interface BucketBuilderProps extends BucketProps {
-  /**
-   * Whether to automatically create an S3 access logging bucket.
-   *
-   * When `true`, the builder creates a dedicated logging bucket using
-   * {@link createBucketBuilder} (with secure defaults appropriate for log
-   * storage) and configures it as the server access logs destination. The
-   * logging bucket inherits secure defaults (block public access, encryption,
-   * enforceSSL, versioning for log integrity) with `removalPolicy: RETAIN`
-   * and access logging disabled to avoid recursion. The created logging
-   * bucket is returned in the build result as `accessLogsBucket`.
-   *
-   * When `false`, no logging bucket is created. You can still provide your
-   * own destination via `serverAccessLogsBucket`.
-   *
-   * This setting is ignored when `serverAccessLogsBucket` is provided — the
-   * user-supplied destination takes precedence.
-   */
-  accessLogging?: boolean;
+export type ServerAccessLogsConfig =
+  | false
+  | {
+      destination?: IBucket;
+      prefix?: string;
+      /**
+       * Customize the auto-created logging sub-builder. Receives a builder
+       * pre-seeded with `versioned: false`, `removalPolicy: RETAIN`, and
+       * recursive access logging disabled.
+       */
+      configure?: (b: IBucketBuilder) => IBucketBuilder;
+    };
 
-  /**
-   * The prefix applied to server access log object keys when the builder
-   * auto-creates a logging bucket.
-   *
-   * This setting is only used when {@link accessLogging} is `true` and no
-   * user-provided `serverAccessLogsBucket` is set.
-   *
-   * @default "logs/"
-   */
-  accessLogsPrefix?: string;
+/**
+ * Configuration properties for the S3 bucket builder. Extends CDK
+ * {@link BucketProps} with builder-specific options.
+ */
+export interface BucketBuilderProps extends Omit<
+  BucketProps,
+  "serverAccessLogsBucket" | "serverAccessLogsPrefix"
+> {
+  /** See {@link ServerAccessLogsConfig}. Defaults to `{ prefix: "logs/" }`. */
+  serverAccessLogs?: ServerAccessLogsConfig;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -124,42 +120,11 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
   }
 
   build(scope: IConstruct, id: string): BucketBuilderResult {
-    const {
-      accessLogging,
-      accessLogsPrefix,
-      recommendedAlarms: alarmConfig,
-      ...bucketProps
-    } = this.props;
-    const {
-      accessLogging: defaultAccessLogging,
-      accessLogsPrefix: defaultLogsPrefix,
-      ...cdkDefaults
-    } = BUCKET_DEFAULTS;
-    const autoAccessLog =
-      (accessLogging ?? defaultAccessLogging) && !bucketProps.serverAccessLogsBucket;
+    const { serverAccessLogs, recommendedAlarms: alarmConfig, ...bucketProps } = this.props;
+    const { serverAccessLogs: defaultServerAccessLogs, ...cdkDefaults } = BUCKET_DEFAULTS;
+    const cfg = serverAccessLogs ?? defaultServerAccessLogs;
 
-    if (accessLogsPrefix !== undefined && !autoAccessLog) {
-      throw new Error(
-        "Cannot set 'accessLogsPrefix' when access logging is disabled or " +
-          "'serverAccessLogsBucket' is provided. Set 'serverAccessLogsPrefix' " +
-          "directly when using your own logging bucket.",
-      );
-    }
-
-    let accessLogsBucket: Bucket | undefined;
-    let accessLogProps = {};
-
-    if (autoAccessLog) {
-      accessLogsBucket = createBucketBuilder()
-        .accessLogging(false)
-        .versioned(false)
-        .removalPolicy(RemovalPolicy.RETAIN)
-        .build(scope, `${id}AccessLogs`).bucket;
-      accessLogProps = {
-        serverAccessLogsBucket: accessLogsBucket,
-        serverAccessLogsPrefix: accessLogsPrefix ?? defaultLogsPrefix,
-      };
-    }
+    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg);
 
     const mergedProps = {
       ...cdkDefaults,
@@ -185,6 +150,48 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
       alarms,
     };
   }
+}
+
+function resolveAccessLogs(
+  scope: IConstruct,
+  id: string,
+  cfg: ServerAccessLogsConfig | undefined,
+): { accessLogsBucket?: Bucket; accessLogProps: Partial<BucketProps> } {
+  if (cfg === false || cfg === undefined) {
+    return { accessLogProps: {} };
+  }
+
+  if (cfg.destination !== undefined) {
+    if (cfg.configure !== undefined) {
+      throw new Error(
+        "serverAccessLogs: 'configure' cannot be combined with 'destination' — " +
+          "the destination bucket is user-managed and not built by this builder.",
+      );
+    }
+    return {
+      accessLogProps: {
+        serverAccessLogsBucket: cfg.destination,
+        ...(cfg.prefix !== undefined ? { serverAccessLogsPrefix: cfg.prefix } : {}),
+      },
+    };
+  }
+
+  let subBuilder = createBucketBuilder()
+    .serverAccessLogs(false)
+    .versioned(false)
+    .removalPolicy(RemovalPolicy.RETAIN);
+  if (cfg.configure) {
+    subBuilder = cfg.configure(subBuilder);
+  }
+  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`).bucket;
+
+  return {
+    accessLogsBucket,
+    accessLogProps: {
+      serverAccessLogsBucket: accessLogsBucket,
+      ...(cfg.prefix !== undefined ? { serverAccessLogsPrefix: cfg.prefix } : {}),
+    },
+  };
 }
 
 /**

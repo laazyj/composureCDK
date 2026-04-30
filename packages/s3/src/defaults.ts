@@ -9,18 +9,14 @@ import type { BucketBuilderProps } from "./bucket-builder.js";
  */
 export const BUCKET_DEFAULTS: Partial<BucketBuilderProps> = {
   /**
-   * Automatically create an access logging bucket for S3 server access logs.
-   * Access logging provides an audit trail of all object-level operations for
-   * security monitoring and troubleshooting.
+   * Auto-create a dedicated logging bucket and write S3 server access logs
+   * to it under the `logs/` prefix. Access logging provides an audit trail
+   * of all object-level operations for security monitoring and
+   * troubleshooting.
+   *
    * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_detect_investigate_events_app_service_logging.html
    */
-  accessLogging: true,
-
-  /**
-   * Default prefix for server access log object keys in the auto-created
-   * logging bucket.
-   */
-  accessLogsPrefix: "logs/",
+  serverAccessLogs: { prefix: "logs/" },
 
   /**
    * Block all public access to the bucket. S3 buckets should not be

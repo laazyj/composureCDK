@@ -14,14 +14,14 @@ function buildResult(configureFn: (builder: ReturnType<typeof createBucketBuilde
 }
 
 function withAlarms(builder: ReturnType<typeof createBucketBuilder>) {
-  builder.accessLogging(false).metrics([{ id: "EntireBucket" }]);
+  builder.serverAccessLogs(false).metrics([{ id: "EntireBucket" }]);
 }
 
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates no alarms without metrics configured", () => {
       const { result, template } = buildResult((b) => {
-        b.accessLogging(false);
+        b.serverAccessLogs(false);
       });
 
       expect(result.alarms).toEqual({});
@@ -38,7 +38,7 @@ describe("recommended alarms", () => {
 
     it("creates alarms for each metrics configuration", () => {
       const { result, template } = buildResult((b) => {
-        b.accessLogging(false).metrics([
+        b.serverAccessLogs(false).metrics([
           { id: "EntireBucket" },
           { id: "UploadsOnly", prefix: "uploads/" },
         ]);
@@ -85,7 +85,7 @@ describe("recommended alarms", () => {
 
     it("includes FilterId dimension from metrics configuration", () => {
       const { template } = buildResult((b) => {
-        b.accessLogging(false).metrics([{ id: "MyFilter" }]);
+        b.serverAccessLogs(false).metrics([{ id: "MyFilter" }]);
       });
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
@@ -107,7 +107,7 @@ describe("recommended alarms", () => {
   describe("customization", () => {
     it("allows customizing serverErrors alarm threshold", () => {
       const { template } = buildResult((b) => {
-        b.accessLogging(false)
+        b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
             serverErrors: { threshold: 10 },
@@ -122,7 +122,7 @@ describe("recommended alarms", () => {
 
     it("allows customizing evaluation periods", () => {
       const { template } = buildResult((b) => {
-        b.accessLogging(false)
+        b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
             clientErrors: { evaluationPeriods: 5, datapointsToAlarm: 3 },
@@ -138,7 +138,7 @@ describe("recommended alarms", () => {
 
     it("allows customizing treat missing data", () => {
       const { template } = buildResult((b) => {
-        b.accessLogging(false)
+        b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
             serverErrors: { treatMissingData: TreatMissingData.BREACHING },
@@ -155,7 +155,7 @@ describe("recommended alarms", () => {
   describe("disabling alarms", () => {
     it("disables all alarms when recommendedAlarms is false", () => {
       const { result, template } = buildResult((b) => {
-        b.accessLogging(false)
+        b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms(false);
       });
@@ -166,7 +166,7 @@ describe("recommended alarms", () => {
 
     it("disables all alarms when enabled is false", () => {
       const { result, template } = buildResult((b) => {
-        b.accessLogging(false)
+        b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
             enabled: false,
@@ -179,7 +179,7 @@ describe("recommended alarms", () => {
 
     it("disables individual alarms when set to false", () => {
       const { result, template } = buildResult((b) => {
-        b.accessLogging(false)
+        b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
             serverErrors: false,
@@ -193,7 +193,7 @@ describe("recommended alarms", () => {
 
     it("disables multiple individual alarms", () => {
       const { result, template } = buildResult((b) => {
-        b.accessLogging(false)
+        b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
             serverErrors: false,
@@ -221,7 +221,7 @@ describe("recommended alarms", () => {
 describe("addAlarm", () => {
   it("creates a custom alarm alongside recommended alarms", () => {
     const { result, template } = buildResult((b) => {
-      b.accessLogging(false)
+      b.serverAccessLogs(false)
         .metrics([{ id: "EntireBucket" }])
         .addAlarm("totalRequests", (alarm) =>
           alarm
@@ -252,7 +252,7 @@ describe("addAlarm", () => {
   it("throws on duplicate key with recommended alarm", () => {
     expect(() =>
       buildResult((b) => {
-        b.accessLogging(false)
+        b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .addAlarm("serverErrors:EntireBucket", (alarm) =>
             alarm

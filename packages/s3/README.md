@@ -18,15 +18,14 @@ Every [BucketProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_
 
 `createBucketBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
 
-| Property            | Default      | Rationale                                                        |
-| ------------------- | ------------ | ---------------------------------------------------------------- |
-| `accessLogging`     | `true`       | Auto-creates a logging bucket for server access log audit trail. |
-| `accessLogsPrefix`  | `"logs/"`    | Default prefix for access log object keys.                       |
-| `blockPublicAccess` | `BLOCK_ALL`  | Prevents public access unless explicitly required.               |
-| `encryption`        | `S3_MANAGED` | Enables server-side encryption with S3-managed keys (SSE-S3).    |
-| `enforceSSL`        | `true`       | Requires SSL/TLS for all requests to the bucket.                 |
-| `versioned`         | `true`       | Protects against accidental deletions and supports rollback.     |
-| `removalPolicy`     | `RETAIN`     | Retains the bucket on stack deletion to prevent data loss.       |
+| Property            | Default               | Rationale                                                                                     |
+| ------------------- | --------------------- | --------------------------------------------------------------------------------------------- |
+| `serverAccessLogs`  | `{ prefix: "logs/" }` | Auto-creates a logging bucket for the server access log audit trail under the `logs/` prefix. |
+| `blockPublicAccess` | `BLOCK_ALL`           | Prevents public access unless explicitly required.                                            |
+| `encryption`        | `S3_MANAGED`          | Enables server-side encryption with S3-managed keys (SSE-S3).                                 |
+| `enforceSSL`        | `true`                | Requires SSL/TLS for all requests to the bucket.                                              |
+| `versioned`         | `true`                | Protects against accidental deletions and supports rollback.                                  |
+| `removalPolicy`     | `RETAIN`              | Retains the bucket on stack deletion to prevent data loss.                                    |
 
 These defaults are guided by the [AWS Well-Architected Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-at-rest.html).
 
@@ -53,7 +52,7 @@ When `removalPolicy` is set to `DESTROY`, the builder automatically enables `aut
 
 ### Access logging
 
-By default, the builder creates a dedicated logging bucket with secure defaults and configures it as the server access logs destination. The created bucket is returned in the build result:
+Server access logging is configured through a single `.serverAccessLogs(config)` setting. By default, the builder creates a dedicated logging bucket with secure defaults and writes logs under `logs/`. The created bucket is returned in the build result:
 
 ```ts
 const result = createBucketBuilder().build(stack, "MyBucket");
@@ -62,7 +61,30 @@ result.bucket; // Bucket
 result.accessLogsBucket; // Bucket | undefined
 ```
 
-To provide your own destination instead, set `serverAccessLogsBucket` — the auto-created logging bucket is skipped. To disable access logging entirely, set `.accessLogging(false)`.
+`.serverAccessLogs(config)` accepts either `false` to disable access logging, or an object describing how to handle logs:
+
+```ts
+import { Duration } from "aws-cdk-lib";
+
+// Disable access logging entirely
+createBucketBuilder().serverAccessLogs(false);
+
+// Auto-create a logging bucket with a custom prefix
+createBucketBuilder().serverAccessLogs({ prefix: "audit/" });
+
+// Auto-create and customize the logging sub-builder
+createBucketBuilder().serverAccessLogs({
+  configure: (sub) => sub.lifecycleRules([{ id: "ShortLogs", expiration: Duration.days(180) }]),
+});
+
+// Bring your own destination bucket
+createBucketBuilder().serverAccessLogs({ destination: myBucket });
+
+// Bring your own destination with a prefix
+createBucketBuilder().serverAccessLogs({ destination: myBucket, prefix: "x/" });
+```
+
+`destination` and `configure` cannot be combined — the destination bucket is user-managed and is not built by this builder.
 
 ## Recommended Alarms
 

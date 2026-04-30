@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { App, RemovalPolicy, Stack } from "aws-cdk-lib";
+import { App, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { Bucket } from "aws-cdk-lib/aws-s3";
+import { Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
 import { createBucketBuilder } from "../src/bucket-builder.js";
-import { BUCKET_DEFAULTS } from "../src/defaults.js";
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createBucketBuilder>) => void,
@@ -18,7 +17,21 @@ function synthTemplate(
 
 /** Disables access logging so tests that don't need it get a single-bucket template. */
 function withoutLogging(builder: ReturnType<typeof createBucketBuilder>) {
-  return builder.accessLogging(false);
+  return builder.serverAccessLogs(false);
+}
+
+/** Returns the auto-created logging bucket — the one without a LoggingConfiguration. */
+function findLogBucket(template: Template): {
+  Properties: Record<string, unknown>;
+  DeletionPolicy?: string;
+} {
+  const buckets = template.findResources("AWS::S3::Bucket", {
+    Properties: { LoggingConfiguration: Match.absent() },
+  });
+  return Object.values(buckets)[0] as {
+    Properties: Record<string, unknown>;
+    DeletionPolicy?: string;
+  };
 }
 
 describe("BucketBuilder", () => {
@@ -62,7 +75,7 @@ describe("BucketBuilder", () => {
       const userLogBucket = new Bucket(stack, "UserLogBucket");
       const builder = createBucketBuilder();
 
-      builder.serverAccessLogsBucket(userLogBucket);
+      builder.serverAccessLogs({ destination: userLogBucket });
 
       const result = builder.build(stack, "TestBucket");
 
@@ -167,19 +180,21 @@ describe("BucketBuilder", () => {
       template.resourceCountIs("AWS::S3::Bucket", 2);
     });
 
-    it("configures server access logs on the main bucket", () => {
+    it("configures server access logs on the main bucket with the default prefix", () => {
       const template = synthTemplate((b) => b.bucketName("main"));
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         LoggingConfiguration: {
           DestinationBucketName: Match.anyValue(),
-          LogFilePrefix: BUCKET_DEFAULTS.accessLogsPrefix,
+          LogFilePrefix: "logs/",
         },
       });
     });
 
     it("allows the user to override the access logs prefix", () => {
-      const template = synthTemplate((b) => b.bucketName("main").accessLogsPrefix("custom/"));
+      const template = synthTemplate((b) =>
+        b.bucketName("main").serverAccessLogs({ prefix: "custom/" }),
+      );
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         LoggingConfiguration: {
@@ -200,7 +215,7 @@ describe("BucketBuilder", () => {
       const stack = new Stack(app, "TestStack");
       const userLogBucket = new Bucket(stack, "UserLogBucket");
       const builder = createBucketBuilder();
-      builder.serverAccessLogsBucket(userLogBucket);
+      builder.serverAccessLogs({ destination: userLogBucket });
       builder.build(stack, "TestBucket");
       const template = Template.fromStack(stack);
 
@@ -208,17 +223,27 @@ describe("BucketBuilder", () => {
       template.resourceCountIs("AWS::S3::Bucket", 2);
     });
 
+    it("wires the user-provided destination and prefix onto the main bucket", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const userLogBucket = new Bucket(stack, "UserLogBucket");
+      const builder = createBucketBuilder();
+      builder.serverAccessLogs({ destination: userLogBucket, prefix: "byo/" });
+      builder.build(stack, "TestBucket");
+      const template = Template.fromStack(stack);
+
+      template.hasResourceProperties("AWS::S3::Bucket", {
+        LoggingConfiguration: {
+          DestinationBucketName: Match.anyValue(),
+          LogFilePrefix: "byo/",
+        },
+      });
+    });
+
     it("disables versioning on the auto-created logging bucket", () => {
       const template = synthTemplate((b) => b.bucketName("main"));
 
-      const buckets = template.findResources("AWS::S3::Bucket", {
-        Properties: {
-          LoggingConfiguration: Match.absent(),
-        },
-      });
-      const logBucket = Object.values(buckets)[0] as {
-        Properties: Record<string, unknown>;
-      };
+      const logBucket = findLogBucket(template);
       expect(logBucket.Properties.VersioningConfiguration).toBeUndefined();
     });
 
@@ -237,16 +262,7 @@ describe("BucketBuilder", () => {
     it("applies secure defaults to the auto-created logging bucket", () => {
       const template = synthTemplate((b) => b.bucketName("main"));
 
-      // The logging bucket should have block public access and encryption
-      const buckets = template.findResources("AWS::S3::Bucket", {
-        Properties: {
-          LoggingConfiguration: Match.absent(),
-        },
-      });
-      const logBucket = Object.values(buckets)[0] as {
-        Properties: Record<string, unknown>;
-        DeletionPolicy: string;
-      };
+      const logBucket = findLogBucket(template);
       expect(logBucket.Properties.PublicAccessBlockConfiguration).toEqual({
         BlockPublicAcls: true,
         BlockPublicPolicy: true,
@@ -258,23 +274,64 @@ describe("BucketBuilder", () => {
   });
 
   describe("validation", () => {
-    it("throws when accessLogsPrefix is set with accessLogging disabled", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
-      const builder = createBucketBuilder().accessLogging(false).accessLogsPrefix("custom/");
-
-      expect(() => builder.build(stack, "TestBucket")).toThrow(/Cannot set 'accessLogsPrefix'/);
-    });
-
-    it("throws when accessLogsPrefix is set with a user-provided logging bucket", () => {
+    it("throws when serverAccessLogs combines a destination with a configure callback", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const userLogBucket = new Bucket(stack, "UserLogBucket");
-      const builder = createBucketBuilder()
-        .serverAccessLogsBucket(userLogBucket)
-        .accessLogsPrefix("custom/");
+      const builder = createBucketBuilder().serverAccessLogs({
+        destination: userLogBucket,
+        configure: (b) => b,
+      });
 
-      expect(() => builder.build(stack, "TestBucket")).toThrow(/Cannot set 'accessLogsPrefix'/);
+      expect(() => builder.build(stack, "TestBucket")).toThrow(
+        /'configure' cannot be combined with 'destination'/,
+      );
+    });
+  });
+
+  describe("serverAccessLogs configure callback", () => {
+    it("applies user-supplied lifecycle rules to the auto-created logging bucket", () => {
+      const template = synthTemplate((b) =>
+        b.bucketName("main").serverAccessLogs({
+          configure: (sub) =>
+            sub.lifecycleRules([{ id: "ShortLogs", expiration: Duration.days(30) }]),
+        }),
+      );
+
+      const logBucket = findLogBucket(template);
+      const lifecycle = logBucket.Properties.LifecycleConfiguration as
+        | { Rules: Record<string, unknown>[] }
+        | undefined;
+      const rules = lifecycle?.Rules ?? [];
+      expect(rules).toHaveLength(1);
+      expect(rules[0]).toMatchObject({ Id: "ShortLogs", ExpirationInDays: 30 });
+    });
+
+    it("allows the configure callback to override the removal policy", () => {
+      const template = synthTemplate((b) =>
+        b.bucketName("main").serverAccessLogs({
+          configure: (sub) => sub.removalPolicy(RemovalPolicy.DESTROY),
+        }),
+      );
+
+      expect(findLogBucket(template).DeletionPolicy).toBe("Delete");
+    });
+
+    it("allows the configure callback to override encryption on the logging bucket", () => {
+      const template = synthTemplate((b) =>
+        b.bucketName("main").serverAccessLogs({
+          configure: (sub) => sub.encryption(BucketEncryption.KMS_MANAGED),
+        }),
+      );
+
+      const encryption = findLogBucket(template).Properties.BucketEncryption as {
+        ServerSideEncryptionConfiguration: {
+          ServerSideEncryptionByDefault: { SSEAlgorithm: string };
+        }[];
+      };
+      expect(
+        encryption.ServerSideEncryptionConfiguration[0].ServerSideEncryptionByDefault.SSEAlgorithm,
+      ).toBe("aws:kms");
     });
   });
 

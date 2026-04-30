@@ -3,6 +3,7 @@ export {
   type BucketBuilderProps,
   type BucketBuilderResult,
   type IBucketBuilder,
+  type ServerAccessLogsConfig,
 } from "./bucket-builder.js";
 export { BUCKET_DEFAULTS } from "./defaults.js";
 export { type BucketAlarmConfig } from "./alarm-config.js";

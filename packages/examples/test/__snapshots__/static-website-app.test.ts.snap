@@ -670,6 +670,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
                 "RegionalDomainName",
               ],
             },
+            "Prefix": "logs/",
           },
           "Origins": [
             {

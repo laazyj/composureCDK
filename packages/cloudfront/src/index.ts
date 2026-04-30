@@ -1,5 +1,6 @@
 export {
   createDistributionBuilder,
+  type AccessLogsConfig,
   type DistributionBuilderProps,
   type DistributionBuilderResult,
   type IDistributionBuilder,

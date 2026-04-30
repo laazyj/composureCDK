@@ -37,15 +37,15 @@ compose({ site: createBucketBuilder(), cdn }, { site: [], cdn: ["site"] }).build
 
 `createDistributionBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
 
-| Property                                | Default             | Rationale                                                                |
-| --------------------------------------- | ------------------- | ------------------------------------------------------------------------ |
-| `accessLogging`                         | `true`              | Auto-creates an S3 logging bucket for access log audit trail.            |
-| `priceClass`                            | `PRICE_CLASS_100`   | North America and Europe edge locations — sufficient and cost-effective. |
-| `httpVersion`                           | `HTTP2_AND_3`       | Enables HTTP/2 and HTTP/3 (QUIC) for improved performance.               |
-| `defaultRootObject`                     | `"index.html"`      | Standard for static website hosting.                                     |
-| `minimumProtocolVersion`                | `TLS_V1_2_2021`     | Requires TLS 1.2+ to prevent older, less secure protocol negotiation.    |
-| `defaultBehavior.viewerProtocolPolicy`  | `REDIRECT_TO_HTTPS` | Ensures all viewer traffic is encrypted in transit.                      |
-| `defaultBehavior.responseHeadersPolicy` | `SECURITY_HEADERS`  | Applies managed security headers (HSTS, X-Content-Type-Options, etc.).   |
+| Property                                | Default               | Rationale                                                                                  |
+| --------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------ |
+| `accessLogs`                            | `{ prefix: "logs/" }` | Auto-creates an S3 logging bucket for the access log audit trail under the `logs/` prefix. |
+| `priceClass`                            | `PRICE_CLASS_100`     | North America and Europe edge locations — sufficient and cost-effective.                   |
+| `httpVersion`                           | `HTTP2_AND_3`         | Enables HTTP/2 and HTTP/3 (QUIC) for improved performance.                                 |
+| `defaultRootObject`                     | `"index.html"`        | Standard for static website hosting.                                                       |
+| `minimumProtocolVersion`                | `TLS_V1_2_2021`       | Requires TLS 1.2+ to prevent older, less secure protocol negotiation.                      |
+| `defaultBehavior.viewerProtocolPolicy`  | `REDIRECT_TO_HTTPS`   | Ensures all viewer traffic is encrypted in transit.                                        |
+| `defaultBehavior.responseHeadersPolicy` | `SECURITY_HEADERS`    | Applies managed security headers (HSTS, X-Content-Type-Options, etc.).                     |
 
 These defaults are guided by the [AWS Well-Architected Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-in-transit.html).
 
@@ -63,14 +63,14 @@ import { PriceClass, ViewerProtocolPolicy } from "aws-cdk-lib/aws-cloudfront";
 const cdn = createDistributionBuilder()
   .origin(myOrigin)
   .priceClass(PriceClass.PRICE_CLASS_ALL)
-  .accessLogging(false)
+  .accessLogs(false)
   .defaultBehavior({ viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL })
   .build(stack, "CDN");
 ```
 
 ### Access logging
 
-By default, the builder creates an S3 logging bucket (using `@composurecdk/s3` with its secure defaults) and configures it as the distribution's log destination. The created bucket is returned in the build result:
+CloudFront standard access logging is configured through a single `.accessLogs(config)` setting. By default, the builder creates a dedicated logging bucket (using `@composurecdk/s3` with its secure defaults, plus `BUCKET_OWNER_PREFERRED` object ownership which CloudFront standard logging requires) and writes logs under `logs/`. The created bucket is returned in the build result:
 
 ```ts
 const result = createDistributionBuilder().origin(myOrigin).build(stack, "CDN");
@@ -79,7 +79,39 @@ result.distribution; // Distribution
 result.accessLogsBucket; // Bucket | undefined
 ```
 
-To provide your own bucket instead, set `logBucket` — the auto-created logging bucket is skipped. To disable access logging entirely, set `.accessLogging(false)`.
+`.accessLogs(config)` accepts either `false` to disable access logging, or an object describing how to handle logs:
+
+```ts
+import { Duration } from "aws-cdk-lib";
+
+// Disable access logging entirely
+createDistributionBuilder().origin(myOrigin).accessLogs(false);
+
+// Auto-create a logging bucket with a custom prefix
+createDistributionBuilder().origin(myOrigin).accessLogs({ prefix: "cdn/" });
+
+// Include cookies in the logs
+createDistributionBuilder().origin(myOrigin).accessLogs({ includeCookies: true });
+
+// Auto-create and customize the logging sub-builder
+createDistributionBuilder()
+  .origin(myOrigin)
+  .accessLogs({
+    configure: (sub) => sub.lifecycleRules([{ id: "ShortLogs", expiration: Duration.days(180) }]),
+  });
+
+// Bring your own destination bucket
+createDistributionBuilder().origin(myOrigin).accessLogs({ destination: myBucket });
+
+// Bring your own destination with a prefix and cookies
+createDistributionBuilder()
+  .origin(myOrigin)
+  .accessLogs({ destination: myBucket, prefix: "cdn/", includeCookies: true });
+```
+
+`destination` and `configure` cannot be combined — the destination bucket is user-managed and is not built by this builder.
+
+The config object replaces the default wholesale rather than merging with it. For example, `.accessLogs({ includeCookies: true })` does **not** preserve the default `prefix: "logs/"` — restate any default you want to keep.
 
 ## Recommended Alarms
 

@@ -12,7 +12,7 @@ import {
 } from "aws-cdk-lib/aws-cloudfront";
 import { type ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { type Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
+import { type Bucket, type IBucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
 import {
@@ -23,7 +23,7 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import { createBucketBuilder } from "@composurecdk/s3";
+import { createBucketBuilder, type IBucketBuilder } from "@composurecdk/s3";
 import type { DistributionAlarmConfig, FunctionAlarmConfig } from "./alarm-config.js";
 import { DISTRIBUTION_DEFAULTS } from "./defaults.js";
 import { resolveBehaviors } from "./resolve-behaviors.js";
@@ -157,6 +157,29 @@ export interface AdditionalBehaviorConfig extends Omit<
 }
 
 /**
+ * Configures how CloudFront standard access logs are handled. Pass `false`
+ * to disable logging; pass an object to wire a destination, prefix,
+ * include cookies, or customize the auto-created sub-builder.
+ *
+ * `configure` cannot be combined with `destination` — a user-managed
+ * destination is not built by this builder.
+ */
+export type AccessLogsConfig =
+  | false
+  | {
+      destination?: IBucket;
+      prefix?: string;
+      includeCookies?: boolean;
+      /**
+       * Customize the auto-created logging sub-builder. Receives a builder
+       * pre-seeded with `versioned: false`, `objectOwnership:
+       * BUCKET_OWNER_PREFERRED`, `removalPolicy: RETAIN`, and recursive
+       * S3 server access logging disabled.
+       */
+      configure?: (b: IBucketBuilder) => IBucketBuilder;
+    };
+
+/**
  * Configuration properties for the CloudFront distribution builder.
  *
  * Extends the CDK {@link DistributionProps} with additional builder-specific
@@ -165,29 +188,22 @@ export interface AdditionalBehaviorConfig extends Omit<
  * {@link IDistributionBuilder.behavior} method rather than the raw
  * `additionalBehaviors` record.
  *
- * The `enableLogging` CDK prop is replaced by {@link accessLogging}, which
- * auto-creates a logging bucket with secure defaults when enabled.
+ * The CDK `enableLogging`, `logBucket`, `logFilePrefix`, and
+ * `logIncludesCookies` props are replaced by {@link accessLogs}, which
+ * auto-creates a logging bucket with secure defaults by default.
  */
 export interface DistributionBuilderProps extends Omit<
   DistributionProps,
-  "defaultBehavior" | "additionalBehaviors" | "enableLogging" | "certificate"
+  | "defaultBehavior"
+  | "additionalBehaviors"
+  | "enableLogging"
+  | "logBucket"
+  | "logFilePrefix"
+  | "logIncludesCookies"
+  | "certificate"
 > {
-  /**
-   * Whether to automatically create an S3 bucket for CloudFront standard
-   * access logging.
-   *
-   * When `true`, the builder creates a logging bucket using
-   * {@link createBucketBuilder} (with its secure defaults) and configures it
-   * as the distribution's log destination. The created bucket is returned in
-   * the build result as `accessLogsBucket`.
-   *
-   * When `false`, no logging bucket is created. You can still provide your
-   * own bucket via `logBucket`.
-   *
-   * This setting is ignored when `logBucket` is provided — the user-supplied
-   * bucket takes precedence.
-   */
-  accessLogging?: boolean;
+  /** See {@link AccessLogsConfig}. Defaults to `{ prefix: "logs/" }`. */
+  accessLogs?: AccessLogsConfig;
 
   /**
    * The ACM certificate to associate with the distribution for HTTPS.
@@ -405,7 +421,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
     }
 
     const {
-      accessLogging,
+      accessLogs,
       certificate,
       defaultBehavior: userBehavior,
       recommendedAlarms: alarmConfig,
@@ -413,28 +429,13 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
     } = this.props;
     const resolvedCertificate = certificate ? resolve(certificate, context ?? {}) : undefined;
     const {
-      accessLogging: defaultAccessLogging,
+      accessLogs: defaultAccessLogs,
       defaultBehavior: defaultBehaviorDefaults,
       ...cdkDefaults
     } = DISTRIBUTION_DEFAULTS;
-    const autoAccessLog = (accessLogging ?? defaultAccessLogging) && !distProps.logBucket;
+    const cfg = accessLogs ?? defaultAccessLogs;
 
-    let accessLogsBucket: Bucket | undefined;
-    let accessLogProps = {};
-
-    if (autoAccessLog) {
-      accessLogsBucket = createBucketBuilder()
-        .serverAccessLogs(false)
-        .versioned(false)
-        // CloudFront standard logging writes via ACLs, which requires BucketOwnerPreferred.
-        .objectOwnership(ObjectOwnership.BUCKET_OWNER_PREFERRED)
-        .removalPolicy(RemovalPolicy.RETAIN)
-        .build(scope, `${id}AccessLogs`).bucket;
-      accessLogProps = {
-        enableLogging: true,
-        logBucket: accessLogsBucket,
-      };
-    }
+    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg);
 
     const behaviors = resolveBehaviors({
       scope,
@@ -512,4 +513,60 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
  */
 export function createDistributionBuilder(): IDistributionBuilder {
   return Builder<DistributionBuilderProps, DistributionBuilder>(DistributionBuilder);
+}
+
+function resolveAccessLogs(
+  scope: IConstruct,
+  id: string,
+  cfg: AccessLogsConfig | undefined,
+): {
+  accessLogsBucket?: Bucket;
+  accessLogProps: Partial<
+    Pick<DistributionProps, "enableLogging" | "logBucket" | "logFilePrefix" | "logIncludesCookies">
+  >;
+} {
+  if (cfg === false || cfg === undefined) {
+    return { accessLogProps: {} };
+  }
+
+  const extras = {
+    ...(cfg.prefix !== undefined ? { logFilePrefix: cfg.prefix } : {}),
+    ...(cfg.includeCookies !== undefined ? { logIncludesCookies: cfg.includeCookies } : {}),
+  };
+
+  if (cfg.destination !== undefined) {
+    if (cfg.configure !== undefined) {
+      throw new Error(
+        "accessLogs: 'configure' cannot be combined with 'destination' — " +
+          "the destination bucket is user-managed and not built by this builder.",
+      );
+    }
+    return {
+      accessLogProps: {
+        enableLogging: true,
+        logBucket: cfg.destination,
+        ...extras,
+      },
+    };
+  }
+
+  let subBuilder = createBucketBuilder()
+    .serverAccessLogs(false)
+    .versioned(false)
+    // CloudFront standard logging writes via ACLs, which requires BucketOwnerPreferred.
+    .objectOwnership(ObjectOwnership.BUCKET_OWNER_PREFERRED)
+    .removalPolicy(RemovalPolicy.RETAIN);
+  if (cfg.configure) {
+    subBuilder = cfg.configure(subBuilder);
+  }
+  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`).bucket;
+
+  return {
+    accessLogsBucket,
+    accessLogProps: {
+      enableLogging: true,
+      logBucket: accessLogsBucket,
+      ...extras,
+    },
+  };
 }

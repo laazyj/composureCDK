@@ -33,7 +33,7 @@ describe("DistributionBuilder", () => {
       const bucket = new Bucket(stack, "TestBucket");
       const origin = S3BucketOrigin.withOriginAccessControl(bucket);
 
-      const builder = createDistributionBuilder().origin(origin).accessLogging(false);
+      const builder = createDistributionBuilder().origin(origin).accessLogs(false);
       const result = builder.build(stack, "TestDistribution");
 
       expect(result).toBeDefined();
@@ -227,13 +227,13 @@ describe("DistributionBuilder", () => {
 
       const result = createDistributionBuilder()
         .origin(origin)
-        .accessLogging(false)
+        .accessLogs(false)
         .build(stack, "TestDistribution");
 
       expect(result.accessLogsBucket).toBeUndefined();
     });
 
-    it("skips auto-created logging bucket when logBucket is provided", () => {
+    it("skips auto-created logging bucket when destination is provided", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const bucket = new Bucket(stack, "TestBucket");
@@ -242,10 +242,91 @@ describe("DistributionBuilder", () => {
 
       const result = createDistributionBuilder()
         .origin(origin)
-        .logBucket(logBucket)
+        .accessLogs({ destination: logBucket })
         .build(stack, "TestDistribution");
 
       expect(result.accessLogsBucket).toBeUndefined();
+    });
+
+    it("uses the default 'logs/' prefix on the log bucket", () => {
+      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          Logging: Match.objectLike({ Prefix: "logs/" }),
+        }),
+      });
+    });
+
+    it("applies a custom prefix on the auto-created log bucket", () => {
+      const template = synthTemplate((b, stack) =>
+        b.origin(withBucketOrigin(stack)).accessLogs({ prefix: "cdn/" }),
+      );
+
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          Logging: Match.objectLike({ Prefix: "cdn/" }),
+        }),
+      });
+    });
+
+    it("applies a custom prefix on a user-provided destination", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const bucket = new Bucket(stack, "TestBucket");
+      const logBucket = new Bucket(stack, "LogBucket");
+      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+
+      createDistributionBuilder()
+        .origin(origin)
+        .accessLogs({ destination: logBucket, prefix: "cdn/" })
+        .build(stack, "TestDistribution");
+
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          Logging: Match.objectLike({ Prefix: "cdn/" }),
+        }),
+      });
+    });
+
+    it("forwards includeCookies to logIncludesCookies", () => {
+      const template = synthTemplate((b, stack) =>
+        b.origin(withBucketOrigin(stack)).accessLogs({ includeCookies: true }),
+      );
+
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          Logging: Match.objectLike({ IncludeCookies: true }),
+        }),
+      });
+    });
+
+    it("applies a configure callback to the auto-created log bucket", () => {
+      const template = synthTemplate((b, stack) =>
+        b
+          .origin(withBucketOrigin(stack))
+          .accessLogs({ configure: (lb) => lb.bucketName("my-cdn-logs") }),
+      );
+
+      template.hasResourceProperties("AWS::S3::Bucket", {
+        BucketName: "my-cdn-logs",
+      });
+    });
+
+    it("throws when destination and configure are combined", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const bucket = new Bucket(stack, "TestBucket");
+      const logBucket = new Bucket(stack, "LogBucket");
+      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+
+      expect(() =>
+        createDistributionBuilder()
+          .origin(origin)
+          .accessLogs({ destination: logBucket, configure: (lb) => lb })
+          .build(stack, "TestDistribution"),
+      ).toThrow(/configure.*cannot be combined with.*destination/);
     });
 
     it("allows the user to override price class", () => {
@@ -311,7 +392,7 @@ describe("DistributionBuilder", () => {
             S3BucketOrigin.withOriginAccessControl(r.bucket),
           ),
         )
-        .accessLogging(false);
+        .accessLogs(false);
 
       const result = builder.build(stack, "TestDistribution", {
         site: { bucket },
@@ -343,7 +424,7 @@ describe("DistributionBuilder", () => {
         .origin(withBucketOrigin(stack))
         .certificate(ref<{ certificate: typeof cert }>("tls").map((r) => r.certificate))
         .domainNames(["example.com"])
-        .accessLogging(false);
+        .accessLogs(false);
 
       const result = builder.build(stack, "TestDistribution", {
         tls: { certificate: cert },
@@ -374,7 +455,7 @@ describe("DistributionBuilder", () => {
         .origin(withBucketOrigin(stack))
         .certificate(cert)
         .domainNames(["example.com"])
-        .accessLogging(false);
+        .accessLogs(false);
 
       const result = builder.build(stack, "TestDistribution");
 
@@ -397,7 +478,7 @@ describe("DistributionBuilder", () => {
       const bucket = new Bucket(stack, "TestBucket");
       const origin = S3BucketOrigin.withOriginAccessControl(bucket);
 
-      const builder = createDistributionBuilder().origin(origin).accessLogging(true);
+      const builder = createDistributionBuilder().origin(origin);
       builder.build(stack, "TestDistribution");
 
       const template = Template.fromStack(stack);
@@ -430,7 +511,7 @@ describe("DistributionBuilder", () => {
       const bucket = new Bucket(stack, "TestBucket");
       const origin = S3BucketOrigin.withOriginAccessControl(bucket);
 
-      const builder = createDistributionBuilder().origin(origin).accessLogging(false);
+      const builder = createDistributionBuilder().origin(origin).accessLogs(false);
       builder.build(stack, "TestDistribution");
 
       const template = Template.fromStack(stack);

@@ -19,12 +19,13 @@ import type { DistributionBuilderProps, InlineFunctionDefinition } from "./distr
  */
 export const DISTRIBUTION_DEFAULTS: Partial<DistributionBuilderProps> = {
   /**
-   * Automatically create an S3 logging bucket for CloudFront standard access logs.
-   * Access logging provides an audit trail of all viewer requests for security
-   * monitoring and troubleshooting.
+   * Auto-create a dedicated logging bucket and write CloudFront standard
+   * access logs to it under the `logs/` prefix. Access logging provides an
+   * audit trail of all viewer requests for security monitoring and
+   * troubleshooting.
    * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_detect_investigate_events_app_service_logging.html
    */
-  accessLogging: true,
+  accessLogs: { prefix: "logs/" },
 
   /**
    * Use the cheapest price class — edge locations in North America and Europe.

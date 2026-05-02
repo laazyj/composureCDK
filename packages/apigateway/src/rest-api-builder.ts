@@ -111,7 +111,7 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
     const api = new RestApi(scope, id, {
       ...restApiProps,
       deployOptions,
-    } as RestApiProps);
+    });
     this.#root.applyTo(api.root, context ?? {});
 
     const alarms = createRestApiAlarms(scope, id, api, alarmConfig, this.#customAlarms);

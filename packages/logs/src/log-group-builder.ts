@@ -41,7 +41,7 @@ class LogGroupBuilder implements Lifecycle<LogGroupBuilderResult> {
     const mergedProps = {
       ...LOG_GROUP_DEFAULTS,
       ...this.props,
-    } as LogGroupBuilderProps;
+    };
     return {
       logGroup: new LogGroup(scope, id, mergedProps),
     };

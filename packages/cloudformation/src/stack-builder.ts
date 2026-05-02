@@ -85,7 +85,7 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
   }
 
   build(scope: IConstruct, id: string): StackBuilderResult {
-    const stack = new Stack(scope, id, this.props as StackProps);
+    const stack = new Stack(scope, id, this.props);
     this.#tags.forEach(([key, value]) => {
       Tags.of(stack).add(key, value);
     });
@@ -124,5 +124,5 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
  * ```
  */
 export function createStackBuilder(): IStackBuilder {
-  return Builder<StackProps, StackBuilder>(StackBuilder) as IStackBuilder;
+  return Builder<StackProps, StackBuilder>(StackBuilder);
 }

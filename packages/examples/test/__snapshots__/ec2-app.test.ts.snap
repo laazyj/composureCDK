@@ -1,0 +1,967 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ec2-app > matches the expected synthesised template 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+    "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter": {
+      "Default": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+      "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+    },
+  },
+  "Resources": {
+    "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E": {
+      "DependsOn": [
+        "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200.zip",
+        },
+        "Description": "Lambda function for removing all inbound/outbound rules from the VPC default security group",
+        "Handler": "__entrypoint__.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+        ],
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "ec2:AuthorizeSecurityGroupIngress",
+                    "ec2:AuthorizeSecurityGroupEgress",
+                    "ec2:RevokeSecurityGroupIngress",
+                    "ec2:RevokeSecurityGroupEgress",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition",
+                          },
+                          ":ec2:",
+                          {
+                            "Ref": "AWS::Region",
+                          },
+                          ":",
+                          {
+                            "Ref": "AWS::AccountId",
+                          },
+                          ":security-group/",
+                          {
+                            "Fn::GetAtt": [
+                              "Ec2Appnetwork88B7C786",
+                              "DefaultSecurityGroup",
+                            ],
+                          },
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "Inline",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "Ec2Appalerts262D0F75": {
+      "Properties": {
+        "DisplayName": "EC2 Alerts",
+      },
+      "Type": "AWS::SNS::Topic",
+    },
+    "Ec2AppalertsNumberOfNotificationsFailedAlarmA14DF993": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "Ec2Appalerts262D0F75",
+          },
+        ],
+        "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
+        "AlarmName": "composure-cdk-ec2-stack/ec2-app/alerts/number-of-notifications-failed",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "Ec2Appalerts262D0F75",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFailed",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "Ec2AppalertsNumberOfNotificationsFailedToRedriveToDlqAlarmD0066E38": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "Ec2Appalerts262D0F75",
+          },
+        ],
+        "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
+        "AlarmName": "composure-cdk-ec2-stack/ec2-app/alerts/number-of-notifications-failed-to-redrive-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "Ec2Appalerts262D0F75",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFailedToRedriveToDlq",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "Ec2AppalertsNumberOfNotificationsFilteredOutInvalidAttributesAlarm428DC53E": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "Ec2Appalerts262D0F75",
+          },
+        ],
+        "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
+        "AlarmName": "composure-cdk-ec2-stack/ec2-app/alerts/number-of-notifications-filtered-out-invalid-attributes",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "Ec2Appalerts262D0F75",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "Ec2AppalertsNumberOfNotificationsRedrivenToDlqAlarm1513FC46": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "Ec2Appalerts262D0F75",
+          },
+        ],
+        "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
+        "AlarmName": "composure-cdk-ec2-stack/ec2-app/alerts/number-of-notifications-redriven-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "Ec2Appalerts262D0F75",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsRedrivenToDlq",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "Ec2AppalertsPolicyA98B45CA": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sns:Publish",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": {
+                "Ref": "Ec2Appalerts262D0F75",
+              },
+              "Sid": "AllowPublishThroughSSLOnly",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Topics": [
+          {
+            "Ref": "Ec2Appalerts262D0F75",
+          },
+        ],
+      },
+      "Type": "AWS::SNS::TopicPolicy",
+    },
+    "Ec2Appnetwork88B7C786": {
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::VPC",
+    },
+    "Ec2AppnetworkDefaultFlowLog5FD31592": {
+      "Properties": {
+        "DeliverLogsPermissionArn": {
+          "Fn::GetAtt": [
+            "Ec2AppnetworkDefaultFlowLogIAMRoleD4BC9070",
+            "Arn",
+          ],
+        },
+        "LogDestinationType": "cloud-watch-logs",
+        "LogGroupName": {
+          "Ref": "Ec2AppnetworkFlowLogsLogGroup71573991",
+        },
+        "ResourceId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+        "ResourceType": "VPC",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/DefaultFlowLog",
+          },
+        ],
+        "TrafficType": "ALL",
+      },
+      "Type": "AWS::EC2::FlowLog",
+    },
+    "Ec2AppnetworkDefaultFlowLogIAMRoleD4BC9070": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "vpc-flow-logs.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/DefaultFlowLog",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "Ec2AppnetworkDefaultFlowLogIAMRoleDefaultPolicy3698FAA6": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "Ec2AppnetworkFlowLogsLogGroup71573991",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "Ec2AppnetworkDefaultFlowLogIAMRoleDefaultPolicy3698FAA6",
+        "Roles": [
+          {
+            "Ref": "Ec2AppnetworkDefaultFlowLogIAMRoleD4BC9070",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "Ec2AppnetworkFlowLogsLogGroup71573991": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "Ec2AppnetworkIGW0D028A88": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::InternetGateway",
+    },
+    "Ec2AppnetworkIsolatedSubnet1RouteTableAssociationA187A523": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "Ec2AppnetworkIsolatedSubnet1RouteTableF00490D5",
+        },
+        "SubnetId": {
+          "Ref": "Ec2AppnetworkIsolatedSubnet1Subnet61154782",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "Ec2AppnetworkIsolatedSubnet1RouteTableF00490D5": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/IsolatedSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "Ec2AppnetworkIsolatedSubnet1Subnet61154782": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.128.0/18",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/IsolatedSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "Ec2AppnetworkIsolatedSubnet2RouteTable658D43BA": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/IsolatedSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "Ec2AppnetworkIsolatedSubnet2RouteTableAssociation010AD238": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "Ec2AppnetworkIsolatedSubnet2RouteTable658D43BA",
+        },
+        "SubnetId": {
+          "Ref": "Ec2AppnetworkIsolatedSubnet2Subnet947174CD",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "Ec2AppnetworkIsolatedSubnet2Subnet947174CD": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.192.0/18",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/IsolatedSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "Ec2AppnetworkPublicSubnet1DefaultRoute4FE2F5CB": {
+      "DependsOn": [
+        "Ec2AppnetworkVPCGW15960077",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "Ec2AppnetworkIGW0D028A88",
+        },
+        "RouteTableId": {
+          "Ref": "Ec2AppnetworkPublicSubnet1RouteTableF1978AC4",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "Ec2AppnetworkPublicSubnet1RouteTableAssociation163B7543": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "Ec2AppnetworkPublicSubnet1RouteTableF1978AC4",
+        },
+        "SubnetId": {
+          "Ref": "Ec2AppnetworkPublicSubnet1SubnetE115BDBE",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "Ec2AppnetworkPublicSubnet1RouteTableF1978AC4": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PublicSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "Ec2AppnetworkPublicSubnet1SubnetE115BDBE": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.0.0/18",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Public",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PublicSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "Ec2AppnetworkPublicSubnet2DefaultRoute752E2A01": {
+      "DependsOn": [
+        "Ec2AppnetworkVPCGW15960077",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "Ec2AppnetworkIGW0D028A88",
+        },
+        "RouteTableId": {
+          "Ref": "Ec2AppnetworkPublicSubnet2RouteTable7DF25ADA",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "Ec2AppnetworkPublicSubnet2RouteTable7DF25ADA": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PublicSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "Ec2AppnetworkPublicSubnet2RouteTableAssociation9B1C5804": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "Ec2AppnetworkPublicSubnet2RouteTable7DF25ADA",
+        },
+        "SubnetId": {
+          "Ref": "Ec2AppnetworkPublicSubnet2Subnet4961EBA4",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "Ec2AppnetworkPublicSubnet2Subnet4961EBA4": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.64.0/18",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Public",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PublicSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "Ec2AppnetworkRestrictDefaultSecurityGroupCustomResource43C77B68": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "Account": {
+          "Ref": "AWS::AccountId",
+        },
+        "DefaultSecurityGroupId": {
+          "Fn::GetAtt": [
+            "Ec2Appnetwork88B7C786",
+            "DefaultSecurityGroup",
+          ],
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::VpcRestrictDefaultSG",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "Ec2AppnetworkVPCGW15960077": {
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "Ec2AppnetworkIGW0D028A88",
+        },
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+    },
+    "Ec2Appserver2236696B": {
+      "DependsOn": [
+        "Ec2AppserverInstanceRole9E976BE4",
+      ],
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/xvda",
+            "Ebs": {
+              "Encrypted": true,
+              "VolumeSize": 8,
+              "VolumeType": "gp3",
+            },
+          },
+        ],
+        "EbsOptimized": true,
+        "IamInstanceProfile": {
+          "Ref": "Ec2AppserverInstanceProfile21D920AD",
+        },
+        "ImageId": {
+          "Ref": "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "InstanceType": "t3.micro",
+        "LaunchTemplate": {
+          "LaunchTemplateName": "Ec2App--serverLaunchTemplate",
+          "Version": {
+            "Fn::GetAtt": [
+              "Ec2AppserverLaunchTemplateDDE5D6EF",
+              "LatestVersionNumber",
+            ],
+          },
+        },
+        "Monitoring": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "Ec2AppserverInstanceSecurityGroup67724A4B",
+              "GroupId",
+            ],
+          },
+        ],
+        "SubnetId": {
+          "Ref": "Ec2AppnetworkIsolatedSubnet1Subnet61154782",
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--server",
+          },
+        ],
+        "UserData": {
+          "Fn::Base64": "#!/bin/bash",
+        },
+      },
+      "Type": "AWS::EC2::Instance",
+    },
+    "Ec2AppserverAttachedEbsStatusCheckFailedAlarm0E117CD6": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "Ec2Appalerts262D0F75",
+          },
+        ],
+        "AlarmDescription": "EC2 instance attached EBS volume(s) are unreachable or unable to complete I/O. Threshold: >= 1 failed checks (max) over 10 x 1 minute.",
+        "AlarmName": "composure-cdk-ec2-stack/ec2-app/server/attached-ebs-status-check-failed",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 10,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "Ec2Appserver2236696B",
+            },
+          },
+        ],
+        "EvaluationPeriods": 10,
+        "MetricName": "StatusCheckFailed_AttachedEBS",
+        "Namespace": "AWS/EC2",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "Ec2AppserverCpuCreditBalanceAlarm60CA2898": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "Ec2Appalerts262D0F75",
+          },
+        ],
+        "AlarmDescription": "EC2 burstable instance CPU credit balance is low — baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
+        "AlarmName": "composure-cdk-ec2-stack/ec2-app/server/cpu-credit-balance",
+        "ComparisonOperator": "LessThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "Ec2Appserver2236696B",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "CPUCreditBalance",
+        "Namespace": "AWS/EC2",
+        "Period": 300,
+        "Statistic": "Minimum",
+        "Threshold": 50,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "Ec2AppserverCpuUtilizationAlarmB0716D7B": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "Ec2Appalerts262D0F75",
+          },
+        ],
+        "AlarmDescription": "EC2 instance CPU utilization is sustained at a high level. Threshold: > 80% average over 5 x 1 minute.",
+        "AlarmName": "composure-cdk-ec2-stack/ec2-app/server/cpu-utilization",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "Ec2Appserver2236696B",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 80,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "Ec2AppserverInstanceProfile21D920AD": {
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "Ec2AppserverInstanceRole9E976BE4",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::InstanceProfile",
+    },
+    "Ec2AppserverInstanceRole9E976BE4": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/AmazonSSMManagedInstanceCore",
+              ],
+            ],
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--server",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "Ec2AppserverInstanceSecurityGroup67724A4B": {
+      "Properties": {
+        "GroupDescription": "ComposureCDK-Ec2Stack/Ec2App--server/InstanceSecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--server",
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "Ec2AppserverLaunchTemplateDDE5D6EF": {
+      "Properties": {
+        "LaunchTemplateData": {
+          "MetadataOptions": {
+            "HttpTokens": "required",
+          },
+        },
+        "LaunchTemplateName": "Ec2App--serverLaunchTemplate",
+      },
+      "Type": "AWS::EC2::LaunchTemplate",
+    },
+    "Ec2AppserverStatusCheckFailedAlarm49B43E4F": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "Ec2Appalerts262D0F75",
+          },
+        ],
+        "AlarmDescription": "EC2 instance is failing its status checks. Threshold: > 0 failed checks over 2 x 1 minute.",
+        "AlarmName": "composure-cdk-ec2-stack/ec2-app/server/status-check-failed",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 2,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "Ec2Appserver2236696B",
+            },
+          },
+        ],
+        "EvaluationPeriods": 2,
+        "MetricName": "StatusCheckFailed",
+        "Namespace": "AWS/EC2",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

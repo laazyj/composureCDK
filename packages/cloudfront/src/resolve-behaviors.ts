@@ -4,7 +4,6 @@ import {
   Function as CfFunction,
   type FunctionAssociation,
   type FunctionEventType,
-  type FunctionProps,
   FunctionRuntime,
   type IOrigin,
 } from "aws-cdk-lib/aws-cloudfront";
@@ -151,7 +150,7 @@ export function resolveBehaviors(input: ResolveBehaviorsInput): ResolveBehaviors
       const fn = new CfFunction(scope, fnId, {
         ...INLINE_FUNCTION_DEFAULTS,
         ...omit(def, "eventType", "recommendedAlarms"),
-      } as FunctionProps);
+      });
       functions[behaviorFunctionKeyPrefix(pathPattern, eventType)] = {
         function: fn,
         pathPattern,

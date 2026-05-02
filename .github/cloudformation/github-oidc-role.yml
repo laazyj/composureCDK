@@ -131,6 +131,18 @@ Resources:
               - cloudformation:ListStacks
             Resource: "*"
 
+          # EC2 — read-only describes for the smoke test (instance state +
+          # status checks for ComposureCDK-Ec2Stack). EC2 Describe* actions
+          # do not support resource-level permissions, so Resource is "*".
+          # Stack creation/mutation of EC2 resources runs under the CDK
+          # cfn-exec role (not this OIDC role) via AssumeRole below.
+          - Sid: EC2Read
+            Effect: Allow
+            Action:
+              - ec2:DescribeInstances
+              - ec2:DescribeInstanceStatus
+            Resource: "*"
+
           # Lambda — scoped by CloudFormation stack-name tag.
           # CreateFunction accepts Tags, so aws:RequestTag works at
           # creation time. Mutations use aws:ResourceTag on the

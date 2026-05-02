@@ -168,6 +168,61 @@ try {
   fail(`${WEBSITE_STACK} — ${err.message}`);
 }
 
+// --- EC2 instance checks ----------------------------------------------------
+
+console.log("\n=== EC2 instance checks ===\n");
+
+const EC2_STACK = "ComposureCDK-Ec2Stack";
+
+try {
+  const { StackResourceSummaries: resources } = aws(
+    "cloudformation",
+    "list-stack-resources",
+    "--stack-name",
+    EC2_STACK,
+    "--output",
+    "json",
+  );
+  const instanceIds = resources
+    .filter((r) => r.ResourceType === "AWS::EC2::Instance")
+    .map((r) => r.PhysicalResourceId);
+
+  if (instanceIds.length === 0) {
+    fail(`${EC2_STACK} — no AWS::EC2::Instance resources found`);
+  } else {
+    // describe-instance-status only returns "running" instances by default.
+    // --include-all-instances surfaces stopped/pending so we can report state
+    // explicitly rather than getting an empty result.
+    const { InstanceStatuses: statuses } = aws(
+      "ec2",
+      "describe-instance-status",
+      "--instance-ids",
+      ...instanceIds,
+      "--include-all-instances",
+      "--output",
+      "json",
+    );
+
+    for (const id of instanceIds) {
+      const status = statuses.find((s) => s.InstanceId === id);
+      if (!status) {
+        fail(`${id} — no status returned`);
+        continue;
+      }
+      const state = status.InstanceState?.Name;
+      const sys = status.SystemStatus?.Status;
+      const inst = status.InstanceStatus?.Status;
+      if (state === "running" && sys === "ok" && inst === "ok") {
+        pass(`${id} — running, system=ok, instance=ok`);
+      } else {
+        fail(`${id} — state=${state}, system=${sys}, instance=${inst}`);
+      }
+    }
+  }
+} catch (err) {
+  fail(`${EC2_STACK} — ${err.message}`);
+}
+
 // --- Summary ----------------------------------------------------------------
 
 console.log("");

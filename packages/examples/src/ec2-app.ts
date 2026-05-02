@@ -1,0 +1,55 @@
+import { App, Stack } from "aws-cdk-lib";
+import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
+import {
+  InstanceClass,
+  InstanceSize,
+  InstanceType,
+  MachineImage,
+  type Vpc,
+} from "aws-cdk-lib/aws-ec2";
+import { compose, ref } from "@composurecdk/core";
+import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
+import { createInstanceBuilder, createVpcBuilder, type VpcBuilderResult } from "@composurecdk/ec2";
+import { createTopicBuilder } from "@composurecdk/sns";
+
+/**
+ * A VPC with an EC2 instance launched into its private subnet, composed
+ * into a single stack alongside an SNS alert topic.
+ *
+ * Demonstrates:
+ * - Creating a VPC with well-architected defaults (2 AZs, flow logs)
+ * - Creating an EC2 instance with well-architected defaults
+ *   (IMDSv2, detailed monitoring, encrypted GP3 root, SSM-managed)
+ * - Wiring the instance to the VPC via `ref<VpcBuilderResult>(...)` —
+ *   no direct construct passing needed
+ * - Recommended alarms (CPU, status check, CPU credit balance for T-family)
+ * - Routing every alarm to the alert topic via `alarmActionsPolicy`
+ *
+ * NAT gateways are disabled here to keep deploy/destroy fast and cheap
+ * for the example workflow — the instance therefore has no internet
+ * egress, so SSM Session Manager will not work without VPC endpoints.
+ * Override `natGateways` for a workload that needs egress.
+ */
+export function createEc2App(app = new App()) {
+  const stack = new Stack(app, "ComposureCDK-Ec2Stack");
+
+  const { alerts } = compose(
+    {
+      alerts: createTopicBuilder().displayName("EC2 Alerts"),
+
+      network: createVpcBuilder().maxAzs(2).natGateways(0),
+
+      server: createInstanceBuilder()
+        .vpc(ref<VpcBuilderResult>("network").map((r: VpcBuilderResult): Vpc => r.vpc))
+        .instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO))
+        .machineImage(MachineImage.latestAmazonLinux2023()),
+    },
+    { alerts: [], network: [], server: ["network"] },
+  ).build(stack, "Ec2App");
+
+  alarmActionsPolicy(stack, {
+    defaults: { alarmActions: [new SnsAction(alerts.topic)] },
+  });
+
+  return { stack };
+}

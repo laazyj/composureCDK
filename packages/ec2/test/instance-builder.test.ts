@@ -5,10 +5,12 @@ import {
   InstanceClass,
   InstanceSize,
   InstanceType,
+  KeyPair,
   MachineImage,
   SecurityGroup,
   Vpc,
 } from "aws-cdk-lib/aws-ec2";
+import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { ref } from "@composurecdk/core";
 import { createInstanceBuilder } from "../src/instance-builder.js";
 import { createVpcBuilder } from "../src/vpc-builder.js";
@@ -58,6 +60,63 @@ describe("InstanceBuilder", () => {
         .machineImage(MachineImage.latestAmazonLinux2023());
 
       expect(() => builder.build(stack, "TestInstance")).toThrow(/requires a VPC/);
+    });
+
+    it("resolves a Ref-based role from context", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = new Vpc(stack, "TestVpc", { maxAzs: 2, natGateways: 0 });
+      const role = new Role(stack, "ProvidedRole", {
+        assumedBy: new ServicePrincipal("ec2.amazonaws.com"),
+      });
+
+      createInstanceBuilder()
+        .vpc(vpc)
+        .instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO))
+        .machineImage(MachineImage.latestAmazonLinux2023())
+        .role(ref<{ role: Role }>("iam").get("role"))
+        .build(stack, "TestInstance", { iam: { role } });
+
+      const template = Template.fromStack(stack);
+      // Only the provided role exists; the builder did not create a default one.
+      template.resourceCountIs("AWS::IAM::Role", 1);
+    });
+
+    it("resolves a Ref-based keyPair from context", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = new Vpc(stack, "TestVpc", { maxAzs: 2, natGateways: 0 });
+      const keyPair = new KeyPair(stack, "ProvidedKeyPair", { keyPairName: "ref-key" });
+
+      createInstanceBuilder()
+        .vpc(vpc)
+        .instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO))
+        .machineImage(MachineImage.latestAmazonLinux2023())
+        .keyPair(ref<{ keyPair: KeyPair }>("access").get("keyPair"))
+        .build(stack, "TestInstance", { access: { keyPair } });
+
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::EC2::Instance", {
+        KeyName: Match.anyValue(),
+      });
+    });
+
+    it("resolves a Ref-based securityGroup from context", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = new Vpc(stack, "TestVpc", { maxAzs: 2, natGateways: 0 });
+      const sg = new SecurityGroup(stack, "ProvidedSG", { vpc, allowAllOutbound: false });
+
+      createInstanceBuilder()
+        .vpc(vpc)
+        .instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO))
+        .machineImage(MachineImage.latestAmazonLinux2023())
+        .securityGroup(ref<{ sg: SecurityGroup }>("network").get("sg"))
+        .build(stack, "TestInstance", { network: { sg } });
+
+      const template = Template.fromStack(stack);
+      // VPC default SG + the resolved SG. No extra instance-created SG.
+      template.resourceCountIs("AWS::EC2::SecurityGroup", 1);
     });
 
     it("resolves a Ref-based vpc from context", () => {

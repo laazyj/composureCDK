@@ -1,5 +1,12 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { Instance, type IVpc, type InstanceProps } from "aws-cdk-lib/aws-ec2";
+import {
+  Instance,
+  type IKeyPair,
+  type ISecurityGroup,
+  type IVpc,
+  type InstanceProps,
+} from "aws-cdk-lib/aws-ec2";
+import { type IRole } from "aws-cdk-lib/aws-iam";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -16,11 +23,58 @@ import { INSTANCE_DEFAULTS } from "./instance-defaults.js";
 /**
  * Configuration properties for the EC2 instance builder.
  *
- * Extends the CDK {@link InstanceProps} (minus `vpc`, which is supplied via
- * the dedicated {@link IInstanceBuilder.vpc | .vpc()} method to support
- * {@link Resolvable} cross-component wiring) with builder-specific options.
+ * Extends the CDK {@link InstanceProps} but lifts the cross-component-wiring
+ * props to {@link Resolvable} so they can be supplied as either concrete
+ * values or {@link Ref}s to sibling components in a {@link compose}d system:
+ *
+ * - `vpc` is supplied via the dedicated
+ *   {@link IInstanceBuilder.vpc | .vpc()} method.
+ * - `role`, `keyPair`, and `securityGroup` are exposed on the builder as
+ *   `Resolvable<T>` setters.
+ *
+ * Other props (`instanceType`, `machineImage`, `userData`, `blockDevices`,
+ * etc.) are passed through with their CDK types unchanged because they are
+ * almost always constructed inline rather than referenced from another
+ * component.
  */
-export interface InstanceBuilderProps extends Omit<InstanceProps, "vpc"> {
+export interface InstanceBuilderProps extends Omit<
+  InstanceProps,
+  "vpc" | "role" | "keyPair" | "securityGroup"
+> {
+  /**
+   * IAM role assumed by the instance via its instance profile.
+   *
+   * Accepts a concrete {@link IRole} or a {@link Ref} that resolves to one
+   * at build time, e.g. a sibling `RoleBuilder` in the same composed system.
+   *
+   * @default - CDK creates a role and attaches `AmazonSSMManagedInstanceCore`,
+   *   driven by the `ssmSessionPermissions: true` default in
+   *   {@link INSTANCE_DEFAULTS}.
+   */
+  role?: Resolvable<IRole>;
+
+  /**
+   * Key pair to associate with the instance.
+   *
+   * Accepts a concrete {@link IKeyPair} or a {@link Ref} that resolves to
+   * one at build time.
+   *
+   * @default - no key pair is associated; SSM Session Manager is the
+   *   recommended access path.
+   */
+  keyPair?: Resolvable<IKeyPair>;
+
+  /**
+   * Primary security group for the instance.
+   *
+   * Accepts a concrete {@link ISecurityGroup} or a {@link Ref} that resolves
+   * to one at build time. Additional security groups can be attached via
+   * `instance.addSecurityGroup()` after build.
+   *
+   * @default - CDK creates a security group allowing all outbound traffic.
+   */
+  securityGroup?: Resolvable<ISecurityGroup>;
+
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
@@ -72,7 +126,9 @@ export interface InstanceBuilderResult {
  *
  * The `vpc` is set via the dedicated {@link IInstanceBuilder.vpc | .vpc()}
  * method that accepts a {@link Resolvable} value for cross-component wiring
- * (e.g., to a sibling {@link IVpcBuilder}).
+ * (e.g., to a sibling {@link IVpcBuilder}). The `role`, `keyPair`, and
+ * `securityGroup` setters likewise accept {@link Resolvable} values so they
+ * can be supplied by sibling builders' outputs via {@link ref}.
  *
  * The builder implements {@link Lifecycle}, so it can be used directly as a
  * component in a {@link compose | composed system}. When built, it creates
@@ -141,12 +197,21 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
       );
     }
 
-    const { recommendedAlarms: alarmConfig, ...instanceProps } = this.props;
+    const {
+      recommendedAlarms: alarmConfig,
+      role,
+      keyPair,
+      securityGroup,
+      ...instanceProps
+    } = this.props;
 
     const mergedProps = {
       ...INSTANCE_DEFAULTS,
       ...instanceProps,
       vpc: resolvedVpc,
+      ...(role !== undefined ? { role: resolve(role, context) } : {}),
+      ...(keyPair !== undefined ? { keyPair: resolve(keyPair, context) } : {}),
+      ...(securityGroup !== undefined ? { securityGroup: resolve(securityGroup, context) } : {}),
     } as InstanceProps;
 
     const instance = new Instance(scope, id, mergedProps);

@@ -30,7 +30,8 @@ jobs:
         run: |
           subject=$(printf '%s' "$SUBJECT" | head -n1)
           # SemVer: MAJOR.MINOR.PATCH with optional -prerelease and +build identifiers.
-          if [[ "$subject" =~ ^chore\(release\):\ v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)[[:space:]]*$ ]]; then
+          # GitHub squash-merge appends ` (#NN)` to the commit subject — allow it.
+          if [[ "$subject" =~ ^chore\(release\):\ v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)(\ \(#[0-9]+\))?[[:space:]]*$ ]]; then
             version="${BASH_REMATCH[1]}"
             echo "version=${version}" >> "$GITHUB_OUTPUT"
             echo "Detected release commit for v${version}"

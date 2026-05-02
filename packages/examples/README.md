@@ -12,6 +12,7 @@ All example stacks use the `ComposureCDK-` name prefix. This convention enables 
 | [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment                     |
 | [`ComposureCDK-OpenApiPetstoreStack`](src/openapi-petstore-app.ts)                                  | PetStore REST API defined by an inline OpenAPI 3.0 specification                                 |
 | [`ComposureCDK-DnsZoneStack`](src/dns-zone-app.ts)                                                  | Public Route 53 zone built with the BIND-style zone DSL, including a CloudFront `ALIAS` at `www` |
+| [`ComposureCDK-Ec2Stack`](src/ec2-app.ts)                                                           | VPC + EC2 instance with well-architected defaults, recommended alarms, and SNS alert wiring      |
 
 ## Prerequisites
 

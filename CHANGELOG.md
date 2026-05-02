@@ -1,3 +1,17 @@
+## 0.5.1 (2026-05-02)
+
+### 🚀 Features
+
+- **ec2:** add InstanceBuilder and VpcBuilder with well-architected d… ([#48](https://github.com/laazyj/composureCDK/pull/48), [#33](https://github.com/laazyj/composureCDK/issues/33))
+
+### 🩹 Fixes
+
+- **release:** move git config under version/changelog subcommands ([#71](https://github.com/laazyj/composureCDK/pull/71))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.5.0 (2026-04-30)
 
 ### 🚀 Features

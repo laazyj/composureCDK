@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/ec2",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Composable EC2 instance and VPC builders with well-architected defaults",
   "repository": {
     "type": "git",

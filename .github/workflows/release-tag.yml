@@ -1,0 +1,100 @@
+name: Release Tag
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag and create GitHub Release
+    # Cheap workflow-level filter so non-release pushes never spin up a runner.
+    # Assumes squash-merge of the release PR — the strict regex parse below is
+    # the authoritative validation.
+    if: "${{ startsWith(github.event.head_commit.message, 'chore(release): v') }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - name: Parse version from commit subject
+        id: parse
+        env:
+          SUBJECT: ${{ github.event.head_commit.message }}
+        run: |
+          subject=$(printf '%s' "$SUBJECT" | head -n1)
+          # SemVer: MAJOR.MINOR.PATCH with optional -prerelease and +build identifiers.
+          if [[ "$subject" =~ ^chore\(release\):\ v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)[[:space:]]*$ ]]; then
+            version="${BASH_REMATCH[1]}"
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
+            echo "Detected release commit for v${version}"
+          else
+            echo "::error::Commit subject matched startsWith filter but failed strict regex: $subject"
+            exit 1
+          fi
+
+      - name: Checkout
+        # Use the default GITHUB_TOKEN explicitly: actions taken with this token do not
+        # trigger new workflow runs, so pushing the tag below will not double-fire
+        # release.yml's `push: tags` trigger. release.yml is invoked via workflow_call.
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          tag="v${VERSION}"
+          if git ls-remote --exit-code --tags origin "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists on origin; nothing to do."
+            exit 0
+          fi
+          git tag -a "$tag" -m "Release $tag"
+          git push origin "$tag"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          tag="v${VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; nothing to do."
+            exit 0
+          fi
+          # Notes are extracted from the workspace CHANGELOG.md section for this version.
+          # The section header format is set by nx release: `## VERSION` followed by content
+          # until the next `## ` heading.
+          notes=$(awk -v ver="$VERSION" '
+            $0 ~ "^## "ver"( |$|\\()" { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$notes" ]; then
+            echo "::warning::Could not extract notes for $tag from CHANGELOG.md; using auto-generated notes."
+            gh release create "$tag" --title "$tag" --generate-notes
+          else
+            printf '%s' "$notes" | gh release create "$tag" --title "$tag" --notes-file -
+          fi
+
+  release:
+    name: Release
+    needs: tag
+    if: ${{ needs.tag.outputs.version != '' }}
+    uses: ./.github/workflows/release.yml
+    permissions:
+      contents: write
+      id-token: write
+    secrets: inherit

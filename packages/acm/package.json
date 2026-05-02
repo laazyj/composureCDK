@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/acm",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Composable AWS Certificate Manager builder with well-architected defaults",
   "repository": {
     "type": "git",

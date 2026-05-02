@@ -17,13 +17,18 @@ import { createTopicBuilder } from "@composurecdk/sns";
  * into a single stack alongside an SNS alert topic.
  *
  * Demonstrates:
- * - Creating a VPC with well-architected defaults (2 AZs, 1 NAT, flow logs)
+ * - Creating a VPC with well-architected defaults (2 AZs, flow logs)
  * - Creating an EC2 instance with well-architected defaults
  *   (IMDSv2, detailed monitoring, encrypted GP3 root, SSM-managed)
  * - Wiring the instance to the VPC via `ref<VpcBuilderResult>(...)` —
  *   no direct construct passing needed
  * - Recommended alarms (CPU, status check, CPU credit balance for T-family)
  * - Routing every alarm to the alert topic via `alarmActionsPolicy`
+ *
+ * NAT gateways are disabled here to keep deploy/destroy fast and cheap
+ * for the example workflow — the instance therefore has no internet
+ * egress, so SSM Session Manager will not work without VPC endpoints.
+ * Override `natGateways` for a workload that needs egress.
  */
 export function createEc2App(app = new App()) {
   const stack = new Stack(app, "ComposureCDK-Ec2Stack");
@@ -32,7 +37,7 @@ export function createEc2App(app = new App()) {
     {
       alerts: createTopicBuilder().displayName("EC2 Alerts"),
 
-      network: createVpcBuilder().maxAzs(2).natGateways(1),
+      network: createVpcBuilder().maxAzs(2).natGateways(0),
 
       server: createInstanceBuilder()
         .vpc(ref<VpcBuilderResult>("network").map((r: VpcBuilderResult): Vpc => r.vpc))

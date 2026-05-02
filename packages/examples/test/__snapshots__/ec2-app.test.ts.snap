@@ -384,35 +384,23 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::EC2::InternetGateway",
     },
-    "Ec2AppnetworkPrivateSubnet1DefaultRoute9F207552": {
-      "Properties": {
-        "DestinationCidrBlock": "0.0.0.0/0",
-        "NatGatewayId": {
-          "Ref": "Ec2AppnetworkPublicSubnet1NATGatewayF62069B1",
-        },
-        "RouteTableId": {
-          "Ref": "Ec2AppnetworkPrivateSubnet1RouteTableD03BDDD3",
-        },
-      },
-      "Type": "AWS::EC2::Route",
-    },
-    "Ec2AppnetworkPrivateSubnet1RouteTableAssociation5E9CB477": {
+    "Ec2AppnetworkIsolatedSubnet1RouteTableAssociationA187A523": {
       "Properties": {
         "RouteTableId": {
-          "Ref": "Ec2AppnetworkPrivateSubnet1RouteTableD03BDDD3",
+          "Ref": "Ec2AppnetworkIsolatedSubnet1RouteTableF00490D5",
         },
         "SubnetId": {
-          "Ref": "Ec2AppnetworkPrivateSubnet1SubnetC8423EED",
+          "Ref": "Ec2AppnetworkIsolatedSubnet1Subnet61154782",
         },
       },
       "Type": "AWS::EC2::SubnetRouteTableAssociation",
     },
-    "Ec2AppnetworkPrivateSubnet1RouteTableD03BDDD3": {
+    "Ec2AppnetworkIsolatedSubnet1RouteTableF00490D5": {
       "Properties": {
         "Tags": [
           {
             "Key": "Name",
-            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PrivateSubnet1",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/IsolatedSubnet1",
           },
         ],
         "VpcId": {
@@ -421,7 +409,7 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::EC2::RouteTable",
     },
-    "Ec2AppnetworkPrivateSubnet1SubnetC8423EED": {
+    "Ec2AppnetworkIsolatedSubnet1Subnet61154782": {
       "Properties": {
         "AvailabilityZone": {
           "Fn::Select": [
@@ -436,15 +424,15 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
         "Tags": [
           {
             "Key": "aws-cdk:subnet-name",
-            "Value": "Private",
+            "Value": "Isolated",
           },
           {
             "Key": "aws-cdk:subnet-type",
-            "Value": "Private",
+            "Value": "Isolated",
           },
           {
             "Key": "Name",
-            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PrivateSubnet1",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/IsolatedSubnet1",
           },
         ],
         "VpcId": {
@@ -453,35 +441,12 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::EC2::Subnet",
     },
-    "Ec2AppnetworkPrivateSubnet2DefaultRoute05F0569C": {
-      "Properties": {
-        "DestinationCidrBlock": "0.0.0.0/0",
-        "NatGatewayId": {
-          "Ref": "Ec2AppnetworkPublicSubnet1NATGatewayF62069B1",
-        },
-        "RouteTableId": {
-          "Ref": "Ec2AppnetworkPrivateSubnet2RouteTableBBB21C38",
-        },
-      },
-      "Type": "AWS::EC2::Route",
-    },
-    "Ec2AppnetworkPrivateSubnet2RouteTableAssociationCF89AC99": {
-      "Properties": {
-        "RouteTableId": {
-          "Ref": "Ec2AppnetworkPrivateSubnet2RouteTableBBB21C38",
-        },
-        "SubnetId": {
-          "Ref": "Ec2AppnetworkPrivateSubnet2SubnetE401E79E",
-        },
-      },
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-    },
-    "Ec2AppnetworkPrivateSubnet2RouteTableBBB21C38": {
+    "Ec2AppnetworkIsolatedSubnet2RouteTable658D43BA": {
       "Properties": {
         "Tags": [
           {
             "Key": "Name",
-            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PrivateSubnet2",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/IsolatedSubnet2",
           },
         ],
         "VpcId": {
@@ -490,7 +455,18 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::EC2::RouteTable",
     },
-    "Ec2AppnetworkPrivateSubnet2SubnetE401E79E": {
+    "Ec2AppnetworkIsolatedSubnet2RouteTableAssociation010AD238": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "Ec2AppnetworkIsolatedSubnet2RouteTable658D43BA",
+        },
+        "SubnetId": {
+          "Ref": "Ec2AppnetworkIsolatedSubnet2Subnet947174CD",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "Ec2AppnetworkIsolatedSubnet2Subnet947174CD": {
       "Properties": {
         "AvailabilityZone": {
           "Fn::Select": [
@@ -505,15 +481,15 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
         "Tags": [
           {
             "Key": "aws-cdk:subnet-name",
-            "Value": "Private",
+            "Value": "Isolated",
           },
           {
             "Key": "aws-cdk:subnet-type",
-            "Value": "Private",
+            "Value": "Isolated",
           },
           {
             "Key": "Name",
-            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PrivateSubnet2",
+            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/IsolatedSubnet2",
           },
         ],
         "VpcId": {
@@ -536,42 +512,6 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
         },
       },
       "Type": "AWS::EC2::Route",
-    },
-    "Ec2AppnetworkPublicSubnet1EIPFA7A6A38": {
-      "Properties": {
-        "Domain": "vpc",
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PublicSubnet1",
-          },
-        ],
-      },
-      "Type": "AWS::EC2::EIP",
-    },
-    "Ec2AppnetworkPublicSubnet1NATGatewayF62069B1": {
-      "DependsOn": [
-        "Ec2AppnetworkPublicSubnet1DefaultRoute4FE2F5CB",
-        "Ec2AppnetworkPublicSubnet1RouteTableAssociation163B7543",
-      ],
-      "Properties": {
-        "AllocationId": {
-          "Fn::GetAtt": [
-            "Ec2AppnetworkPublicSubnet1EIPFA7A6A38",
-            "AllocationId",
-          ],
-        },
-        "SubnetId": {
-          "Ref": "Ec2AppnetworkPublicSubnet1SubnetE115BDBE",
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "ComposureCDK-Ec2Stack/Ec2App--network/PublicSubnet1",
-          },
-        ],
-      },
-      "Type": "AWS::EC2::NatGateway",
     },
     "Ec2AppnetworkPublicSubnet1RouteTableAssociation163B7543": {
       "Properties": {
@@ -785,7 +725,7 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
           },
         ],
         "SubnetId": {
-          "Ref": "Ec2AppnetworkPrivateSubnet1SubnetC8423EED",
+          "Ref": "Ec2AppnetworkIsolatedSubnet1Subnet61154782",
         },
         "Tags": [
           {

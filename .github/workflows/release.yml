@@ -4,9 +4,10 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_call:
 
 permissions:
-  contents: write # Changed from read to write for creating releases
+  contents: write # Required for creating GitHub releases
   id-token: write # For npm provenance
 
 jobs:

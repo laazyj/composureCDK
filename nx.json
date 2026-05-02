@@ -32,14 +32,15 @@
     },
     "releaseTagPattern": "v{version}",
     "git": {
+      "commit": false,
+      "tag": false,
+      "push": false,
       "commitMessage": "chore(release): v{version}"
     },
     "changelog": {
       "automaticFromRef": true,
       "projectChangelogs": false,
-      "workspaceChangelog": {
-        "createRelease": "github"
-      }
+      "workspaceChangelog": true
     }
   },
   "analytics": false

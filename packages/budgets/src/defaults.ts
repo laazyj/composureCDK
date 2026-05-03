@@ -43,3 +43,52 @@ export const BUDGET_DEFAULTS = {
     forecastedPercent: 100,
   },
 };
+
+/**
+ * ISO 4217 currency codes accepted by AWS Budgets for `COST` budgets'
+ * `BudgetLimit.Unit` and the `EstimatedCharges` alarm's `Currency`
+ * dimension. Sourced from the AWS Billing supported-currencies list.
+ *
+ * The synth context cannot see an account's billing currency, so the
+ * builder uses this set for shape validation only — a hard error on
+ * anything outside it (catches typos like `"ZZZ"`/`"USDD"`) — and emits
+ * a soft warning when the configured unit is anything other than `USD`,
+ * since most accounts default to USD billing.
+ *
+ * @see https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/manage-account-payment.html
+ */
+export const DEFAULT_BUDGET_CURRENCIES: readonly string[] = [
+  "AED",
+  "ARS",
+  "AUD",
+  "BRL",
+  "CAD",
+  "CHF",
+  "CLP",
+  "CNY",
+  "COP",
+  "CZK",
+  "DKK",
+  "EUR",
+  "GBP",
+  "HKD",
+  "IDR",
+  "ILS",
+  "INR",
+  "JPY",
+  "KRW",
+  "MXN",
+  "MYR",
+  "NOK",
+  "NZD",
+  "PLN",
+  "RUB",
+  "SAR",
+  "SEK",
+  "SGD",
+  "THB",
+  "TRY",
+  "TWD",
+  "USD",
+  "ZAR",
+];

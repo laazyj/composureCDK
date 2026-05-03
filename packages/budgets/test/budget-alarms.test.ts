@@ -101,6 +101,14 @@ describe("recommended alarms", () => {
       });
     });
 
+    it("rejects an unknown ISO 4217 currency", () => {
+      expect(() =>
+        buildResult((b) => {
+          b.recommendedAlarms({ estimatedCharges: { threshold: 25, currency: "ZZZ" } });
+        }),
+      ).toThrow(/not a recognised AWS Budgets currency/);
+    });
+
     it("honours custom evaluation/datapoints overrides", () => {
       const { template } = buildResult((b) => {
         b.recommendedAlarms({

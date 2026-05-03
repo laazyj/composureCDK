@@ -7,12 +7,12 @@ This package provides a fluent builder for `AWS::Budgets::Budget` with well-arch
 ## Budget Builder
 
 ```ts
-import { createBudgetBuilder } from "@composurecdk/budgets";
+import { createBudgetBuilder, email } from "@composurecdk/budgets";
 
 const budget = createBudgetBuilder()
   .budgetName("AgentBudget")
-  .limit({ amount: 50, unit: "GBP" })
-  .notifyOnActual(100, "ops@example.com")
+  .limit({ amount: 50 })
+  .notifyOnActual(100, { emails: [email("ops@example.com")] })
   .build(stack, "AgentBudget");
 ```
 
@@ -31,33 +31,42 @@ Every field on [CfnBudget.BudgetDataProperty](https://docs.aws.amazon.com/cdk/ap
 
 ### Notifications
 
-Percentage-threshold helpers cover the common case; `addNotification` accepts the raw shape when you need absolute-value thresholds or a different comparison operator.
+Each notification takes a `NotifySubscribers` object with **at most one** `sns` topic and a list of validated `emails` — AWS Budgets caps every notification at 1 SNS subscriber plus up to 10 EMAIL subscribers. The shape encodes that constraint in the type system: passing two SNS topics is unrepresentable.
 
 ```ts
+import { email } from "@composurecdk/budgets";
+
 createBudgetBuilder()
   .limit({ amount: 100 })
-  .notifyOnActual(80, "ops@example.com") // 80% ACTUAL → email
-  .notifyOnForecasted(
-    100,
-    ref("alerts", (r) => r.topic),
-  ) // 100% FORECASTED → SNS topic
+  .notifyOnActual(80, { emails: [email("ops@example.com")] }) // 80% ACTUAL → email
+  .notifyOnForecasted(100, { sns: ref("alerts", (r) => r.topic) }) // 100% FORECASTED → SNS topic
+  .notifyOnActual(100, {
+    sns: killSwitchTopic,
+    emails: [email("oncall@example.com")],
+  }) // hard breach → automation + human
   .addNotification({
     notificationType: "ACTUAL",
     threshold: 120,
     thresholdType: "ABSOLUTE_VALUE",
-    subscribers: ["oncall@example.com"],
+    subscribers: { emails: [email("oncall@example.com")] },
   });
 ```
 
-Subscribers may be email strings, `ITopic` instances, or `Resolvable<ITopic>` references to topics owned by sibling components.
+Email addresses must be constructed via `email(string)`, which validates and brands the value — bare strings are rejected at compile time. The `sns` slot accepts an `ITopic` instance or a `Resolvable<ITopic>` reference to a topic owned by a sibling component.
 
 ### Recommended Thresholds
 
 ```ts
-createBudgetBuilder().limit({ amount: 50 }).withRecommendedThresholds("ops@example.com");
+createBudgetBuilder()
+  .limit({ amount: 50 })
+  .withRecommendedThresholds({ emails: [email("ops@example.com")] });
 ```
 
 Applies the AWS Cost Optimization pillar defaults: `ACTUAL` at 80% and `FORECASTED` at 100%.
+
+### Currency
+
+`limit({ amount, unit })` validates `unit` against the AWS-Budgets-supported ISO 4217 set (`DEFAULT_BUDGET_CURRENCIES`). Typos like `"ZZZ"` throw at synth instead of mid-deploy. Because the synth context cannot see an account's billing currency, anything other than `"USD"` also emits a non-fatal warning (`@composurecdk/budgets:limit-currency`) — verify the configured unit matches your billing currency before deploying.
 
 ## Defaults
 

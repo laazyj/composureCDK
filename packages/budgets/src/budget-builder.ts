@@ -6,15 +6,18 @@ import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BudgetAlarmConfig } from "./alarm-config.js";
 import { buildBudgetAlarms } from "./budget-alarm-builder.js";
+import { assertValidBudgetCurrency, warnIfNonUsdCurrency } from "./currency.js";
 import { BUDGET_DEFAULTS } from "./defaults.js";
 import {
-  type BudgetSubscriber,
   type NotificationEntry,
   type NotificationType,
+  type NotifySubscribers,
   resolveSubscribers,
   toCfnNotificationWithSubscribers,
 } from "./notifications.js";
 import { createBudgetsTopicPolicies } from "./topic-policy.js";
+
+const MAX_EMAILS_PER_NOTIFICATION = 10;
 
 /**
  * Spend limit for a cost or usage budget.
@@ -25,6 +28,12 @@ export interface BudgetLimit {
   /**
    * Currency or usage unit. Defaults to
    * {@link BUDGET_DEFAULTS.limitUnit} when omitted.
+   *
+   * For `COST` budgets, must be a recognised AWS Budgets currency
+   * (validated at synth — see {@link DEFAULT_BUDGET_CURRENCIES}). The
+   * builder also emits a non-fatal warning when this is anything other
+   * than `"USD"`, since the account's billing currency isn't visible
+   * at synth and a mismatch is rejected at deploy time.
    */
   unit?: string;
 }
@@ -121,9 +130,12 @@ export interface BudgetBuilderResult {
  * ```ts
  * createBudgetBuilder()
  *   .budgetName("AgentBudget")
- *   .limit({ amount: 50, unit: "GBP" })
- *   .notifyOnActual(100, ref("alerts", r => r.topic))
- *   .withRecommendedThresholds()
+ *   .limit({ amount: 50 })
+ *   .notifyOnActual(100, {
+ *     emails: [email("ops@example.com")],
+ *     sns: ref("alerts", r => r.topic),
+ *   })
+ *   .withRecommendedThresholds({ emails: [email("ops@example.com")] })
  *   .build(stack, "AgentBudget");
  * ```
  */
@@ -140,10 +152,11 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
    *
    * @param thresholdPercent - Percentage of the budget limit (e.g. `80`).
    *   For absolute-value thresholds, use {@link addNotification} directly.
-   * @param subscribers - One or more email addresses / SNS topics (or
-   *   {@link Resolvable} refs to topics).
+   * @param subscribers - Up to one SNS topic plus up to ten validated
+   *   email addresses. AWS Budgets caps each notification at 1 SNS + up
+   *   to 10 EMAIL subscribers.
    */
-  notifyOnActual(thresholdPercent: number, ...subscribers: BudgetSubscriber[]): this {
+  notifyOnActual(thresholdPercent: number, subscribers: NotifySubscribers): this {
     return this.#addPercentageNotification("ACTUAL", thresholdPercent, subscribers);
   }
 
@@ -153,8 +166,10 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
    *
    * @param thresholdPercent - Percentage of the budget limit (e.g. `100`).
    *   For absolute-value thresholds, use {@link addNotification} directly.
+   * @param subscribers - Up to one SNS topic plus up to ten validated
+   *   email addresses.
    */
-  notifyOnForecasted(thresholdPercent: number, ...subscribers: BudgetSubscriber[]): this {
+  notifyOnForecasted(thresholdPercent: number, subscribers: NotifySubscribers): this {
     return this.#addPercentageNotification("FORECASTED", thresholdPercent, subscribers);
   }
 
@@ -174,12 +189,12 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
    * - `FORECASTED` at 100% — trending-over-budget alert.
    *
    * Must be called with at least one subscriber; the same subscriber
-   * list is used for both thresholds.
+   * set is used for both thresholds.
    *
    * @see https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-best-practices.html
    */
-  withRecommendedThresholds(...subscribers: BudgetSubscriber[]): this {
-    if (subscribers.length === 0) {
+  withRecommendedThresholds(subscribers: NotifySubscribers): this {
+    if (!hasAnySubscriber(subscribers)) {
       throw new Error(
         `BudgetBuilder: withRecommendedThresholds(...) must be called with at least one subscriber.`,
       );
@@ -227,7 +242,13 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
       );
     }
 
-    const { notificationsWithSubscribers, snsTopics } = this.#buildNotifications(context);
+    const limitUnit = budgetProps.limit?.unit ?? BUDGET_DEFAULTS.limitUnit;
+    if (budgetType === "COST" && budgetProps.limit) {
+      assertValidBudgetCurrency(limitUnit, `BudgetBuilder "${id}": limit unit`);
+      warnIfNonUsdCurrency(scope, limitUnit, `BudgetBuilder "${id}": limit unit`);
+    }
+
+    const { notificationsWithSubscribers, snsTopics } = this.#buildNotifications(id, context);
 
     const budgetData: CfnBudget.BudgetDataProperty = {
       budgetName: budgetProps.budgetName,
@@ -237,7 +258,7 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
         ? {
             budgetLimit: {
               amount: budgetProps.limit.amount,
-              unit: budgetProps.limit.unit ?? BUDGET_DEFAULTS.limitUnit,
+              unit: limitUnit,
             },
           }
         : {}),
@@ -269,9 +290,9 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
   #addPercentageNotification(
     notificationType: NotificationType,
     thresholdPercent: number,
-    subscribers: BudgetSubscriber[],
+    subscribers: NotifySubscribers,
   ): this {
-    if (subscribers.length === 0) {
+    if (!hasAnySubscriber(subscribers)) {
       throw new Error(
         `BudgetBuilder: ${notificationType} notification at ${String(thresholdPercent)}% requires at least one subscriber.`,
       );
@@ -280,7 +301,10 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
     return this;
   }
 
-  #buildNotifications(context: Record<string, object>): {
+  #buildNotifications(
+    id: string,
+    context: Record<string, object>,
+  ): {
     notificationsWithSubscribers: CfnBudget.NotificationWithSubscribersProperty[];
     snsTopics: ITopic[];
   } {
@@ -288,6 +312,14 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
     const allSnsTopics: ITopic[] = [];
 
     for (const entry of this.#notifications) {
+      const emailCount = entry.subscribers.emails?.length ?? 0;
+      if (emailCount > MAX_EMAILS_PER_NOTIFICATION) {
+        throw new Error(
+          `BudgetBuilder "${id}": ${describeNotification(entry)} has ${String(emailCount)} email subscribers; ` +
+            `AWS Budgets allows at most ${String(MAX_EMAILS_PER_NOTIFICATION)} email subscribers per notification (plus up to 1 SNS topic).`,
+        );
+      }
+
       const resolved = resolveSubscribers(entry.subscribers, context);
       notificationsWithSubscribers.push(toCfnNotificationWithSubscribers(entry, resolved.cfn));
       allSnsTopics.push(...resolved.snsTopics);
@@ -295,6 +327,15 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
 
     return { notificationsWithSubscribers, snsTopics: allSnsTopics };
   }
+}
+
+function hasAnySubscriber(subscribers: NotifySubscribers): boolean {
+  return subscribers.sns !== undefined || (subscribers.emails?.length ?? 0) > 0;
+}
+
+function describeNotification(entry: NotificationEntry): string {
+  const unit = (entry.thresholdType ?? "PERCENTAGE") === "PERCENTAGE" ? "%" : "";
+  return `notification ${entry.notificationType} @ ${String(entry.threshold)}${unit}`;
 }
 
 /**

@@ -62,19 +62,30 @@ If two components depend on each other, that is an architectural problem to be s
 
 - **Infrastructure engineers** who want to standardise patterns, enforce best practices, and reduce configuration drift across an organisation. ComposureCDK's defaults and builder patterns provide a consistent foundation that teams can extend.
 
+## Who's using ComposureCDK
+
+See [docs/showcase.md](docs/showcase.md) for case studies of projects built with ComposureCDK, and for the badge snippet to add to your own README:
+
+[![Built with ComposureCDK](https://img.shields.io/badge/built%20with-ComposureCDK-0f0d0c?labelColor=b85416)](https://github.com/laazyj/composureCDK)
+
 ## Packages
 
-| Package                    | Description                                                 |
-| -------------------------- | ----------------------------------------------------------- |
-| `@composurecdk/core`       | System lifecycle, dependency resolution, component protocol |
-| `@composurecdk/s3`         | S3 bucket components with secure defaults                   |
-| `@composurecdk/lambda`     | Lambda function components                                  |
-| `@composurecdk/ecs`        | ECS service and task components                             |
-| `@composurecdk/iam`        | IAM role and policy components                              |
-| `@composurecdk/apigateway` | API Gateway components                                      |
-| `@composurecdk/ec2`        | EC2 and VPC components                                      |
-| `@composurecdk/acm`        | ACM certificate components with DNS validation              |
-| `@composurecdk/route53`    | Route 53 hosted zones, records, and alias target helpers    |
+| Package                                                                                      | Downloads                                                                                                   | Description                                                       |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`@composurecdk/acm`](https://www.npmjs.com/package/@composurecdk/acm)                       | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/acm?labelColor=b85416&color=0f0d0c)            | ACM certificate components with DNS validation                    |
+| [`@composurecdk/apigateway`](https://www.npmjs.com/package/@composurecdk/apigateway)         | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/apigateway?labelColor=b85416&color=0f0d0c)     | API Gateway components                                            |
+| [`@composurecdk/budgets`](https://www.npmjs.com/package/@composurecdk/budgets)               | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/budgets?labelColor=b85416&color=0f0d0c)        | AWS Budgets components with automatic SNS topic policies          |
+| [`@composurecdk/cloudformation`](https://www.npmjs.com/package/@composurecdk/cloudformation) | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/cloudformation?labelColor=b85416&color=0f0d0c) | CloudFormation stack builders and assignment strategies           |
+| [`@composurecdk/cloudfront`](https://www.npmjs.com/package/@composurecdk/cloudfront)         | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/cloudfront?labelColor=b85416&color=0f0d0c)     | CloudFront distribution components with well-architected defaults |
+| [`@composurecdk/cloudwatch`](https://www.npmjs.com/package/@composurecdk/cloudwatch)         | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/cloudwatch?labelColor=b85416&color=0f0d0c)     | CloudWatch alarm primitives shared by resource packages           |
+| [`@composurecdk/core`](https://www.npmjs.com/package/@composurecdk/core)                     | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/core?labelColor=b85416&color=0f0d0c)           | System lifecycle, dependency resolution, component protocol       |
+| [`@composurecdk/ec2`](https://www.npmjs.com/package/@composurecdk/ec2)                       | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/ec2?labelColor=b85416&color=0f0d0c)            | EC2 and VPC components                                            |
+| [`@composurecdk/iam`](https://www.npmjs.com/package/@composurecdk/iam)                       | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/iam?labelColor=b85416&color=0f0d0c)            | IAM role and policy components                                    |
+| [`@composurecdk/lambda`](https://www.npmjs.com/package/@composurecdk/lambda)                 | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/lambda?labelColor=b85416&color=0f0d0c)         | Lambda function components                                        |
+| [`@composurecdk/logs`](https://www.npmjs.com/package/@composurecdk/logs)                     | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/logs?labelColor=b85416&color=0f0d0c)           | CloudWatch log group components with secure defaults              |
+| [`@composurecdk/route53`](https://www.npmjs.com/package/@composurecdk/route53)               | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/route53?labelColor=b85416&color=0f0d0c)        | Route 53 hosted zones, records, and alias target helpers          |
+| [`@composurecdk/s3`](https://www.npmjs.com/package/@composurecdk/s3)                         | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/s3?labelColor=b85416&color=0f0d0c)             | S3 bucket components with secure defaults                         |
+| [`@composurecdk/sns`](https://www.npmjs.com/package/@composurecdk/sns)                       | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/sns?labelColor=b85416&color=0f0d0c)            | SNS topic components with well-architected defaults               |
 
 ## License
 

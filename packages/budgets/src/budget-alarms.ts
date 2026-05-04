@@ -2,6 +2,7 @@ import { Duration } from "aws-cdk-lib";
 import { ComparisonOperator, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import type { BudgetAlarmConfig } from "./alarm-config.js";
+import { assertValidBudgetCurrency } from "./currency.js";
 
 const BILLING_METRIC_PERIOD = Duration.hours(6);
 
@@ -31,6 +32,7 @@ export function resolveBudgetAlarmDefinitions(
 
   const cfg = config.estimatedCharges;
   const currency = cfg.currency ?? "USD";
+  assertValidBudgetCurrency(currency, `EstimatedChargesAlarmConfig: currency`);
 
   return [
     {

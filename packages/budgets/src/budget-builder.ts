@@ -2,7 +2,8 @@ import { CfnBudget, type CfnBudgetProps } from "aws-cdk-lib/aws-budgets";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { ITopic, TopicPolicy } from "aws-cdk-lib/aws-sns";
 import type { IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BudgetAlarmConfig } from "./alarm-config.js";
 import { buildBudgetAlarms } from "./budget-alarm-builder.js";
@@ -139,7 +140,7 @@ export interface BudgetBuilderResult {
  *   .build(stack, "AgentBudget");
  * ```
  */
-export type IBudgetBuilder = IBuilder<BudgetBuilderProps, BudgetBuilder>;
+export type IBudgetBuilder = ITaggedBuilder<BudgetBuilderProps, BudgetBuilder>;
 
 class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
   props: Partial<BudgetBuilderProps> = {};
@@ -342,5 +343,5 @@ function describeNotification(entry: NotificationEntry): string {
  * Creates a new {@link IBudgetBuilder} for configuring an AWS Budget.
  */
 export function createBudgetBuilder(): IBudgetBuilder {
-  return Builder<BudgetBuilderProps, BudgetBuilder>(BudgetBuilder);
+  return taggedBuilder<BudgetBuilderProps, BudgetBuilder>(BudgetBuilder);
 }

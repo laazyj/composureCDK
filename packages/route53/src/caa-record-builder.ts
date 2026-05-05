@@ -1,12 +1,7 @@
 import { CaaRecord, type CaaRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { CAA_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -39,7 +34,7 @@ export interface CaaRecordBuilderResult {
  *
  * @see https://docs.aws.amazon.com/acm/latest/userguide/setup-caa.html
  */
-export type ICaaRecordBuilder = IBuilder<CaaRecordBuilderProps, CaaRecordBuilder>;
+export type ICaaRecordBuilder = ITaggedBuilder<CaaRecordBuilderProps, CaaRecordBuilder>;
 
 class CaaRecordBuilder implements Lifecycle<CaaRecordBuilderResult> {
   props: Partial<CaaRecordBuilderProps> = {};
@@ -76,5 +71,5 @@ class CaaRecordBuilder implements Lifecycle<CaaRecordBuilderResult> {
  * @returns A fluent builder for a Route53 CAA record.
  */
 export function createCaaRecordBuilder(): ICaaRecordBuilder {
-  return Builder<CaaRecordBuilderProps, CaaRecordBuilder>(CaaRecordBuilder);
+  return taggedBuilder<CaaRecordBuilderProps, CaaRecordBuilder>(CaaRecordBuilder);
 }

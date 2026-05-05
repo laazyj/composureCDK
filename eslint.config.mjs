@@ -108,6 +108,26 @@ export default defineConfig(
             "Parameter properties cannot be ECMAScript private. Declare the field with `readonly #field` and assign it in the constructor body.",
         },
       ],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@composurecdk/core",
+              importNames: ["Builder", "IBuilder"],
+              message:
+                "Use `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation` instead. Library builders opt into the shared tagging surface via the wrapper; importing `Builder`/`IBuilder` directly bypasses it. The wrapper itself in `packages/cloudformation/src/tagged-builder.ts` is the only legitimate consumer of the bare core API.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The wrapper IS the legitimate consumer of the bare core API.
+    files: ["packages/cloudformation/src/tagged-builder.ts"],
+    rules: {
+      "no-restricted-imports": "off",
     },
   },
   eslintConfigPrettier,

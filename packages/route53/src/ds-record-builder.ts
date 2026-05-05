@@ -1,12 +1,7 @@
 import { DsRecord, type DsRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { DS_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -37,7 +32,7 @@ export interface DsRecordBuilderResult {
  *
  * @see https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec-chain-of-trust.html
  */
-export type IDsRecordBuilder = IBuilder<DsRecordBuilderProps, DsRecordBuilder>;
+export type IDsRecordBuilder = ITaggedBuilder<DsRecordBuilderProps, DsRecordBuilder>;
 
 class DsRecordBuilder implements Lifecycle<DsRecordBuilderResult> {
   props: Partial<DsRecordBuilderProps> = {};
@@ -72,5 +67,5 @@ class DsRecordBuilder implements Lifecycle<DsRecordBuilderResult> {
  * @returns A fluent builder for a Route53 DS record.
  */
 export function createDsRecordBuilder(): IDsRecordBuilder {
-  return Builder<DsRecordBuilderProps, DsRecordBuilder>(DsRecordBuilder);
+  return taggedBuilder<DsRecordBuilderProps, DsRecordBuilder>(DsRecordBuilder);
 }

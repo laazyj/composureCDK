@@ -348,4 +348,37 @@ describe("FunctionBuilder", () => {
       });
     });
   });
+
+  describe("tagging", () => {
+    it("applies builder tags to the function and the auto-created log group sibling", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .tag("Owner", "platform")
+        .tag("Project", "claude-rig")
+        .build(stack, "TestFunction");
+
+      const template = Template.fromStack(stack);
+      const fns = template.findResources("AWS::Lambda::Function") as Record<
+        string,
+        { Properties: { Tags?: { Key: string; Value: string }[] } }
+      >;
+      expect(Object.values(fns)[0]?.Properties.Tags).toEqual(
+        expect.arrayContaining([
+          { Key: "Owner", Value: "platform" },
+          { Key: "Project", Value: "claude-rig" },
+        ]),
+      );
+      const logGroups = template.findResources("AWS::Logs::LogGroup") as Record<
+        string,
+        { Properties: { Tags?: { Key: string; Value: string }[] } }
+      >;
+      expect(Object.values(logGroups)[0]?.Properties.Tags).toEqual(
+        expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
+      );
+    });
+  });
 });

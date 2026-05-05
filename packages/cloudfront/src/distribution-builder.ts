@@ -15,13 +15,8 @@ import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type Bucket, type IBucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import {
   DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES,
@@ -346,7 +341,7 @@ export interface DistributionBuilderResult {
  *   });
  * ```
  */
-export type IDistributionBuilder = IBuilder<DistributionBuilderProps, DistributionBuilder>;
+export type IDistributionBuilder = ITaggedBuilder<DistributionBuilderProps, DistributionBuilder>;
 
 class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
   props: Partial<DistributionBuilderProps> = {};
@@ -516,7 +511,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
  * ```
  */
 export function createDistributionBuilder(): IDistributionBuilder {
-  return Builder<DistributionBuilderProps, DistributionBuilder>(DistributionBuilder);
+  return taggedBuilder<DistributionBuilderProps, DistributionBuilder>(DistributionBuilder);
 }
 
 function resolveAccessLogs(

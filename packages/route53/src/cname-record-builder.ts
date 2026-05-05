@@ -1,12 +1,7 @@
 import { CnameRecord, type CnameRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { CNAME_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -36,7 +31,7 @@ export interface CnameRecordBuilderResult {
  * used at the apex. Use CNAME for non-AWS targets or for sub-domain
  * redirections where an alias is not available.
  */
-export type ICnameRecordBuilder = IBuilder<CnameRecordBuilderProps, CnameRecordBuilder>;
+export type ICnameRecordBuilder = ITaggedBuilder<CnameRecordBuilderProps, CnameRecordBuilder>;
 
 class CnameRecordBuilder implements Lifecycle<CnameRecordBuilderResult> {
   props: Partial<CnameRecordBuilderProps> = {};
@@ -81,5 +76,5 @@ class CnameRecordBuilder implements Lifecycle<CnameRecordBuilderResult> {
  * @returns A fluent builder for a Route53 CNAME record.
  */
 export function createCnameRecordBuilder(): ICnameRecordBuilder {
-  return Builder<CnameRecordBuilderProps, CnameRecordBuilder>(CnameRecordBuilder);
+  return taggedBuilder<CnameRecordBuilderProps, CnameRecordBuilder>(CnameRecordBuilder);
 }

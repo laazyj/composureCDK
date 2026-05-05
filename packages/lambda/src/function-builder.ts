@@ -2,7 +2,8 @@ import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Function as LambdaFunction, type FunctionProps } from "aws-cdk-lib/aws-lambda";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createLogGroupBuilder } from "@composurecdk/logs";
 import type { FunctionAlarmConfig } from "./alarm-config.js";
@@ -106,7 +107,7 @@ export interface FunctionBuilderResult {
  *   .timeout(Duration.seconds(30));
  * ```
  */
-export type IFunctionBuilder = IBuilder<FunctionBuilderProps, FunctionBuilder>;
+export type IFunctionBuilder = ITaggedBuilder<FunctionBuilderProps, FunctionBuilder>;
 
 class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   props: Partial<FunctionBuilderProps> = {};
@@ -182,5 +183,5 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
  * ```
  */
 export function createFunctionBuilder(): IFunctionBuilder {
-  return Builder<FunctionBuilderProps, FunctionBuilder>(FunctionBuilder);
+  return taggedBuilder<FunctionBuilderProps, FunctionBuilder>(FunctionBuilder);
 }

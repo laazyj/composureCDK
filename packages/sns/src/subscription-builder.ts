@@ -1,13 +1,8 @@
 import { type ITopic, Subscription, type SubscriptionProps } from "aws-cdk-lib/aws-sns";
 import type { IQueue } from "aws-cdk-lib/aws-sqs";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  type Resolvable,
-  resolve,
-} from "@composurecdk/core";
+import { type Lifecycle, type Resolvable, resolve } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 
 /**
  * Configuration properties for the SNS subscription builder.
@@ -78,7 +73,7 @@ export interface SubscriptionBuilderResult {
  *   .endpoint("ops@example.com");
  * ```
  */
-export type ISubscriptionBuilder = IBuilder<SubscriptionBuilderProps, SubscriptionBuilder>;
+export type ISubscriptionBuilder = ITaggedBuilder<SubscriptionBuilderProps, SubscriptionBuilder>;
 
 class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
   props: Partial<SubscriptionBuilderProps> = {};
@@ -150,5 +145,5 @@ class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
  * ```
  */
 export function createSubscriptionBuilder(): ISubscriptionBuilder {
-  return Builder<SubscriptionBuilderProps, SubscriptionBuilder>(SubscriptionBuilder);
+  return taggedBuilder<SubscriptionBuilderProps, SubscriptionBuilder>(SubscriptionBuilder);
 }

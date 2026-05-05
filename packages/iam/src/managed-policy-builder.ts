@@ -1,6 +1,7 @@
 import { ManagedPolicy, type ManagedPolicyProps, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { StatementBuilder } from "./statement-builder.js";
 
 /**
@@ -38,7 +39,7 @@ export interface ManagedPolicyBuilderResult {
  *   ]);
  * ```
  */
-export type IManagedPolicyBuilder = IBuilder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>;
+export type IManagedPolicyBuilder = ITaggedBuilder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>;
 
 class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
   props: Partial<ManagedPolicyBuilderProps> = {};
@@ -78,5 +79,5 @@ class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
  * @returns A fluent builder for a customer-managed policy.
  */
 export function createManagedPolicyBuilder(): IManagedPolicyBuilder {
-  return Builder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>(ManagedPolicyBuilder);
+  return taggedBuilder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>(ManagedPolicyBuilder);
 }

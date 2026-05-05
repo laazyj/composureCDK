@@ -61,6 +61,25 @@ describe("StackBuilder", () => {
 
       expect(returned).toBe(builder);
     });
+
+    it("applies multiple tags via .tags({...}) shorthand", () => {
+      const app = new App();
+
+      const { stack } = createStackBuilder()
+        .tags({ team: "platform", env: "prod" })
+        .build(app, "TaggedStack");
+
+      const assembly = app.synth();
+      const stackArtifact = assembly.getStackByName("TaggedStack");
+      expect(stackArtifact.tags).toEqual({ team: "platform", env: "prod" });
+      expect(stack.stackName).toBe("TaggedStack");
+    });
+
+    it("validates tag keys at call time", () => {
+      const builder = createStackBuilder();
+      expect(() => builder.tag("aws:reserved", "x")).toThrow(/aws:/);
+      expect(() => builder.tag("", "x")).toThrow(/non-empty/);
+    });
   });
 
   describe("toScopeFactory", () => {

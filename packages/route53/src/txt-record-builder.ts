@@ -1,12 +1,7 @@
 import { TxtRecord, type TxtRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { TXT_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -33,7 +28,7 @@ export interface TxtRecordBuilderResult {
  *
  * Commonly used for SPF, DKIM, DMARC, and domain-verification tokens.
  */
-export type ITxtRecordBuilder = IBuilder<TxtRecordBuilderProps, TxtRecordBuilder>;
+export type ITxtRecordBuilder = ITaggedBuilder<TxtRecordBuilderProps, TxtRecordBuilder>;
 
 class TxtRecordBuilder implements Lifecycle<TxtRecordBuilderResult> {
   props: Partial<TxtRecordBuilderProps> = {};
@@ -70,5 +65,5 @@ class TxtRecordBuilder implements Lifecycle<TxtRecordBuilderResult> {
  * @returns A fluent builder for a Route53 TXT record.
  */
 export function createTxtRecordBuilder(): ITxtRecordBuilder {
-  return Builder<TxtRecordBuilderProps, TxtRecordBuilder>(TxtRecordBuilder);
+  return taggedBuilder<TxtRecordBuilderProps, TxtRecordBuilder>(TxtRecordBuilder);
 }

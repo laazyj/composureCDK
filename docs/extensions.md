@@ -43,7 +43,7 @@ Multiple `.afterBuild()` calls can be chained. Hooks run in registration order:
 ```ts
 compose({ site, cdn }, { site: [], cdn: ["site"] })
   .afterBuild(outputs({ ... }))
-  .afterBuild(tagging({ ... }))
+  .afterBuild(tags({ ... }))
   .build(stack, "MySystem");
 ```
 
@@ -93,6 +93,56 @@ compose({ ... }, { ... })
 
 Hooks that reference component results can use `Ref` and `resolve` from `@composurecdk/core` to resolve values lazily, just as builders do.
 
+## Tagging
+
+Tagging spans both the builder API and the system extension surface. Two layers cover different use cases:
+
+### Layer 1 — `.tag()` / `.tags()` on every builder
+
+Every builder factory the library ships exposes `.tag(key, value)` and `.tags({...})` directly on the builder. Tags accumulate during configuration and apply to every construct in the build result one level deep — primary plus siblings (auto-created log groups, access-log buckets) plus values inside `Record<string, IConstruct>` fields (alarm maps, topic policy maps).
+
+```ts
+createInstanceBuilder()
+  .vpc(vpc)
+  .role(agentRole)
+  .tag("Project", "claude-rig") // selector tag for an IAM kill-switch
+  .tags({ Owner: "platform", Environment: "prod" });
+```
+
+Use builder-level tagging for **selector tags** that drive IAM resource-tag conditions, EventBridge filters, kill-switches, and cost-allocation tags scoped to a specific resource type. The tag is set at create-time on every resource the builder produces, which is what those downstream consumers require.
+
+Keys and values are validated synchronously when `.tag()` / `.tags()` is called. The validator rejects empty keys, the reserved `aws:` prefix (case-insensitive), keys longer than 128 characters, values longer than 256 characters, and characters outside the AWS-documented tag character set. Duplicate `.tag(k, ...)` calls last-wins and emit `process.emitWarning` so the override is visible at the call site.
+
+### Layer 2 — `tags()` afterBuild hook for cross-cutting tags
+
+For ownership, environment, and cost-allocation tags that should reach every component of a composed system, use the `tags()` hook:
+
+```ts
+import { compose } from "@composurecdk/core";
+import { tags } from "@composurecdk/cloudformation";
+
+compose(
+  { agent: createInstanceBuilder(), bucket: createBucketBuilder() },
+  { agent: [], bucket: [] },
+)
+  .afterBuild(
+    tags({
+      system: { Owner: "platform", Environment: "prod" },
+      byComponent: { agent: { Project: "claude-rig" } },
+    }),
+  )
+  .build(stack, "MySystem");
+```
+
+- **`system`** — applied to the top-level scope. CDK's tag aspect propagates each tag to every taggable descendant.
+- **`byComponent`** — applied to a specific component's scope. Under `.withStacks()` or `.withStackStrategy()` this is the per-component stack; otherwise it's the top-level scope. Component keys are statically checked against the composed system's component keys.
+
+### Precedence
+
+Builder-level tags win on key collision because they target a closer scope. CDK's tag priority resolves this automatically — there is no special configuration to enable it. Use Layer 2 for blanket cost/ownership dimensions and Layer 1 for the specific resource type a downstream consumer cares about.
+
+See [ADR-0005](./adr/0005-decorator-builder-pattern.md) for the architectural decision behind the wrapper that powers builder-level tagging.
+
 ## Built-in hooks
 
 ### `outputs()` — `@composurecdk/cloudformation`
@@ -128,3 +178,7 @@ Each output definition accepts:
 - **`description`** — Optional description for the CloudFormation output.
 - **`exportName`** — Optional export name for cross-stack references.
 - **`scope`** — Optional Stack to attach the output to. Either an `IConstruct` (a direct Stack reference, typical with `.withStacks()`) or a component key string typed against the composed system (typical with `.withStackStrategy()`, where stacks are created dynamically). When omitted, the output falls back to the hook's `scope` — the top-level scope given to `build()`. See [Per-Output Stack Routing](./stack-management.md#per-output-stack-routing).
+
+### `tags()` — `@composurecdk/cloudformation`
+
+Applies cross-cutting tags to a composed system. See the [Tagging](#tagging) section above for the full API and the trade-off between Layer 1 (`.tag()` on individual builders) and Layer 2 (`tags()` here).

@@ -8,13 +8,8 @@ import {
 } from "aws-cdk-lib/aws-ec2";
 import { type IRole } from "aws-cdk-lib/aws-iam";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { InstanceAlarmConfig } from "./instance-alarm-config.js";
 import { createInstanceAlarms } from "./instance-alarms.js";
@@ -149,7 +144,7 @@ export interface InstanceBuilderResult {
  *   .machineImage(MachineImage.latestAmazonLinux2023());
  * ```
  */
-export type IInstanceBuilder = IBuilder<InstanceBuilderProps, InstanceBuilder>;
+export type IInstanceBuilder = ITaggedBuilder<InstanceBuilderProps, InstanceBuilder>;
 
 class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
   props: Partial<InstanceBuilderProps> = {};
@@ -258,5 +253,5 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
  * ```
  */
 export function createInstanceBuilder(): IInstanceBuilder {
-  return Builder<InstanceBuilderProps, InstanceBuilder>(InstanceBuilder);
+  return taggedBuilder<InstanceBuilderProps, InstanceBuilder>(InstanceBuilder);
 }

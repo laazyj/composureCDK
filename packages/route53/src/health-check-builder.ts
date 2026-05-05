@@ -1,7 +1,8 @@
 import { HealthCheck, type HealthCheckProps, type IHealthCheck } from "aws-cdk-lib/aws-route53";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { HealthCheckAlarmConfig } from "./health-check-alarm-config.js";
 import { buildHealthCheckAlarms } from "./health-check-alarm-builder.js";
@@ -79,7 +80,7 @@ export interface HealthCheckBuilderResult {
  *   .resourcePath("/health");
  * ```
  */
-export type IHealthCheckBuilder = IBuilder<HealthCheckBuilderProps, HealthCheckBuilder>;
+export type IHealthCheckBuilder = ITaggedBuilder<HealthCheckBuilderProps, HealthCheckBuilder>;
 
 class HealthCheckBuilder implements Lifecycle<HealthCheckBuilderResult> {
   props: Partial<HealthCheckBuilderProps> = {};
@@ -141,5 +142,5 @@ class HealthCheckBuilder implements Lifecycle<HealthCheckBuilderResult> {
  * ```
  */
 export function createHealthCheckBuilder(): IHealthCheckBuilder {
-  return Builder<HealthCheckBuilderProps, HealthCheckBuilder>(HealthCheckBuilder);
+  return taggedBuilder<HealthCheckBuilderProps, HealthCheckBuilder>(HealthCheckBuilder);
 }

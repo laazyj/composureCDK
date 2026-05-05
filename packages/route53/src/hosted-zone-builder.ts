@@ -1,6 +1,7 @@
 import { PublicHostedZone, type PublicHostedZoneProps } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { HOSTED_ZONE_DEFAULTS } from "./defaults.js";
 
 /**
@@ -42,7 +43,7 @@ export interface HostedZoneBuilderResult {
  *   .comment("Primary customer-facing domain");
  * ```
  */
-export type IHostedZoneBuilder = IBuilder<HostedZoneBuilderProps, HostedZoneBuilder>;
+export type IHostedZoneBuilder = ITaggedBuilder<HostedZoneBuilderProps, HostedZoneBuilder>;
 
 class HostedZoneBuilder implements Lifecycle<HostedZoneBuilderResult> {
   props: Partial<HostedZoneBuilderProps> = {};
@@ -94,5 +95,5 @@ class HostedZoneBuilder implements Lifecycle<HostedZoneBuilderResult> {
  * ```
  */
 export function createHostedZoneBuilder(): IHostedZoneBuilder {
-  return Builder<HostedZoneBuilderProps, HostedZoneBuilder>(HostedZoneBuilder);
+  return taggedBuilder<HostedZoneBuilderProps, HostedZoneBuilder>(HostedZoneBuilder);
 }

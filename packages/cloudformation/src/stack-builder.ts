@@ -1,6 +1,8 @@
-import { Stack, type StackProps, Tags } from "aws-cdk-lib";
+import { Stack, type StackProps } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle, type ScopeFactory } from "@composurecdk/core";
+import { type Lifecycle, type ScopeFactory } from "@composurecdk/core";
+import { applyTagsToConstruct } from "./apply-builder-tags.js";
+import { getBuilderTags, type ITaggedBuilder, taggedBuilder } from "./tagged-builder.js";
 
 /**
  * The build output of a {@link IStackBuilder}. Contains the CDK Stack
@@ -23,29 +25,33 @@ export interface StackBuilderResult {
  * a Stack with the configured properties and returns a
  * {@link StackBuilderResult}.
  *
+ * Tags accumulated via {@link ITaggedBuilder.tag | .tag()} or
+ * {@link ITaggedBuilder.tags | .tags()} are applied to the resulting Stack.
+ * CloudFormation propagates stack-level tags to every resource the stack
+ * contains, so a single `.tag()` call on a stack reaches everything inside.
+ *
  * @example
  * ```ts
- * const stack = createStackBuilder()
+ * const { stack } = createStackBuilder()
  *   .description("Network infrastructure")
  *   .terminationProtection(true)
+ *   .tag("Owner", "platform")
  *   .build(app, "NetworkStack");
  * ```
  */
-export type IStackBuilder = IBuilder<StackProps, StackBuilder> & {
-  /**
-   * Adds a tag to the Stack. Tags are applied to the Stack and propagate
-   * to all resources within it.
-   *
-   * @param key - The tag key.
-   * @param value - The tag value.
-   * @returns The builder for chaining.
-   */
-  tag(key: string, value: string): IStackBuilder;
+export type IStackBuilder = ITaggedBuilder<StackProps, StackBuilder>;
+
+class StackBuilder implements Lifecycle<StackBuilderResult> {
+  props: Partial<StackProps> = {};
 
   /**
    * Returns a {@link ScopeFactory} that creates Stacks with the builder's
-   * configured properties. Use this to integrate with
+   * configured properties — including any tags accumulated via
+   * {@link ITaggedBuilder.tag | .tag()}. Use this to integrate with
    * {@link singleStack} or {@link groupedStacks} strategies.
+   *
+   * Each call captures a snapshot of the current props and tags; subsequent
+   * builder mutations do not affect previously returned factories.
    *
    * @returns A factory function compatible with stack strategies.
    *
@@ -53,6 +59,7 @@ export type IStackBuilder = IBuilder<StackProps, StackBuilder> & {
    * ```ts
    * const factory = createStackBuilder()
    *   .terminationProtection(true)
+   *   .tag("Owner", "platform")
    *   .toScopeFactory();
    *
    * compose({ ... }, { ... })
@@ -60,36 +67,18 @@ export type IStackBuilder = IBuilder<StackProps, StackBuilder> & {
    *   .build(app, "MySystem");
    * ```
    */
-  toScopeFactory(): ScopeFactory;
-};
-
-class StackBuilder implements Lifecycle<StackBuilderResult> {
-  props: Partial<StackProps> = {};
-  readonly #tags: [string, string][] = [];
-
-  tag(key: string, value: string): this {
-    this.#tags.push([key, value]);
-    return this;
-  }
-
   toScopeFactory(): ScopeFactory {
     const props = { ...this.props };
-    const tags = [...this.#tags];
+    const tags = new Map(getBuilderTags(this));
     return (scope: IConstruct, id: string) => {
       const stack = new Stack(scope, id, props);
-      tags.forEach(([key, value]) => {
-        Tags.of(stack).add(key, value);
-      });
+      applyTagsToConstruct(stack, tags);
       return stack;
     };
   }
 
   build(scope: IConstruct, id: string): StackBuilderResult {
-    const stack = new Stack(scope, id, this.props);
-    this.#tags.forEach(([key, value]) => {
-      Tags.of(stack).add(key, value);
-    });
-    return { stack };
+    return { stack: new Stack(scope, id, this.props) };
   }
 }
 
@@ -98,7 +87,7 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
  *
  * This is the entry point for declarative stack configuration. The returned
  * builder exposes every {@link StackProps} property as a fluent setter/getter,
- * plus {@link IStackBuilder.tag | .tag()} for adding tags and
+ * `.tag(key, value)` / `.tags({...})` for stack-level tagging, and
  * {@link IStackBuilder.toScopeFactory | .toScopeFactory()} for integration
  * with stack strategies.
  *
@@ -124,5 +113,5 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
  * ```
  */
 export function createStackBuilder(): IStackBuilder {
-  return Builder<StackProps, StackBuilder>(StackBuilder);
+  return taggedBuilder<StackProps, StackBuilder>(StackBuilder);
 }

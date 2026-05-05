@@ -3,13 +3,8 @@ import { type IBucket } from "aws-cdk-lib/aws-s3";
 import { type IDistribution } from "aws-cdk-lib/aws-cloudfront";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { createLogGroupBuilder } from "@composurecdk/logs";
 import { effectiveDefaults } from "./bucket-deployment-defaults.js";
 import { type BucketDeploymentBuilderProps } from "./bucket-deployment-props.js";
@@ -58,7 +53,7 @@ export interface BucketDeploymentBuilderResult {
  *   .distributionPaths(["/*"]);
  * ```
  */
-export type IBucketDeploymentBuilder = IBuilder<
+export type IBucketDeploymentBuilder = ITaggedBuilder<
   BucketDeploymentBuilderProps,
   BucketDeploymentBuilder
 >;
@@ -184,5 +179,7 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
  * ```
  */
 export function createBucketDeploymentBuilder(): IBucketDeploymentBuilder {
-  return Builder<BucketDeploymentBuilderProps, BucketDeploymentBuilder>(BucketDeploymentBuilder);
+  return taggedBuilder<BucketDeploymentBuilderProps, BucketDeploymentBuilder>(
+    BucketDeploymentBuilder,
+  );
 }

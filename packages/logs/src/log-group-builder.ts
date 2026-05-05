@@ -1,6 +1,7 @@
 import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { LOG_GROUP_DEFAULTS } from "./defaults.js";
 
 export type LogGroupBuilderProps = LogGroupProps;
@@ -32,7 +33,7 @@ export interface LogGroupBuilderResult {
  *   .retention(RetentionDays.SIX_MONTHS);
  * ```
  */
-export type ILogGroupBuilder = IBuilder<LogGroupBuilderProps, LogGroupBuilder>;
+export type ILogGroupBuilder = ITaggedBuilder<LogGroupBuilderProps, LogGroupBuilder>;
 
 class LogGroupBuilder implements Lifecycle<LogGroupBuilderResult> {
   props: Partial<LogGroupBuilderProps> = {};
@@ -73,5 +74,5 @@ class LogGroupBuilder implements Lifecycle<LogGroupBuilderResult> {
  * ```
  */
 export function createLogGroupBuilder(): ILogGroupBuilder {
-  return Builder<LogGroupBuilderProps, LogGroupBuilder>(LogGroupBuilder);
+  return taggedBuilder<LogGroupBuilderProps, LogGroupBuilder>(LogGroupBuilder);
 }

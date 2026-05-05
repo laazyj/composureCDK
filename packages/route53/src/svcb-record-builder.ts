@@ -1,12 +1,7 @@
 import { SvcbRecord, type SvcbRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { SVCB_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -35,7 +30,7 @@ export interface SvcbRecordBuilderResult {
  * specifically, prefer {@link createHttpsRecordBuilder} — most clients only
  * consult HTTPS records for web traffic.
  */
-export type ISvcbRecordBuilder = IBuilder<SvcbRecordBuilderProps, SvcbRecordBuilder>;
+export type ISvcbRecordBuilder = ITaggedBuilder<SvcbRecordBuilderProps, SvcbRecordBuilder>;
 
 class SvcbRecordBuilder implements Lifecycle<SvcbRecordBuilderResult> {
   props: Partial<SvcbRecordBuilderProps> = {};
@@ -73,5 +68,5 @@ class SvcbRecordBuilder implements Lifecycle<SvcbRecordBuilderResult> {
  * @returns A fluent builder for a Route53 SVCB record.
  */
 export function createSvcbRecordBuilder(): ISvcbRecordBuilder {
-  return Builder<SvcbRecordBuilderProps, SvcbRecordBuilder>(SvcbRecordBuilder);
+  return taggedBuilder<SvcbRecordBuilderProps, SvcbRecordBuilder>(SvcbRecordBuilder);
 }

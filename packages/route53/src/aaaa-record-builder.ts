@@ -5,13 +5,8 @@ import {
   type RecordTarget,
 } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AAAA_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -43,7 +38,7 @@ export interface AaaaRecordBuilderResult {
  * over both IPv4 and IPv6 — AWS alias targets support both families from a
  * single resource.
  */
-export type IAaaaRecordBuilder = IBuilder<AaaaRecordBuilderProps, AaaaRecordBuilder>;
+export type IAaaaRecordBuilder = ITaggedBuilder<AaaaRecordBuilderProps, AaaaRecordBuilder>;
 
 class AaaaRecordBuilder implements Lifecycle<AaaaRecordBuilderResult> {
   props: Partial<AaaaRecordBuilderProps> = {};
@@ -82,5 +77,5 @@ class AaaaRecordBuilder implements Lifecycle<AaaaRecordBuilderResult> {
  * @returns A fluent builder for a Route53 AAAA record.
  */
 export function createAaaaRecordBuilder(): IAaaaRecordBuilder {
-  return Builder<AaaaRecordBuilderProps, AaaaRecordBuilder>(AaaaRecordBuilder);
+  return taggedBuilder<AaaaRecordBuilderProps, AaaaRecordBuilder>(AaaaRecordBuilder);
 }

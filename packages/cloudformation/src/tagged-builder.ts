@@ -1,17 +1,9 @@
 import { Builder } from "@composurecdk/core";
 import { applyBuilderTags } from "./apply-builder-tags.js";
-import { validateTag } from "./tag-validator.js";
+import { validateTag, validateTagRecord } from "./tag-validator.js";
 
-/**
- * Constructs an instance of `T` with no required arguments. Mirrors the
- * constraint used by {@link Builder} in `@composurecdk/core`.
- */
 type Constructor<T> = new () => T;
 
-/**
- * Constrains `T` to have a mutable `props` property. Mirrors the constraint
- * used by {@link Builder} in `@composurecdk/core`.
- */
 interface ObjectWithProps<Props extends object> {
   props: Partial<Props>;
 }
@@ -66,35 +58,27 @@ export type ITaggedBuilder<Props extends object, T> = {
 };
 
 /**
- * Symbol-keyed field set on the wrapped instance to expose accumulated tags
- * to builder code that creates constructs outside the standard `build()`
- * path — the canonical case is {@link createStackBuilder}'s
- * `toScopeFactory()`, which produces a Stack via a deferred factory rather
- * than as part of a `BuilderResult`.
- *
- * Internal to `@composurecdk/cloudformation`. External consumers should rely
- * on the standard `build()` flow, which applies tags via the wrapper.
+ * Module-private symbol used to expose the wrapper's tag accumulator to
+ * builder code that creates constructs outside `build()` — currently only
+ * `StackBuilder.toScopeFactory()`. Plain `Symbol(...)` (not `Symbol.for`)
+ * so the registry isn't shared with unrelated code.
  */
-export const BUILDER_TAGS = Symbol.for("composurecdk.builderTags");
+const BUILDER_TAGS = Symbol("composurecdk.builderTags");
 
 interface TaggedInstance {
   [BUILDER_TAGS]?: ReadonlyMap<string, string>;
 }
 
 /**
- * Reads the tag accumulator the wrapper has synchronised onto a builder
- * instance, returning an empty map when none has been set (e.g. when the
- * class is constructed outside {@link taggedBuilder}).
+ * Reads the tag accumulator the wrapper has attached to a builder instance.
+ * Returns an empty map for instances not constructed via {@link taggedBuilder}.
  *
- * The standard `build()` flow does **not** read this — it draws from the
- * wrapper's closure-held accumulator directly. This getter exists for
- * out-of-band paths where a builder produces a construct outside its
- * declared result type. The only such path today is
- * `StackBuilder.toScopeFactory()`, which returns a Stack-creating function
- * the wrapper cannot observe.
+ * The standard `build()` flow does not need this; tags are applied via the
+ * walker. This getter exists for builders that produce a construct outside
+ * their declared result type — currently only `StackBuilder.toScopeFactory()`.
  *
- * Returns a snapshot map; mutations to the returned value do not affect
- * the wrapper's accumulator.
+ * Returns a live, read-only view of the accumulator. Callers that want a
+ * snapshot independent of later mutations should clone it (`new Map(...)`).
  */
 export function getBuilderTags(instance: object): ReadonlyMap<string, string> {
   return (instance as TaggedInstance)[BUILDER_TAGS] ?? new Map();
@@ -109,19 +93,21 @@ export function getBuilderTags(instance: object): ReadonlyMap<string, string> {
  * created by `@composurecdk/core`. The outer Proxy:
  *
  * 1. Intercepts `.tag(k, v)` and `.tags({...})` to validate inputs and
- *    accumulate them in a closure-held insertion-ordered map. Repeated
- *    keys overwrite earlier values and emit `process.emitWarning` so the
- *    override is visible at the configuring call site.
- * 2. Synchronises the current accumulator onto the wrapped instance via a
- *    symbol-keyed field, so builder code that produces constructs outside
- *    the standard build result (e.g. `StackBuilder.toScopeFactory()`) can
- *    read the same tag state. Use {@link getBuilderTags} to access it.
- * 3. Intercepts `build()` to call {@link applyBuilderTags} on the result
+ *    accumulate them in an insertion-ordered map. Repeated keys overwrite
+ *    earlier values and emit `process.emitWarning` so the override is
+ *    visible at the configuring call site.
+ * 2. Intercepts `build()` to call {@link applyBuilderTags} on the result
  *    after the inner build completes.
- * 4. Passes every other access through to the inner Proxy unchanged. Inner
+ * 3. Passes every other access through to the inner Proxy unchanged. Inner
  *    methods that return the inner Proxy (chainable setters) are
  *    re-wrapped so the chain returns the outer Proxy and the new tag
  *    methods stay reachable.
+ *
+ * The accumulator is also attached to the wrapped instance via a private
+ * symbol so out-of-band consumers (`StackBuilder.toScopeFactory()`) can
+ * read it via {@link getBuilderTags}. The attachment happens once at
+ * construction and shares the live map; the wrapper does not clone on
+ * each mutation.
  *
  * Each builder factory in the library opts in by calling `taggedBuilder()`
  * instead of `Builder()`. Custom builders authored outside the library can
@@ -149,14 +135,13 @@ export function taggedBuilder<Props extends object, T extends ObjectWithProps<Pr
   const accumulator = new Map<string, string>();
 
   // core's Builder proxy installs no `set` trap, so symbol-keyed writes pass
-  // through to the wrapped instance. Used to expose accumulated tags to
-  // builder code that creates constructs outside `build()`.
-  const syncToInstance = (): void => {
-    (inner as unknown as TaggedInstance)[BUILDER_TAGS] = new Map(accumulator);
-  };
+  // through to the wrapped instance. One assignment of the live map is enough;
+  // mutations to `accumulator` are visible to readers without re-syncing.
+  (inner as unknown as TaggedInstance)[BUILDER_TAGS] = accumulator;
 
-  const setTag = (key: string, value: string): void => {
-    validateTag(key, value);
+  // Records a pre-validated key/value pair and emits a process warning when
+  // the key was already set, so override is visible at the call site.
+  const recordTag = (key: string, value: string): void => {
     if (accumulator.has(key)) {
       const previous = accumulator.get(key);
       process.emitWarning(
@@ -168,32 +153,23 @@ export function taggedBuilder<Props extends object, T extends ObjectWithProps<Pr
     accumulator.set(key, value);
   };
 
+  const buildFn = (...args: unknown[]): object => {
+    const target = inner as unknown as { build: (...a: unknown[]) => object };
+    const result = target.build(...args);
+    applyBuilderTags(result, accumulator);
+    return result;
+  };
+
+  // Pre-bound interceptors so each property access doesn't allocate a new
+  // closure for the three special method names. They reference `outer` to
+  // return the wrapper from chained calls, so they are declared after the
+  // Proxy is built; the Proxy's `get` trap closes over them and only reads
+  // them when a property is accessed (after this function returns).
   const outer: ITaggedBuilder<Props, T> = new Proxy(inner, {
     get(target, prop, receiver) {
-      if (prop === "tag") {
-        return (key: string, value: string) => {
-          setTag(key, value);
-          syncToInstance();
-          return outer;
-        };
-      }
-      if (prop === "tags") {
-        return (values: Record<string, string>) => {
-          for (const [key, value] of Object.entries(values)) {
-            setTag(key, value);
-          }
-          syncToInstance();
-          return outer;
-        };
-      }
-      if (prop === "build") {
-        return (...args: unknown[]) => {
-          const buildFn = (target as Record<string, unknown>)[prop] as (...a: unknown[]) => object;
-          const result = buildFn.apply(target, args);
-          applyBuilderTags(result, accumulator);
-          return result;
-        };
-      }
+      if (prop === "tag") return tagFn;
+      if (prop === "tags") return tagsFn;
+      if (prop === "build") return buildFn;
 
       const value = Reflect.get(target, prop, receiver) as unknown;
       if (typeof value === "function") {
@@ -205,6 +181,19 @@ export function taggedBuilder<Props extends object, T extends ObjectWithProps<Pr
       return value;
     },
   }) as ITaggedBuilder<Props, T>;
+
+  const tagFn = (key: string, value: string): ITaggedBuilder<Props, T> => {
+    validateTag(key, value);
+    recordTag(key, value);
+    return outer;
+  };
+  const tagsFn = (values: Record<string, string>): ITaggedBuilder<Props, T> => {
+    validateTagRecord(values);
+    for (const [key, value] of Object.entries(values)) {
+      recordTag(key, value);
+    }
+    return outer;
+  };
 
   return outer;
 }

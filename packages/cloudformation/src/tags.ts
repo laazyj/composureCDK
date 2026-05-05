@@ -1,7 +1,7 @@
-import { Tags } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
 import { type AfterBuildHook } from "@composurecdk/core";
-import { validateTag } from "./tag-validator.js";
+import { applyTagsToConstruct } from "./apply-builder-tags.js";
+import { validateTagRecord } from "./tag-validator.js";
 
 /**
  * Configures cross-cutting tag application against a composed system.
@@ -96,9 +96,7 @@ export interface TagDefinitions<T extends object = object> {
 export function tags<T extends object = object>(defs: TagDefinitions<T>): AfterBuildHook<T> {
   // Validate eagerly so configuration errors surface at the call site.
   if (defs.system) {
-    for (const [key, value] of Object.entries(defs.system)) {
-      validateTag(key, value);
-    }
+    validateTagRecord(defs.system);
   }
   const byComponent = defs.byComponent as
     | Record<string, Record<string, string> | undefined>
@@ -106,15 +104,13 @@ export function tags<T extends object = object>(defs: TagDefinitions<T>): AfterB
   if (byComponent) {
     for (const componentTags of Object.values(byComponent)) {
       if (componentTags === undefined) continue;
-      for (const [key, value] of Object.entries(componentTags)) {
-        validateTag(key, value);
-      }
+      validateTagRecord(componentTags);
     }
   }
 
   return (scope, _id, _results, componentScopes) => {
     if (defs.system) {
-      applyTagsTo(scope, defs.system);
+      applyTagsToConstruct(scope, Object.entries(defs.system));
     }
     if (byComponent) {
       const scopesByKey = componentScopes as Readonly<Record<string, IConstruct | undefined>>;
@@ -124,15 +120,8 @@ export function tags<T extends object = object>(defs: TagDefinitions<T>): AfterB
         if (target === undefined) {
           throw new Error(`tags(): byComponent entry "${componentKey}" is not a known component.`);
         }
-        applyTagsTo(target, componentTags);
+        applyTagsToConstruct(target, Object.entries(componentTags));
       }
     }
   };
-}
-
-function applyTagsTo(target: IConstruct, kv: Record<string, string>): void {
-  const t = Tags.of(target);
-  for (const [key, value] of Object.entries(kv)) {
-    t.add(key, value);
-  }
 }

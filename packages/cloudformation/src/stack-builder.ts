@@ -1,6 +1,7 @@
-import { Stack, type StackProps, Tags } from "aws-cdk-lib";
+import { Stack, type StackProps } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
 import { type Lifecycle, type ScopeFactory } from "@composurecdk/core";
+import { applyTagsToConstruct } from "./apply-builder-tags.js";
 import { getBuilderTags, type ITaggedBuilder, taggedBuilder } from "./tagged-builder.js";
 
 /**
@@ -71,9 +72,7 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
     const tags = new Map(getBuilderTags(this));
     return (scope: IConstruct, id: string) => {
       const stack = new Stack(scope, id, props);
-      for (const [key, value] of tags) {
-        Tags.of(stack).add(key, value);
-      }
+      applyTagsToConstruct(stack, tags);
       return stack;
     };
   }

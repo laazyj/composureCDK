@@ -31,23 +31,25 @@ export function applyBuilderTags(result: object, tags: ReadonlyMap<string, strin
 
   for (const value of Object.values(result)) {
     if (isConstruct(value)) {
-      applyTagsTo(value, tags);
+      applyTagsToConstruct(value, tags);
       continue;
     }
     if (isPlainObject(value)) {
-      // Plain objects are treated as `Record<string, IConstruct>`; the
-      // construct guard inside the loop discards non-construct entries
-      // naturally (e.g. wrapper objects, primitive collections).
       for (const inner of Object.values(value)) {
         if (isConstruct(inner)) {
-          applyTagsTo(inner, tags);
+          applyTagsToConstruct(inner, tags);
         }
       }
     }
   }
 }
 
-function applyTagsTo(target: IConstruct, tags: ReadonlyMap<string, string>): void {
+/**
+ * Applies every entry of `tags` to `target` via `Tags.of(target).add(...)`.
+ * Accepts any iterable of `[key, value]` pairs so callers can pass `Map`,
+ * `Object.entries(record)`, or other compatible sources without copying.
+ */
+export function applyTagsToConstruct(target: IConstruct, tags: Iterable<[string, string]>): void {
   const t = Tags.of(target);
   for (const [key, value] of tags) {
     t.add(key, value);

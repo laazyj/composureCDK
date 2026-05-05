@@ -59,3 +59,13 @@ export function validateTag(key: string, value: string): void {
     );
   }
 }
+
+/**
+ * Validates every entry of a record via {@link validateTag}, throwing on the
+ * first invalid pair so the failure surfaces at the configuring call site.
+ */
+export function validateTagRecord(values: Record<string, string>): void {
+  for (const [key, value] of Object.entries(values)) {
+    validateTag(key, value);
+  }
+}

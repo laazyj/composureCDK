@@ -8,6 +8,7 @@ import { createMockApiApp } from "../src/mock-api-app.js";
 import { createMultiStackApp } from "../src/multi-stack-app.js";
 import { createOpenApiPetstoreApp } from "../src/openapi-petstore-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
+import { createTaggedSystemApp } from "../src/tagged-system-app.js";
 
 const app = new App();
 cleanDeskPolicy(app);
@@ -19,5 +20,6 @@ createMockApiApp(app);
 createMultiStackApp(app);
 createOpenApiPetstoreApp(app);
 createStaticWebsiteApp(app);
+createTaggedSystemApp(app);
 
 app.synth();

@@ -33,3 +33,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0002: Policies — cross-cutting helpers applied to a construct subtree](0002-policies.md)
 - [ADR-0003: Nested `compose()` — propagate parent context into inner components](0003-nested-compose-context-propagation.md)
 - [ADR-0004: Split-alarm builder pattern for AWS services with fixed-region metrics](0004-split-alarm-builder-for-fixed-region-metrics.md)
+- [ADR-0005: Decorator pattern for adding cross-cutting builder features](0005-decorator-builder-pattern.md)

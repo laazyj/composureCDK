@@ -7,39 +7,40 @@ function isConstruct(value: unknown): value is IConstruct {
 
 /**
  * Applies every accumulated tag to every {@link IConstruct} reachable in a
- * builder result, one level deep.
+ * builder result.
  *
- * The walker tags:
- * - any top-level field whose value is an `IConstruct`, and
- * - any value inside top-level fields whose value is a plain object treated
- *   as `Record<string, IConstruct>` — alarms maps, topic-policy maps, and
- *   similar collections produced by builders that create multiple
- *   homogeneous resources.
+ * Recursively descends through plain-object literals, tagging every
+ * `IConstruct` it finds. Stops at:
  *
- * Plain-data fields, CDK core objects that are not constructs (e.g.
- * `PolicyDocument`), and arrays are skipped. Recursion deeper than one level
- * is intentionally not performed — wrapper objects (e.g. `FunctionEntry`)
- * are not unwrapped automatically and need to expose their construct as a
- * top-level result field if they want to be tagged by this walker.
+ * - **Constructs** — tagged via `Tags.of(...).add(...)`. The CDK Aspect
+ *   schedules tag application across the construct's subtree at
+ *   synth-prepare time, so the walker does not recurse into the construct's
+ *   internals.
+ * - **Class instances that aren't constructs** (e.g. `PolicyDocument`) —
+ *   skipped. Plain-object detection requires `Object.prototype` as the
+ *   prototype, so class instances are opaque to the walker.
+ * - **Arrays and primitives** — skipped.
  *
- * Matches `Tags.of(scope).add` semantics: the call schedules an Aspect that
- * walks the construct subtree at synth-prepare time, so children of each
- * tagged construct also receive the tag.
+ * The contract this implements: every construct exposed in a builder's
+ * result type is a tag target. Wrapper shapes such as
+ * `Record<string, { construct: ..., metadata: ... }>` are unwrapped
+ * naturally — the walker descends through the plain-object value and tags
+ * the construct field. Authors do not need an opt-in marker; if a construct
+ * appears in the result, it is tagged.
  */
 export function applyBuilderTags(result: object, tags: ReadonlyMap<string, string>): void {
   if (tags.size === 0) return;
+  walkAndTag(result, tags);
+}
 
-  for (const value of Object.values(result)) {
-    if (isConstruct(value)) {
-      applyTagsToConstruct(value, tags);
-      continue;
-    }
-    if (isPlainObject(value)) {
-      for (const inner of Object.values(value)) {
-        if (isConstruct(inner)) {
-          applyTagsToConstruct(inner, tags);
-        }
-      }
+function walkAndTag(value: unknown, tags: ReadonlyMap<string, string>): void {
+  if (isConstruct(value)) {
+    applyTagsToConstruct(value, tags);
+    return;
+  }
+  if (isPlainObject(value)) {
+    for (const inner of Object.values(value)) {
+      walkAndTag(inner, tags);
     }
   }
 }

@@ -99,7 +99,7 @@ Tagging spans both the builder API and the system extension surface. Two layers 
 
 ### Layer 1 — `.tag()` / `.tags()` on every builder
 
-Every builder factory the library ships exposes `.tag(key, value)` and `.tags({...})` directly on the builder. Tags accumulate during configuration and apply to every construct in the build result one level deep — primary plus siblings (auto-created log groups, access-log buckets) plus values inside `Record<string, IConstruct>` fields (alarm maps, topic policy maps).
+Every builder factory the library ships exposes `.tag(key, value)` and `.tags({...})` directly on the builder — provided the wrapped CFN resource supports tags. Tags accumulate during configuration and apply to every construct exposed in the build result. The walker descends through plain-object literals (so wrappers like `Record<string, { construct, metadata }>` are unwrapped naturally) and stops at construct boundaries, leaving CDK's tag aspect to propagate to each construct's subtree.
 
 ```ts
 createInstanceBuilder()

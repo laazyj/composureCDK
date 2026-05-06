@@ -80,13 +80,14 @@ describe("applyBuilderTags", () => {
     expect(tagged).toHaveLength(2);
   });
 
-  it("does not recurse into wrapper objects (one level deep only)", () => {
+  it("recurses through wrapper objects to tag nested constructs", () => {
     const stack = new Stack(new App(), "TestStack");
     const wrappedTopic = new Topic(stack, "Wrapped");
     const directTopic = new Topic(stack, "Direct");
 
-    // The wrapper objects nest a construct inside `.inner`. The walker
-    // must not reach it; only the directly-attached topic is tagged.
+    // The wrapper bundles a construct alongside metadata. The walker
+    // descends into plain-object literals, so both topics are tagged
+    // and the metadata fields are skipped (not constructs).
     const result = {
       direct: directTopic,
       wrappers: {
@@ -101,8 +102,9 @@ describe("applyBuilderTags", () => {
     const taggedNames = Object.entries(topics)
       .filter(([, r]) => tagsOnResource(r).some((t) => t.Key === "Owner"))
       .map(([key]) => key);
-    expect(taggedNames).toHaveLength(1);
-    expect(taggedNames[0]).toMatch(/Direct/);
+    expect(taggedNames).toHaveLength(2);
+    expect(taggedNames.some((n) => n.includes("Direct"))).toBe(true);
+    expect(taggedNames.some((n) => n.includes("Wrapped"))).toBe(true);
   });
 
   it("skips CDK core objects that are not constructs (PolicyDocument)", () => {

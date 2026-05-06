@@ -162,4 +162,25 @@ describe("applyBuilderTags", () => {
       expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
     );
   });
+
+  it("descends into Object.create(null) dictionaries", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const a = new Topic(stack, "A");
+    const b = new Topic(stack, "B");
+
+    // Builder authors may use Object.create(null) for Record fields whose keys
+    // come from user input — the prototype is null, not Object.prototype.
+    const nullProtoMap = Object.create(null) as Record<string, Topic>;
+    nullProtoMap.first = a;
+    nullProtoMap.second = b;
+
+    applyBuilderTags({ alarms: nullProtoMap }, new Map([["Owner", "platform"]]));
+
+    const template = Template.fromStack(stack);
+    const topics = template.findResources("AWS::SNS::Topic") as Record<string, CfnResourceWithTags>;
+    const tagged = Object.values(topics).filter((r) =>
+      tagsOnResource(r).some((t) => t.Key === "Owner" && t.Value === "platform"),
+    );
+    expect(tagged).toHaveLength(2);
+  });
 });

@@ -58,10 +58,10 @@ export function applyTagsToConstruct(target: IConstruct, tags: Iterable<[string,
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  // Accept both `{...}` literals and `Object.create(null)` dictionaries — the
+  // latter is a common idiom for prototype-pollution-safe key/value maps and
+  // would otherwise be silently skipped here.
+  const proto = Object.getPrototypeOf(value) as object | null;
+  return proto === null || proto === Object.prototype;
 }

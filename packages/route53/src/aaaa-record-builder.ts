@@ -5,8 +5,13 @@ import {
   type RecordTarget,
 } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { AAAA_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -38,7 +43,8 @@ export interface AaaaRecordBuilderResult {
  * over both IPv4 and IPv6 — AWS alias targets support both families from a
  * single resource.
  */
-export type IAaaaRecordBuilder = ITaggedBuilder<AaaaRecordBuilderProps, AaaaRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type IAaaaRecordBuilder = IBuilder<AaaaRecordBuilderProps, AaaaRecordBuilder>;
 
 class AaaaRecordBuilder implements Lifecycle<AaaaRecordBuilderResult> {
   props: Partial<AaaaRecordBuilderProps> = {};
@@ -77,5 +83,6 @@ class AaaaRecordBuilder implements Lifecycle<AaaaRecordBuilderResult> {
  * @returns A fluent builder for a Route53 AAAA record.
  */
 export function createAaaaRecordBuilder(): IAaaaRecordBuilder {
-  return taggedBuilder<AaaaRecordBuilderProps, AaaaRecordBuilder>(AaaaRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<AaaaRecordBuilderProps, AaaaRecordBuilder>(AaaaRecordBuilder);
 }

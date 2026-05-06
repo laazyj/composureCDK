@@ -3,6 +3,60 @@ import eslint from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier/flat";
+import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
+
+/**
+ * Flags uses of `Builder()` or `IBuilder<…>` imported from `@composurecdk/core`
+ * in library builder files. Library builders should opt into the shared tagging
+ * surface via `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation`.
+ */
+const builderTaggingRule = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Library builders must use `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation` " +
+        "unless the wrapped CFN resource has no Tags property.",
+    },
+    schema: [],
+    messages: {
+      restrictedCall:
+        "Use `taggedBuilder` from `@composurecdk/cloudformation` instead of `Builder` from `@composurecdk/core`. " +
+        "If the wrapped CFN resource has no Tags property (Route53 records, IAM ManagedPolicy, " +
+        "SNS Subscription, AWS Budgets), disable this rule on the offending line with a directive " +
+        "naming the resource: `// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::… has no Tags property`.",
+      restrictedType:
+        "Use `ITaggedBuilder` from `@composurecdk/cloudformation` instead of `IBuilder` from `@composurecdk/core`. " +
+        "If the wrapped CFN resource has no Tags property (Route53 records, IAM ManagedPolicy, " +
+        "SNS Subscription, AWS Budgets), disable this rule on the offending line with a directive " +
+        "naming the resource: `// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::… has no Tags property`.",
+    },
+  },
+  create(ctx) {
+    const localBuilderNames = new Set();
+    const localIBuilderNames = new Set();
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value !== "@composurecdk/core") return;
+        for (const spec of node.specifiers) {
+          if (spec.type !== "ImportSpecifier") continue;
+          if (spec.imported.name === "Builder") localBuilderNames.add(spec.local.name);
+          if (spec.imported.name === "IBuilder") localIBuilderNames.add(spec.local.name);
+        }
+      },
+      CallExpression(node) {
+        if (node.callee.type === "Identifier" && localBuilderNames.has(node.callee.name)) {
+          ctx.report({ node: node.callee, messageId: "restrictedCall" });
+        }
+      },
+      TSTypeReference(node) {
+        if (node.typeName.type === "Identifier" && localIBuilderNames.has(node.typeName.name)) {
+          ctx.report({ node: node.typeName, messageId: "restrictedType" });
+        }
+      },
+    };
+  },
+};
 
 /**
  * Flags Lifecycle-implementing classes whose `build` method does not accept a
@@ -85,11 +139,13 @@ export default defineConfig(
       composurecdk: {
         rules: {
           "lifecycle-build-context-required": lifecycleContextParamRule,
+          "builder-must-be-tagged": builderTaggingRule,
         },
       },
     },
     rules: {
       "composurecdk/lifecycle-build-context-required": "error",
+      "composurecdk/builder-must-be-tagged": "error",
       "no-restricted-syntax": [
         "error",
         {
@@ -108,26 +164,15 @@ export default defineConfig(
             "Parameter properties cannot be ECMAScript private. Declare the field with `readonly #field` and assign it in the constructor body.",
         },
       ],
-      "no-restricted-imports": [
-        "error",
-        {
-          paths: [
-            {
-              name: "@composurecdk/core",
-              importNames: ["Builder", "IBuilder"],
-              message:
-                "Use `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation` instead. Library builders opt into the shared tagging surface via the wrapper; importing `Builder`/`IBuilder` directly bypasses it. The wrapper itself in `packages/cloudformation/src/tagged-builder.ts` is the only legitimate consumer of the bare core API.",
-            },
-          ],
-        },
-      ],
     },
   },
   {
-    // The wrapper IS the legitimate consumer of the bare core API.
-    files: ["packages/cloudformation/src/tagged-builder.ts"],
+    files: ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts"],
+    plugins: {
+      "@eslint-community/eslint-comments": eslintComments,
+    },
     rules: {
-      "no-restricted-imports": "off",
+      "@eslint-community/eslint-comments/require-description": ["error", { ignore: [] }],
     },
   },
   eslintConfigPrettier,

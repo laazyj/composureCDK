@@ -11,7 +11,7 @@
  * in the monorepo applies the same constraints.
  */
 
-// eslint-disable-next-line no-control-regex
+// eslint-disable-next-line no-control-regex -- the regex must literally match control characters to strip them from construct IDs
 const UNSAFE = /[/\x00-\x1f\x7f]/g;
 
 /**

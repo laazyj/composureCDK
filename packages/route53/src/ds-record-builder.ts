@@ -1,7 +1,12 @@
 import { DsRecord, type DsRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { DS_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -32,7 +37,8 @@ export interface DsRecordBuilderResult {
  *
  * @see https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec-chain-of-trust.html
  */
-export type IDsRecordBuilder = ITaggedBuilder<DsRecordBuilderProps, DsRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type IDsRecordBuilder = IBuilder<DsRecordBuilderProps, DsRecordBuilder>;
 
 class DsRecordBuilder implements Lifecycle<DsRecordBuilderResult> {
   props: Partial<DsRecordBuilderProps> = {};
@@ -67,5 +73,6 @@ class DsRecordBuilder implements Lifecycle<DsRecordBuilderResult> {
  * @returns A fluent builder for a Route53 DS record.
  */
 export function createDsRecordBuilder(): IDsRecordBuilder {
-  return taggedBuilder<DsRecordBuilderProps, DsRecordBuilder>(DsRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<DsRecordBuilderProps, DsRecordBuilder>(DsRecordBuilder);
 }

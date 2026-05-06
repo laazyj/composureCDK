@@ -1,7 +1,12 @@
 import { MxRecord, type MxRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { MX_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -30,7 +35,8 @@ export interface MxRecordBuilderResult {
  * Each value pairs a priority (lower wins) with a fully-qualified mail-server
  * host name. Pair with SPF/DKIM/DMARC TXT records for authenticated email.
  */
-export type IMxRecordBuilder = ITaggedBuilder<MxRecordBuilderProps, MxRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type IMxRecordBuilder = IBuilder<MxRecordBuilderProps, MxRecordBuilder>;
 
 class MxRecordBuilder implements Lifecycle<MxRecordBuilderResult> {
   props: Partial<MxRecordBuilderProps> = {};
@@ -65,5 +71,6 @@ class MxRecordBuilder implements Lifecycle<MxRecordBuilderResult> {
  * @returns A fluent builder for a Route53 MX record.
  */
 export function createMxRecordBuilder(): IMxRecordBuilder {
-  return taggedBuilder<MxRecordBuilderProps, MxRecordBuilder>(MxRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<MxRecordBuilderProps, MxRecordBuilder>(MxRecordBuilder);
 }

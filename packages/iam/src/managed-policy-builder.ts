@@ -1,7 +1,6 @@
 import { ManagedPolicy, type ManagedPolicyProps, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
-import { type Lifecycle } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
 import { StatementBuilder } from "./statement-builder.js";
 
 /**
@@ -39,7 +38,8 @@ export interface ManagedPolicyBuilderResult {
  *   ]);
  * ```
  */
-export type IManagedPolicyBuilder = ITaggedBuilder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::IAM::ManagedPolicy has no Tags property
+export type IManagedPolicyBuilder = IBuilder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>;
 
 class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
   props: Partial<ManagedPolicyBuilderProps> = {};
@@ -79,5 +79,6 @@ class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
  * @returns A fluent builder for a customer-managed policy.
  */
 export function createManagedPolicyBuilder(): IManagedPolicyBuilder {
-  return taggedBuilder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>(ManagedPolicyBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::IAM::ManagedPolicy has no Tags property
+  return Builder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>(ManagedPolicyBuilder);
 }

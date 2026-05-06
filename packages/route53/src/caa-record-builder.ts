@@ -1,7 +1,12 @@
 import { CaaRecord, type CaaRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { CAA_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -34,7 +39,8 @@ export interface CaaRecordBuilderResult {
  *
  * @see https://docs.aws.amazon.com/acm/latest/userguide/setup-caa.html
  */
-export type ICaaRecordBuilder = ITaggedBuilder<CaaRecordBuilderProps, CaaRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type ICaaRecordBuilder = IBuilder<CaaRecordBuilderProps, CaaRecordBuilder>;
 
 class CaaRecordBuilder implements Lifecycle<CaaRecordBuilderResult> {
   props: Partial<CaaRecordBuilderProps> = {};
@@ -71,5 +77,6 @@ class CaaRecordBuilder implements Lifecycle<CaaRecordBuilderResult> {
  * @returns A fluent builder for a Route53 CAA record.
  */
 export function createCaaRecordBuilder(): ICaaRecordBuilder {
-  return taggedBuilder<CaaRecordBuilderProps, CaaRecordBuilder>(CaaRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<CaaRecordBuilderProps, CaaRecordBuilder>(CaaRecordBuilder);
 }

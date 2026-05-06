@@ -5,8 +5,13 @@ import {
   type RecordTarget,
 } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { HTTPS_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -39,7 +44,8 @@ export interface HttpsRecordBuilderResult {
  * HTTP/3 upgrades. Specify exactly one of `values` (explicit parameter list)
  * or `target` (alias, typically a CloudFront distribution).
  */
-export type IHttpsRecordBuilder = ITaggedBuilder<HttpsRecordBuilderProps, HttpsRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type IHttpsRecordBuilder = IBuilder<HttpsRecordBuilderProps, HttpsRecordBuilder>;
 
 class HttpsRecordBuilder implements Lifecycle<HttpsRecordBuilderResult> {
   props: Partial<HttpsRecordBuilderProps> = {};
@@ -86,5 +92,6 @@ class HttpsRecordBuilder implements Lifecycle<HttpsRecordBuilderResult> {
  * @returns A fluent builder for a Route53 HTTPS record.
  */
 export function createHttpsRecordBuilder(): IHttpsRecordBuilder {
-  return taggedBuilder<HttpsRecordBuilderProps, HttpsRecordBuilder>(HttpsRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<HttpsRecordBuilderProps, HttpsRecordBuilder>(HttpsRecordBuilder);
 }

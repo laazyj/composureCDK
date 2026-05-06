@@ -131,6 +131,7 @@ export function getBuilderTags(instance: object): ReadonlyMap<string, string> {
 export function taggedBuilder<Props extends object, T extends ObjectWithProps<Props>>(
   constructor: Constructor<T>,
 ): ITaggedBuilder<Props, T> {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- this wrapper IS the implementation of the tagged-builder surface
   const inner = Builder<Props, T>(constructor);
   const accumulator = new Map<string, string>();
 

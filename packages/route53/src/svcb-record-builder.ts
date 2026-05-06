@@ -1,7 +1,12 @@
 import { SvcbRecord, type SvcbRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { SVCB_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -30,7 +35,8 @@ export interface SvcbRecordBuilderResult {
  * specifically, prefer {@link createHttpsRecordBuilder} — most clients only
  * consult HTTPS records for web traffic.
  */
-export type ISvcbRecordBuilder = ITaggedBuilder<SvcbRecordBuilderProps, SvcbRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type ISvcbRecordBuilder = IBuilder<SvcbRecordBuilderProps, SvcbRecordBuilder>;
 
 class SvcbRecordBuilder implements Lifecycle<SvcbRecordBuilderResult> {
   props: Partial<SvcbRecordBuilderProps> = {};
@@ -68,5 +74,6 @@ class SvcbRecordBuilder implements Lifecycle<SvcbRecordBuilderResult> {
  * @returns A fluent builder for a Route53 SVCB record.
  */
 export function createSvcbRecordBuilder(): ISvcbRecordBuilder {
-  return taggedBuilder<SvcbRecordBuilderProps, SvcbRecordBuilder>(SvcbRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<SvcbRecordBuilderProps, SvcbRecordBuilder>(SvcbRecordBuilder);
 }

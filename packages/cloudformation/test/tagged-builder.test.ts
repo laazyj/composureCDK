@@ -225,7 +225,7 @@ describe("taggedBuilder", () => {
       let captured: CaptureBuilder | undefined;
       class CaptureBuilder extends SyntheticBuilder {
         build(scope: IConstruct, id: string): SyntheticResult {
-          // eslint-disable-next-line @typescript-eslint/no-this-alias
+          // eslint-disable-next-line @typescript-eslint/no-this-alias -- captures the build-time `this` so the test can assert on the wrapped instance
           captured = this;
           return super.build(scope, id);
         }

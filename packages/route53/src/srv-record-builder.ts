@@ -1,7 +1,12 @@
 import { SrvRecord, type SrvRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { SRV_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -30,7 +35,8 @@ export interface SrvRecordBuilderResult {
  * the record name typically follows the `_service._proto` convention (e.g.
  * `_sip._tcp`). Lower priority wins; weight distributes load across peers.
  */
-export type ISrvRecordBuilder = ITaggedBuilder<SrvRecordBuilderProps, SrvRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type ISrvRecordBuilder = IBuilder<SrvRecordBuilderProps, SrvRecordBuilder>;
 
 class SrvRecordBuilder implements Lifecycle<SrvRecordBuilderResult> {
   props: Partial<SrvRecordBuilderProps> = {};
@@ -67,5 +73,6 @@ class SrvRecordBuilder implements Lifecycle<SrvRecordBuilderResult> {
  * @returns A fluent builder for a Route53 SRV record.
  */
 export function createSrvRecordBuilder(): ISrvRecordBuilder {
-  return taggedBuilder<SrvRecordBuilderProps, SrvRecordBuilder>(SrvRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<SrvRecordBuilderProps, SrvRecordBuilder>(SrvRecordBuilder);
 }

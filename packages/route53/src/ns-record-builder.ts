@@ -1,7 +1,12 @@
 import { NsRecord, type NsRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { NS_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -30,7 +35,8 @@ export interface NsRecordBuilderResult {
  * (including another Route53 hosted zone). The apex NS record set is managed
  * by Route53 itself and should not be recreated here.
  */
-export type INsRecordBuilder = ITaggedBuilder<NsRecordBuilderProps, NsRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type INsRecordBuilder = IBuilder<NsRecordBuilderProps, NsRecordBuilder>;
 
 class NsRecordBuilder implements Lifecycle<NsRecordBuilderResult> {
   props: Partial<NsRecordBuilderProps> = {};
@@ -72,5 +78,6 @@ class NsRecordBuilder implements Lifecycle<NsRecordBuilderResult> {
  * @returns A fluent builder for a Route53 NS record.
  */
 export function createNsRecordBuilder(): INsRecordBuilder {
-  return taggedBuilder<NsRecordBuilderProps, NsRecordBuilder>(NsRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<NsRecordBuilderProps, NsRecordBuilder>(NsRecordBuilder);
 }

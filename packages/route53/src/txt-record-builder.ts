@@ -1,7 +1,12 @@
 import { TxtRecord, type TxtRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { TXT_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -28,7 +33,8 @@ export interface TxtRecordBuilderResult {
  *
  * Commonly used for SPF, DKIM, DMARC, and domain-verification tokens.
  */
-export type ITxtRecordBuilder = ITaggedBuilder<TxtRecordBuilderProps, TxtRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type ITxtRecordBuilder = IBuilder<TxtRecordBuilderProps, TxtRecordBuilder>;
 
 class TxtRecordBuilder implements Lifecycle<TxtRecordBuilderResult> {
   props: Partial<TxtRecordBuilderProps> = {};
@@ -65,5 +71,6 @@ class TxtRecordBuilder implements Lifecycle<TxtRecordBuilderResult> {
  * @returns A fluent builder for a Route53 TXT record.
  */
 export function createTxtRecordBuilder(): ITxtRecordBuilder {
-  return taggedBuilder<TxtRecordBuilderProps, TxtRecordBuilder>(TxtRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<TxtRecordBuilderProps, TxtRecordBuilder>(TxtRecordBuilder);
 }

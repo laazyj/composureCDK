@@ -1,7 +1,12 @@
 import { CnameRecord, type CnameRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
-import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  Builder,
+  type IBuilder,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { CNAME_RECORD_DEFAULTS } from "./defaults.js";
 
 /**
@@ -31,7 +36,8 @@ export interface CnameRecordBuilderResult {
  * used at the apex. Use CNAME for non-AWS targets or for sub-domain
  * redirections where an alias is not available.
  */
-export type ICnameRecordBuilder = ITaggedBuilder<CnameRecordBuilderProps, CnameRecordBuilder>;
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+export type ICnameRecordBuilder = IBuilder<CnameRecordBuilderProps, CnameRecordBuilder>;
 
 class CnameRecordBuilder implements Lifecycle<CnameRecordBuilderResult> {
   props: Partial<CnameRecordBuilderProps> = {};
@@ -76,5 +82,6 @@ class CnameRecordBuilder implements Lifecycle<CnameRecordBuilderResult> {
  * @returns A fluent builder for a Route53 CNAME record.
  */
 export function createCnameRecordBuilder(): ICnameRecordBuilder {
-  return taggedBuilder<CnameRecordBuilderProps, CnameRecordBuilder>(CnameRecordBuilder);
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
+  return Builder<CnameRecordBuilderProps, CnameRecordBuilder>(CnameRecordBuilder);
 }

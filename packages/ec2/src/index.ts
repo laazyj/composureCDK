@@ -7,6 +7,9 @@ export {
 export { INSTANCE_DEFAULTS } from "./instance-defaults.js";
 export { type InstanceAlarmConfig } from "./instance-alarm-config.js";
 export { INSTANCE_ALARM_DEFAULTS } from "./instance-alarm-defaults.js";
+export { type AttachVolumeOptions } from "./instance-volume-attachments.js";
+export { type VolumeAttachmentAlarmConfig } from "./instance-volume-attachment-config.js";
+export { VOLUME_ATTACHMENT_ALARM_DEFAULTS } from "./instance-volume-attachment-defaults.js";
 
 export {
   createVolumeBuilder,

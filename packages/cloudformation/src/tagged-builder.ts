@@ -2,6 +2,16 @@ import { Builder, type IBuilder } from "@composurecdk/core";
 import { applyBuilderTags } from "./apply-builder-tags.js";
 import { validateTag, validateTagRecord } from "./tag-validator.js";
 
+/**
+ * The `name` attached to the `process.emitWarning` call when `.tag(k, v)` /
+ * `.tags({...})` overwrites an existing key. Exported so callers with
+ * layered configuration (a base builder plus per-environment refinements
+ * that intentionally override) can filter via
+ * `process.on("warning", w => { if (w.name !== TAG_OVERRIDE_WARNING_NAME) ... })`
+ * or the Node 21.3+ `--disable-warning=ComposureCDKTagOverride` CLI flag.
+ */
+export const TAG_OVERRIDE_WARNING_NAME = "ComposureCDKTagOverride";
+
 type Constructor<T> = new () => T;
 
 interface ObjectWithProps<Props extends object> {
@@ -126,7 +136,7 @@ function wrapTagged<Props extends object, T extends ObjectWithProps<Props>>(
       process.emitWarning(
         `Tag "${key}" was already set to "${previous ?? ""}" and is being overwritten with "${value}". ` +
           "Last write wins; remove the duplicate to silence this warning.",
-        { type: "ComposureCDKTagOverride" },
+        { type: TAG_OVERRIDE_WARNING_NAME },
       );
     }
     accumulator.set(key, value);
@@ -144,9 +154,11 @@ function wrapTagged<Props extends object, T extends ObjectWithProps<Props>>(
     return wrapTagged<Props, T>(innerCopy.copy(), new Map(accumulator));
   };
 
-  // Pre-bound interceptors close over `outer` so chained calls return the
-  // wrapper. They are referenced from the Proxy's `get` trap, which only
-  // reads them when a property is accessed (after this function returns).
+  // `tagFn` / `tagsFn` and `outer` form a cycle: the interceptors return
+  // `outer` for chaining, and `outer`'s `get` trap returns the interceptors.
+  // Resolved by Proxy laziness: the `get` trap closes over the names but
+  // does not read them until a property is accessed, by which point the
+  // `const`s below have initialised.
   const outer: ITaggedBuilder<Props, T> = new Proxy(inner, {
     get(target, prop, receiver) {
       if (prop === "tag") return tagFn;

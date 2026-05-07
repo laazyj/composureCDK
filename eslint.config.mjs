@@ -10,6 +10,11 @@ import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
  * in library builder files. Library builders should opt into the shared tagging
  * surface via `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation`.
  */
+const taggedSuffix =
+  "If the wrapped CFN resource has no Tags property (Route53 records, IAM ManagedPolicy, " +
+  "SNS Subscription, AWS Budgets), disable this rule on the offending line with a directive " +
+  "naming the resource: `// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::… has no Tags property`.";
+
 const builderTaggingRule = {
   meta: {
     type: "problem",
@@ -22,14 +27,10 @@ const builderTaggingRule = {
     messages: {
       restrictedCall:
         "Use `taggedBuilder` from `@composurecdk/cloudformation` instead of `Builder` from `@composurecdk/core`. " +
-        "If the wrapped CFN resource has no Tags property (Route53 records, IAM ManagedPolicy, " +
-        "SNS Subscription, AWS Budgets), disable this rule on the offending line with a directive " +
-        "naming the resource: `// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::… has no Tags property`.",
+        taggedSuffix,
       restrictedType:
         "Use `ITaggedBuilder` from `@composurecdk/cloudformation` instead of `IBuilder` from `@composurecdk/core`. " +
-        "If the wrapped CFN resource has no Tags property (Route53 records, IAM ManagedPolicy, " +
-        "SNS Subscription, AWS Budgets), disable this rule on the offending line with a directive " +
-        "naming the resource: `// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::… has no Tags property`.",
+        taggedSuffix,
     },
   },
   create(ctx) {

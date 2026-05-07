@@ -174,6 +174,25 @@ The class must have a `props: Partial<Props>` field (this is how the builder pro
 
 Builder authors: see [ADR-0001](adr/0001-builder-type-emission.md) for type-emission rules.
 
+### Copying a builder
+
+Every builder exposes `.copy()`, returning an independent builder with the same configured state. Mutations to either side do not affect the other. This unlocks two patterns:
+
+```typescript
+// Variant authoring: derive specialized builders from a shared base
+const baseStack = createStackBuilder().tag("project", "shared");
+
+const us = baseStack.copy().description("US region stack");
+const eu = baseStack.copy().description("EU region stack");
+
+// Strategy hand-off snapshot: pass an isolated builder to a strategy
+compose(...).withStackStrategy(singleStack(baseStack.copy())).build(app, "MySystem");
+```
+
+`.copy()` shallow-clones `props`. Top-level keys are independent; nested object references (CDK constructs, IRoles, IVpcs) are shared by design — these are construct identities, not configuration data.
+
+State stored outside `props` (private fields, internal accumulators) is invisible to the default `.copy()`. A class that holds such state implements a `[COPY_STATE]` hook to copy it onto the cloned instance. Decorators that wrap `Builder()` and hold their own state on an outer proxy must override `.copy()` in that proxy rather than rely on the hook. See [ADR-0005](adr/0005-builder-copy.md) for the full design rationale.
+
 ## Defaults
 
 Builders apply secure, AWS-recommended defaults to every resource they create. Each builder package exports a `defaults.ts` module containing a constant of type `Partial<Props>` — the set of properties that are applied unless the user explicitly overrides them.

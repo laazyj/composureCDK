@@ -1,4 +1,4 @@
-export { Builder, type IBuilder } from "./builder.js";
+export { Builder, COPY_STATE, type IBuilder } from "./builder.js";
 export { constructId, sanitizeConstructId } from "./construct-id.js";
 export {
   compose,

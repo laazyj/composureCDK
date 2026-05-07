@@ -1,6 +1,7 @@
-import { Stack, type StackProps, Tags } from "aws-cdk-lib";
+import { Stack, type StackProps } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import { Builder, COPY_STATE, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "./tagged-builder.js";
 
 /**
  * The build output of a {@link IStackBuilder}. Contains the CDK Stack
@@ -24,45 +25,27 @@ export interface StackBuilderResult {
  * builder to a strategy that may be invoked after further configuration of
  * the original, pass `builder.copy()` to snapshot the current state.
  *
+ * Tags accumulated via {@link ITaggedBuilder.tag | .tag()} or
+ * {@link ITaggedBuilder.tags | .tags()} are applied to the resulting Stack.
+ * CloudFormation propagates stack-level tags to every resource the stack
+ * contains, so a single `.tag()` call on a stack reaches everything inside.
+ *
  * @example
  * ```ts
  * const { stack } = createStackBuilder()
  *   .description("Network infrastructure")
  *   .terminationProtection(true)
+ *   .tag("Owner", "platform")
  *   .build(app, "NetworkStack");
  * ```
  */
-export type IStackBuilder = IBuilder<StackProps, StackBuilder> & {
-  /**
-   * Adds a tag to the Stack. Tags are applied to the Stack and propagate
-   * to all resources within it.
-   *
-   * @param key - The tag key.
-   * @param value - The tag value.
-   * @returns The builder for chaining.
-   */
-  tag(key: string, value: string): IStackBuilder;
-};
+export type IStackBuilder = ITaggedBuilder<StackProps, StackBuilder>;
 
 class StackBuilder implements Lifecycle<StackBuilderResult> {
   props: Partial<StackProps> = {};
-  readonly #tags: [string, string][] = [];
-
-  tag(key: string, value: string): this {
-    this.#tags.push([key, value]);
-    return this;
-  }
-
-  [COPY_STATE](next: StackBuilder): void {
-    next.#tags.push(...this.#tags);
-  }
 
   build(scope: IConstruct, id: string): StackBuilderResult {
-    const stack = new Stack(scope, id, this.props);
-    this.#tags.forEach(([key, value]) => {
-      Tags.of(stack).add(key, value);
-    });
-    return { stack };
+    return { stack: new Stack(scope, id, this.props) };
   }
 }
 
@@ -71,9 +54,10 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
  *
  * This is the entry point for declarative stack configuration. The returned
  * builder exposes every {@link StackProps} property as a fluent setter/getter,
- * plus {@link IStackBuilder.tag | .tag()} for adding tags. It implements
- * {@link Lifecycle}, so it composes naturally and can be passed to
- * {@link singleStack} or {@link groupedStacks}.
+ * `.tag(key, value)` / `.tags({...})` for stack-level tagging, and `.copy()`
+ * for variant authoring. It implements {@link Lifecycle}, so it composes
+ * naturally and can be passed to {@link singleStack} or
+ * {@link groupedStacks}.
  *
  * @returns A fluent builder for a CloudFormation Stack.
  *
@@ -83,6 +67,7 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
  * const { stack } = createStackBuilder()
  *   .description("Service layer")
  *   .terminationProtection(true)
+ *   .tag("Owner", "platform")
  *   .build(app, "ServiceStack");
  *
  * // Hand a configured builder to a strategy. Use `.copy()` to snapshot
@@ -97,5 +82,5 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
  * ```
  */
 export function createStackBuilder(): IStackBuilder {
-  return Builder<StackProps, StackBuilder>(StackBuilder);
+  return taggedBuilder<StackProps, StackBuilder>(StackBuilder);
 }

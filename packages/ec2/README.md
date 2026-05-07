@@ -175,6 +175,82 @@ createVpcBuilder().flowLogs(false);
 
 For multiple flow logs against the same VPC, omit this config and create additional `FlowLog` constructs directly against the returned `vpc`.
 
+## Volume Builder
+
+```ts
+import { createVolumeBuilder } from "@composurecdk/ec2";
+import { Size } from "aws-cdk-lib";
+
+const data = createVolumeBuilder()
+  .availabilityZone("us-east-1a")
+  .size(Size.gibibytes(50))
+  .build(stack, "AgentData");
+```
+
+Every [VolumeProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ec2.VolumeProps.html) property is available as a fluent setter on the builder, except `availabilityZone` which is set via the dedicated `.availabilityZone()` method (so it can be wired from a sibling `VpcBuilder` via `ref`) and `encryptionKey` which accepts a `Resolvable<IKey>` for cross-component KMS-key wiring.
+
+### Volume Defaults
+
+| Property        | Default                | Rationale                                                                                                 |
+| --------------- | ---------------------- | --------------------------------------------------------------------------------------------------------- |
+| `volumeType`    | `GP3`                  | Current-generation general-purpose SSD — cheaper and faster than GP2 at equivalent sizes.                 |
+| `encrypted`     | `true`                 | Encryption at rest with the account's default EBS KMS key. Pass `encryptionKey` for a CMK.                |
+| `autoEnableIo`  | `true`                 | Lets I/O resume on suspected inconsistency so the instance can come up unattended.                        |
+| `removalPolicy` | `RemovalPolicy.RETAIN` | A destroyed volume is unrecoverable; an orphaned volume is a $/month nuisance. Mirrors `BUCKET_DEFAULTS`. |
+
+Three properties intentionally have no default — they are application-specific and must be supplied explicitly:
+
+- `availabilityZone` (via the `.availabilityZone()` method)
+- `size`
+- `iops` / `throughput` (only when opting into a volume type that requires them)
+
+The defaults are exported as `VOLUME_DEFAULTS` for visibility and testing:
+
+```ts
+import { VOLUME_DEFAULTS } from "@composurecdk/ec2";
+```
+
+### Recommended Volume Alarms
+
+The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#EBS) by default. No alarm actions are configured — wire actions via `alarmActionsPolicy` from `@composurecdk/cloudwatch`.
+
+| Alarm          | Metric                        | Default threshold    | Created when                                    |
+| -------------- | ----------------------------- | -------------------- | ----------------------------------------------- |
+| `burstBalance` | BurstBalance (Average, 5 min) | < 20% over 3 × 5 min | `volumeType` is burstable (`gp2`, `st1`, `sc1`) |
+
+The defaults are exported as `VOLUME_ALARM_DEFAULTS` for visibility and testing:
+
+```ts
+import { VOLUME_ALARM_DEFAULTS } from "@composurecdk/ec2";
+```
+
+`VolumeQueueLength` and `VolumeIdleTime` are deferred — both need per-`volumeType`/per-workload tuning to be a defensible default. Wire them via `addAlarm` until first-class support lands:
+
+```ts
+import { Metric, Stats } from "aws-cdk-lib/aws-cloudwatch";
+import { Duration } from "aws-cdk-lib";
+
+const data = createVolumeBuilder()
+  .availabilityZone("us-east-1a")
+  .size(Size.gibibytes(50))
+  .addAlarm("volumeQueueLength", (alarm) =>
+    alarm
+      .metric(
+        (volume) =>
+          new Metric({
+            namespace: "AWS/EBS",
+            metricName: "VolumeQueueLength",
+            dimensionsMap: { VolumeId: volume.volumeId },
+            statistic: Stats.AVERAGE,
+            period: Duration.minutes(5),
+          }),
+      )
+      .threshold(10)
+      .greaterThan()
+      .description("EBS volume queue length is high"),
+  );
+```
+
 ## Composing EC2 + VPC
 
 Compose the builders into a single system — the instance is wired to the VPC via `ref`:

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Template } from "aws-cdk-lib/assertions";
+import { Match, Template } from "aws-cdk-lib/assertions";
 import { createDualFunctionApp } from "../src/dual-function-app.js";
 
 describe("dual-function-app", () => {
@@ -34,6 +34,37 @@ describe("dual-function-app", () => {
       TracingConfig: { Mode: "Active" },
       Description: "Worker — processes requests asynchronously",
     });
+  });
+
+  it("schedules the worker every 15 minutes via an EventBridge rule", () => {
+    template.resourceCountIs("AWS::Events::Rule", 1);
+    template.hasResourceProperties("AWS::Events::Rule", {
+      ScheduleExpression: "rate(15 minutes)",
+      Description: "Tick the worker every 15 minutes",
+      Targets: Match.arrayWith([Match.objectLike({ Id: "Target0" })]),
+    });
+  });
+
+  it("grants EventBridge permission to invoke the worker", () => {
+    template.hasResourceProperties("AWS::Lambda::Permission", {
+      Action: "lambda:InvokeFunction",
+      Principal: "events.amazonaws.com",
+    });
+  });
+
+  it("creates the four AWS-recommended rule alarms", () => {
+    template.resourcePropertiesCountIs("AWS::CloudWatch::Alarm", { Namespace: "AWS/Events" }, 4);
+    for (const metricName of [
+      "FailedInvocations",
+      "ThrottledRules",
+      "InvocationsSentToDlq",
+      "InvocationsFailedToBeSentToDlq",
+    ]) {
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        Namespace: "AWS/Events",
+        MetricName: metricName,
+      });
+    }
   });
 
   it("matches the expected synthesised template", () => {

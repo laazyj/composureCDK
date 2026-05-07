@@ -80,4 +80,61 @@ const system = compose(
 
 ## Target Helpers
 
-_Coming in a follow-up commit in this PR — `lambdaTarget`, `sqsTarget`, `snsTarget`, `sfnStateMachineTarget`, `eventBusTarget`, `cloudWatchLogGroupTarget`._
+This package ships small free-function helpers that wrap the corresponding [`aws-events-targets`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_events_targets-readme.html) constructs and accept a `Resolvable<I*>` for the underlying resource. Use them inside `addTarget` instead of constructing the CDK target classes directly — they make cross-component wiring with `ref(...)` work without an `afterBuild` hook.
+
+| Helper                     | Wraps                | Underlying resource |
+| -------------------------- | -------------------- | ------------------- |
+| `lambdaTarget`             | `LambdaFunction`     | `IFunction`         |
+| `sqsTarget`                | `SqsQueue`           | `IQueue`            |
+| `snsTarget`                | `SnsTopic`           | `ITopic`            |
+| `sfnStateMachineTarget`    | `SfnStateMachine`    | `IStateMachine`     |
+| `eventBusTarget`           | `EventBus`           | `IEventBus`         |
+| `cloudWatchLogGroupTarget` | `CloudWatchLogGroup` | `ILogGroup`         |
+
+The second argument is the matching CDK target props type (`LambdaFunctionProps`, `SqsQueueProps`, …) — refer to the CDK docs for available options. Common ones include `deadLetterQueue` (concrete `IQueue`), `retryAttempts`, `maxEventAge`, and target-specific input transforms (`event` / `input` / `message`).
+
+Other CDK target types (API Gateway, ECS task, Batch job, Kinesis, Firehose, AppSync, …) are not yet wrapped — pass them inline as a regular `IRuleTarget` until a wrapper helper lands.
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createRuleBuilder,
+  lambdaTarget,
+  sqsTarget,
+} from "@composurecdk/events";
+import {
+  createFunctionBuilder,
+  type FunctionBuilderResult,
+} from "@composurecdk/lambda";
+
+compose(
+  {
+    handler: createFunctionBuilder()./* ... */,
+    rule: createRuleBuilder()
+      .eventPattern({ source: ["aws.s3"], detailType: ["Object Created"] })
+      .addTarget(
+        "primary",
+        lambdaTarget(ref("handler", (r: FunctionBuilderResult) => r.function), {
+          retryAttempts: 2,
+        }),
+      ),
+  },
+  { handler: [], rule: ["handler"] },
+);
+```
+
+### Cross-component DLQ wiring
+
+Each helper takes a single `Resolvable` for its primary resource. Secondary props such as `deadLetterQueue` accept the concrete CDK type (`IQueue` for most targets). When the DLQ is also a sibling-component output, construct the helper inside `ref().map()` and have the dependency component expose both the resource and the queue:
+
+```ts
+.addTarget(
+  "stopper",
+  ref<{ fn: IFunction; dlq: IQueue }>(
+    "stopperBundle",
+    (b) => lambdaTarget(b.fn, { deadLetterQueue: b.dlq }),
+  ),
+)
+```
+
+A dedicated DLQ component (`createQueueBuilder`-style) — and helpers that accept `Resolvable<IQueue>` for the DLQ directly — are out of scope for this PR; track as a follow-up if a use case emerges.

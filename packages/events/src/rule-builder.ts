@@ -1,4 +1,11 @@
-import { type IEventBus, type IRuleTarget, Rule, type RuleProps } from "aws-cdk-lib/aws-events";
+import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import {
+  type IEventBus,
+  type IRule,
+  type IRuleTarget,
+  Rule,
+  type RuleProps,
+} from "aws-cdk-lib/aws-events";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -8,7 +15,10 @@ import {
   resolve,
   type Resolvable,
 } from "@composurecdk/core";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { RULE_DEFAULTS } from "./defaults.js";
+import type { RuleAlarmConfig } from "./rule-alarm-config.js";
+import { createRuleAlarms } from "./rule-alarms.js";
 
 /**
  * Configuration properties for the EventBridge rule builder.
@@ -27,6 +37,21 @@ export interface RuleBuilderProps extends Omit<RuleProps, "targets" | "eventBus"
    * default.
    */
   eventBus?: Resolvable<IEventBus>;
+
+  /**
+   * Configuration for AWS-recommended CloudWatch alarms.
+   *
+   * By default, the builder creates recommended alarms with sensible
+   * thresholds for every applicable metric. Individual alarms can be
+   * customized or disabled. Set to `false` to disable all alarms.
+   *
+   * No alarm actions are configured by default since notification methods
+   * are user-specific. Access alarms from the build result or apply them
+   * via the {@link alarmActionsPolicy} from `@composurecdk/cloudwatch`.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#EventBridge
+   */
+  recommendedAlarms?: RuleAlarmConfig | false;
 }
 
 /**
@@ -36,6 +61,15 @@ export interface RuleBuilderProps extends Omit<RuleProps, "targets" | "eventBus"
 export interface RuleBuilderResult {
   /** The EventBridge rule construct created by the builder. */
   rule: Rule;
+
+  /**
+   * CloudWatch alarms created for the rule, keyed by alarm key.
+   *
+   * Includes both AWS-recommended alarms and any custom alarms added via
+   * {@link IRuleBuilder.addAlarm}. No alarm actions are configured —
+   * apply them via the result or an {@link alarmActionsPolicy}.
+   */
+  alarms: Record<string, Alarm>;
 
   /**
    * Resolved {@link IRuleTarget}s registered via
@@ -85,7 +119,21 @@ interface TargetEntry {
 
 class RuleBuilder implements Lifecycle<RuleBuilderResult> {
   props: Partial<RuleBuilderProps> = {};
+  readonly #customAlarms: AlarmDefinitionBuilder<IRule>[] = [];
   readonly #targets: TargetEntry[] = [];
+
+  /**
+   * Register a custom CloudWatch alarm on the rule. The configure callback
+   * receives an {@link AlarmDefinitionBuilder} typed to {@link IRule} so the
+   * metric factory has access to the rule's properties.
+   */
+  addAlarm(
+    key: string,
+    configure: (alarm: AlarmDefinitionBuilder<IRule>) => AlarmDefinitionBuilder<IRule>,
+  ): this {
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IRule>(key)));
+    return this;
+  }
 
   /**
    * Register a target to be attached to the rule at build time.
@@ -108,7 +156,7 @@ class RuleBuilder implements Lifecycle<RuleBuilderResult> {
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): RuleBuilderResult {
     const ctx = context ?? {};
-    const { eventBus, ...rest } = this.props;
+    const { eventBus, recommendedAlarms: alarmConfig, ...rest } = this.props;
 
     if (rest.schedule === undefined && rest.eventPattern === undefined) {
       throw new Error(
@@ -132,12 +180,15 @@ class RuleBuilder implements Lifecycle<RuleBuilderResult> {
       targets[entry.key] = resolved;
     }
 
-    return { rule, targets };
+    const alarms = createRuleAlarms(scope, id, rule, alarmConfig, this.#customAlarms);
+
+    return { rule, alarms, targets };
   }
 
-  /** Deep-clones the target accumulator so `.copy()` produces an independent builder. */
+  /** Deep-clones accumulator state so `.copy()` produces an independent builder. */
   [COPY_STATE](next: RuleBuilder): void {
     next.#targets.push(...this.#targets);
+    next.#customAlarms.push(...this.#customAlarms);
   }
 }
 

@@ -41,6 +41,95 @@ compose(
 
 When omitted, the rule attaches to the account default bus, matching CDK's `RuleProps.eventBus` default.
 
+## Recommended Alarms
+
+The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#EventBridge) by default. No alarm actions are configured — access alarms from the build result, or use the `alarmActionsPolicy` from `@composurecdk/cloudwatch` to wire them to an SNS topic in one place.
+
+| Alarm                            | Metric                                      | Default threshold | Created when |
+| -------------------------------- | ------------------------------------------- | ----------------- | ------------ |
+| `failedInvocations`              | FailedInvocations (Sum, 1 min)              | > 0               | Always       |
+| `throttledRules`                 | ThrottledRules (Sum, 1 min)                 | > 0               | Always       |
+| `invocationsSentToDlq`           | InvocationsSentToDlq (Sum, 1 min)           | > 0               | Always[^dlq] |
+| `invocationsFailedToBeSentToDlq` | InvocationsFailedToBeSentToDlq (Sum, 1 min) | > 0               | Always[^dlq] |
+
+[^dlq]: The DLQ metrics only emit data when at least one target on the rule has a `deadLetterQueue` configured and EventBridge attempts redrive. `TreatMissingData` defaults to `notBreaching`, so the alarm stays quiet on rules without DLQs. Attach a DLQ via the matching target helper's `deadLetterQueue` option — see [Cross-component DLQ wiring](#cross-component-dlq-wiring) below, and the [EventBridge DLQ docs](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-dlq.html).
+
+The defaults are exported as `RULE_ALARM_DEFAULTS` for visibility and testing:
+
+```ts
+import { RULE_ALARM_DEFAULTS } from "@composurecdk/events";
+```
+
+### Customizing thresholds
+
+Override individual alarm properties via `recommendedAlarms`. Unspecified fields keep their defaults.
+
+```ts
+const rule = createRuleBuilder()
+  .eventPattern({ source: ["my.app"] })
+  .recommendedAlarms({
+    failedInvocations: { threshold: 5, evaluationPeriods: 3 },
+  });
+```
+
+### Disabling alarms
+
+Disable all recommended alarms:
+
+```ts
+builder.recommendedAlarms(false);
+// or
+builder.recommendedAlarms({ enabled: false });
+```
+
+Disable individual alarms:
+
+```ts
+builder.recommendedAlarms({ throttledRules: false });
+```
+
+### Custom alarms
+
+Add custom alarms alongside the recommended ones via `addAlarm`. The callback receives an `AlarmDefinitionBuilder` typed to `IRule`, so the metric factory has access to the rule's properties. The Serverless Lens flags `RetryInvocationAttempts` as an early indicator of an undersized target — a good candidate for `addAlarm`:
+
+```ts
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { Duration } from "aws-cdk-lib";
+
+createRuleBuilder()
+  .eventPattern({ source: ["my.app"] })
+  .addAlarm("retryAttempts", (alarm) =>
+    alarm
+      .metric(
+        (rule) =>
+          new Metric({
+            namespace: "AWS/Events",
+            metricName: "RetryInvocationAttempts",
+            dimensionsMap: { RuleName: rule.ruleName },
+            statistic: "Sum",
+            period: Duration.minutes(1),
+          }),
+      )
+      .threshold(10)
+      .greaterThan()
+      .description("Target is being undersized; retries are climbing."),
+  );
+```
+
+### Applying alarm actions
+
+Alarms are returned in the build result as `Record<string, Alarm>`:
+
+```ts
+const result = rule.build(stack, "MyRule");
+
+for (const alarm of Object.values(result.alarms)) {
+  alarm.addAlarmAction(new SnsAction(alertTopic));
+}
+```
+
+Or apply them stack-wide via `alarmActionsPolicy(stack, { defaults: { alarmActions: [new SnsAction(alertTopic)] } })` from `@composurecdk/cloudwatch` — same pattern used by the rest of the library, so a single SNS topic can fan out to function and rule alarms together.
+
 ## Adding Targets
 
 Targets are registered via `addTarget(key, target)`, where `target` is a CDK [`IRuleTarget`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_events.IRuleTarget.html) (or a `Resolvable<IRuleTarget>` for cross-component wiring). Each target is exposed on `result.targets` under its key.

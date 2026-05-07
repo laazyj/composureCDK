@@ -2,7 +2,8 @@ import { RemovalPolicy } from "aws-cdk-lib";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BucketAlarmConfig } from "./alarm-config.js";
 import { createBucketAlarms } from "./bucket-alarms.js";
@@ -105,7 +106,7 @@ export interface BucketBuilderResult {
  *   .versioned(false);
  * ```
  */
-export type IBucketBuilder = IBuilder<BucketBuilderProps, BucketBuilder>;
+export type IBucketBuilder = ITaggedBuilder<BucketBuilderProps, BucketBuilder>;
 
 class BucketBuilder implements Lifecycle<BucketBuilderResult> {
   props: Partial<BucketBuilderProps> = {};
@@ -240,5 +241,5 @@ function autoDeleteProps(
  * ```
  */
 export function createBucketBuilder(): IBucketBuilder {
-  return Builder<BucketBuilderProps, BucketBuilder>(BucketBuilder);
+  return taggedBuilder<BucketBuilderProps, BucketBuilder>(BucketBuilder);
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
 import { createBucketBuilder } from "../src/bucket-builder.js";
 
@@ -432,6 +433,105 @@ describe("BucketBuilder", () => {
       );
 
       template.resourceCountIs("Custom::S3AutoDeleteObjects", 0);
+    });
+  });
+
+  describe("tagging", () => {
+    it("applies builder tags to the primary bucket", () => {
+      const template = synthTemplate((b) =>
+        withoutLogging(b).tag("Project", "claude-rig").tag("Owner", "platform"),
+      );
+
+      const buckets = template.findResources("AWS::S3::Bucket") as Record<
+        string,
+        { Properties: { Tags?: { Key: string; Value: string }[] } }
+      >;
+      const tags = Object.values(buckets)[0]?.Properties.Tags ?? [];
+      expect(tags).toEqual(
+        expect.arrayContaining([
+          { Key: "Project", Value: "claude-rig" },
+          { Key: "Owner", Value: "platform" },
+        ]),
+      );
+    });
+
+    it("does not crash when a sibling result field is undefined", () => {
+      const template = synthTemplate((b) => withoutLogging(b).tag("Project", "claude-rig"));
+
+      const buckets = template.findResources("AWS::S3::Bucket") as Record<
+        string,
+        { Properties: { Tags?: { Key: string; Value: string }[] } }
+      >;
+      expect(Object.keys(buckets)).toHaveLength(1);
+      expect(Object.values(buckets)[0]?.Properties.Tags).toEqual(
+        expect.arrayContaining([{ Key: "Project", Value: "claude-rig" }]),
+      );
+    });
+
+    it("applies builder tags to the auto-created access logs bucket sibling", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      createBucketBuilder().tag("Project", "claude-rig").build(stack, "TestBucket");
+
+      const template = Template.fromStack(stack);
+      // Both buckets — the primary and the auto-created access-logs sibling — carry the tag.
+      const buckets = template.findResources("AWS::S3::Bucket");
+      expect(Object.keys(buckets)).toHaveLength(2);
+      for (const resource of Object.values(buckets) as {
+        Properties: { Tags?: { Key: string; Value: string }[] };
+      }[]) {
+        expect(resource.Properties.Tags).toEqual(
+          expect.arrayContaining([{ Key: "Project", Value: "claude-rig" }]),
+        );
+      }
+    });
+
+    it("applies builder tags to alarm constructs in the result", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      createBucketBuilder()
+        .serverAccessLogs(false)
+        .tag("Owner", "platform")
+        .addAlarm("requests", (alarm) =>
+          alarm.metric(
+            (bucket) =>
+              new Metric({
+                namespace: "AWS/S3",
+                metricName: "AllRequests",
+                dimensionsMap: { BucketName: bucket.bucketName },
+              }),
+          ),
+        )
+        .build(stack, "TestBucket");
+
+      const template = Template.fromStack(stack);
+      const alarms = template.findResources("AWS::CloudWatch::Alarm");
+      expect(Object.keys(alarms).length).toBeGreaterThan(0);
+      for (const resource of Object.values(alarms) as {
+        Properties: { Tags?: { Key: string; Value: string }[] };
+      }[]) {
+        expect(resource.Properties.Tags).toEqual(
+          expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
+        );
+      }
+    });
+
+    it("supports the .tags({...}) shorthand", () => {
+      const template = synthTemplate((b) =>
+        withoutLogging(b).tags({ Owner: "platform", Environment: "prod" }),
+      );
+
+      const buckets = template.findResources("AWS::S3::Bucket") as Record<
+        string,
+        { Properties: { Tags?: { Key: string; Value: string }[] } }
+      >;
+      const tags = Object.values(buckets)[0]?.Properties.Tags ?? [];
+      expect(tags).toEqual(
+        expect.arrayContaining([
+          { Key: "Owner", Value: "platform" },
+          { Key: "Environment", Value: "prod" },
+        ]),
+      );
     });
   });
 });

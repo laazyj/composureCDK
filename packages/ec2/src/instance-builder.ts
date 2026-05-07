@@ -1,5 +1,6 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import {
+  type CfnVolumeAttachment,
   Instance,
   type IKeyPair,
   type ISecurityGroup,
@@ -14,6 +15,12 @@ import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { InstanceAlarmConfig } from "./instance-alarm-config.js";
 import { createInstanceAlarms } from "./instance-alarms.js";
 import { INSTANCE_DEFAULTS } from "./instance-defaults.js";
+import {
+  type AttachVolumeOptions,
+  type AttachVolumeRef,
+  createVolumeAttachments,
+  type PendingVolumeAttachment,
+} from "./instance-volume-attachments.js";
 
 /**
  * Configuration properties for the EC2 instance builder.
@@ -100,9 +107,10 @@ export interface InstanceBuilderResult {
   /**
    * CloudWatch alarms created for the instance, keyed by alarm name.
    *
-   * Includes both AWS-recommended alarms and any custom alarms added
-   * via {@link IInstanceBuilder.addAlarm}. Access individual alarms by
-   * key (e.g., `result.alarms.cpuUtilization`).
+   * Includes AWS-recommended instance alarms, any custom alarms added
+   * via {@link IInstanceBuilder.addAlarm}, and per-attachment alarms
+   * added by {@link IInstanceBuilder.attachVolume} (keyed
+   * `${attachmentKey}.${alarmKey}`, e.g. `AgentData.volumeStalledIo`).
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
@@ -110,6 +118,15 @@ export interface InstanceBuilderResult {
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#EC2
    */
   alarms: Record<string, Alarm>;
+
+  /**
+   * `AWS::EC2::VolumeAttachment` constructs created via
+   * {@link IInstanceBuilder.attachVolume}, keyed by the attachment key
+   * supplied in that call.
+   *
+   * Empty when no volumes were attached.
+   */
+  volumeAttachments: Record<string, CfnVolumeAttachment>;
 }
 
 /**
@@ -149,6 +166,7 @@ export type IInstanceBuilder = ITaggedBuilder<InstanceBuilderProps, InstanceBuil
 class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
   props: Partial<InstanceBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Instance>[] = [];
+  readonly #volumeAttachments: PendingVolumeAttachment[] = [];
   #vpc?: Resolvable<IVpc>;
 
   /**
@@ -183,6 +201,38 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
     return this;
   }
 
+  /**
+   * Attaches an externally-managed EBS volume to the instance via an
+   * `AWS::EC2::VolumeAttachment` resource, mirroring the call shape of
+   * {@link addAlarm}.
+   *
+   * The `volumeRef` accepts either a `Resolvable<VolumeBuilderResult>`
+   * (drop a `ref<VolumeBuilderResult>("data")` straight in) or a
+   * `Resolvable<IVolume>` for an externally-managed volume — the builder
+   * unwraps either at build time.
+   *
+   * When both AZs are concrete at synth time, the builder asserts the
+   * instance and the volume are in the same Availability Zone — synth-
+   * time failure beats boot-time failure for AZ mismatches.
+   *
+   * Per-attachment AWS-recommended alarms (e.g. `volumeStalledIo`) are
+   * created by default and merged into the result's `alarms` record
+   * under prefixed keys (`${attachmentKey}.${alarmKey}`).
+   *
+   * @param key - Unique key for the attachment (used as the result-map
+   *   field name and as the construct id suffix).
+   * @param volumeRef - Resolvable to the volume to attach.
+   * @param options - Attachment options (`device`, `recommendedAlarms`).
+   * @returns This builder for chaining.
+   */
+  attachVolume(key: string, volumeRef: AttachVolumeRef, options: AttachVolumeOptions): this {
+    if (this.#volumeAttachments.some((a) => a.key === key)) {
+      throw new Error(`attachVolume: duplicate attachment key "${key}".`);
+    }
+    this.#volumeAttachments.push({ key, volumeRef, options });
+    return this;
+  }
+
   build(scope: IConstruct, id: string, context?: Record<string, object>): InstanceBuilderResult {
     const resolvedVpc = this.#vpc ? resolve(this.#vpc, context) : undefined;
 
@@ -211,7 +261,7 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
 
     const instance = new Instance(scope, id, mergedProps);
 
-    const alarms = createInstanceAlarms(
+    const instanceAlarms = createInstanceAlarms(
       scope,
       id,
       instance,
@@ -220,7 +270,20 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
       this.#customAlarms,
     );
 
-    return { instance, alarms };
+    const { attachments, alarms: attachmentAlarms } = createVolumeAttachments(
+      scope,
+      id,
+      instance,
+      mergedProps,
+      this.#volumeAttachments,
+      context,
+    );
+
+    return {
+      instance,
+      alarms: { ...instanceAlarms, ...attachmentAlarms },
+      volumeAttachments: attachments,
+    };
   }
 }
 

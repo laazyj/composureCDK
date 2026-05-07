@@ -120,6 +120,51 @@ const server = createInstanceBuilder()
   );
 ```
 
+### Attaching persistent volumes
+
+`attachVolume(key, volumeRef, opts)` mirrors the call shape of `addAlarm` and produces an `AWS::EC2::VolumeAttachment` for an externally-managed EBS volume. The volume reference accepts either a `Resolvable<VolumeBuilderResult>` (drop a `ref<VolumeBuilderResult>("data")` straight in) or a `Resolvable<IVolume>`.
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createInstanceBuilder,
+  createVolumeBuilder,
+  createVpcBuilder,
+  type VolumeBuilderResult,
+  type VpcBuilderResult,
+} from "@composurecdk/ec2";
+import { Size } from "aws-cdk-lib";
+import { InstanceClass, InstanceSize, InstanceType, MachineImage } from "aws-cdk-lib/aws-ec2";
+
+compose(
+  {
+    network: createVpcBuilder().maxAzs(2).natGateways(0),
+
+    data: createVolumeBuilder()
+      .availabilityZone(ref<VpcBuilderResult>("network").map((r) => r.vpc.availabilityZones[0]))
+      .size(Size.gibibytes(50)),
+
+    agent: createInstanceBuilder()
+      .vpc(ref<VpcBuilderResult>("network").map((r) => r.vpc))
+      .instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO))
+      .machineImage(MachineImage.latestAmazonLinux2023())
+      .attachVolume("AgentData", ref<VolumeBuilderResult>("data"), { device: "/dev/sdf" }),
+  },
+  { network: [], data: ["network"], agent: ["network", "data"] },
+).build(stack, "AgentApp");
+```
+
+The result exposes the attachment under `result.agent.volumeAttachments.AgentData` and emits a per-attachment `volumeStalledIo` alarm under `result.agent.alarms["AgentData.volumeStalledIo"]`. When both AZs are concrete strings at synth, the builder asserts the instance and volume share an Availability Zone — synth-time failure beats boot-time failure.
+
+`VolumeStalledIOCheck` is published only for Nitro-instance attachments. On non-Nitro instances the alarm sits at `INSUFFICIENT_DATA`, which the `treatMissingData: NOT_BREACHING` default makes harmless. To disable the alarm per attachment:
+
+```ts
+.attachVolume("AgentData", ref<VolumeBuilderResult>("data"), {
+  device: "/dev/sdf",
+  recommendedAlarms: false,
+})
+```
+
 ## VPC Builder
 
 ```ts

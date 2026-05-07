@@ -7,7 +7,7 @@ import {
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { CertificateAlarmConfig } from "./alarm-config.js";
@@ -133,6 +133,17 @@ class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
   ): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<ICertificate>(key)));
     return this;
+  }
+
+  /**
+   * Copies non-`props` state onto a freshly cloned builder. Per ADR-0005,
+   * the array is spread into a fresh container; the
+   * {@link AlarmDefinitionBuilder} elements are shared by reference.
+   *
+   * @internal
+   */
+  [COPY_STATE](target: CertificateBuilder): void {
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): CertificateBuilderResult {

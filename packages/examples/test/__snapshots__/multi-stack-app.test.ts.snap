@@ -43,6 +43,12 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
       "DeletionPolicy": "Retain",
       "Properties": {
         "RetentionInDays": 731,
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
       },
       "Type": "AWS::Logs::LogGroup",
       "UpdateReplacePolicy": "Retain",
@@ -86,6 +92,12 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
         "Namespace": "AWS/ApiGateway",
         "Period": 60,
         "Statistic": "Average",
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
         "Threshold": 0.05,
         "TreatMissingData": "notBreaching",
       },
@@ -120,11 +132,17 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
             ],
           },
         ],
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
       },
       "Type": "AWS::IAM::Role",
       "UpdateReplacePolicy": "Retain",
     },
-    "MultiStackAppapiDeploymentA87644C906c5d79fb068938895d9e8be0a1d6e29": {
+    "MultiStackAppapiDeploymentA87644C95de9b18a41ec02ef96026c26a931afa1": {
       "DependsOn": [
         "MultiStackAppapiGET2EF1C40F",
       ],
@@ -154,7 +172,7 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
           "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
         },
         "DeploymentId": {
-          "Ref": "MultiStackAppapiDeploymentA87644C906c5d79fb068938895d9e8be0a1d6e29",
+          "Ref": "MultiStackAppapiDeploymentA87644C95de9b18a41ec02ef96026c26a931afa1",
         },
         "MethodSettings": [
           {
@@ -168,6 +186,12 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
           "Ref": "MultiStackAppapiFB7EC5DD",
         },
         "StageName": "prod",
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
         "TracingEnabled": true,
       },
       "Type": "AWS::ApiGateway::Stage",
@@ -176,6 +200,12 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
       "Properties": {
         "Description": "API in a separate stack from its handler",
         "Name": "MultiStackApi",
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
       },
       "Type": "AWS::ApiGateway::RestApi",
     },
@@ -314,6 +344,12 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
         "MetricName": "Latency",
         "Namespace": "AWS/ApiGateway",
         "Period": 60,
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
         "Threshold": 2500,
         "TreatMissingData": "notBreaching",
       },
@@ -342,6 +378,12 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
         "Namespace": "AWS/ApiGateway",
         "Period": 60,
         "Statistic": "Average",
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
         "Threshold": 0.05,
         "TreatMissingData": "notBreaching",
       },
@@ -426,6 +468,12 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
           ],
         },
         "Runtime": "nodejs22.x",
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
         "Timeout": 30,
         "TracingConfig": {
           "Mode": "Active",
@@ -452,6 +500,12 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         "MetricName": "Duration",
         "Namespace": "AWS/Lambda",
         "Period": 60,
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
         "Threshold": 27000,
         "TreatMissingData": "notBreaching",
       },
@@ -476,6 +530,12 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         "Namespace": "AWS/Lambda",
         "Period": 60,
         "Statistic": "Sum",
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
         "Threshold": 0,
         "TreatMissingData": "notBreaching",
       },
@@ -485,6 +545,12 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
       "DeletionPolicy": "Retain",
       "Properties": {
         "RetentionInDays": 731,
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
       },
       "Type": "AWS::Logs::LogGroup",
       "UpdateReplacePolicy": "Retain",
@@ -515,6 +581,12 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
                 ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
               ],
             ],
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
           },
         ],
       },
@@ -563,6 +635,12 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         "Namespace": "AWS/Lambda",
         "Period": 60,
         "Statistic": "Sum",
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
         "Threshold": 0,
         "TreatMissingData": "notBreaching",
       },

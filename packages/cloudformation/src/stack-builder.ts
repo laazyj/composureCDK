@@ -1,6 +1,6 @@
 import { Stack, type StackProps, Tags } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle, type ScopeFactory } from "@composurecdk/core";
+import { Builder, COPY_STATE, type IBuilder, type Lifecycle } from "@composurecdk/core";
 
 /**
  * The build output of a {@link IStackBuilder}. Contains the CDK Stack
@@ -18,14 +18,15 @@ export interface StackBuilderResult {
  * as an overloaded method: call with a value to set it (returns the builder
  * for chaining), or call with no arguments to read the current value.
  *
- * The builder implements {@link Lifecycle}, so it can be used directly as a
- * component in a {@link compose | composed system}. When built, it creates
- * a Stack with the configured properties and returns a
- * {@link StackBuilderResult}.
+ * The builder implements {@link Lifecycle}, so it can be used directly as
+ * a component in a {@link compose | composed system}, or handed to a stack
+ * strategy via {@link singleStack} / {@link groupedStacks}. When handing a
+ * builder to a strategy that may be invoked after further configuration of
+ * the original, pass `builder.copy()` to snapshot the current state.
  *
  * @example
  * ```ts
- * const stack = createStackBuilder()
+ * const { stack } = createStackBuilder()
  *   .description("Network infrastructure")
  *   .terminationProtection(true)
  *   .build(app, "NetworkStack");
@@ -41,26 +42,6 @@ export type IStackBuilder = IBuilder<StackProps, StackBuilder> & {
    * @returns The builder for chaining.
    */
   tag(key: string, value: string): IStackBuilder;
-
-  /**
-   * Returns a {@link ScopeFactory} that creates Stacks with the builder's
-   * configured properties. Use this to integrate with
-   * {@link singleStack} or {@link groupedStacks} strategies.
-   *
-   * @returns A factory function compatible with stack strategies.
-   *
-   * @example
-   * ```ts
-   * const factory = createStackBuilder()
-   *   .terminationProtection(true)
-   *   .toScopeFactory();
-   *
-   * compose({ ... }, { ... })
-   *   .withStackStrategy(singleStack(factory))
-   *   .build(app, "MySystem");
-   * ```
-   */
-  toScopeFactory(): ScopeFactory;
 };
 
 class StackBuilder implements Lifecycle<StackBuilderResult> {
@@ -72,16 +53,8 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
     return this;
   }
 
-  toScopeFactory(): ScopeFactory {
-    const props = { ...this.props };
-    const tags = [...this.#tags];
-    return (scope: IConstruct, id: string) => {
-      const stack = new Stack(scope, id, props);
-      tags.forEach(([key, value]) => {
-        Tags.of(stack).add(key, value);
-      });
-      return stack;
-    };
+  [COPY_STATE](next: StackBuilder): void {
+    next.#tags.push(...this.#tags);
   }
 
   build(scope: IConstruct, id: string): StackBuilderResult {
@@ -98,9 +71,9 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
  *
  * This is the entry point for declarative stack configuration. The returned
  * builder exposes every {@link StackProps} property as a fluent setter/getter,
- * plus {@link IStackBuilder.tag | .tag()} for adding tags and
- * {@link IStackBuilder.toScopeFactory | .toScopeFactory()} for integration
- * with stack strategies.
+ * plus {@link IStackBuilder.tag | .tag()} for adding tags. It implements
+ * {@link Lifecycle}, so it composes naturally and can be passed to
+ * {@link singleStack} or {@link groupedStacks}.
  *
  * @returns A fluent builder for a CloudFormation Stack.
  *
@@ -112,14 +85,14 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
  *   .terminationProtection(true)
  *   .build(app, "ServiceStack");
  *
- * // Use as a scope factory with strategies
- * const factory = createStackBuilder()
+ * // Hand a configured builder to a strategy. Use `.copy()` to snapshot
+ * // when the original may be mutated further.
+ * const base = createStackBuilder()
  *   .terminationProtection(true)
- *   .tag("team", "platform")
- *   .toScopeFactory();
+ *   .tag("team", "platform");
  *
  * compose({ ... }, { ... })
- *   .withStackStrategy(singleStack(factory))
+ *   .withStackStrategy(singleStack(base.copy()))
  *   .build(app, "MySystem");
  * ```
  */

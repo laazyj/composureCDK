@@ -1,7 +1,8 @@
 import { FlowLogDestination, Vpc, type VpcProps } from "aws-cdk-lib/aws-ec2";
 import { type LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { createLogGroupBuilder, type ILogGroupBuilder } from "@composurecdk/logs";
 import { VPC_DEFAULTS } from "./vpc-defaults.js";
 
@@ -84,7 +85,7 @@ export interface VpcBuilderResult {
  * const network = createVpcBuilder().maxAzs(3).natGateways(3);
  * ```
  */
-export type IVpcBuilder = IBuilder<VpcBuilderProps, VpcBuilder>;
+export type IVpcBuilder = ITaggedBuilder<VpcBuilderProps, VpcBuilder>;
 
 const DEFAULT_FLOW_LOG_KEY = "DefaultFlowLog";
 
@@ -174,5 +175,5 @@ function resolveFlowLogs(
  * ```
  */
 export function createVpcBuilder(): IVpcBuilder {
-  return Builder<VpcBuilderProps, VpcBuilder>(VpcBuilder);
+  return taggedBuilder<VpcBuilderProps, VpcBuilder>(VpcBuilder);
 }

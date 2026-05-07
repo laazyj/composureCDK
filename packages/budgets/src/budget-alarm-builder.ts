@@ -2,13 +2,8 @@ import { type CfnBudget } from "aws-cdk-lib/aws-budgets";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Annotations, Stack, Token } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
 import type { BudgetAlarmConfig } from "./alarm-config.js";
@@ -66,7 +61,7 @@ export interface BudgetAlarmBuilderResult {
  *
  * @see {@link createBudgetAlarmBuilder}
  */
-export type IBudgetAlarmBuilder = IBuilder<BudgetAlarmBuilderProps, BudgetAlarmBuilder>;
+export type IBudgetAlarmBuilder = ITaggedBuilder<BudgetAlarmBuilderProps, BudgetAlarmBuilder>;
 
 /**
  * The `AWS/Billing EstimatedCharges` metric is emitted in `us-east-1`
@@ -224,5 +219,5 @@ class BudgetAlarmBuilder implements Lifecycle<BudgetAlarmBuilderResult> {
  * budget from custom alarms via `.addAlarm()`.
  */
 export function createBudgetAlarmBuilder(): IBudgetAlarmBuilder {
-  return Builder<BudgetAlarmBuilderProps, BudgetAlarmBuilder>(BudgetAlarmBuilder);
+  return taggedBuilder<BudgetAlarmBuilderProps, BudgetAlarmBuilder>(BudgetAlarmBuilder);
 }

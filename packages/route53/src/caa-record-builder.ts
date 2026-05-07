@@ -39,6 +39,7 @@ export interface CaaRecordBuilderResult {
  *
  * @see https://docs.aws.amazon.com/acm/latest/userguide/setup-caa.html
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
 export type ICaaRecordBuilder = IBuilder<CaaRecordBuilderProps, CaaRecordBuilder>;
 
 class CaaRecordBuilder implements Lifecycle<CaaRecordBuilderResult> {
@@ -76,5 +77,6 @@ class CaaRecordBuilder implements Lifecycle<CaaRecordBuilderResult> {
  * @returns A fluent builder for a Route53 CAA record.
  */
 export function createCaaRecordBuilder(): ICaaRecordBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
   return Builder<CaaRecordBuilderProps, CaaRecordBuilder>(CaaRecordBuilder);
 }

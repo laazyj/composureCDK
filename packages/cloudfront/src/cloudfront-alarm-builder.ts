@@ -2,13 +2,8 @@ import { type Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Annotations, Stack, Token } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
 import type { DistributionAlarmConfig } from "./alarm-config.js";
@@ -66,7 +61,10 @@ export interface CloudFrontAlarmBuilderResult {
  *
  * @see {@link createCloudFrontAlarmBuilder}
  */
-export type ICloudFrontAlarmBuilder = IBuilder<CloudFrontAlarmBuilderProps, CloudFrontAlarmBuilder>;
+export type ICloudFrontAlarmBuilder = ITaggedBuilder<
+  CloudFrontAlarmBuilderProps,
+  CloudFrontAlarmBuilder
+>;
 
 /**
  * CloudFront metrics are emitted in `us-east-1` only. CloudWatch alarms are
@@ -228,5 +226,5 @@ class CloudFrontAlarmBuilder implements Lifecycle<CloudFrontAlarmBuilderResult> 
  * `DistributionId` from the site stack and import it in the alarm stack.
  */
 export function createCloudFrontAlarmBuilder(): ICloudFrontAlarmBuilder {
-  return Builder<CloudFrontAlarmBuilderProps, CloudFrontAlarmBuilder>(CloudFrontAlarmBuilder);
+  return taggedBuilder<CloudFrontAlarmBuilderProps, CloudFrontAlarmBuilder>(CloudFrontAlarmBuilder);
 }

@@ -139,6 +139,7 @@ export interface BudgetBuilderResult {
  *   .build(stack, "AgentBudget");
  * ```
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Budgets::Budget has no Tags property
 export type IBudgetBuilder = IBuilder<BudgetBuilderProps, BudgetBuilder>;
 
 class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
@@ -342,5 +343,6 @@ function describeNotification(entry: NotificationEntry): string {
  * Creates a new {@link IBudgetBuilder} for configuring an AWS Budget.
  */
 export function createBudgetBuilder(): IBudgetBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Budgets::Budget has no Tags property
   return Builder<BudgetBuilderProps, BudgetBuilder>(BudgetBuilder);
 }

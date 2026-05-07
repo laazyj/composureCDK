@@ -78,6 +78,7 @@ export interface SubscriptionBuilderResult {
  *   .endpoint("ops@example.com");
  * ```
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::SNS::Subscription has no Tags property
 export type ISubscriptionBuilder = IBuilder<SubscriptionBuilderProps, SubscriptionBuilder>;
 
 class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
@@ -150,5 +151,6 @@ class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
  * ```
  */
 export function createSubscriptionBuilder(): ISubscriptionBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::SNS::Subscription has no Tags property
   return Builder<SubscriptionBuilderProps, SubscriptionBuilder>(SubscriptionBuilder);
 }

@@ -43,6 +43,7 @@ export interface AaaaRecordBuilderResult {
  * over both IPv4 and IPv6 — AWS alias targets support both families from a
  * single resource.
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
 export type IAaaaRecordBuilder = IBuilder<AaaaRecordBuilderProps, AaaaRecordBuilder>;
 
 class AaaaRecordBuilder implements Lifecycle<AaaaRecordBuilderResult> {
@@ -82,5 +83,6 @@ class AaaaRecordBuilder implements Lifecycle<AaaaRecordBuilderResult> {
  * @returns A fluent builder for a Route53 AAAA record.
  */
 export function createAaaaRecordBuilder(): IAaaaRecordBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
   return Builder<AaaaRecordBuilderProps, AaaaRecordBuilder>(AaaaRecordBuilder);
 }

@@ -7,13 +7,8 @@ import {
   type TopicProps,
 } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TopicAlarmConfig } from "./topic-alarm-config.js";
 import { createTopicAlarms } from "./topic-alarms.js";
@@ -98,7 +93,7 @@ export interface TopicBuilderResult {
  *   .displayName("My Alert Topic");
  * ```
  */
-export type ITopicBuilder = IBuilder<TopicBuilderProps, TopicBuilder>;
+export type ITopicBuilder = ITaggedBuilder<TopicBuilderProps, TopicBuilder>;
 
 interface SubscriptionEntry {
   key: string;
@@ -198,5 +193,5 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
  * ```
  */
 export function createTopicBuilder(): ITopicBuilder {
-  return Builder<TopicBuilderProps, TopicBuilder>(TopicBuilder);
+  return taggedBuilder<TopicBuilderProps, TopicBuilder>(TopicBuilder);
 }

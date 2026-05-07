@@ -6,7 +6,8 @@ import {
   type RestApiProps,
 } from "aws-cdk-lib/aws-apigateway";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle, type Resolvable } from "@composurecdk/core";
+import { type Lifecycle, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { REST_API_DEFAULTS } from "./defaults.js";
@@ -53,7 +54,7 @@ export type RestApiBuilderResult = RestApiBuilderResultBase<RestApi>;
  *   );
  * ```
  */
-export type IRestApiBuilder = IBuilder<RestApiBuilderProps, RestApiBuilder>;
+export type IRestApiBuilder = ITaggedBuilder<RestApiBuilderProps, RestApiBuilder>;
 
 class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
   props: Partial<RestApiBuilderProps> = {};
@@ -154,5 +155,5 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
  * ```
  */
 export function createRestApiBuilder(): IRestApiBuilder {
-  return Builder<RestApiBuilderProps, RestApiBuilder>(RestApiBuilder);
+  return taggedBuilder<RestApiBuilderProps, RestApiBuilder>(RestApiBuilder);
 }

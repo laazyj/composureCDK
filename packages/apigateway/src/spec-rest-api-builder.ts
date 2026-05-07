@@ -1,6 +1,7 @@
 import { type RestApiBase, SpecRestApi, type SpecRestApiProps } from "aws-cdk-lib/aws-apigateway";
 import { type IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { SPEC_REST_API_DEFAULTS } from "./defaults.js";
@@ -42,7 +43,7 @@ export type SpecRestApiBuilderResult = RestApiBuilderResultBase<SpecRestApi>;
  *   .apiDefinition(ApiDefinition.fromAsset("openapi/petstore.yaml"));
  * ```
  */
-export type ISpecRestApiBuilder = IBuilder<SpecRestApiBuilderProps, SpecRestApiBuilder>;
+export type ISpecRestApiBuilder = ITaggedBuilder<SpecRestApiBuilderProps, SpecRestApiBuilder>;
 
 class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
   props: Partial<SpecRestApiBuilderProps> = {};
@@ -116,5 +117,5 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
  * ```
  */
 export function createSpecRestApiBuilder(): ISpecRestApiBuilder {
-  return Builder<SpecRestApiBuilderProps, SpecRestApiBuilder>(SpecRestApiBuilder);
+  return taggedBuilder<SpecRestApiBuilderProps, SpecRestApiBuilder>(SpecRestApiBuilder);
 }

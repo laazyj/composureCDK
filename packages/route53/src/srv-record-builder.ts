@@ -35,6 +35,7 @@ export interface SrvRecordBuilderResult {
  * the record name typically follows the `_service._proto` convention (e.g.
  * `_sip._tcp`). Lower priority wins; weight distributes load across peers.
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
 export type ISrvRecordBuilder = IBuilder<SrvRecordBuilderProps, SrvRecordBuilder>;
 
 class SrvRecordBuilder implements Lifecycle<SrvRecordBuilderResult> {
@@ -72,5 +73,6 @@ class SrvRecordBuilder implements Lifecycle<SrvRecordBuilderResult> {
  * @returns A fluent builder for a Route53 SRV record.
  */
 export function createSrvRecordBuilder(): ISrvRecordBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
   return Builder<SrvRecordBuilderProps, SrvRecordBuilder>(SrvRecordBuilder);
 }

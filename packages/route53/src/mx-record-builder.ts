@@ -35,6 +35,7 @@ export interface MxRecordBuilderResult {
  * Each value pairs a priority (lower wins) with a fully-qualified mail-server
  * host name. Pair with SPF/DKIM/DMARC TXT records for authenticated email.
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
 export type IMxRecordBuilder = IBuilder<MxRecordBuilderProps, MxRecordBuilder>;
 
 class MxRecordBuilder implements Lifecycle<MxRecordBuilderResult> {
@@ -70,5 +71,6 @@ class MxRecordBuilder implements Lifecycle<MxRecordBuilderResult> {
  * @returns A fluent builder for a Route53 MX record.
  */
 export function createMxRecordBuilder(): IMxRecordBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
   return Builder<MxRecordBuilderProps, MxRecordBuilder>(MxRecordBuilder);
 }

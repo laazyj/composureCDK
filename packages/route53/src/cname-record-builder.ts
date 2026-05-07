@@ -36,6 +36,7 @@ export interface CnameRecordBuilderResult {
  * used at the apex. Use CNAME for non-AWS targets or for sub-domain
  * redirections where an alias is not available.
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
 export type ICnameRecordBuilder = IBuilder<CnameRecordBuilderProps, CnameRecordBuilder>;
 
 class CnameRecordBuilder implements Lifecycle<CnameRecordBuilderResult> {
@@ -81,5 +82,6 @@ class CnameRecordBuilder implements Lifecycle<CnameRecordBuilderResult> {
  * @returns A fluent builder for a Route53 CNAME record.
  */
 export function createCnameRecordBuilder(): ICnameRecordBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
   return Builder<CnameRecordBuilderProps, CnameRecordBuilder>(CnameRecordBuilder);
 }

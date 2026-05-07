@@ -33,6 +33,7 @@ export interface TxtRecordBuilderResult {
  *
  * Commonly used for SPF, DKIM, DMARC, and domain-verification tokens.
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
 export type ITxtRecordBuilder = IBuilder<TxtRecordBuilderProps, TxtRecordBuilder>;
 
 class TxtRecordBuilder implements Lifecycle<TxtRecordBuilderResult> {
@@ -70,5 +71,6 @@ class TxtRecordBuilder implements Lifecycle<TxtRecordBuilderResult> {
  * @returns A fluent builder for a Route53 TXT record.
  */
 export function createTxtRecordBuilder(): ITxtRecordBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
   return Builder<TxtRecordBuilderProps, TxtRecordBuilder>(TxtRecordBuilder);
 }

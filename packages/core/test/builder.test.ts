@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Builder, type IBuilder } from "../src/builder.js";
+import { Builder, COPY_STATE, type IBuilder } from "../src/builder.js";
 
 // -- Test fixtures --
 
@@ -229,6 +229,157 @@ describe("Builder", () => {
 
       expect(builder1.name()).toBe("Alice");
       expect(builder2.name()).toBe("Bob");
+    });
+  });
+
+  describe("copy", () => {
+    it("returns a chainable builder of the same shape", () => {
+      const builder = Builder<SimpleProps, SimpleTarget>(SimpleTarget).name("Alice").count(5);
+
+      const copy = builder.copy();
+
+      expect(copy.name()).toBe("Alice");
+      expect(copy.count()).toBe(5);
+      expect(copy.greet()).toBe("Hello, Alice");
+    });
+
+    it("preserves all configured props", () => {
+      const builder = Builder<PropsWithDefaults, TargetWithDefaults>(TargetWithDefaults)
+        .enabled(false)
+        .timeout(60);
+
+      const copy = builder.copy();
+
+      expect(copy.enabled()).toBe(false);
+      expect(copy.timeout()).toBe(60);
+    });
+
+    it("isolates the copy from later mutations to the original", () => {
+      const original = Builder<SimpleProps, SimpleTarget>(SimpleTarget).name("Alice").count(5);
+
+      const copy = original.copy();
+      original.name("Bob").count(99);
+
+      expect(copy.name()).toBe("Alice");
+      expect(copy.count()).toBe(5);
+    });
+
+    it("isolates the original from later mutations to the copy", () => {
+      const original = Builder<SimpleProps, SimpleTarget>(SimpleTarget).name("Alice").count(5);
+
+      const copy = original.copy();
+      copy.name("Bob").count(99);
+
+      expect(original.name()).toBe("Alice");
+      expect(original.count()).toBe(5);
+    });
+
+    it("shares nested object references (shallow clone)", () => {
+      interface NestedProps {
+        config: { key: string };
+      }
+      class NestedTarget {
+        props: Partial<NestedProps> = {};
+      }
+
+      const config = { key: "value" };
+      const builder = Builder<NestedProps, NestedTarget>(NestedTarget).config(config);
+
+      const copy = builder.copy();
+
+      expect(copy.config()).toBe(config);
+      expect(copy.config()).toBe(builder.config());
+    });
+
+    it("invokes [COPY_STATE] when defined on the underlying class", () => {
+      const hook = vi.fn();
+      class WithHook {
+        props: Partial<SimpleProps> = {};
+        [COPY_STATE](next: WithHook): void {
+          hook(next);
+        }
+      }
+
+      const builder = Builder<SimpleProps, WithHook>(WithHook).name("Alice");
+
+      builder.copy();
+
+      expect(hook).toHaveBeenCalledOnce();
+      const arg = hook.mock.calls[0]?.[0] as WithHook | undefined;
+      expect(arg).toBeInstanceOf(WithHook);
+      expect(arg?.props.name).toBe("Alice");
+    });
+
+    it("uses [COPY_STATE] to deep-clone class-private state", () => {
+      class WithAccumulator {
+        props: Partial<SimpleProps> = {};
+        readonly #items: string[] = [];
+
+        add(value: string): this {
+          this.#items.push(value);
+          return this;
+        }
+
+        items(): readonly string[] {
+          return this.#items;
+        }
+
+        [COPY_STATE](next: WithAccumulator): void {
+          next.#items.push(...this.#items);
+        }
+      }
+
+      const original = Builder<SimpleProps, WithAccumulator>(WithAccumulator)
+        .name("Alice")
+        .add("first")
+        .add("second");
+
+      const copy = original.copy();
+      original.add("after-copy");
+      copy.add("on-copy-only");
+
+      expect(original.items()).toEqual(["first", "second", "after-copy"]);
+      expect(copy.items()).toEqual(["first", "second", "on-copy-only"]);
+    });
+
+    it("works on classes without a [COPY_STATE] hook", () => {
+      const builder = Builder<SimpleProps, SimpleTarget>(SimpleTarget).name("Alice");
+
+      expect(() => builder.copy()).not.toThrow();
+      expect(builder.copy().name()).toBe("Alice");
+    });
+
+    it("copies an unconfigured builder with no props set", () => {
+      const builder = Builder<SimpleProps, SimpleTarget>(SimpleTarget);
+
+      const copy = builder.copy();
+
+      expect(copy.name()).toBeUndefined();
+      expect(copy.count()).toBeUndefined();
+      copy.name("Alice");
+      expect(builder.name()).toBeUndefined();
+    });
+
+    it("supports repeated copying", () => {
+      const builder = Builder<SimpleProps, SimpleTarget>(SimpleTarget).name("Alice").count(5);
+
+      const a = builder.copy();
+      const b = a.copy().name("Bob");
+
+      expect(builder.name()).toBe("Alice");
+      expect(a.name()).toBe("Alice");
+      expect(b.name()).toBe("Bob");
+      expect(b.count()).toBe(5);
+    });
+
+    it("wraps a pre-instantiated instance when invoked directly", () => {
+      const instance = new SimpleTarget();
+      instance.props = { name: "Alice", count: 5 };
+
+      const builder = Builder<SimpleProps, SimpleTarget>(SimpleTarget, instance);
+
+      expect(builder.name()).toBe("Alice");
+      expect(builder.count()).toBe(5);
     });
   });
 });

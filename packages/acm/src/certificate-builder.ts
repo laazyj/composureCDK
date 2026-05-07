@@ -7,13 +7,8 @@ import {
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { CertificateAlarmConfig } from "./alarm-config.js";
 import { createCertificateAlarms } from "./certificate-alarms.js";
@@ -124,7 +119,7 @@ export interface CertificateBuilderResult {
  *   .validationZone(zone);
  * ```
  */
-export type ICertificateBuilder = IBuilder<CertificateBuilderProps, CertificateBuilder>;
+export type ICertificateBuilder = ITaggedBuilder<CertificateBuilderProps, CertificateBuilder>;
 
 class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
   props: Partial<CertificateBuilderProps> = {};
@@ -218,5 +213,5 @@ class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
  * ```
  */
 export function createCertificateBuilder(): ICertificateBuilder {
-  return Builder<CertificateBuilderProps, CertificateBuilder>(CertificateBuilder);
+  return taggedBuilder<CertificateBuilderProps, CertificateBuilder>(CertificateBuilder);
 }

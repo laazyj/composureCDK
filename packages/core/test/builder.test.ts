@@ -16,7 +16,7 @@ class SimpleTarget {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- intentional empty Props for the builder-with-no-props test fixture
 interface EmptyProps {}
 
 class EmptyTarget {
@@ -199,7 +199,7 @@ describe("Builder", () => {
       > &
         Record<string, unknown>;
 
-      // eslint-disable-next-line @typescript-eslint/dot-notation
+      // eslint-disable-next-line @typescript-eslint/dot-notation -- bracket access exercises the proxy's `get` trap for an unknown key
       const accessor = builder["nonexistent"];
       expect(typeof accessor).toBe("function");
     });

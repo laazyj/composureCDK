@@ -503,3 +503,50 @@ describe("additional path-pattern behaviors", () => {
     });
   });
 });
+
+describe("builder-level tags reach inline CloudFront Functions", () => {
+  it("applies .tag()/.tags() to every CloudFront Function created by the builder", () => {
+    const { template } = synthTemplate((b, stack) => {
+      b.origin(withBucketOrigin(stack))
+        .accessLogs(false)
+        .recommendedAlarms(false)
+        .tag("Project", "claude-rig")
+        .tags({ Owner: "platform" })
+        .defaultBehavior({
+          functions: [
+            {
+              eventType: FunctionEventType.VIEWER_REQUEST,
+              code: FunctionCode.fromInline(INLINE_CODE),
+            },
+          ],
+        })
+        .behavior("/api/*", {
+          origin: new HttpOrigin("api.example.com"),
+          functions: [
+            {
+              eventType: FunctionEventType.VIEWER_REQUEST,
+              code: FunctionCode.fromInline(INLINE_CODE),
+            },
+          ],
+        });
+    });
+
+    interface CfnTagEntry {
+      Key: string;
+      Value: string;
+    }
+    const fns = template.findResources("AWS::CloudFront::Function") as Record<
+      string,
+      { Properties?: { Tags?: CfnTagEntry[] } }
+    >;
+    expect(Object.keys(fns)).toHaveLength(2);
+    for (const fn of Object.values(fns)) {
+      expect(fn.Properties?.Tags).toEqual(
+        expect.arrayContaining([
+          { Key: "Project", Value: "claude-rig" },
+          { Key: "Owner", Value: "platform" },
+        ]),
+      );
+    }
+  });
+});

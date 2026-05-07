@@ -35,6 +35,7 @@ export interface SvcbRecordBuilderResult {
  * specifically, prefer {@link createHttpsRecordBuilder} — most clients only
  * consult HTTPS records for web traffic.
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
 export type ISvcbRecordBuilder = IBuilder<SvcbRecordBuilderProps, SvcbRecordBuilder>;
 
 class SvcbRecordBuilder implements Lifecycle<SvcbRecordBuilderResult> {
@@ -73,5 +74,6 @@ class SvcbRecordBuilder implements Lifecycle<SvcbRecordBuilderResult> {
  * @returns A fluent builder for a Route53 SVCB record.
  */
 export function createSvcbRecordBuilder(): ISvcbRecordBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
   return Builder<SvcbRecordBuilderProps, SvcbRecordBuilder>(SvcbRecordBuilder);
 }

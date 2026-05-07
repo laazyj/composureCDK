@@ -44,6 +44,7 @@ export interface HttpsRecordBuilderResult {
  * HTTP/3 upgrades. Specify exactly one of `values` (explicit parameter list)
  * or `target` (alias, typically a CloudFront distribution).
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
 export type IHttpsRecordBuilder = IBuilder<HttpsRecordBuilderProps, HttpsRecordBuilder>;
 
 class HttpsRecordBuilder implements Lifecycle<HttpsRecordBuilderResult> {
@@ -91,5 +92,6 @@ class HttpsRecordBuilder implements Lifecycle<HttpsRecordBuilderResult> {
  * @returns A fluent builder for a Route53 HTTPS record.
  */
 export function createHttpsRecordBuilder(): IHttpsRecordBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
   return Builder<HttpsRecordBuilderProps, HttpsRecordBuilder>(HttpsRecordBuilder);
 }

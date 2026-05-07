@@ -38,6 +38,7 @@ export interface ManagedPolicyBuilderResult {
  *   ]);
  * ```
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::IAM::ManagedPolicy has no Tags property
 export type IManagedPolicyBuilder = IBuilder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>;
 
 class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
@@ -78,5 +79,6 @@ class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
  * @returns A fluent builder for a customer-managed policy.
  */
 export function createManagedPolicyBuilder(): IManagedPolicyBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::IAM::ManagedPolicy has no Tags property
   return Builder<ManagedPolicyBuilderProps, ManagedPolicyBuilder>(ManagedPolicyBuilder);
 }

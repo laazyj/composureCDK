@@ -2,13 +2,8 @@ import { type IHealthCheck } from "aws-cdk-lib/aws-route53";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Annotations, Stack, Token } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
 import type { HealthCheckAlarmConfig } from "./health-check-alarm-config.js";
@@ -63,7 +58,7 @@ export interface HealthCheckAlarmBuilderResult {
  *
  * @see {@link createHealthCheckAlarmBuilder}
  */
-export type IHealthCheckAlarmBuilder = IBuilder<
+export type IHealthCheckAlarmBuilder = ITaggedBuilder<
   HealthCheckAlarmBuilderProps,
   HealthCheckAlarmBuilder
 >;
@@ -217,5 +212,7 @@ class HealthCheckAlarmBuilder implements Lifecycle<HealthCheckAlarmBuilderResult
  * `HealthCheckId` from the app stack and import it in the alarm stack.
  */
 export function createHealthCheckAlarmBuilder(): IHealthCheckAlarmBuilder {
-  return Builder<HealthCheckAlarmBuilderProps, HealthCheckAlarmBuilder>(HealthCheckAlarmBuilder);
+  return taggedBuilder<HealthCheckAlarmBuilderProps, HealthCheckAlarmBuilder>(
+    HealthCheckAlarmBuilder,
+  );
 }

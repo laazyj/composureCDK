@@ -3,6 +3,61 @@ import eslint from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier/flat";
+import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
+
+/**
+ * Flags uses of `Builder()` or `IBuilder<…>` imported from `@composurecdk/core`
+ * in library builder files. Library builders should opt into the shared tagging
+ * surface via `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation`.
+ */
+const taggedSuffix =
+  "If the wrapped CFN resource has no Tags property (Route53 records, IAM ManagedPolicy, " +
+  "SNS Subscription, AWS Budgets), disable this rule on the offending line with a directive " +
+  "naming the resource: `// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::… has no Tags property`.";
+
+const builderTaggingRule = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Library builders must use `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation` " +
+        "unless the wrapped CFN resource has no Tags property.",
+    },
+    schema: [],
+    messages: {
+      restrictedCall:
+        "Use `taggedBuilder` from `@composurecdk/cloudformation` instead of `Builder` from `@composurecdk/core`. " +
+        taggedSuffix,
+      restrictedType:
+        "Use `ITaggedBuilder` from `@composurecdk/cloudformation` instead of `IBuilder` from `@composurecdk/core`. " +
+        taggedSuffix,
+    },
+  },
+  create(ctx) {
+    const localBuilderNames = new Set();
+    const localIBuilderNames = new Set();
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value !== "@composurecdk/core") return;
+        for (const spec of node.specifiers) {
+          if (spec.type !== "ImportSpecifier") continue;
+          if (spec.imported.name === "Builder") localBuilderNames.add(spec.local.name);
+          if (spec.imported.name === "IBuilder") localIBuilderNames.add(spec.local.name);
+        }
+      },
+      CallExpression(node) {
+        if (node.callee.type === "Identifier" && localBuilderNames.has(node.callee.name)) {
+          ctx.report({ node: node.callee, messageId: "restrictedCall" });
+        }
+      },
+      TSTypeReference(node) {
+        if (node.typeName.type === "Identifier" && localIBuilderNames.has(node.typeName.name)) {
+          ctx.report({ node: node.typeName, messageId: "restrictedType" });
+        }
+      },
+    };
+  },
+};
 
 /**
  * Flags Lifecycle-implementing classes whose `build` method does not accept a
@@ -85,11 +140,13 @@ export default defineConfig(
       composurecdk: {
         rules: {
           "lifecycle-build-context-required": lifecycleContextParamRule,
+          "builder-must-be-tagged": builderTaggingRule,
         },
       },
     },
     rules: {
       "composurecdk/lifecycle-build-context-required": "error",
+      "composurecdk/builder-must-be-tagged": "error",
       "no-restricted-syntax": [
         "error",
         {
@@ -108,6 +165,25 @@ export default defineConfig(
             "Parameter properties cannot be ECMAScript private. Declare the field with `readonly #field` and assign it in the constructor body.",
         },
       ],
+    },
+  },
+  {
+    // The tagged-builder wrapper IS the implementation of the tagged-builder
+    // surface — by definition it must reach for `Builder` / `IBuilder` from
+    // `@composurecdk/core`. Disable the rule at the file level rather than
+    // peppering disable comments through the body.
+    files: ["packages/cloudformation/src/tagged-builder.ts"],
+    rules: {
+      "composurecdk/builder-must-be-tagged": "off",
+    },
+  },
+  {
+    files: ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts"],
+    plugins: {
+      "@eslint-community/eslint-comments": eslintComments,
+    },
+    rules: {
+      "@eslint-community/eslint-comments/require-description": ["error", { ignore: [] }],
     },
   },
   eslintConfigPrettier,

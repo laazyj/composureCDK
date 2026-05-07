@@ -6,13 +6,8 @@ import {
   type RoleProps,
 } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
-import {
-  Builder,
-  type IBuilder,
-  type Lifecycle,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { ROLE_DEFAULTS } from "./role-defaults.js";
 import { StatementBuilder } from "./statement-builder.js";
 
@@ -91,7 +86,7 @@ export interface RoleBuilderResult {
  *   ]);
  * ```
  */
-export type IRoleBuilder = IBuilder<RoleBuilderProps, RoleBuilder>;
+export type IRoleBuilder = ITaggedBuilder<RoleBuilderProps, RoleBuilder>;
 
 interface InlinePolicyEntry {
   name: string;
@@ -183,5 +178,5 @@ class RoleBuilder implements Lifecycle<RoleBuilderResult> {
  * ```
  */
 export function createRoleBuilder(): IRoleBuilder {
-  return Builder<RoleBuilderProps, RoleBuilder>(RoleBuilder);
+  return taggedBuilder<RoleBuilderProps, RoleBuilder>(RoleBuilder);
 }

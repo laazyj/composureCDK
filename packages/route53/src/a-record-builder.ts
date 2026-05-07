@@ -57,6 +57,7 @@ export interface ARecordBuilderResult {
  *   .target(cloudfrontAliasTarget(ref("cdn", (r: DistributionBuilderResult) => r.distribution)));
  * ```
  */
+// eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
 export type IARecordBuilder = IBuilder<ARecordBuilderProps, ARecordBuilder>;
 
 class ARecordBuilder implements Lifecycle<ARecordBuilderResult> {
@@ -93,5 +94,6 @@ class ARecordBuilder implements Lifecycle<ARecordBuilderResult> {
  * @returns A fluent builder for a Route53 A record.
  */
 export function createARecordBuilder(): IARecordBuilder {
+  // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Route53::RecordSet has no Tags property
   return Builder<ARecordBuilderProps, ARecordBuilder>(ARecordBuilder);
 }

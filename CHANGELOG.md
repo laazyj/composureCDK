@@ -1,3 +1,37 @@
+## 0.6.0 (2026-05-07)
+
+### 🚀 Features
+
+- ⚠️ **budgets:** encode service constraints in NotifySubscribers + Email ([#75](https://github.com/laazyj/composureCDK/pull/75))
+- ⚠️ **cloudformation:** consume Lifecycle<StackBuilderResult> in singleStack/groupedStacks; drop toScopeFactory ([#78](https://github.com/laazyj/composureCDK/issues/78))
+- **core:** add .copy() to Builder via COPY_STATE hook ([cfc9d02](https://github.com/laazyj/composureCDK/commit/cfc9d02))
+
+### 🩹 Fixes
+
+- **release-tag:** allow GitHub squash-merge `(#NN)` suffix ([#73](https://github.com/laazyj/composureCDK/pull/73), [#72](https://github.com/laazyj/composureCDK/issues/72))
+
+### ⚠️ Breaking Changes
+
+- **cloudformation:** consume Lifecycle<StackBuilderResult> in singleStack/groupedStacks; drop toScopeFactory ([#78](https://github.com/laazyj/composureCDK/issues/78))
+  singleStack and groupedStacks in
+  @composurecdk/cloudformation now take a Lifecycle<StackBuilderResult>
+  instead of a ScopeFactory. StackBuilder.toScopeFactory() is removed.
+  Pre-1.0; release-please will pick up the major bump on the
+  cloudformation package.
+- **budgets:** encode service constraints in NotifySubscribers + Email ([#75](https://github.com/laazyj/composureCDK/pull/75))
+  `notifyOnActual`, `notifyOnForecasted`,
+  `withRecommendedThresholds`, and `NotificationEntry.subscribers` now
+  take a `NotifySubscribers` object instead of variadic
+  `BudgetSubscriber` arguments. Email addresses must be constructed via
+  `email("addr@host")`. The `BudgetSubscriber` type is removed.
+  Migration:
+  before: .notifyOnActual(100, alertTopic, "ops@example.com")
+  after: .notifyOnActual(100, { sns: alertTopic, emails: [email("ops@example.com")] })
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.5.1 (2026-05-02)
 
 ### 🚀 Features

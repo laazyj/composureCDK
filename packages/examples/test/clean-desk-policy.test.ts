@@ -1,10 +1,13 @@
 import { beforeAll, describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { Size } from "aws-cdk-lib";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Volume } from "aws-cdk-lib/aws-ec2";
 import { MockIntegration, RestApi } from "aws-cdk-lib/aws-apigateway";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
+import { createAgentVolumeApp } from "../src/agent-volume-app.js";
 import { createMockApiApp } from "../src/mock-api-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
 
@@ -23,6 +26,32 @@ describe("cleanDeskPolicy", () => {
     });
 
     template.hasResource("AWS::S3::Bucket", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+  });
+
+  it("overrides EBS Volume removal policy to DESTROY (overriding the RETAIN default)", () => {
+    const template = buildWithPolicy((stack) => {
+      new Volume(stack, "Vol", {
+        availabilityZone: "us-east-1a",
+        size: Size.gibibytes(10),
+      });
+    });
+
+    template.hasResource("AWS::EC2::Volume", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+  });
+
+  it("sets the agent-volume stack's persistent EBS volume to Delete", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createAgentVolumeApp(app);
+    const template = Template.fromStack(stack);
+
+    template.hasResource("AWS::EC2::Volume", {
       DeletionPolicy: "Delete",
       UpdateReplacePolicy: "Delete",
     });

@@ -2,6 +2,7 @@ import { Aspects, CfnDeletionPolicy, PropertyInjectors, RemovalPolicy, Stack } f
 import type { IAspect, IPropertyInjector } from "aws-cdk-lib";
 import { Bucket, CfnBucket, type BucketProps } from "aws-cdk-lib/aws-s3";
 import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
+import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
 import { RestApi, type RestApiProps } from "aws-cdk-lib/aws-apigateway";
 import {
   AwsCustomResource,
@@ -177,6 +178,7 @@ function resolveLogsBucketInStack(
  * Covered construct types:
  * - `aws-cdk-lib/aws-s3.Bucket`
  * - `aws-cdk-lib/aws-logs.LogGroup`
+ * - `aws-cdk-lib/aws-ec2.Volume`
  * - `aws-cdk-lib/aws-apigateway.RestApi` (Account + CloudWatch Role)
  *
  * If new stateful construct types are added to example stacks (e.g.
@@ -188,6 +190,7 @@ export function cleanDeskPolicy(scope: IConstruct): void {
   const injectors = PropertyInjectors.of(scope);
   injectors.add(new BucketRemovalPolicyInjector());
   injectors.add(new RemovalPolicyInjector<LogGroupProps>(LogGroup.PROPERTY_INJECTION_ID));
+  injectors.add(new RemovalPolicyInjector<VolumeProps>(Volume.PROPERTY_INJECTION_ID));
   injectors.add(new RestApiRemovalPolicyInjector());
 
   Aspects.of(scope).add(new DisableSourceLoggingOnDeleteAspect());

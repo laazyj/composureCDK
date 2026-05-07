@@ -113,10 +113,10 @@ Use builder-level tagging for **selector tags** that drive IAM resource-tag cond
 
 Keys and values are validated synchronously when `.tag()` / `.tags()` is called. The validator rejects empty keys, the reserved `aws:` prefix (case-insensitive), keys longer than 128 characters, values longer than 256 characters, and characters outside the AWS-documented tag character set.
 
-Duplicate `.tag(k, ...)` calls last-wins and emit a Node process warning with name `ComposureCDKTagOverride` so the override is visible at the call site. If layered configuration intentionally overrides earlier tags (e.g. a base builder factory plus per-environment refinements), suppress the noise with either:
+Duplicate `.tag(k, ...)` calls last-wins and emit a Node process warning with name `ComposureCDKTagOverride` so the override is visible at the call site. The name is also exported as `TAG_OVERRIDE_WARNING_NAME` for callers that want to filter without a string literal. If layered configuration intentionally overrides earlier tags (e.g. a base builder factory plus per-environment refinements), suppress the noise with either:
 
 - `node --disable-warning=ComposureCDKTagOverride …` on Node 21.3+ to silence them globally, or
-- a `process.on("warning", w => { if (w.name !== "ComposureCDKTagOverride") /* … */ })` listener for finer control.
+- a `process.on("warning", w => { if (w.name !== TAG_OVERRIDE_WARNING_NAME) /* … */ })` listener for finer control.
 
 ### Layer 2 — `tags()` afterBuild hook for cross-cutting tags
 

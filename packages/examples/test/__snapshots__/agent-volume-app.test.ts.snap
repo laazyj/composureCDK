@@ -1,0 +1,1034 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`agent-volume-app > matches the expected synthesised template 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+    "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter": {
+      "Default": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+      "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+    },
+  },
+  "Resources": {
+    "AgentVolumeAppagentAgentDataAttachment": {
+      "Properties": {
+        "Device": "/dev/sdf",
+        "InstanceId": {
+          "Ref": "AgentVolumeAppagentC54F8099",
+        },
+        "VolumeId": {
+          "Ref": "AgentVolumeAppdataFC64D46A",
+        },
+      },
+      "Type": "AWS::EC2::VolumeAttachment",
+    },
+    "AgentVolumeAppagentAgentDatavolumeStalledIoAlarm3A095D1C": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+        "AlarmDescription": "EBS volume attachment "AgentData" is reporting a stalled I/O condition. Threshold: >= 1 (max) over 10 x 1 minute. Note: VolumeStalledIOCheck is published only for Nitro-instance attachments.",
+        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/agent/agent-data-volume-stalled-io",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 10,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "AgentVolumeAppagentC54F8099",
+            },
+          },
+          {
+            "Name": "VolumeId",
+            "Value": {
+              "Ref": "AgentVolumeAppdataFC64D46A",
+            },
+          },
+        ],
+        "EvaluationPeriods": 10,
+        "MetricName": "VolumeStalledIOCheck",
+        "Namespace": "AWS/EBS",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AgentVolumeAppagentAttachedEbsStatusCheckFailedAlarmE7F4220D": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+        "AlarmDescription": "EC2 instance attached EBS volume(s) are unreachable or unable to complete I/O. Threshold: >= 1 failed checks (max) over 10 x 1 minute.",
+        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/agent/attached-ebs-status-check-failed",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 10,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "AgentVolumeAppagentC54F8099",
+            },
+          },
+        ],
+        "EvaluationPeriods": 10,
+        "MetricName": "StatusCheckFailed_AttachedEBS",
+        "Namespace": "AWS/EC2",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AgentVolumeAppagentC54F8099": {
+      "DependsOn": [
+        "AgentVolumeAppagentInstanceRoleCE2938BB",
+      ],
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/xvda",
+            "Ebs": {
+              "Encrypted": true,
+              "VolumeSize": 8,
+              "VolumeType": "gp3",
+            },
+          },
+        ],
+        "EbsOptimized": true,
+        "IamInstanceProfile": {
+          "Ref": "AgentVolumeAppagentInstanceProfile4E2FF6DC",
+        },
+        "ImageId": {
+          "Ref": "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "InstanceType": "t3.micro",
+        "LaunchTemplate": {
+          "LaunchTemplateName": "AgentVolumeApp--agentLaunchTemplate",
+          "Version": {
+            "Fn::GetAtt": [
+              "AgentVolumeAppagentLaunchTemplate2029DE3B",
+              "LatestVersionNumber",
+            ],
+          },
+        },
+        "Monitoring": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "AgentVolumeAppagentInstanceSecurityGroup09EE35A3",
+              "GroupId",
+            ],
+          },
+        ],
+        "SubnetId": {
+          "Ref": "AgentVolumeAppnetworkIsolatedSubnet1SubnetEE7F71DC",
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--agent",
+          },
+        ],
+        "UserData": {
+          "Fn::Base64": "#!/bin/bash",
+        },
+      },
+      "Type": "AWS::EC2::Instance",
+    },
+    "AgentVolumeAppagentCpuCreditBalanceAlarm5BAF5650": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+        "AlarmDescription": "EC2 burstable instance CPU credit balance is low — baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
+        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/agent/cpu-credit-balance",
+        "ComparisonOperator": "LessThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "AgentVolumeAppagentC54F8099",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "CPUCreditBalance",
+        "Namespace": "AWS/EC2",
+        "Period": 300,
+        "Statistic": "Minimum",
+        "Threshold": 50,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AgentVolumeAppagentCpuUtilizationAlarm0911245B": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+        "AlarmDescription": "EC2 instance CPU utilization is sustained at a high level. Threshold: > 80% average over 5 x 1 minute.",
+        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/agent/cpu-utilization",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "AgentVolumeAppagentC54F8099",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 80,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AgentVolumeAppagentInstanceProfile4E2FF6DC": {
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "AgentVolumeAppagentInstanceRoleCE2938BB",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::InstanceProfile",
+    },
+    "AgentVolumeAppagentInstanceRoleCE2938BB": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/AmazonSSMManagedInstanceCore",
+              ],
+            ],
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--agent",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "AgentVolumeAppagentInstanceSecurityGroup09EE35A3": {
+      "Properties": {
+        "GroupDescription": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--agent/InstanceSecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--agent",
+          },
+        ],
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "AgentVolumeAppagentLaunchTemplate2029DE3B": {
+      "Properties": {
+        "LaunchTemplateData": {
+          "MetadataOptions": {
+            "HttpTokens": "required",
+          },
+        },
+        "LaunchTemplateName": "AgentVolumeApp--agentLaunchTemplate",
+      },
+      "Type": "AWS::EC2::LaunchTemplate",
+    },
+    "AgentVolumeAppagentStatusCheckFailedAlarmB8E9E14E": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+        "AlarmDescription": "EC2 instance is failing its status checks. Threshold: > 0 failed checks over 2 x 1 minute.",
+        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/agent/status-check-failed",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 2,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "AgentVolumeAppagentC54F8099",
+            },
+          },
+        ],
+        "EvaluationPeriods": 2,
+        "MetricName": "StatusCheckFailed",
+        "Namespace": "AWS/EC2",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AgentVolumeAppalerts0D02612E": {
+      "Properties": {
+        "DisplayName": "Agent Volume Alerts",
+      },
+      "Type": "AWS::SNS::Topic",
+    },
+    "AgentVolumeAppalertsNumberOfNotificationsFailedAlarm44FCA0DF": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+        "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
+        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/alerts/number-of-notifications-failed",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "AgentVolumeAppalerts0D02612E",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFailed",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AgentVolumeAppalertsNumberOfNotificationsFailedToRedriveToDlqAlarm91AA69A1": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+        "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
+        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/alerts/number-of-notifications-failed-to-redrive-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "AgentVolumeAppalerts0D02612E",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFailedToRedriveToDlq",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AgentVolumeAppalertsNumberOfNotificationsFilteredOutInvalidAttributesAlarm4D9BA4F6": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+        "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
+        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/alerts/number-of-notifications-filtered-out-invalid-attributes",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "AgentVolumeAppalerts0D02612E",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AgentVolumeAppalertsNumberOfNotificationsRedrivenToDlqAlarmB5342705": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+        "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
+        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/alerts/number-of-notifications-redriven-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "AgentVolumeAppalerts0D02612E",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsRedrivenToDlq",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "AgentVolumeAppalertsPolicyEC51ACBB": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sns:Publish",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": {
+                "Ref": "AgentVolumeAppalerts0D02612E",
+              },
+              "Sid": "AllowPublishThroughSSLOnly",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Topics": [
+          {
+            "Ref": "AgentVolumeAppalerts0D02612E",
+          },
+        ],
+      },
+      "Type": "AWS::SNS::TopicPolicy",
+    },
+    "AgentVolumeAppdataFC64D46A": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AutoEnableIO": true,
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "Encrypted": true,
+        "MultiAttachEnabled": false,
+        "Size": 20,
+        "VolumeType": "gp3",
+      },
+      "Type": "AWS::EC2::Volume",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "AgentVolumeAppnetworkA421F964": {
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::VPC",
+    },
+    "AgentVolumeAppnetworkDefaultFlowLogCFEC3068": {
+      "Properties": {
+        "DeliverLogsPermissionArn": {
+          "Fn::GetAtt": [
+            "AgentVolumeAppnetworkDefaultFlowLogIAMRoleE912E37A",
+            "Arn",
+          ],
+        },
+        "LogDestinationType": "cloud-watch-logs",
+        "LogGroupName": {
+          "Ref": "AgentVolumeAppnetworkFlowLogsLogGroupB21FC068",
+        },
+        "ResourceId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+        "ResourceType": "VPC",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/DefaultFlowLog",
+          },
+        ],
+        "TrafficType": "ALL",
+      },
+      "Type": "AWS::EC2::FlowLog",
+    },
+    "AgentVolumeAppnetworkDefaultFlowLogIAMRoleDefaultPolicy468BE8B6": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "AgentVolumeAppnetworkFlowLogsLogGroupB21FC068",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "AgentVolumeAppnetworkDefaultFlowLogIAMRoleDefaultPolicy468BE8B6",
+        "Roles": [
+          {
+            "Ref": "AgentVolumeAppnetworkDefaultFlowLogIAMRoleE912E37A",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "AgentVolumeAppnetworkDefaultFlowLogIAMRoleE912E37A": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "vpc-flow-logs.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/DefaultFlowLog",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "AgentVolumeAppnetworkFlowLogsLogGroupB21FC068": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "AgentVolumeAppnetworkIGW5CB8BDE2": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::InternetGateway",
+    },
+    "AgentVolumeAppnetworkIsolatedSubnet1RouteTableAssociation4910DB84": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "AgentVolumeAppnetworkIsolatedSubnet1RouteTableBFEB9C15",
+        },
+        "SubnetId": {
+          "Ref": "AgentVolumeAppnetworkIsolatedSubnet1SubnetEE7F71DC",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "AgentVolumeAppnetworkIsolatedSubnet1RouteTableBFEB9C15": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/IsolatedSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "AgentVolumeAppnetworkIsolatedSubnet1SubnetEE7F71DC": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.128.0/18",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/IsolatedSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "AgentVolumeAppnetworkIsolatedSubnet2RouteTable65E75C10": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/IsolatedSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "AgentVolumeAppnetworkIsolatedSubnet2RouteTableAssociationA9C7D882": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "AgentVolumeAppnetworkIsolatedSubnet2RouteTable65E75C10",
+        },
+        "SubnetId": {
+          "Ref": "AgentVolumeAppnetworkIsolatedSubnet2Subnet9DCF5FD1",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "AgentVolumeAppnetworkIsolatedSubnet2Subnet9DCF5FD1": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.192.0/18",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/IsolatedSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "AgentVolumeAppnetworkPublicSubnet1DefaultRouteEFE97BE9": {
+      "DependsOn": [
+        "AgentVolumeAppnetworkVPCGW3682EA26",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "AgentVolumeAppnetworkIGW5CB8BDE2",
+        },
+        "RouteTableId": {
+          "Ref": "AgentVolumeAppnetworkPublicSubnet1RouteTableF82EA861",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "AgentVolumeAppnetworkPublicSubnet1RouteTableAssociation04E3BEBB": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "AgentVolumeAppnetworkPublicSubnet1RouteTableF82EA861",
+        },
+        "SubnetId": {
+          "Ref": "AgentVolumeAppnetworkPublicSubnet1SubnetE826CD3D",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "AgentVolumeAppnetworkPublicSubnet1RouteTableF82EA861": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/PublicSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "AgentVolumeAppnetworkPublicSubnet1SubnetE826CD3D": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.0.0/18",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Public",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/PublicSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "AgentVolumeAppnetworkPublicSubnet2DefaultRoute9B796CF4": {
+      "DependsOn": [
+        "AgentVolumeAppnetworkVPCGW3682EA26",
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "AgentVolumeAppnetworkIGW5CB8BDE2",
+        },
+        "RouteTableId": {
+          "Ref": "AgentVolumeAppnetworkPublicSubnet2RouteTable48FCE736",
+        },
+      },
+      "Type": "AWS::EC2::Route",
+    },
+    "AgentVolumeAppnetworkPublicSubnet2RouteTable48FCE736": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/PublicSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "AgentVolumeAppnetworkPublicSubnet2RouteTableAssociation7A0D3A81": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "AgentVolumeAppnetworkPublicSubnet2RouteTable48FCE736",
+        },
+        "SubnetId": {
+          "Ref": "AgentVolumeAppnetworkPublicSubnet2Subnet51BB99F4",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "AgentVolumeAppnetworkPublicSubnet2Subnet51BB99F4": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.64.0/18",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Public",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-AgentVolumeStack/AgentVolumeApp--network/PublicSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "AgentVolumeAppnetworkRestrictDefaultSecurityGroupCustomResource3528DE01": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "Account": {
+          "Ref": "AWS::AccountId",
+        },
+        "DefaultSecurityGroupId": {
+          "Fn::GetAtt": [
+            "AgentVolumeAppnetworkA421F964",
+            "DefaultSecurityGroup",
+          ],
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::VpcRestrictDefaultSG",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "AgentVolumeAppnetworkVPCGW3682EA26": {
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "AgentVolumeAppnetworkIGW5CB8BDE2",
+        },
+        "VpcId": {
+          "Ref": "AgentVolumeAppnetworkA421F964",
+        },
+      },
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+    },
+    "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E": {
+      "DependsOn": [
+        "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200.zip",
+        },
+        "Description": "Lambda function for removing all inbound/outbound rules from the VPC default security group",
+        "Handler": "__entrypoint__.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+        ],
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "ec2:AuthorizeSecurityGroupIngress",
+                    "ec2:AuthorizeSecurityGroupEgress",
+                    "ec2:RevokeSecurityGroupIngress",
+                    "ec2:RevokeSecurityGroupEgress",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition",
+                          },
+                          ":ec2:",
+                          {
+                            "Ref": "AWS::Region",
+                          },
+                          ":",
+                          {
+                            "Ref": "AWS::AccountId",
+                          },
+                          ":security-group/",
+                          {
+                            "Fn::GetAtt": [
+                              "AgentVolumeAppnetworkA421F964",
+                              "DefaultSecurityGroup",
+                            ],
+                          },
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "Inline",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

@@ -96,19 +96,30 @@ compose({ handler, api, table }, { handler: [], api: ["handler"], table: [] })
   .build(app, "MySystem");
 ```
 
-Both `singleStack` and `groupedStacks` from `@composurecdk/cloudformation` default to creating CDK Stacks. Pass a custom `ScopeFactory` to use `DeploymentStack` or other subclasses:
+Both `singleStack` and `groupedStacks` from `@composurecdk/cloudformation` default to creating a plain CDK Stack. Pass a configured `IStackBuilder` to apply `description`, `terminationProtection`, tags, etc. to every Stack the strategy creates:
 
 ```ts
-import { singleStack } from "@composurecdk/cloudformation";
-import { createStackBuilder } from "@composurecdk/cloudformation";
+import { singleStack, createStackBuilder } from "@composurecdk/cloudformation";
 
-const factory = createStackBuilder()
+const baseStack = createStackBuilder()
   .terminationProtection(true)
-  .tag("team", "platform")
-  .toScopeFactory();
+  .tag("team", "platform");
 
 compose({ ... }, { ... })
-  .withStackStrategy(singleStack(factory))
+  .withStackStrategy(singleStack(baseStack.copy()))
+  .build(app, "MySystem");
+```
+
+The strategy calls `builder.build(scope, id).stack` lazily. Pass `builder.copy()` (rather than the live builder) when the original may be mutated further — `.copy()` snapshots the current props and tags so later edits do not leak into the strategy's stack.
+
+For non-Stack scope types (`DeploymentStack`, custom subclasses), drop down to `@composurecdk/core`'s `singleStack` / `groupedStacks`, which accept a raw `ScopeFactory`:
+
+```ts
+import { singleStack } from "@composurecdk/core";
+import { DeploymentStack } from "my-cdk-extensions";
+
+compose({ ... }, { ... })
+  .withStackStrategy(singleStack((scope, id) => new DeploymentStack(scope, id)))
   .build(app, "MySystem");
 ```
 
@@ -180,6 +191,6 @@ When `scope` is omitted, the output falls back to the scope passed to `build()` 
 Stack management is split across two packages:
 
 - **`@composurecdk/core`** — `StackStrategy`, `ScopeFactory`, `singleStack(factory)`, `groupedStacks(classify, factory)`, and `.withStacks()` / `.withStackStrategy()` on `ComposedSystem`. Core depends only on `constructs`, not `aws-cdk-lib`.
-- **`@composurecdk/cloudformation`** — `createStackBuilder()`, plus convenience `singleStack(factory?)` and `groupedStacks(classify, factory?)` that default to creating CDK Stacks. This package depends on `aws-cdk-lib`.
+- **`@composurecdk/cloudformation`** — `createStackBuilder()`, plus convenience `singleStack(builder?)` and `groupedStacks(classify, builder?)` that accept a `Lifecycle<StackBuilderResult>` (typically an `IStackBuilder`) and default to a fresh `createStackBuilder()`. This package depends on `aws-cdk-lib`.
 
-If you use CDK `Stack` (the common case), import strategies from `@composurecdk/cloudformation` for the default factory. If you use a custom Stack subclass, import from `@composurecdk/core` and provide your own `ScopeFactory`.
+If you use CDK `Stack` (the common case), import strategies from `@composurecdk/cloudformation` and pass a configured `IStackBuilder` (with `.copy()` to snapshot when needed). If you use a custom Stack subclass, import from `@composurecdk/core` and provide your own `ScopeFactory`.

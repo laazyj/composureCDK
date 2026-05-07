@@ -28,24 +28,20 @@ const { stack } = createStackBuilder()
   .build(app, "ServiceStack");
 ```
 
-### Scope factory
+### Variants and snapshots with `.copy()`
 
-Convert a configured builder into a `ScopeFactory` for use with stack strategies:
+`.copy()` returns an independent builder with the same configured state. Use it to derive variants from a shared base, or to snapshot a builder before handing it to a stack strategy that may be invoked after further mutations:
 
 ```ts
-const factory = createStackBuilder()
-  .terminationProtection(true)
-  .tag("team", "platform")
-  .toScopeFactory();
+const baseStack = createStackBuilder().tag("team", "platform");
 
-compose({ ... }, { ... })
-  .withStackStrategy(singleStack(factory))
-  .build(app, "MySystem");
+const { stack: us } = baseStack.copy().description("US region").build(app, "UsStack");
+const { stack: eu } = baseStack.copy().description("EU region").build(app, "EuStack");
 ```
 
 ## Stack Strategies
 
-Convenience wrappers around `@composurecdk/core`'s strategy primitives that default to creating Stacks via `createStackBuilder`. Pass an optional `ScopeFactory` to customise the Stack configuration.
+Convenience wrappers around `@composurecdk/core`'s strategy primitives. Both accept a `Lifecycle<StackBuilderResult>` (typically an `IStackBuilder`) and default to a fresh `createStackBuilder()` per call.
 
 ### singleStack
 
@@ -59,6 +55,16 @@ compose({ handler, api }, { handler: [], api: ["handler"] })
   .build(app, "MySystem");
 ```
 
+Pass a configured builder to apply tags, description, etc. to the strategy's stack. Use `.copy()` to snapshot the configuration when the original may be mutated later:
+
+```ts
+const base = createStackBuilder().tag("team", "platform");
+
+compose({ ... }, { ... })
+  .withStackStrategy(singleStack(base.copy()))
+  .build(app, "MySystem");
+```
+
 ### groupedStacks
 
 Groups components into named Stacks by a classifier function:
@@ -69,6 +75,18 @@ import { groupedStacks } from "@composurecdk/cloudformation";
 compose({ handler, api, table }, { ... })
   .withStackStrategy(
     groupedStacks((key) => (key === "table" ? "persistence" : "service")),
+  )
+  .build(app, "MySystem");
+```
+
+The same builder is invoked once per group key with `${systemId}-${group}` as the id, so any tags configured on the supplied builder propagate to every stack the strategy creates. As with `singleStack`, pass `builder.copy()` to snapshot the configuration when the original may be mutated after hand-off:
+
+```ts
+const base = createStackBuilder().tag("team", "platform");
+
+compose({ ... }, { ... })
+  .withStackStrategy(
+    groupedStacks((key) => (key === "table" ? "persistence" : "service"), base.copy()),
   )
   .build(app, "MySystem");
 ```

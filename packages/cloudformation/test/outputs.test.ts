@@ -252,7 +252,7 @@ describe("outputs", () => {
         { data: stubComponent({ name: "t1" }), api: stubComponent({ route: "/" }) },
         { data: [], api: ["data"] },
       )
-        .withStackStrategy(groupedStacks(classify, (parent, id) => new Stack(parent, id)))
+        .withStackStrategy(groupedStacks(classify))
         .afterBuild(
           outputs({
             TableName: { value: "tbl", scope: "data" },

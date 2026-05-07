@@ -14,12 +14,17 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
  * - Routing components to different stacks via {@link ComposedSystem.withStacks}
  * - Cross-stack references resolved automatically by CDK
  * - Components without a stack mapping fall back to the default scope
+ * - `.copy()` for deriving stack variants from a shared base configuration
  */
 export function createMultiStackApp(app = new App()) {
-  const { stack: serviceStack } = createStackBuilder()
+  const baseStack = createStackBuilder().tag("project", "multi-stack-example");
+
+  const { stack: serviceStack } = baseStack
+    .copy()
     .description("Service resources for multi-stack example")
     .build(app, "ComposureCDK-MultiStackServiceStack");
-  const { stack: apiStack } = createStackBuilder()
+  const { stack: apiStack } = baseStack
+    .copy()
     .description("API resources for multi-stack example")
     .build(app, "ComposureCDK-MultiStackApiStack");
 

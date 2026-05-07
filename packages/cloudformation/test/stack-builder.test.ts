@@ -63,43 +63,62 @@ describe("StackBuilder", () => {
     });
   });
 
-  describe("toScopeFactory", () => {
-    it("returns a factory that creates Stacks with configured props", () => {
-      const factory = createStackBuilder()
-        .description("Factory stack")
-        .terminationProtection(true)
-        .toScopeFactory();
+  describe("copy", () => {
+    it("returns an independent builder with the same configured props", () => {
+      const original = createStackBuilder()
+        .description("Original description")
+        .terminationProtection(true);
 
-      const app = new App();
-      const scope = factory(app, "FactoryStack");
+      const copy = original.copy();
 
-      expect(scope).toBeInstanceOf(Stack);
-      const stack = scope as Stack;
-      expect(stack.templateOptions.description).toBe("Factory stack");
-      expect(stack.terminationProtection).toBe(true);
+      expect(copy.description()).toBe("Original description");
+      expect(copy.terminationProtection()).toBe(true);
     });
 
-    it("returns a factory that applies tags", () => {
-      const factory = createStackBuilder().tag("team", "platform").toScopeFactory();
+    it("isolates props mutations between original and copy", () => {
+      const original = createStackBuilder().description("Original");
+      const copy = original.copy();
 
+      original.description("Mutated original");
+      copy.description("Mutated copy");
+
+      expect(original.description()).toBe("Mutated original");
+      expect(copy.description()).toBe("Mutated copy");
+    });
+
+    it("isolates tag mutations between original and copy", () => {
       const app = new App();
-      factory(app, "TaggedFactoryStack");
+      const original = createStackBuilder().tag("team", "platform");
+      const copy = original.copy();
+
+      original.tag("env", "prod");
+      copy.tag("env", "test");
+
+      const { stack: originalStack } = original.build(app, "OriginalStack");
+      const { stack: copyStack } = copy.build(app, "CopyStack");
 
       const assembly = app.synth();
-      const stackArtifact = assembly.getStackByName("TaggedFactoryStack");
-      expect(stackArtifact.tags).toEqual({ team: "platform" });
+      expect(assembly.getStackByName(originalStack.stackName).tags).toEqual({
+        team: "platform",
+        env: "prod",
+      });
+      expect(assembly.getStackByName(copyStack.stackName).tags).toEqual({
+        team: "platform",
+        env: "test",
+      });
     });
 
-    it("creates independent stacks on each call", () => {
-      const factory = createStackBuilder().description("Shared config").toScopeFactory();
-
+    it("preserves accumulated tags on the copy", () => {
       const app = new App();
-      const stack1 = factory(app, "Stack1");
-      const stack2 = factory(app, "Stack2");
+      const original = createStackBuilder().tag("team", "platform").tag("env", "prod");
 
-      expect(stack1).not.toBe(stack2);
-      expect(stack1).toBeInstanceOf(Stack);
-      expect(stack2).toBeInstanceOf(Stack);
+      const { stack } = original.copy().build(app, "CopiedTaggedStack");
+
+      const assembly = app.synth();
+      expect(assembly.getStackByName(stack.stackName).tags).toEqual({
+        team: "platform",
+        env: "prod",
+      });
     });
   });
 

@@ -6,7 +6,7 @@ import {
   type RestApiProps,
 } from "aws-cdk-lib/aws-apigateway";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
@@ -97,6 +97,20 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
   addResource(pathPart: string, configure?: (resource: ResourceBuilder) => void): this {
     this.#root.addResource(pathPart, configure);
     return this;
+  }
+
+  /**
+   * Copies non-`props` state onto a freshly cloned builder. The resource
+   * tree is deep-cloned via `ResourceBuilder.copyInto` so mutations on
+   * either side after `.copy()` do not leak; the alarm-builder array is
+   * spread into a fresh container with elements shared by reference per
+   * ADR-0005's shallow-clone stance.
+   *
+   * @internal
+   */
+  [COPY_STATE](target: RestApiBuilder): void {
+    this.#root.copyInto(target.#root);
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): RestApiBuilderResult {

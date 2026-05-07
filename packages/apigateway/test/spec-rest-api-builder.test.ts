@@ -1,12 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import {
   ApiDefinition,
   LogGroupLogDestination,
   MethodLoggingLevel,
+  type RestApiBase,
 } from "aws-cdk-lib/aws-apigateway";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createSpecRestApiBuilder } from "../src/spec-rest-api-builder.js";
 
 /** Minimal OpenAPI 3.0 spec with a single mock-integrated GET /pets endpoint. */
@@ -226,6 +229,39 @@ describe("SpecRestApiBuilder", () => {
         AccessLogSetting: {
           DestinationArn: Match.anyValue(),
         },
+      });
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #customAlarms across .copy()", () => {
+      const errorMetric = (api: RestApiBase): Metric =>
+        new Metric({
+          namespace: "AWS/ApiGateway",
+          metricName: "5XXError",
+          dimensionsMap: { ApiName: api.restApiName },
+          statistic: "Sum",
+          period: Duration.minutes(1),
+        });
+
+      assertCopyPreservesState({
+        factory: () =>
+          createSpecRestApiBuilder().apiDefinition(ApiDefinition.fromInline(minimalOpenApiSpec())),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (alarm) =>
+            alarm.metric(errorMetric).threshold(1).greaterThanOrEqual(),
+          );
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (alarm) =>
+            alarm.metric(errorMetric).threshold(5).greaterThanOrEqual(),
+          );
+        },
+        build: (b) => {
+          const stack = new Stack(new App(), "S");
+          return b.build(stack, "Api");
+        },
+        inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });
   });

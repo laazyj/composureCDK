@@ -1,6 +1,6 @@
 import { type RestApiBase, SpecRestApi, type SpecRestApiProps } from "aws-cdk-lib/aws-apigateway";
 import { type IConstruct } from "constructs";
-import { type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
@@ -55,6 +55,11 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
   ): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<RestApiBase>(key)));
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: SpecRestApiBuilder): void {
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(scope: IConstruct, id: string): SpecRestApiBuilderResult {

@@ -3,6 +3,7 @@ import { App, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBucketBuilder } from "../src/bucket-builder.js";
 
 function synthTemplate(
@@ -532,6 +533,31 @@ describe("BucketBuilder", () => {
           { Key: "Environment", Value: "prod" },
         ]),
       );
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #customAlarms across .copy()", () => {
+      const sizeMetric = (bucket: Bucket): Metric =>
+        new Metric({
+          namespace: "AWS/S3",
+          metricName: "BucketSizeBytes",
+          dimensionsMap: { BucketName: bucket.bucketName, StorageType: "StandardStorage" },
+          statistic: "Average",
+          period: Duration.days(1),
+        });
+
+      assertCopyPreservesState({
+        factory: () => createBucketBuilder().serverAccessLogs(false),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (a) => a.metric(sizeMetric).threshold(1e9).greaterThan());
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (a) => a.metric(sizeMetric).threshold(5e9).greaterThan());
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Bucket"),
+        inspect: (r) => Object.keys(r.alarms).sort(),
+      });
     });
   });
 });

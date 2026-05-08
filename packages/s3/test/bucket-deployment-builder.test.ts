@@ -6,7 +6,8 @@ import { Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Source } from "aws-cdk-lib/aws-s3-deployment";
-import { Ref } from "@composurecdk/core";
+import { Ref, ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBucketDeploymentBuilder } from "../src/bucket-deployment-builder.js";
 import { BUCKET_DEPLOYMENT_DEFAULTS } from "../src/bucket-deployment-defaults.js";
 
@@ -321,6 +322,45 @@ describe("BucketDeploymentBuilder", () => {
       template.resourceCountIs("AWS::Logs::LogGroup", 1);
       template.hasResourceProperties("AWS::Logs::LogGroup", {
         RetentionInDays: 7,
+      });
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #destinationBucket and #distribution across .copy()", () => {
+      const bucketRefA = ref<{ bucket: Bucket }>("bucketA").map((r) => r.bucket);
+      const bucketRefB = ref<{ bucket: Bucket }>("bucketB").map((r) => r.bucket);
+
+      assertCopyPreservesState({
+        factory: () => createBucketDeploymentBuilder().sources([Source.asset("./test")]),
+        configure: (b) => {
+          b.destinationBucket(bucketRefA);
+        },
+        // Switching to a different ref on the original after copy. The copy
+        // must keep using bucketA — proven by the synthesised
+        // DestinationBucketName diverging between original and copy.
+        mutate: (b) => {
+          b.destinationBucket(bucketRefB);
+        },
+        build: (b) => {
+          const stack = new Stack(new App(), "S");
+          const bucketA = new Bucket(stack, "BucketA");
+          const bucketB = new Bucket(stack, "BucketB");
+          return b.build(stack, "Deploy", {
+            bucketA: { bucket: bucketA },
+            bucketB: { bucket: bucketB },
+          });
+        },
+        inspect: (r) => {
+          const stack = Stack.of(r.deployment);
+          const deployments = Template.fromStack(stack).findResources(
+            "Custom::CDKBucketDeployment",
+          );
+          const entry = Object.values(deployments)[0] as
+            | { Properties: { DestinationBucketName: unknown } }
+            | undefined;
+          return JSON.stringify(entry?.Properties.DestinationBucketName);
+        },
       });
     });
   });

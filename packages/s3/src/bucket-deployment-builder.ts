@@ -3,7 +3,7 @@ import { type IBucket } from "aws-cdk-lib/aws-s3";
 import { type IDistribution } from "aws-cdk-lib/aws-cloudfront";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { createLogGroupBuilder } from "@composurecdk/logs";
 import { effectiveDefaults } from "./bucket-deployment-defaults.js";
@@ -90,6 +90,12 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
   distribution(distribution: Resolvable<IDistribution>): this {
     this.#distribution = distribution;
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: BucketDeploymentBuilder): void {
+    target.#destinationBucket = this.#destinationBucket;
+    target.#distribution = this.#distribution;
   }
 
   build(

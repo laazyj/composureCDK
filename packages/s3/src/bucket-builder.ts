@@ -2,7 +2,7 @@ import { RemovalPolicy } from "aws-cdk-lib";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
 import { type IConstruct } from "constructs";
-import { type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BucketAlarmConfig } from "./alarm-config.js";
@@ -118,6 +118,11 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
   ): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Bucket>(key)));
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: BucketBuilder): void {
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(scope: IConstruct, id: string): BucketBuilderResult {

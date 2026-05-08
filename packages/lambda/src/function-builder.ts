@@ -2,7 +2,7 @@ import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Function as LambdaFunction, type FunctionProps } from "aws-cdk-lib/aws-lambda";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
-import { type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createLogGroupBuilder } from "@composurecdk/logs";
@@ -121,6 +121,11 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   ): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<LambdaFunction>(key)));
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: FunctionBuilder): void {
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(scope: IConstruct, id: string): FunctionBuilderResult {

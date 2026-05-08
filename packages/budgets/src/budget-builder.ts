@@ -2,7 +2,7 @@ import { CfnBudget, type CfnBudgetProps } from "aws-cdk-lib/aws-budgets";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { ITopic, TopicPolicy } from "aws-cdk-lib/aws-sns";
 import type { IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { Builder, COPY_STATE, type IBuilder, type Lifecycle } from "@composurecdk/core";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BudgetAlarmConfig } from "./alarm-config.js";
 import { buildBudgetAlarms } from "./budget-alarm-builder.js";
@@ -228,6 +228,12 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
   ): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<CfnBudget>(key)));
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: BudgetBuilder): void {
+    target.#notifications.push(...this.#notifications);
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(scope: IConstruct, id: string, context: Record<string, object> = {}): BudgetBuilderResult {

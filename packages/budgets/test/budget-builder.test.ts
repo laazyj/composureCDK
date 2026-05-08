@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBudgetBuilder } from "../src/budget-builder.js";
 import { email } from "../src/email.js";
 import type { NotifySubscribers } from "../src/notifications.js";
@@ -377,6 +379,63 @@ describe("BudgetBuilder", () => {
             }),
           }),
         ]),
+      });
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #notifications across .copy()", () => {
+      assertCopyPreservesState({
+        factory: () => createBudgetBuilder().budgetName("Account").limit({ amount: 1000 }),
+        configure: (b) => {
+          b.notifyOnActual(80, { emails: [email("first@example.com")] });
+        },
+        mutate: (b) => {
+          b.notifyOnForecasted(100, { emails: [email("second@example.com")] });
+        },
+        build: (b) => b.build(newStack(), "Budget"),
+        inspect: (r) => {
+          const template = Template.fromStack(Stack.of(r.budget));
+          const budgets = template.findResources("AWS::Budgets::Budget");
+          const entry = Object.values(budgets)[0] as
+            | { Properties: { NotificationsWithSubscribers?: { Notification: object }[] } }
+            | undefined;
+          return (entry?.Properties.NotificationsWithSubscribers ?? []).map((n) => n.Notification);
+        },
+      });
+    });
+
+    it("preserves #customAlarms across .copy()", () => {
+      const billingMetric = (): Metric =>
+        new Metric({
+          namespace: "AWS/Billing",
+          metricName: "EstimatedCharges",
+          dimensionsMap: { Currency: "USD" },
+          statistic: "Maximum",
+        });
+
+      assertCopyPreservesState({
+        factory: () =>
+          createBudgetBuilder()
+            .budgetName("Account")
+            .limit({ amount: 1000 })
+            .recommendedAlarms(false),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (alarm) =>
+            alarm.metric(billingMetric).threshold(500).greaterThan(),
+          );
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (alarm) =>
+            alarm.metric(billingMetric).threshold(800).greaterThan(),
+          );
+        },
+        build: (b) =>
+          b.build(
+            new Stack(new App(), "S", { env: { account: "123456789012", region: "us-east-1" } }),
+            "Budget",
+          ),
+        inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });
   });

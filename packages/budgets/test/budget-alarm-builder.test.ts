@@ -4,6 +4,7 @@ import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type CfnBudget } from "aws-cdk-lib/aws-budgets";
 import { compose, ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createBudgetBuilder } from "../src/budget-builder.js";
 import {
@@ -279,6 +280,37 @@ describe("createBudgetAlarmBuilder", () => {
         Match.stringLikeRegexp("AWS/Billing EstimatedCharges"),
       );
       expect(warnings).toHaveLength(0);
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #budget and #customAlarms across .copy()", () => {
+      const { result: budgetResult } = buildBudget();
+
+      assertCopyPreservesState({
+        factory: () => createBudgetAlarmBuilder().budget(budgetResult).recommendedAlarms(false),
+        configure: (b) => {
+          b.addAlarm("firstCustom", ec2EstimatedCharges);
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (a) =>
+            a
+              .metric(
+                () =>
+                  new Metric({
+                    namespace: "AWS/Billing",
+                    metricName: "EstimatedCharges",
+                    dimensionsMap: { Currency: "USD", ServiceName: "AmazonS3" },
+                    statistic: "Maximum",
+                  }),
+              )
+              .threshold(100)
+              .greaterThan(),
+          );
+        },
+        build: (b) => b.build(new Stack(new App(), "AlarmStack", { env: ENV_US_EAST_1 }), "Alarms"),
+        inspect: (r) => Object.keys(r.alarms).sort(),
+      });
     });
   });
 });

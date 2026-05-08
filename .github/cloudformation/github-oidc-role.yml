@@ -2,6 +2,8 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   GitHub Actions OIDC federation for ComposureCDK deploy-test pipeline.
   Deploy this stack once in your sandbox account before running the workflow.
+  IAM resources (role, managed policy, OIDC provider) are global, so a single
+  deployment covers every region the workflow operates in.
 
   Usage:
     aws cloudformation deploy \
@@ -9,6 +11,9 @@ Description: >
       --stack-name github-actions-oidc \
       --parameter-overrides GitHubOrg=laazyj RepoName=composureCDK \
       --capabilities CAPABILITY_NAMED_IAM
+    aws cloudformation update-termination-protection \
+      --stack-name github-actions-oidc \
+      --enable-termination-protection
 
 Parameters:
   GitHubOrg:
@@ -73,6 +78,8 @@ Resources:
   # so tag conditions using "ComposureCDK-*" limit access to resources belonging
   # to example stacks without needing to enumerate each stack by name.
   # New examples automatically get coverage as long as they follow the prefix.
+  # Region segments in resource ARNs use `*`: the security boundary is the
+  # tag-condition / stack-name pattern, not the region. See docs/ci.md.
   DeployTestPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -100,7 +107,7 @@ Resources:
             Action:
               - ssm:GetParameter
             Resource:
-              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cdk-bootstrap/*
+              - !Sub arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:parameter/cdk-bootstrap/*
 
           # CloudFormation — mutating actions scoped to ComposureCDK- stacks.
           # Resource ARNs are string patterns evaluated at request time;
@@ -121,7 +128,7 @@ Resources:
               - cloudformation:GetTemplateSummary
               - cloudformation:ListStackResources
             Resource:
-              - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/ComposureCDK-*
+              - !Sub arn:${AWS::Partition}:cloudformation:*:${AWS::AccountId}:stack/ComposureCDK-*
           # ListStacks is read-only (names and statuses only) and cannot
           # be scoped to specific stacks. Needed by the smoke test to
           # discover ComposureCDK-* stacks.
@@ -153,7 +160,7 @@ Resources:
               - lambda:CreateFunction
               - lambda:TagResource
             Resource:
-              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:*
+              - !Sub arn:${AWS::Partition}:lambda:*:${AWS::AccountId}:function:*
             Condition:
               StringLike:
                 aws:RequestTag/aws:cloudformation:stack-name: ComposureCDK-*
@@ -170,7 +177,7 @@ Resources:
               - lambda:UntagResource
               - lambda:ListTags
             Resource:
-              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:*
+              - !Sub arn:${AWS::Partition}:lambda:*:${AWS::AccountId}:function:*
             Condition:
               StringLike:
                 aws:ResourceTag/aws:cloudformation:stack-name: ComposureCDK-*
@@ -187,8 +194,8 @@ Resources:
               - apigateway:PATCH
               - apigateway:DELETE
             Resource:
-              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis*
-              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags*
+              - !Sub arn:${AWS::Partition}:apigateway:*::/restapis*
+              - !Sub arn:${AWS::Partition}:apigateway:*::/tags*
 
           # CloudWatch Logs — scoped by CloudFormation stack-name tag.
           - Sid: LogsCreate
@@ -198,7 +205,7 @@ Resources:
               - logs:TagResource
               - logs:TagLogGroup
             Resource:
-              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+              - !Sub arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:*
             Condition:
               StringLike:
                 aws:RequestTag/aws:cloudformation:stack-name: ComposureCDK-*
@@ -214,7 +221,7 @@ Resources:
               - logs:ListTagsForResource
               - logs:ListTagsLogGroup
             Resource:
-              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
+              - !Sub arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:*
             Condition:
               StringLike:
                 aws:ResourceTag/aws:cloudformation:stack-name: ComposureCDK-*

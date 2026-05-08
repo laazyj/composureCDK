@@ -63,13 +63,24 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Check for in-progress ComposureCDK stacks
+        env:
+          # Sandbox primary plus every region any example pins via
+          # stack `env.region`. Keep in sync with SWEEP_REGIONS in
+          # sandbox-cleanup.yml.
+          CHECK_REGIONS: ${{ vars.AWS_REGION }} us-east-1
         run: |
-          in_progress=$(aws cloudformation list-stacks \
-            --stack-status-filter CREATE_IN_PROGRESS UPDATE_IN_PROGRESS DELETE_IN_PROGRESS UPDATE_ROLLBACK_IN_PROGRESS ROLLBACK_IN_PROGRESS REVIEW_IN_PROGRESS \
-            --query "StackSummaries[?starts_with(StackName, 'ComposureCDK-')].StackName" \
-            --output text)
-          if [ -n "$in_progress" ]; then
-            echo "::error::CloudFormation operations in progress on ComposureCDK-* stacks: $in_progress"
+          fail=0
+          for region in $CHECK_REGIONS; do
+            in_progress=$(aws cloudformation list-stacks --region "$region" \
+              --stack-status-filter CREATE_IN_PROGRESS UPDATE_IN_PROGRESS DELETE_IN_PROGRESS UPDATE_ROLLBACK_IN_PROGRESS ROLLBACK_IN_PROGRESS REVIEW_IN_PROGRESS \
+              --query "StackSummaries[?starts_with(StackName, 'ComposureCDK-')].StackName" \
+              --output text)
+            if [ -n "$in_progress" ]; then
+              echo "::error::CloudFormation operations in progress in $region on ComposureCDK-* stacks: $in_progress"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
             echo "Wait for sandbox-cleanup to complete or trigger it manually before retrying."
             exit 1
           fi

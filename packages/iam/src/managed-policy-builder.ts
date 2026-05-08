@@ -1,6 +1,6 @@
 import { ManagedPolicy, type ManagedPolicyProps, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
-import { Builder, type IBuilder, type Lifecycle } from "@composurecdk/core";
+import { Builder, COPY_STATE, type IBuilder, type Lifecycle } from "@composurecdk/core";
 import { StatementBuilder } from "./statement-builder.js";
 
 /**
@@ -55,6 +55,11 @@ class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
   addStatements(statements: (PolicyStatement | StatementBuilder)[]): this {
     this.#extraStatements.push(...statements);
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: ManagedPolicyBuilder): void {
+    target.#extraStatements.push(...this.#extraStatements);
   }
 
   build(scope: IConstruct, id: string): ManagedPolicyBuilderResult {

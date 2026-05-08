@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { ManagedPolicy, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createRoleBuilder } from "../src/role-builder.js";
 import { createStatementBuilder, WildcardResourceError } from "../src/statement-builder.js";
 
@@ -167,6 +168,32 @@ describe("RoleBuilder", () => {
             ]),
           }),
         ]),
+      });
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #inlinePolicies across .copy()", () => {
+      assertCopyPreservesState({
+        factory: () => createRoleBuilder().assumedBy(new ServicePrincipal("lambda.amazonaws.com")),
+        configure: (b) => {
+          b.addInlinePolicyStatements("first", [
+            new PolicyStatement({
+              actions: ["s3:GetObject"],
+              resources: ["arn:aws:s3:::bucket-1/*"],
+            }),
+          ]);
+        },
+        mutate: (b) => {
+          b.addInlinePolicyStatements("second", [
+            new PolicyStatement({
+              actions: ["s3:PutObject"],
+              resources: ["arn:aws:s3:::bucket-2/*"],
+            }),
+          ]);
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Role"),
+        inspect: (r) => Object.keys(r.inlinePolicies).sort(),
       });
     });
   });

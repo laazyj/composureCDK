@@ -6,7 +6,7 @@ import {
   type RoleProps,
 } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { ROLE_DEFAULTS } from "./role-defaults.js";
 import { StatementBuilder } from "./statement-builder.js";
@@ -114,6 +114,11 @@ class RoleBuilder implements Lifecycle<RoleBuilderResult> {
   ): this {
     this.#inlinePolicies.push({ name, statements });
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: RoleBuilder): void {
+    target.#inlinePolicies.push(...this.#inlinePolicies);
   }
 
   build(scope: IConstruct, id: string, context: Record<string, object> = {}): RoleBuilderResult {

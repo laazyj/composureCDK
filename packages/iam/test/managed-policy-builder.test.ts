@@ -2,6 +2,7 @@ import { describe, it } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createManagedPolicyBuilder } from "../src/managed-policy-builder.js";
 import { createStatementBuilder } from "../src/statement-builder.js";
 
@@ -64,6 +65,39 @@ describe("ManagedPolicyBuilder", () => {
           Match.objectLike({ Action: "s3:PutObject" }),
         ]),
       }),
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #extraStatements across .copy()", () => {
+      assertCopyPreservesState({
+        factory: () => createManagedPolicyBuilder().managedPolicyName("test"),
+        configure: (b) => {
+          b.addStatements([
+            new PolicyStatement({
+              actions: ["s3:GetObject"],
+              resources: ["arn:aws:s3:::bucket-1/*"],
+            }),
+          ]);
+        },
+        mutate: (b) => {
+          b.addStatements([
+            new PolicyStatement({
+              actions: ["s3:PutObject"],
+              resources: ["arn:aws:s3:::bucket-2/*"],
+            }),
+          ]);
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Policy"),
+        inspect: (r) => {
+          const stack = Stack.of(r.policy);
+          const policies = Template.fromStack(stack).findResources("AWS::IAM::ManagedPolicy");
+          const entry = Object.values(policies)[0] as
+            | { Properties: { PolicyDocument: { Statement: { Action: string }[] } } }
+            | undefined;
+          return (entry?.Properties.PolicyDocument.Statement ?? []).map((s) => s.Action).sort();
+        },
+      });
     });
   });
 });

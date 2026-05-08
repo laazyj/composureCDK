@@ -52,6 +52,8 @@ import {
 export function createDnsZoneApp(app = new App()): void {
   const { stack } = createStackBuilder()
     .description("Public DNS zone (DSL example)")
+    // Route 53 query logging requires us-east-1 — see packages/route53/README.md.
+    .env({ account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-east-1" })
     .build(app, "ComposureCDK-DnsZoneStack");
 
   compose(

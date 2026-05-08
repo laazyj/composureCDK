@@ -1,17 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Duration, Size, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import {
+  type IVolume,
+  type IVpc,
+  type Instance,
   InstanceClass,
   InstanceSize,
   InstanceType,
   KeyPair,
   MachineImage,
   SecurityGroup,
+  Volume,
   Vpc,
 } from "aws-cdk-lib/aws-ec2";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createInstanceBuilder } from "../src/instance-builder.js";
 import { createVpcBuilder } from "../src/vpc-builder.js";
 
@@ -216,6 +222,53 @@ describe("InstanceBuilder", () => {
       const template = Template.fromStack(stack);
       // VPC default SG + the user's SG. No extra instance-created SG.
       template.resourceCountIs("AWS::EC2::SecurityGroup", 1);
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #vpc, #customAlarms, and #volumeAttachments across .copy()", () => {
+      interface InfraEntry {
+        vpc: IVpc;
+        volume: IVolume;
+      }
+      const vpcRef = ref<InfraEntry>("infra").map((r) => r.vpc);
+      const volumeRef = ref<InfraEntry>("infra").map((r) => r.volume);
+
+      const cpuMetric = (instance: Instance): Metric =>
+        new Metric({
+          namespace: "AWS/EC2",
+          metricName: "CPUUtilization",
+          dimensionsMap: { InstanceId: instance.instanceId },
+          statistic: "Average",
+          period: Duration.minutes(5),
+        });
+
+      assertCopyPreservesState({
+        factory: () =>
+          createInstanceBuilder()
+            .vpc(vpcRef)
+            .instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO))
+            .machineImage(MachineImage.latestAmazonLinux2023())
+            .recommendedAlarms(false),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (a) => a.metric(cpuMetric).threshold(80).greaterThanOrEqual());
+          b.attachVolume("first", volumeRef, { device: "/dev/sdf" });
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (a) => a.metric(cpuMetric).threshold(90).greaterThanOrEqual());
+          b.attachVolume("second", volumeRef, { device: "/dev/sdg" });
+        },
+        build: (b) => {
+          const stack = new Stack(new App(), "S");
+          const vpc = new Vpc(stack, "Vpc", { maxAzs: 2, natGateways: 0 });
+          const volume = new Volume(stack, "ExternalVolume", {
+            availabilityZone: vpc.availabilityZones[0],
+            size: Size.gibibytes(10),
+          });
+          return b.build(stack, "Instance", { infra: { vpc, volume } });
+        },
+        inspect: (r) => Object.keys(r.alarms).sort(),
+      });
     });
   });
 });

@@ -512,6 +512,160 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
       "Type": "AWS::Logs::LogGroup",
       "UpdateReplacePolicy": "Retain",
     },
+    "DualFunctionAppworkerSchedule05474C69": {
+      "Properties": {
+        "Description": "Tick the worker every 15 minutes",
+        "ScheduleExpression": "rate(15 minutes)",
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "DualFunctionAppworker219B5B02",
+                "Arn",
+              ],
+            },
+            "Id": "Target0",
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
+    },
+    "DualFunctionAppworkerScheduleAllowEventRuleComposureCDKDualFunctionStackDualFunctionAppworkerDB0478460E2CCD77": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "DualFunctionAppworker219B5B02",
+            "Arn",
+          ],
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "DualFunctionAppworkerSchedule05474C69",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "DualFunctionAppworkerScheduleFailedInvocationsAlarm7F68058F": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DualFunctionAppalerts6076A01F",
+          },
+        ],
+        "AlarmDescription": "EventBridge rule is failing to invoke targets. Threshold: > 0 failures in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker-schedule/failed-invocations",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "RuleName",
+            "Value": {
+              "Ref": "DualFunctionAppworkerSchedule05474C69",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FailedInvocations",
+        "Namespace": "AWS/Events",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DualFunctionAppworkerScheduleInvocationsFailedToBeSentToDlqAlarmCE3C6E7F": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DualFunctionAppalerts6076A01F",
+          },
+        ],
+        "AlarmDescription": "EventBridge rule failed to redrive an event to a target dead-letter queue; events may be lost. Threshold: > 0 failed redrives in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker-schedule/invocations-failed-to-be-sent-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "RuleName",
+            "Value": {
+              "Ref": "DualFunctionAppworkerSchedule05474C69",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "InvocationsFailedToBeSentToDlq",
+        "Namespace": "AWS/Events",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DualFunctionAppworkerScheduleInvocationsSentToDlqAlarm37DE1862": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DualFunctionAppalerts6076A01F",
+          },
+        ],
+        "AlarmDescription": "EventBridge rule is redriving events to a target dead-letter queue. Threshold: > 0 redrives in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker-schedule/invocations-sent-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "RuleName",
+            "Value": {
+              "Ref": "DualFunctionAppworkerSchedule05474C69",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "InvocationsSentToDlq",
+        "Namespace": "AWS/Events",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DualFunctionAppworkerScheduleThrottledRulesAlarm6E846F0E": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DualFunctionAppalerts6076A01F",
+          },
+        ],
+        "AlarmDescription": "EventBridge rule is being throttled, indicating quota or downstream concurrency limits. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker-schedule/throttled-rules",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "RuleName",
+            "Value": {
+              "Ref": "DualFunctionAppworkerSchedule05474C69",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ThrottledRules",
+        "Namespace": "AWS/Events",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "DualFunctionAppworkerServiceRole2CE81560": {
       "Properties": {
         "AssumeRolePolicyDocument": {

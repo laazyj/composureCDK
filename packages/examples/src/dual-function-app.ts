@@ -1,14 +1,17 @@
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
+import { Schedule } from "aws-cdk-lib/aws-events";
 import { Code, Runtime, Tracing } from "aws-cdk-lib/aws-lambda";
-import { compose } from "@composurecdk/core";
+import { compose, ref } from "@composurecdk/core";
 import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
-import { createFunctionBuilder } from "@composurecdk/lambda";
+import { createRuleBuilder, lambdaTarget } from "@composurecdk/events";
+import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
 import { createTopicBuilder } from "@composurecdk/sns";
 
 /**
  * Two Lambda functions — an API handler and an async worker — composed
- * into a single stack.
+ * into a single stack. The worker also runs on a 15-minute EventBridge
+ * schedule wired through `@composurecdk/events`.
  *
  * Demonstrates:
  * - Configuring multiple functions with different settings
@@ -17,7 +20,9 @@ import { createTopicBuilder } from "@composurecdk/sns";
  * - Customizing alarm thresholds on the worker
  * - Adding a custom alarm via `addAlarm`
  * - Using TopicBuilder for the alert topic with recommended alarms
- * - Routing every alarm to the alert topic via `alarmActionsPolicy`
+ * - Using RuleBuilder + lambdaTarget to schedule a sibling Lambda via `ref`
+ * - Routing every alarm (function + rule) to the alert topic via
+ *   `alarmActionsPolicy`
  */
 export function createDualFunctionApp(app = new App()) {
   const stack = new Stack(app, "ComposureCDK-DualFunctionStack");
@@ -58,8 +63,13 @@ export function createDualFunctionApp(app = new App()) {
           // Worker can tolerate occasional errors — only alarm after 5
           errors: { threshold: 5, evaluationPeriods: 3, datapointsToAlarm: 2 },
         }),
+
+      workerSchedule: createRuleBuilder()
+        .schedule(Schedule.rate(Duration.minutes(15)))
+        .description("Tick the worker every 15 minutes")
+        .addTarget("worker", lambdaTarget(ref("worker", (r: FunctionBuilderResult) => r.function))),
     },
-    { alerts: [], api: [], worker: [] },
+    { alerts: [], api: [], worker: [], workerSchedule: ["worker"] },
   ).build(stack, "DualFunctionApp");
 
   alarmActionsPolicy(stack, {

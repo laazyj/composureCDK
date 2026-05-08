@@ -41,12 +41,13 @@ jobs:
           fi
 
       - name: Checkout
-        # Use the default GITHUB_TOKEN explicitly: actions taken with this token do not
-        # trigger new workflow runs, so pushing the tag below will not double-fire
-        # release.yml's `push: tags` trigger. release.yml is invoked via workflow_call.
+        # Authenticate with RELEASE_PR_TOKEN (a PAT) so the tag push below triggers
+        # release.yml's `push: tags` workflow. Pushes authenticated with the default
+        # GITHUB_TOKEN do not trigger downstream workflows.
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
+          token: ${{ secrets.RELEASE_PR_TOKEN }}
 
       - name: Configure git
         run: |
@@ -89,13 +90,3 @@ jobs:
           else
             printf '%s' "$notes" | gh release create "$tag" --title "$tag" --notes-file -
           fi
-
-  release:
-    name: Release
-    needs: tag
-    if: ${{ needs.tag.outputs.version != '' }}
-    uses: ./.github/workflows/release.yml
-    permissions:
-      contents: write
-      id-token: write
-    secrets: inherit

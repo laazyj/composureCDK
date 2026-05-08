@@ -71,6 +71,24 @@ export class ResourceBuilder {
     return this;
   }
 
+  /**
+   * Copies this builder's resource tree onto `target`. Used by
+   * `RestApiBuilder.[COPY_STATE]` per ADR-0005's containers-fresh,
+   * elements-shared rule: the `methods` array and `children` Map are
+   * reconstructed on `target`, but `MethodDefinition` and child
+   * `ResourceDefinition` entries are shared by reference. Sharing the
+   * child entries is safe because the public API (`addResource`)
+   * replaces a child wholesale rather than mutating it in place.
+   *
+   * @internal
+   */
+  copyInto(target: ResourceBuilder): void {
+    target.definition.methods.push(...this.definition.methods);
+    for (const [pathPart, childDef] of this.definition.children) {
+      target.definition.children.set(pathPart, childDef);
+    }
+  }
+
   /** @internal */
   applyTo(resource: IResource, context: Record<string, object> = {}): void {
     for (const method of this.definition.methods) {

@@ -1,13 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import {
   LogGroupLogDestination,
   MethodLoggingLevel,
   MockIntegration,
   PassthroughBehavior,
+  type RestApiBase,
 } from "aws-cdk-lib/aws-apigateway";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createRestApiBuilder } from "../src/rest-api-builder.js";
 
 function mockIntegration(body: Record<string, unknown>) {
@@ -341,6 +344,61 @@ describe("RestApiBuilder", () => {
         AccessLogSetting: {
           DestinationArn: Match.anyValue(),
         },
+      });
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #root resource tree across .copy()", () => {
+      assertCopyPreservesState({
+        factory: () => createRestApiBuilder(),
+        configure: (b) => {
+          b.addResource("first", (r) => r.addMethod("GET", stubIntegration, methodResponse200));
+        },
+        mutate: (b) => {
+          b.addResource("second", (r) => r.addMethod("GET", stubIntegration, methodResponse200));
+        },
+        build: (b) => {
+          const stack = new Stack(new App(), "S");
+          return b.build(stack, "Api");
+        },
+        inspect: (r) => {
+          const stack = Stack.of(r.api);
+          const resources = Template.fromStack(stack).findResources("AWS::ApiGateway::Resource");
+          return Object.values(resources)
+            .map((res) => (res as { Properties: { PathPart: string } }).Properties.PathPart)
+            .sort();
+        },
+      });
+    });
+
+    it("preserves #customAlarms across .copy()", () => {
+      const errorMetric = (api: RestApiBase): Metric =>
+        new Metric({
+          namespace: "AWS/ApiGateway",
+          metricName: "5XXError",
+          dimensionsMap: { ApiName: api.restApiName },
+          statistic: "Sum",
+          period: Duration.minutes(1),
+        });
+
+      assertCopyPreservesState({
+        factory: () => createRestApiBuilder().addMethod("GET", stubIntegration, methodResponse200),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (alarm) =>
+            alarm.metric(errorMetric).threshold(1).greaterThanOrEqual(),
+          );
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (alarm) =>
+            alarm.metric(errorMetric).threshold(5).greaterThanOrEqual(),
+          );
+        },
+        build: (b) => {
+          const stack = new Stack(new App(), "S");
+          return b.build(stack, "Api");
+        },
+        inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });
   });

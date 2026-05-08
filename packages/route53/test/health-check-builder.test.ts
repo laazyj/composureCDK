@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
-import { HealthCheckType } from "aws-cdk-lib/aws-route53";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createHealthCheckBuilder } from "../src/health-check-builder.js";
 
 const ENV_US_EAST_1 = { account: "123456789012", region: "us-east-1" };
@@ -107,6 +109,36 @@ describe("createHealthCheckBuilder", () => {
         Match.stringLikeRegexp("Route 53 health-check metrics are emitted"),
       );
       expect(warnings).toHaveLength(0);
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #customAlarms across .copy()", () => {
+      const connectionTimeMetric = (hc: IHealthCheck): Metric =>
+        new Metric({
+          namespace: "AWS/Route53",
+          metricName: "ConnectionTime",
+          dimensionsMap: { HealthCheckId: hc.healthCheckId },
+          statistic: "Average",
+          period: Duration.minutes(1),
+        });
+
+      assertCopyPreservesState({
+        factory: () =>
+          createHealthCheckBuilder().type(HealthCheckType.HTTPS).fqdn("api.example.com"),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (a) =>
+            a.metric(connectionTimeMetric).threshold(2000).greaterThan(),
+          );
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (a) =>
+            a.metric(connectionTimeMetric).threshold(3000).greaterThan(),
+          );
+        },
+        build: (b) => b.build(new Stack(new App(), "S", { env: ENV_US_EAST_1 }), "HealthCheck"),
+        inspect: (r) => Object.keys(r.alarms).sort(),
+      });
     });
   });
 });

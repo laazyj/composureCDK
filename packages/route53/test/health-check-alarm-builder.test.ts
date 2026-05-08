@@ -4,6 +4,7 @@ import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
 import { compose, ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createHealthCheckBuilder } from "../src/health-check-builder.js";
 import {
@@ -224,6 +225,38 @@ describe("createHealthCheckAlarmBuilder", () => {
         Match.stringLikeRegexp("Route 53 health-check metrics are emitted"),
       );
       expect(warnings).toHaveLength(0);
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #healthCheck and #customAlarms across .copy()", () => {
+      const { result: healthCheckResult } = buildHealthCheck();
+
+      assertCopyPreservesState({
+        factory: () =>
+          createHealthCheckAlarmBuilder().healthCheck(healthCheckResult).recommendedAlarms(false),
+        configure: (b) => {
+          b.addAlarm("firstCustom", connectionTimeAlarm);
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (a) =>
+            a
+              .metric(
+                (hc) =>
+                  new Metric({
+                    namespace: "AWS/Route53",
+                    metricName: "HealthCheckPercentageHealthy",
+                    dimensionsMap: { HealthCheckId: hc.healthCheckId },
+                    statistic: "Average",
+                  }),
+              )
+              .threshold(100)
+              .lessThan(),
+          );
+        },
+        build: (b) => b.build(new Stack(new App(), "AlarmStack", { env: ENV_US_EAST_1 }), "Alarms"),
+        inspect: (r) => Object.keys(r.alarms).sort(),
+      });
     });
   });
 });

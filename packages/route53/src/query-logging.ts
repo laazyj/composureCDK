@@ -48,6 +48,7 @@ export type QueryLoggingConfig =
       logGroupArn?: string;
     };
 
+const QUERY_LOG_REGION = "us-east-1";
 const QUERY_LOGGING_REGION_ANNOTATION = "@composurecdk/route53:query-logging-region";
 const QUERY_LOGGING_NAME_ANNOTATION = "@composurecdk/route53:query-logging-name";
 
@@ -126,7 +127,7 @@ function ensureSharedResourcePolicy(scope: IConstruct): ResourcePolicy {
         principals: [new ServicePrincipal("route53.amazonaws.com")],
         actions: ["logs:CreateLogStream", "logs:PutLogEvents"],
         resources: [
-          `arn:${Aws.PARTITION}:logs:us-east-1:${Aws.ACCOUNT_ID}:log-group:${QUERY_LOGGING_LOG_GROUP_NAME_PREFIX}/*:*`,
+          `arn:${Aws.PARTITION}:logs:${QUERY_LOG_REGION}:${Aws.ACCOUNT_ID}:log-group:${QUERY_LOGGING_LOG_GROUP_NAME_PREFIX}/*:*`,
         ],
         conditions: {
           StringEquals: { "aws:SourceAccount": Aws.ACCOUNT_ID },
@@ -138,26 +139,59 @@ function ensureSharedResourcePolicy(scope: IConstruct): ResourcePolicy {
 
 function errorIfStackNotUsEast1(scope: IConstruct): void {
   const region = Stack.of(scope).region;
-  if (Token.isUnresolved(region)) return;
-  if (region === "us-east-1") return;
-  throw new Error(
-    `Route 53 accepts DNS query logs only in us-east-1, but this stack is deployed in "${region}". ` +
-      `Either:\n` +
-      `  1. Deploy the stack containing this hosted zone in us-east-1, or\n` +
-      `  2. Pass queryLogging({ logGroupArn: 'arn:aws:logs:us-east-1:...' }) referencing a log group ` +
-      `you own in us-east-1, or\n` +
-      `  3. Set queryLogging(false) to opt out.`,
+  if (Token.isUnresolved(region)) {
+    checkEnvAgnosticRegion(scope);
+    return;
+  }
+  if (region === QUERY_LOG_REGION) return;
+  throw new Error(buildRegionErrorMessage(region));
+}
+
+// Env-agnostic stacks have no concrete region in the synthesised template, so
+// fall back to CDK_DEFAULT_REGION — the same env var the CDK toolkit uses to
+// fill the deploy region. Unset means we can't verify at synth time and warn
+// instead, so deploying outside us-east-1 still surfaces a clear synth-time
+// signal rather than the obscure CFN error.
+function checkEnvAgnosticRegion(scope: IConstruct): void {
+  const envRegion = process.env.CDK_DEFAULT_REGION;
+  if (envRegion === undefined || envRegion === "") {
+    Annotations.of(scope).addWarningV2(
+      QUERY_LOGGING_REGION_ANNOTATION,
+      `Route 53 query logging is enabled by default and requires the CloudWatch log ` +
+        `group to live in ${QUERY_LOG_REGION}. This stack is env-agnostic and CDK_DEFAULT_REGION ` +
+        `is not set, so the deploy region cannot be verified at synth time. Deploying ` +
+        `outside ${QUERY_LOG_REGION} will fail with "InvalidInputException - The ARN for the ` +
+        `CloudWatch Logs log group is invalid". To silence this warning, either pin ` +
+        `env: { region: '${QUERY_LOG_REGION}' } on the stack, pass queryLogging({ logGroupArn }) ` +
+        `referencing a log group you own in ${QUERY_LOG_REGION}, or queryLogging(false) to opt out.`,
+    );
+    return;
+  }
+  if (envRegion === QUERY_LOG_REGION) return;
+  throw new Error(buildRegionErrorMessage(envRegion));
+}
+
+function buildRegionErrorMessage(region: string): string {
+  return (
+    `Route 53 accepts DNS query logs only in ${QUERY_LOG_REGION}, but this stack is deployed in "${region}". ` +
+    `Without this check, the deploy fails late with "InvalidInputException - The ARN for the ` +
+    `CloudWatch Logs log group is invalid" after CloudFormation has already started rolling forward. ` +
+    `Either:\n` +
+    `  1. Deploy the stack containing this hosted zone in ${QUERY_LOG_REGION}, or\n` +
+    `  2. Pass queryLogging({ logGroupArn: 'arn:aws:logs:${QUERY_LOG_REGION}:...' }) referencing a log group ` +
+    `you own in ${QUERY_LOG_REGION}, or\n` +
+    `  3. Set queryLogging(false) to opt out.`
   );
 }
 
 function warnIfArnNotUsEast1(scope: IConstruct, arn: string): void {
   if (Token.isUnresolved(arn)) return;
   const region = parseLogGroupArnRegion(arn);
-  if (region === undefined || region === "us-east-1") return;
+  if (region === undefined || region === QUERY_LOG_REGION) return;
   Annotations.of(scope).addWarningV2(
     QUERY_LOGGING_REGION_ANNOTATION,
     `queryLogging.logGroupArn references a log group in "${region}", but Route 53 query logs ` +
-      `are accepted only in us-east-1. The deploy will fail unless this ARN is corrected.`,
+      `are accepted only in ${QUERY_LOG_REGION}. The deploy will fail unless this ARN is corrected.`,
   );
 }
 

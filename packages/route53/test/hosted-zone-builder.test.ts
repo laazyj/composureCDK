@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
@@ -174,11 +174,39 @@ describe("HostedZoneBuilder query logging", () => {
     ).toThrow(/Deploy the stack containing this hosted zone in us-east-1/);
   });
 
-  it("does not error when the stack region is unresolved (env-agnostic stack)", () => {
-    const stack = newStack();
-    expect(() =>
-      createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone"),
-    ).not.toThrow();
+  describe("env-agnostic stacks", () => {
+    beforeEach(() => {
+      vi.stubEnv("CDK_DEFAULT_REGION", "");
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("warns rather than errors when CDK_DEFAULT_REGION is unset", () => {
+      const stack = newStack();
+      createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone");
+      const warnings = Annotations.fromStack(stack).findWarning(
+        "*",
+        Match.stringLikeRegexp("env-agnostic and CDK_DEFAULT_REGION"),
+      );
+      expect(warnings.length).toBeGreaterThan(0);
+    });
+
+    it("passes when CDK_DEFAULT_REGION is us-east-1", () => {
+      vi.stubEnv("CDK_DEFAULT_REGION", "us-east-1");
+      const stack = newStack();
+      expect(() =>
+        createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone"),
+      ).not.toThrow();
+    });
+
+    it("errors when CDK_DEFAULT_REGION is set to a non-us-east-1 region", () => {
+      vi.stubEnv("CDK_DEFAULT_REGION", "eu-west-2");
+      const stack = newStack();
+      expect(() =>
+        createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone"),
+      ).toThrow(/Route 53 accepts DNS query logs only in us-east-1.*"eu-west-2"/s);
+    });
   });
 
   it("warns rather than errors when a user-supplied ARN points outside us-east-1", () => {

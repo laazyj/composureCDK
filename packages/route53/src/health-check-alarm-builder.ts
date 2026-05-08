@@ -2,7 +2,7 @@ import { type IHealthCheck } from "aws-cdk-lib/aws-route53";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Annotations, Stack, Token } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
@@ -154,6 +154,12 @@ class HealthCheckAlarmBuilder implements Lifecycle<HealthCheckAlarmBuilderResult
   ): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IHealthCheck>(key)));
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: HealthCheckAlarmBuilder): void {
+    target.#healthCheck = this.#healthCheck;
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(

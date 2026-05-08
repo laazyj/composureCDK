@@ -2,7 +2,7 @@ import { type Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Annotations, Stack, Token } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
@@ -168,6 +168,12 @@ class CloudFrontAlarmBuilder implements Lifecycle<CloudFrontAlarmBuilderResult> 
   ): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Distribution>(key)));
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: CloudFrontAlarmBuilder): void {
+    target.#distribution = this.#distribution;
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(

@@ -1,11 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
-import { CachePolicy, PriceClass, ViewerProtocolPolicy } from "aws-cdk-lib/aws-cloudfront";
+import { HttpOrigin, S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import {
+  CachePolicy,
+  type Distribution,
+  PriceClass,
+  ViewerProtocolPolicy,
+} from "aws-cdk-lib/aws-cloudfront";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Certificate } from "aws-cdk-lib/aws-certificatemanager";
 import { ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { type BucketBuilderResult } from "@composurecdk/s3";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
 
@@ -553,6 +560,53 @@ describe("DistributionBuilder", () => {
 
       const [, distResource] = distribution;
       expect(distResource.DependsOn).toBeUndefined();
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #origin, #additionalBehaviors, and #customAlarms across .copy()", () => {
+      const requestMetric = (dist: Distribution): Metric =>
+        new Metric({
+          namespace: "AWS/CloudFront",
+          metricName: "Requests",
+          dimensionsMap: { DistributionId: dist.distributionId, Region: "Global" },
+          statistic: "Sum",
+          period: Duration.minutes(5),
+        });
+
+      assertCopyPreservesState({
+        factory: () =>
+          createDistributionBuilder()
+            .origin(new HttpOrigin("origin.example.com"))
+            .accessLogs(false)
+            .recommendedAlarms(false),
+        configure: (b) => {
+          b.behavior("/api/*", {
+            origin: new HttpOrigin("api.example.com"),
+          }).addAlarm("firstCustom", (a) =>
+            a.metric(requestMetric).threshold(1000).greaterThanOrEqual(),
+          );
+        },
+        mutate: (b) => {
+          b.behavior("/cdn/*", {
+            origin: new HttpOrigin("cdn.example.com"),
+          }).addAlarm("secondCustom", (a) =>
+            a.metric(requestMetric).threshold(2000).greaterThanOrEqual(),
+          );
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Distribution"),
+        inspect: (r) => {
+          const stack = Stack.of(r.distribution);
+          const template = Template.fromStack(stack);
+          const dists = Object.values(template.findResources("AWS::CloudFront::Distribution")) as {
+            Properties: { DistributionConfig: { CacheBehaviors?: { PathPattern: string }[] } };
+          }[];
+          const patterns = (dists[0]?.Properties.DistributionConfig.CacheBehaviors ?? [])
+            .map((cb) => cb.PathPattern)
+            .sort();
+          return { patterns, alarms: Object.keys(r.alarms).sort() };
+        },
+      });
     });
   });
 });

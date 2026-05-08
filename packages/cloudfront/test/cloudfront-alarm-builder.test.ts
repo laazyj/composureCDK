@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { HttpOrigin, S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
-import { FunctionCode, FunctionEventType } from "aws-cdk-lib/aws-cloudfront";
+import { type Distribution, FunctionCode, FunctionEventType } from "aws-cdk-lib/aws-cloudfront";
 import { compose, ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
 import {
   createCloudFrontAlarmBuilder,
@@ -403,5 +404,37 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     expect(entries).toHaveLength(2);
     expect(entries.map((e) => e.pathPattern)).toEqual([null, "/api/*"]);
     expect(entries.every((e) => e.eventType === FunctionEventType.VIEWER_REQUEST)).toBe(true);
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #distribution and #customAlarms across .copy()", () => {
+      const { result: distributionResult } = buildDistribution();
+
+      const requestMetric = (dist: Distribution): Metric =>
+        new Metric({
+          namespace: "AWS/CloudFront",
+          metricName: "Requests",
+          dimensionsMap: { DistributionId: dist.distributionId, Region: "Global" },
+          statistic: "Sum",
+          period: Duration.minutes(5),
+        });
+
+      assertCopyPreservesState({
+        factory: () =>
+          createCloudFrontAlarmBuilder().distribution(distributionResult).recommendedAlarms(false),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (a) =>
+            a.metric(requestMetric).threshold(1000).greaterThanOrEqual(),
+          );
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (a) =>
+            a.metric(requestMetric).threshold(2000).greaterThanOrEqual(),
+          );
+        },
+        build: (b) => b.build(new Stack(new App(), "AlarmStack"), "Alarms"),
+        inspect: (r) => Object.keys(r.alarms).sort(),
+      });
+    });
   });
 });

@@ -15,7 +15,7 @@ import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type Bucket, type IBucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import {
@@ -403,6 +403,14 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
     this.#behaviorSlugs.set(slug, pathPattern);
     this.#additionalBehaviors.set(pathPattern, config);
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: DistributionBuilder): void {
+    target.#origin = this.#origin;
+    for (const [k, v] of this.#additionalBehaviors) target.#additionalBehaviors.set(k, v);
+    for (const [k, v] of this.#behaviorSlugs) target.#behaviorSlugs.set(k, v);
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(

@@ -2,8 +2,17 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
 import { Template } from "aws-cdk-lib/assertions";
-import { Code, LoggingFormat, Runtime, Tracing, Architecture } from "aws-cdk-lib/aws-lambda";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import {
+  Architecture,
+  Code,
+  type Function as LambdaFunction,
+  LoggingFormat,
+  Runtime,
+  Tracing,
+} from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createFunctionBuilder } from "../src/function-builder.js";
 
 function synthTemplate(
@@ -379,6 +388,37 @@ describe("FunctionBuilder", () => {
       expect(Object.values(logGroups)[0]?.Properties.Tags).toEqual(
         expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
       );
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #customAlarms across .copy()", () => {
+      const errorMetric = (fn: LambdaFunction): Metric =>
+        new Metric({
+          namespace: "AWS/Lambda",
+          metricName: "Errors",
+          dimensionsMap: { FunctionName: fn.functionName },
+          statistic: "Sum",
+          period: Duration.minutes(5),
+        });
+
+      assertCopyPreservesState({
+        factory: () =>
+          createFunctionBuilder()
+            .runtime(Runtime.NODEJS_22_X)
+            .handler("index.handler")
+            .code(Code.fromInline("exports.handler = async () => {}")),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (a) => a.metric(errorMetric).threshold(1).greaterThanOrEqual());
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (a) =>
+            a.metric(errorMetric).threshold(5).greaterThanOrEqual(),
+          );
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Function"),
+        inspect: (r) => Object.keys(r.alarms).sort(),
+      });
     });
   });
 });

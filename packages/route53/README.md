@@ -21,12 +21,56 @@ Every [PublicHostedZoneProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cd
 
 Route 53 is a global service, but DNS query logs are emitted in `us-east-1` only — the CloudWatch log group that receives them must live there regardless of where the hosted zone is declared. This is an AWS service constraint, not a restriction on where your hosted zone or records can live.
 
-Supply a pre-configured log group via `.queryLogsLogGroupArn(arn)`. The log group must:
+**Query logging is enabled by default.** When you call `createHostedZoneBuilder().zoneName("example.com")` the builder auto-provisions:
 
-- Be in `us-east-1`.
-- Have a resource policy granting `route53.amazonaws.com` permission to `logs:PutLogEvents` and `logs:CreateLogStream`.
+1. A CloudWatch `LogGroup` named `/aws/route53/<zoneName>` with the `@composurecdk/logs` defaults (`RetentionDays.TWO_YEARS`, `RemovalPolicy.RETAIN`).
+2. A single shared `AWS::Logs::ResourcePolicy` per stack — `ComposureCDK-Route53QueryLogging` — granting `route53.amazonaws.com` permission to `logs:CreateLogStream` and `logs:PutLogEvents` against the `/aws/route53/*` prefix. The policy includes the `aws:SourceAccount` confused-deputy condition.
+3. The `QueryLoggingConfig` on the hosted zone wired to the auto-created log group's ARN, plus a `DependsOn` so Route 53 cannot race the policy on first write.
 
-Auto-creating the log group and resource policy on the user's behalf is planned — see [#44](https://github.com/laazyj/composureCDK/issues/44). Once implemented, enabling query logging will become a single opt-in property with the log group + resource policy wired by default.
+Multiple hosted zones in the same stack share the resource policy — you stay well clear of the [10-policy/region soft limit](https://docs.aws.amazon.com/Route53/latest/APIReference/API_CreateQueryLoggingConfig.html). The auto-created log group is exposed as `result.queryLogGroup` for downstream wiring (subscription filters, metric filters).
+
+#### `queryLogging` configuration
+
+```ts
+type QueryLoggingConfig =
+  | false
+  | {
+      configure?: (b: ILogGroupBuilder) => ILogGroupBuilder; // tweak the auto-created log group
+      logGroupArn?: string; // bring your own us-east-1 log group; you own its resource policy
+    };
+```
+
+Customize the auto-created log group:
+
+```ts
+import { RetentionDays } from "aws-cdk-lib/aws-logs";
+
+createHostedZoneBuilder()
+  .zoneName("example.com")
+  .queryLogging({ configure: (lg) => lg.retention(RetentionDays.SIX_MONTHS) });
+```
+
+Bring your own log group (you own the resource policy too):
+
+```ts
+createHostedZoneBuilder()
+  .zoneName("example.com")
+  .queryLogging({ logGroupArn: "arn:aws:logs:us-east-1:111122223333:log-group:/audit/dns" });
+```
+
+Disable entirely:
+
+```ts
+createHostedZoneBuilder().zoneName("example.com").queryLogging(false);
+```
+
+#### `us-east-1` constraint
+
+If the stack's region resolves to a known non-`us-east-1` region, `build()` throws with three remediations: deploy the stack in `us-east-1`, pass `queryLogging({ logGroupArn })`, or set `queryLogging(false)`. Env-agnostic stacks (where the region is an unresolved CDK token) are not blocked. A user-supplied `logGroupArn` outside `us-east-1` emits the synth warning `@composurecdk/route53:query-logging-region` instead of erroring.
+
+#### Cost note
+
+Default-on query logging adds two long-lived resources per stack: the log group (charged per ingested GB and per stored GB after retention) and the resource policy (free). For high-traffic zones consider lowering retention via the `configure` callback or disabling logging on zones with low security/audit value.
 
 ## Record Builders
 
@@ -76,6 +120,7 @@ Each helper accepts a `Resolvable`, so targets produced by other composed compon
 | Builder                    | Property         | Default               | Rationale                                                                                |
 | -------------------------- | ---------------- | --------------------- | ---------------------------------------------------------------------------------------- |
 | `createHostedZoneBuilder`  | `addTrailingDot` | `true`                | Matches RFC 1035 and the CDK default; unambiguous apex.                                  |
+| `createHostedZoneBuilder`  | `queryLogging`   | _auto-managed_        | DNS query logs to a `/aws/route53/<zoneName>` log group with a shared resource policy.   |
 | `createARecordBuilder`     | `ttl`            | `Duration.minutes(5)` | Balances propagation latency against DNS cache churn; skipped for alias targets.[^alias] |
 | `createAaaaRecordBuilder`  | `ttl`            | `Duration.minutes(5)` | Same as A records; skipped for alias targets.[^alias]                                    |
 | `createCnameRecordBuilder` | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
@@ -343,6 +388,11 @@ import {
 } from "@composurecdk/route53";
 import { ALIAS, APEX, zoneRecords } from "@composurecdk/route53/zone";
 
+// This composition only synthesises cleanly when `stack` is in `us-east-1`,
+// because the default-on query logging on `zone` requires its auto-created
+// log group to live there. To run the same shape outside `us-east-1`, pass
+// `queryLogging({ logGroupArn })` referencing a us-east-1 log group, or
+// `queryLogging(false)` to opt out.
 compose(
   {
     zone: createHostedZoneBuilder().zoneName("example.com"),

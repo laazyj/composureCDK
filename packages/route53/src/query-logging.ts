@@ -31,10 +31,11 @@ export type QueryLoggingConfig =
   | {
       /**
        * Customize the auto-created LogGroup sub-builder. Receives a builder
-       * pre-seeded with the well-architected log retention/removal defaults
-       * from {@link createLogGroupBuilder} and the
-       * `/aws/route53/<zoneName>` log-group name. Cannot be combined with
-       * {@link logGroupArn}.
+       * pre-seeded with the `/aws/route53/<zoneName>` log-group name; the
+       * well-architected retention/removal defaults from
+       * {@link createLogGroupBuilder} are merged in at `build()` time and
+       * are overridable by anything set on the builder here. Cannot be
+       * combined with {@link logGroupArn}.
        */
       configure?: (b: ILogGroupBuilder) => ILogGroupBuilder;
 
@@ -92,9 +93,10 @@ export function resolveQueryLogging(
   errorIfStackNotUsEast1(scope);
 
   const defaultLogGroupName = `${QUERY_LOGGING_LOG_GROUP_NAME_PREFIX}/${stripTrailingDot(zoneName)}`;
-  const subBuilder: ILogGroupBuilder =
-    cfg?.configure?.(createLogGroupBuilder().logGroupName(defaultLogGroupName)) ??
-    createLogGroupBuilder().logGroupName(defaultLogGroupName);
+  let subBuilder: ILogGroupBuilder = createLogGroupBuilder().logGroupName(defaultLogGroupName);
+  if (cfg?.configure) {
+    subBuilder = cfg.configure(subBuilder);
+  }
 
   const queryLogGroup = subBuilder.build(scope, `${id}QueryLogs`).logGroup;
   warnIfLogGroupNameOutsidePrefix(scope, id, subBuilder.logGroupName());

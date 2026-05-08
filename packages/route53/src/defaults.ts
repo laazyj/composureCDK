@@ -26,8 +26,9 @@ export const QUERY_LOGGING_LOG_GROUP_NAME_PREFIX = "/aws/route53";
 /**
  * Construct id of the shared `AWS::Logs::ResourcePolicy` materialised once
  * per stack when any hosted zone in that stack uses auto-managed query
- * logging. Exported for visibility/tests; consumers should not reference the
- * policy directly — it is intentionally not surfaced on the build result.
+ * logging. Package-internal — used by the dedup helper and the unit tests, and
+ * intentionally not re-exported from the package barrel; consumers should not
+ * reference the policy directly.
  */
 export const QUERY_LOGGING_RESOURCE_POLICY_ID = "ComposureCDKRoute53QueryLoggingPolicy";
 

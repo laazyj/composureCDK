@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
+import { type ITopic } from "aws-cdk-lib/aws-sns";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import {
   EmailSubscription,
@@ -9,6 +11,7 @@ import {
   SqsSubscription,
 } from "aws-cdk-lib/aws-sns-subscriptions";
 import { ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createTopicBuilder } from "../src/topic-builder.js";
 
 function synthTemplate(
@@ -210,6 +213,40 @@ describe("TopicBuilder", () => {
       const template = synthTemplate((b) => b.enforceSSL(false));
 
       template.resourceCountIs("AWS::SNS::TopicPolicy", 0);
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #customAlarms and #subscriptions across .copy()", () => {
+      const failedMetric = (topic: ITopic): Metric =>
+        new Metric({
+          namespace: "AWS/SNS",
+          metricName: "NumberOfNotificationsFailed",
+          dimensionsMap: { TopicName: topic.topicName },
+          statistic: "Sum",
+          period: Duration.minutes(5),
+        });
+
+      assertCopyPreservesState({
+        factory: () => createTopicBuilder().recommendedAlarms(false),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (a) =>
+            a.metric(failedMetric).threshold(1).greaterThanOrEqual(),
+          );
+          b.addSubscription("first", new EmailSubscription("first@example.com"));
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (a) =>
+            a.metric(failedMetric).threshold(5).greaterThanOrEqual(),
+          );
+          b.addSubscription("second", new EmailSubscription("second@example.com"));
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Topic"),
+        inspect: (r) => ({
+          alarms: Object.keys(r.alarms).sort(),
+          subscriptions: Object.keys(r.subscriptions).sort(),
+        }),
+      });
     });
   });
 });

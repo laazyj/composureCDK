@@ -7,7 +7,7 @@ import {
   type TopicProps,
 } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TopicAlarmConfig } from "./topic-alarm-config.js";
@@ -138,6 +138,12 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
     }
     this.#subscriptions.push({ key, subscription });
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: TopicBuilder): void {
+    target.#customAlarms.push(...this.#customAlarms);
+    target.#subscriptions.push(...this.#subscriptions);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): TopicBuilderResult {

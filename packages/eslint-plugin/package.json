@@ -1,0 +1,44 @@
+{
+  "name": "@composurecdk/eslint-plugin",
+  "version": "0.6.0",
+  "description": "Internal ESLint plugin encoding ComposureCDK architectural invariants (tagged builders, lifecycle context, builder copy state).",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laazyj/composureCDK",
+    "directory": "packages/eslint-plugin"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "Jason Duffett (https://github.com/laazyj)",
+  "license": "MIT",
+  "type": "module",
+  "peerDependencies": {
+    "eslint": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "eslint": "^10.3.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
+  }
+}

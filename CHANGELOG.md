@@ -1,3 +1,51 @@
+## 0.7.0 (2026-05-08)
+
+### 🚀 Features
+
+- ⚠️ roll taggedBuilder out across remaining builders + lint enforcement ([1e6a517](https://github.com/laazyj/composureCDK/commit/1e6a517))
+- **acm:** add [COPY_STATE] hook to CertificateBuilder ([#88](https://github.com/laazyj/composureCDK/pull/88), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- **apigateway:** add [COPY_STATE] to RestApi/SpecRestApiBuilder ([#89](https://github.com/laazyj/composureCDK/pull/89), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- **budgets:** add [COPY_STATE] to Budget/BudgetAlarmBuilder ([#90](https://github.com/laazyj/composureCDK/pull/90), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- **cloudformation:** add taggedBuilder wrapper, tag validator, and result-walker ([#66](https://github.com/laazyj/composureCDK/issues/66))
+- ⚠️ **cloudformation:** route StackBuilder through taggedBuilder, drop bespoke #tags ([5246f65](https://github.com/laazyj/composureCDK/commit/5246f65))
+- **cloudformation:** add tags() afterBuild helper, ADR-0006, docs, example ([76b302b](https://github.com/laazyj/composureCDK/commit/76b302b))
+- **cloudfront:** add [COPY_STATE] to Distribution/CloudFrontAlarmBuilder ([#91](https://github.com/laazyj/composureCDK/pull/91), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- **core:** add assertCopyPreservesState test helper at /testing subpath ([55911a0](https://github.com/laazyj/composureCDK/commit/55911a0))
+- **ec2:** createVolumeBuilder with well-architected defaults ([#76](https://github.com/laazyj/composureCDK/issues/76))
+- **ec2:** InstanceBuilder.attachVolume with synth-time AZ validation ([#76](https://github.com/laazyj/composureCDK/issues/76))
+- **ec2:** add [COPY_STATE] to Instance/VolumeBuilder ([#92](https://github.com/laazyj/composureCDK/pull/92), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- **eslint:** add builder-must-implement-copy-state rule ([#98](https://github.com/laazyj/composureCDK/pull/98), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- **events:** add @composurecdk/events with RuleBuilder, target helpers, alarms ([#85](https://github.com/laazyj/composureCDK/pull/85), [#67](https://github.com/laazyj/composureCDK/issues/67))
+- **iam:** add [COPY_STATE] to Role/ManagedPolicyBuilder ([#93](https://github.com/laazyj/composureCDK/pull/93), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- **lambda:** add [COPY_STATE] to FunctionBuilder ([#94](https://github.com/laazyj/composureCDK/pull/94), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- **route53:** add [COPY_STATE] to HealthCheck/HealthCheckAlarmBuilder ([#95](https://github.com/laazyj/composureCDK/pull/95), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- ⚠️ **s3:** wire BucketBuilder to taggedBuilder for builder-level .tag() / .tags() ([a8bd4d0](https://github.com/laazyj/composureCDK/commit/a8bd4d0))
+- **s3:** add [COPY_STATE] to Bucket/BucketDeploymentBuilder ([#96](https://github.com/laazyj/composureCDK/pull/96), [#84](https://github.com/laazyj/composureCDK/issues/84))
+- **sns:** add [COPY_STATE] to TopicBuilder ([#97](https://github.com/laazyj/composureCDK/pull/97), [#84](https://github.com/laazyj/composureCDK/issues/84))
+
+### ⚠️ Breaking Changes
+
+- roll taggedBuilder out across remaining builders + lint enforcement ([1e6a517](https://github.com/laazyj/composureCDK/commit/1e6a517))
+  the migrated builders' `IXxxBuilder` aliases now
+  structurally extend `ITaggedBuilder` instead of `IBuilder`. Pure
+  consumers that destructure or annotate against the old shape need to
+  recompile. Pre-1.0; release-please will pick up the bump.
+- **cloudformation:** route StackBuilder through taggedBuilder, drop bespoke #tags ([5246f65](https://github.com/laazyj/composureCDK/commit/5246f65))
+  `StackBuilder.tag()`'s duplicate-key behaviour: previously
+  silent (last-wins observable in CFN tags), now last-wins with a
+  `process.emitWarning`. Functionally compatible; previously-quiet duplicate
+  calls now emit a warning. Pre-1.0; release-please will pick up the bump.
+- **s3:** wire BucketBuilder to taggedBuilder for builder-level .tag() / .tags() ([a8bd4d0](https://github.com/laazyj/composureCDK/commit/a8bd4d0))
+  the `IBucketBuilder` alias structurally extends
+  `ITaggedBuilder` instead of `IBuilder`. Pre-1.0; release-please will
+  pick up the bump.
+
+### ❤️ Thank You
+
+- Claude (laazyj)
+- Claude Opus 4.7 (1M context)
+- Jason Duffett
+
 ## 0.6.0 (2026-05-07)
 
 ### 🚀 Features

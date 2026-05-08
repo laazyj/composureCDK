@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/route53",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Composable Route53 hosted zone and record builders with well-architected defaults",
   "repository": {
     "type": "git",
@@ -39,9 +39,9 @@
   },
   "type": "module",
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.6.0",
-    "@composurecdk/cloudwatch": "^0.6.0",
-    "@composurecdk/core": "^0.6.0",
+    "@composurecdk/cloudformation": "^0.7.0",
+    "@composurecdk/cloudwatch": "^0.7.0",
+    "@composurecdk/core": "^0.7.0",
     "aws-cdk-lib": "^2.0.0",
     "constructs": "^10.0.0"
   },

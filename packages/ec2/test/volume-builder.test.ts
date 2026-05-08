@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { App, RemovalPolicy, Size, Stack } from "aws-cdk-lib";
+import { App, Duration, RemovalPolicy, Size, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { EbsDeviceVolumeType, Vpc } from "aws-cdk-lib/aws-ec2";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { EbsDeviceVolumeType, type Volume, Vpc } from "aws-cdk-lib/aws-ec2";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createVolumeBuilder } from "../src/volume-builder.js";
 import { createVpcBuilder } from "../src/vpc-builder.js";
 
@@ -147,6 +149,34 @@ describe("VolumeBuilder", () => {
 
       template.hasResourceProperties("AWS::EC2::Volume", {
         MultiAttachEnabled: true,
+      });
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #availabilityZone and #customAlarms across .copy()", () => {
+      const idleMetric = (volume: Volume): Metric =>
+        new Metric({
+          namespace: "AWS/EBS",
+          metricName: "VolumeIdleTime",
+          dimensionsMap: { VolumeId: volume.volumeId },
+          statistic: "Average",
+          period: Duration.minutes(5),
+        });
+
+      assertCopyPreservesState({
+        factory: () =>
+          createVolumeBuilder().availabilityZone("us-east-1a").size(Size.gibibytes(50)),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (a) => a.metric(idleMetric).threshold(60).greaterThanOrEqual());
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (a) =>
+            a.metric(idleMetric).threshold(120).greaterThanOrEqual(),
+          );
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Volume"),
+        inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });
   });

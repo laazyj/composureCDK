@@ -9,7 +9,7 @@ import {
 } from "aws-cdk-lib/aws-ec2";
 import { type IRole } from "aws-cdk-lib/aws-iam";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { InstanceAlarmConfig } from "./instance-alarm-config.js";
@@ -231,6 +231,13 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
     }
     this.#volumeAttachments.push({ key, volumeRef, options });
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: InstanceBuilder): void {
+    target.#vpc = this.#vpc;
+    target.#customAlarms.push(...this.#customAlarms);
+    target.#volumeAttachments.push(...this.#volumeAttachments);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): InstanceBuilderResult {

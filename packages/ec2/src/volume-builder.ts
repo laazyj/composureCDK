@@ -2,7 +2,7 @@ import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
 import { type IKey } from "aws-cdk-lib/aws-kms";
 import { type IConstruct } from "constructs";
-import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { VolumeAlarmConfig } from "./volume-alarm-config.js";
@@ -156,6 +156,12 @@ class VolumeBuilder implements Lifecycle<VolumeBuilderResult> {
   ): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Volume>(key)));
     return this;
+  }
+
+  /** @internal — see ADR-0005. */
+  [COPY_STATE](target: VolumeBuilder): void {
+    target.#availabilityZone = this.#availabilityZone;
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): VolumeBuilderResult {

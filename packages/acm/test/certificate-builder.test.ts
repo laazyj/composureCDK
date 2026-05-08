@@ -1,9 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { CertificateValidation, KeyAlgorithm } from "aws-cdk-lib/aws-certificatemanager";
+import {
+  CertificateValidation,
+  KeyAlgorithm,
+  type ICertificate,
+} from "aws-cdk-lib/aws-certificatemanager";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
 import { ref } from "@composurecdk/core";
+import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createCertificateBuilder } from "../src/certificate-builder.js";
 import { CERTIFICATE_DEFAULTS } from "../src/defaults.js";
 
@@ -152,6 +158,39 @@ describe("CertificateBuilder", () => {
       template.hasResourceProperties("AWS::CertificateManager::Certificate", {
         KeyAlgorithm: "EC_prime256v1",
         CertificateTransparencyLoggingPreference: "DISABLED",
+      });
+    });
+  });
+
+  describe("[COPY_STATE]", () => {
+    it("preserves #customAlarms across .copy()", () => {
+      const expiryMetric = (cert: ICertificate): Metric =>
+        new Metric({
+          namespace: "AWS/CertificateManager",
+          metricName: "DaysToExpiry",
+          dimensionsMap: { CertificateArn: cert.certificateArn },
+          statistic: "Minimum",
+          period: Duration.days(1),
+        });
+
+      assertCopyPreservesState({
+        factory: () => createCertificateBuilder().domainName("example.com"),
+        configure: (b) => {
+          b.addAlarm("firstCustom", (alarm) =>
+            alarm.metric(expiryMetric).threshold(10).lessThanOrEqual(),
+          );
+        },
+        mutate: (b) => {
+          b.addAlarm("secondCustom", (alarm) =>
+            alarm.metric(expiryMetric).threshold(20).lessThanOrEqual(),
+          );
+        },
+        build: (b) => {
+          const stack = newStack();
+          const zone = new PublicHostedZone(stack, "Zone", { zoneName: "example.com" });
+          return b.validationZone(zone).build(stack, "Cert");
+        },
+        inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });
   });

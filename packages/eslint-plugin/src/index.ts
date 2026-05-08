@@ -1,7 +1,7 @@
-import { configs } from "./configs/index.js";
+import { recommended } from "./configs/recommended.js";
 import { rules } from "./rules/index.js";
 
-const plugin = { rules, configs };
+export const configs = { recommended };
+export { rules };
 
-export { rules, configs };
-export default plugin;
+export default { rules, configs };

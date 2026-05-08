@@ -7,21 +7,22 @@ CI/CD pipeline for ComposureCDK: how the workflows chain, how to bootstrap AWS a
 Five GitHub Actions workflows chain together:
 
 ```
-ci.yml ──► deploy-test.yml ──► release.yml
-   ▲              ▲                ▲
-   │              │                │
- PRs/push    workflow_dispatch  release-tag.yml ◄── push to main
-                                                    (filters chore(release): commits)
-                                ▲
-                                │
-                          release-prepare.yml (workflow_dispatch → opens PR)
+ci.yml ──► deploy-test.yml ──► release.yml ◄── tag push (PAT or manual)
+   ▲              ▲                              ▲
+   │              │                              │
+ PRs/push    workflow_dispatch              release-tag.yml ◄── push to main
+                                            (filters chore(release): commits,
+                                             pushes tag with RELEASE_PR_TOKEN)
+                                                  ▲
+                                                  │
+                                          release-prepare.yml (workflow_dispatch → opens PR)
 ```
 
 - **`ci.yml`** — runs format/typecheck/build/lint/test on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream.
 - **`deploy-test.yml`** — manual `workflow_dispatch`. Calls CI, then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`.
-- **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it tags the commit, creates a GitHub Release from the matching `CHANGELOG.md` section, and invokes `release.yml`. Otherwise no-op. The tag is pushed with the default `GITHUB_TOKEN` so it does not double-fire `release.yml`'s `push: tags` trigger.
-- **`release.yml`** — invoked by `release-tag.yml` via `workflow_call`; also triggered by manual `v*.*.*` tag pushes as an escape hatch. Runs deploy-test, then `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment.
+- **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it tags the commit and creates a GitHub Release from the matching `CHANGELOG.md` section. The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
+- **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Runs deploy-test, then `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
 
 ## Versioning
 
@@ -72,11 +73,18 @@ The workflow rewrites every internal `@composurecdk/*` peer-dep range to `^0.6.0
 
 Patch releases within the same minor (`0.6.0` → `0.6.1`) need neither input.
 
-#### Manual fallback and PR auto-trigger
+#### `RELEASE_PR_TOKEN` (required)
 
-`release.yml` keeps its `push: tags: v*.*.*` trigger as an escape hatch — pushing a `vX.Y.Z` tag (typically by an admin with permission to push tags through branch protection) bypasses the automated chain.
+The automated chain depends on a fine-grained PAT stored as repository secret `RELEASE_PR_TOKEN`. Two reasons:
 
-By default `release-prepare.yml` uses `GITHUB_TOKEN`, and per [GitHub's rules][gha-token-rules] PRs opened by that token do not trigger `pull_request` workflows — so CI will not run on the release PR until someone closes-and-reopens it or pushes a commit. To auto-trigger, create a fine-grained PAT (or GitHub App) with `contents:write` and `pull_requests:write` and store it as repository secret `RELEASE_PR_TOKEN`. The workflow falls back to it if present.
+- **Tag push triggers `release.yml`.** Per [GitHub's rules][gha-token-rules], pushes authenticated with `GITHUB_TOKEN` do not fire downstream workflow triggers. Without the PAT, `release-tag.yml` would tag the commit but `release.yml` would never publish.
+- **PR auto-CI.** PRs opened by `GITHUB_TOKEN` do not trigger `pull_request` workflows, so CI would not run on the release PR until someone re-opened it. The PAT-opened PR triggers CI normally.
+
+Create a fine-grained PAT (or GitHub App) scoped to this repo with `contents:write` and `pull_requests:write`, store it as `RELEASE_PR_TOKEN`. Track its expiry — when it lapses, both `release-prepare.yml` and `release-tag.yml` will start failing at the checkout step.
+
+#### Manual fallback
+
+`release.yml` keeps its `push: tags: v*.*.*` trigger as an escape hatch — pushing a `vX.Y.Z` tag manually (typically by an admin with permission to push tags through branch protection) bypasses the automated chain and runs deploy-test → publish directly.
 
 [gha-token-rules]: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
 

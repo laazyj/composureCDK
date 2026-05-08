@@ -14,14 +14,42 @@ import type { SvcbRecordBuilderProps } from "./svcb-record-builder.js";
 import type { HealthCheckBuilderProps } from "./health-check-builder.js";
 
 /**
+ * Naming prefix applied to every auto-created Route 53 query-log group. A
+ * single shared resource policy targets `<prefix>/*` so multiple hosted zones
+ * in the same stack share one `AWS::Logs::ResourcePolicy` (the per-region
+ * soft limit is 10). Matches the prefix the Route 53 console uses.
+ *
+ * @see https://docs.aws.amazon.com/Route53/latest/APIReference/API_CreateQueryLoggingConfig.html
+ */
+export const QUERY_LOGGING_LOG_GROUP_NAME_PREFIX = "/aws/route53";
+
+/**
+ * Construct id of the shared `AWS::Logs::ResourcePolicy` materialised once
+ * per stack when any hosted zone in that stack uses auto-managed query
+ * logging. Exported for visibility/tests; consumers should not reference the
+ * policy directly — it is intentionally not surfaced on the build result.
+ */
+export const QUERY_LOGGING_RESOURCE_POLICY_ID = "ComposureCDKRoute53QueryLoggingPolicy";
+
+/**
+ * Stable resource-policy name written into CloudWatch Logs so the policy is
+ * deduplicated when the same stack is re-synthesised across deployments.
+ */
+export const QUERY_LOGGING_RESOURCE_POLICY_NAME = "ComposureCDK-Route53QueryLogging";
+
+/**
  * Secure, AWS-recommended defaults applied to every public hosted zone built
  * with {@link createHostedZoneBuilder}. Each property can be individually
  * overridden via the builder's fluent API.
  *
- * Query logging is not enabled by default: Route53 query logs must be written
- * to a CloudWatch log group in `us-east-1` with a resource policy granting
- * `route53.amazonaws.com` write access. Opt in explicitly by calling
- * `.queryLogsLogGroupArn(...)` with a pre-configured log group.
+ * Query logging is enabled by default: the builder auto-creates a CloudWatch
+ * {@link import("aws-cdk-lib/aws-logs").LogGroup} under
+ * `${QUERY_LOGGING_LOG_GROUP_NAME_PREFIX}/<zoneName>` and a single shared
+ * `AWS::Logs::ResourcePolicy` granting `route53.amazonaws.com` permission to
+ * write log streams. Disable with `.queryLogging(false)` or supply a managed
+ * log group via `.queryLogging({ logGroupArn })`.
+ *
+ * @see https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/query-logs.html
  */
 export const HOSTED_ZONE_DEFAULTS: Partial<HostedZoneBuilderProps> = {
   /**
@@ -29,6 +57,13 @@ export const HOSTED_ZONE_DEFAULTS: Partial<HostedZoneBuilderProps> = {
    * fully-qualified domain. Matches the CDK default and RFC 1035.
    */
   addTrailingDot: true,
+  /**
+   * Enable DNS query logging out of the box, with the auto-managed log
+   * group and shared resource policy described above. Set to `false` or to
+   * `{ logGroupArn: '...' }` to deviate.
+   * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_detect_investigate_events_app_service_logging.html
+   */
+  queryLogging: {},
 };
 
 /**

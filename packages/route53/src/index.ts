@@ -4,6 +4,7 @@ export {
   type HostedZoneBuilderResult,
   type IHostedZoneBuilder,
 } from "./hosted-zone-builder.js";
+export { type QueryLoggingConfig } from "./query-logging.js";
 export {
   createARecordBuilder,
   type ARecordBuilderProps,
@@ -91,6 +92,9 @@ export {
 } from "./alias-targets.js";
 export {
   HOSTED_ZONE_DEFAULTS,
+  QUERY_LOGGING_LOG_GROUP_NAME_PREFIX,
+  QUERY_LOGGING_RESOURCE_POLICY_ID,
+  QUERY_LOGGING_RESOURCE_POLICY_NAME,
   A_RECORD_DEFAULTS,
   AAAA_RECORD_DEFAULTS,
   CNAME_RECORD_DEFAULTS,

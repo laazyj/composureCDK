@@ -63,6 +63,8 @@ jobs:
       - name: CDK Destroy (current app)
         working-directory: packages/examples
         run: |
+          # cdk destroy honours each stack's env.region; the OIDC role must
+          # cover every region any example pins.
           for attempt in 1 2 3; do
             echo "=== Destroy attempt $attempt ==="
             if npx cdk destroy --all --force --concurrency 5 2>&1; then
@@ -75,46 +77,70 @@ jobs:
           echo "::warning::cdk destroy --all did not fully succeed; orphan sweep will catch what remains."
 
       - name: Orphan sweep (delete any leftover ComposureCDK-* stacks)
+        env:
+          # Sandbox primary plus every region any example pins via
+          # stack `env.region`. Keep in sync with CHECK_REGIONS in
+          # deploy-test.yml.
+          SWEEP_REGIONS: ${{ vars.AWS_REGION }} us-east-1
         run: |
           # Catches stacks from removed examples (e.g. lambda-api-app,
-          # strategy-stack-app) that are no longer in the current cdk app.
-          orphans=$(aws cloudformation list-stacks \
-            --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE CREATE_FAILED UPDATE_FAILED DELETE_FAILED \
-            --query "StackSummaries[?starts_with(StackName, 'ComposureCDK-')].StackName" \
-            --output text)
-          if [ -z "$orphans" ]; then
-            echo "No orphan ComposureCDK-* stacks remain."
-            exit 0
-          fi
-          echo "Found orphan stacks: $orphans"
-          deletable=()
-          skipped_cloudfront=()
-          for stack in $orphans; do
-            # Raw delete-stack on a CloudFront-bearing stack would leave it
-            # stuck in DELETE_FAILED (distribution must be disabled first,
-            # then propagated globally). Surface and skip; CDK destroy
-            # handles the disable-then-delete dance for in-app stacks.
-            cf=$(aws cloudformation list-stack-resources \
-              --stack-name "$stack" \
-              --query "StackResourceSummaries[?ResourceType=='AWS::CloudFront::Distribution'].LogicalResourceId" \
+          # strategy-stack-app) that are no longer in the current cdk app,
+          # plus anything cdk destroy --all could not finish.
+          sweep_region() {
+            local region="$1"
+            echo "::group::Orphan sweep in $region"
+            local orphans
+            orphans=$(aws cloudformation list-stacks --region "$region" \
+              --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE ROLLBACK_COMPLETE UPDATE_ROLLBACK_COMPLETE CREATE_FAILED UPDATE_FAILED DELETE_FAILED \
+              --query "StackSummaries[?starts_with(StackName, 'ComposureCDK-')].StackName" \
               --output text)
-            if [ -n "$cf" ]; then
-              echo "::error::Stack $stack contains CloudFront distribution(s) [$cf]; skipping raw delete. Disable the distribution(s) manually (or re-run cdk destroy from a branch where $stack is defined) before re-triggering sandbox-cleanup."
-              skipped_cloudfront+=("$stack")
-              continue
+            if [ -z "$orphans" ]; then
+              echo "No orphan ComposureCDK-* stacks remain in $region."
+              echo "::endgroup::"
+              return 0
             fi
-            deletable+=("$stack")
+            echo "Found orphan stacks in $region: $orphans"
+            local -a deletable=()
+            local -a skipped=()
+            local stack cf
+            for stack in $orphans; do
+              # Raw delete-stack on a CloudFront-bearing stack would leave
+              # it stuck in DELETE_FAILED (distribution must be disabled
+              # first, then propagated globally). Surface and skip; CDK
+              # destroy handles the disable-then-delete dance for in-app
+              # stacks.
+              cf=$(aws cloudformation list-stack-resources --region "$region" \
+                --stack-name "$stack" \
+                --query "StackResourceSummaries[?ResourceType=='AWS::CloudFront::Distribution'].LogicalResourceId" \
+                --output text)
+              if [ -n "$cf" ]; then
+                echo "::error::Stack $stack ($region) contains CloudFront distribution(s) [$cf]; skipping raw delete. Disable the distribution(s) manually (or re-run cdk destroy from a branch where $stack is defined) before re-triggering sandbox-cleanup."
+                skipped+=("$stack")
+                continue
+              fi
+              deletable+=("$stack")
+            done
+            for stack in "${deletable[@]}"; do
+              echo "Deleting $stack in $region..."
+              aws cloudformation delete-stack --region "$region" --stack-name "$stack"
+            done
+            for stack in "${deletable[@]}"; do
+              echo "Waiting for $stack ($region) to delete..."
+              aws cloudformation wait stack-delete-complete --region "$region" --stack-name "$stack" || \
+                echo "::warning::$stack ($region) did not finish deleting cleanly; check the AWS console."
+            done
+            echo "::endgroup::"
+            if [ ${#skipped[@]} -ne 0 ]; then
+              return 1
+            fi
+            return 0
+          }
+
+          fail=0
+          for region in $SWEEP_REGIONS; do
+            sweep_region "$region" || fail=1
           done
-          for stack in "${deletable[@]}"; do
-            echo "Deleting $stack..."
-            aws cloudformation delete-stack --stack-name "$stack"
-          done
-          for stack in "${deletable[@]}"; do
-            echo "Waiting for $stack to delete..."
-            aws cloudformation wait stack-delete-complete --stack-name "$stack" || \
-              echo "::warning::$stack did not finish deleting cleanly; check the AWS console."
-          done
-          if [ ${#skipped_cloudfront[@]} -ne 0 ]; then
-            echo "::error::Skipped ${#skipped_cloudfront[@]} CloudFront-bearing orphan stack(s); manual cleanup required."
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::One or more regions had CloudFront-bearing orphan stack(s); manual cleanup required."
             exit 1
           fi

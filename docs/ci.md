@@ -143,13 +143,19 @@ One-time setup for the deploy-test workflow.
 
 ### 1. Bootstrap CDK
 
+Bootstrap every region the workflow deploys into. Currently:
+
+- The sandbox primary region (whatever `AWS_REGION` is set to on the `sandbox` GitHub environment), and
+- `us-east-1`, required by `ComposureCDK-DnsZoneStack` because Route 53 query logging only accepts log groups in that region.
+
 ```sh
 npx cdk bootstrap aws://ACCOUNT_ID/REGION
+npx cdk bootstrap aws://ACCOUNT_ID/us-east-1
 ```
 
 ### 2. Deploy the OIDC stack
 
-`.github/cloudformation/github-oidc-role.yml` creates a GitHub OIDC provider (or references an existing one) and a least-privilege IAM role scoped to `ComposureCDK-*` stacks.
+`.github/cloudformation/github-oidc-role.yml` creates a GitHub OIDC provider (or references an existing one) and a least-privilege IAM role scoped to `ComposureCDK-*` stacks. The role, managed policy, and OIDC provider are global IAM resources, so this stack only needs to be deployed **once**, regardless of how many regions the workflow targets. The policy's resource ARNs use `*` for the region segment; the security boundary is the `ComposureCDK-` tag-condition / stack-name pattern, not the region.
 
 ```sh
 aws cloudformation deploy \
@@ -157,7 +163,12 @@ aws cloudformation deploy \
   --stack-name github-actions-oidc \
   --parameter-overrides GitHubOrg=laazyj RepoName=composureCDK \
   --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation update-termination-protection \
+  --stack-name github-actions-oidc \
+  --enable-termination-protection
 ```
+
+Termination protection is enabled separately (CFN templates cannot self-protect). Without it, an accidental `delete-stack` on this stack would tear down the role mid-deploy and break every workflow run. Re-runs of `aws cloudformation deploy` are unaffected — termination protection only blocks deletion.
 
 If the account already has a GitHub OIDC provider, pass its ARN to avoid a duplicate:
 

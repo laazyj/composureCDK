@@ -4,18 +4,17 @@ Example applications demonstrating ComposureCDK patterns. Each example is a self
 
 All example stacks use the `ComposureCDK-` name prefix. This convention enables the CI deploy-test pipeline to scope IAM permissions and discover stacks automatically — see [CI documentation](../../docs/ci.md#stack-naming-convention) for details. **New examples must follow this prefix.**
 
-| Stack                                                                                               | Description                                                                                                                              |
-| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| [`ComposureCDK-DualFunctionStack`](src/dual-function-app.ts)                                        | Two Lambda functions (API handler + async worker) with different configurations; worker on an EventBridge schedule via `RuleBuilder`     |
-| [`ComposureCDK-ExplicitRoleStack`](src/explicit-role-app.ts)                                        | Lambda with an explicit, scoped execution role extended via `.configureRole(...)` to grant least-privilege access to a sibling S3 bucket |
-| [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations and recommended alarms                                                                              |
-| [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                                                                            |
-| [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment                                                             |
-| [`ComposureCDK-OpenApiPetstoreStack`](src/openapi-petstore-app.ts)                                  | PetStore REST API defined by an inline OpenAPI 3.0 specification                                                                         |
-| [`ComposureCDK-DnsZoneStack`](src/dns-zone-app.ts)                                                  | Public Route 53 zone built with the BIND-style zone DSL, including a CloudFront `ALIAS` at `www`                                         |
-| [`ComposureCDK-Ec2Stack`](src/ec2-app.ts)                                                           | VPC + EC2 instance with well-architected defaults, recommended alarms, and SNS alert wiring                                              |
-| [`ComposureCDK-AgentVolumeStack`](src/agent-volume-app.ts)                                          | VPC + EC2 instance with a persistent EBS data volume attached via `attachVolume` + alarm wiring                                          |
-| [`ComposureCDK-TaggedSystemStack`](src/tagged-system-app.ts)                                        | Builder-level selector tags via `.tag()` plus system-wide cost-allocation tags via `tags()`                                              |
+| Stack                                                                                               | Description                                                                                                                          |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| [`ComposureCDK-DualFunctionStack`](src/dual-function-app.ts)                                        | Two Lambda functions (API handler + async worker) with different configurations; worker on an EventBridge schedule via `RuleBuilder` |
+| [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations and recommended alarms                                                                          |
+| [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                                                                        |
+| [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment                                                         |
+| [`ComposureCDK-OpenApiPetstoreStack`](src/openapi-petstore-app.ts)                                  | PetStore REST API defined by an inline OpenAPI 3.0 specification                                                                     |
+| [`ComposureCDK-DnsZoneStack`](src/dns-zone-app.ts)                                                  | Public Route 53 zone built with the BIND-style zone DSL, including a CloudFront `ALIAS` at `www`                                     |
+| [`ComposureCDK-Ec2Stack`](src/ec2-app.ts)                                                           | VPC + EC2 instance with well-architected defaults, recommended alarms, and SNS alert wiring                                          |
+| [`ComposureCDK-AgentVolumeStack`](src/agent-volume-app.ts)                                          | VPC + EC2 instance with a persistent EBS data volume attached via `attachVolume` + alarm wiring                                      |
+| [`ComposureCDK-TaggedSystemStack`](src/tagged-system-app.ts)                                        | Builder-level selector tags via `.tag()` plus system-wide cost-allocation tags via `tags()`                                          |
 
 ## Prerequisites
 

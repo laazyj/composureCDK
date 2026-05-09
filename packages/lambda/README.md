@@ -219,5 +219,4 @@ for (const alarm of Object.values(result.alarms)) {
 ## Examples
 
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with recommended alarms, custom alarms, and SNS alarm actions
-- [ExplicitRoleStack](../examples/src/explicit-role-app.ts) — `.configureRole(...)` extending the default execution role with a least-privilege S3 grant
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — Lambda split across stacks via `.withStacks()`, wired with `ref`

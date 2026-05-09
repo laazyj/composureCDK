@@ -38,11 +38,13 @@
     "@composurecdk/cloudformation": "^0.7.0",
     "@composurecdk/cloudwatch": "^0.7.0",
     "@composurecdk/core": "^0.7.0",
+    "@composurecdk/iam": "^0.7.0",
     "@composurecdk/logs": "^0.7.0",
     "aws-cdk-lib": "^2.0.0",
     "constructs": "^10.0.0"
   },
   "devDependencies": {
+    "@composurecdk/iam": "^0.7.0",
     "@types/node": "^25.6.0",
     "aws-cdk-lib": "^2.250.0",
     "constructs": "^10.6.0",

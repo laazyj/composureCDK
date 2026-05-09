@@ -49,6 +49,78 @@ const handler = createFunctionBuilder()
   .build(stack, "MyFunction");
 ```
 
+## Execution role
+
+By default, `createFunctionBuilder` creates an explicit IAM execution role with an inline `LogsWriter` policy scoped to the function's auto-created log group:
+
+- `logs:CreateLogStream` and `logs:PutLogEvents` on the function's specific log group ARN.
+- No `logs:CreateLogGroup` (the builder pre-creates the group).
+- No `AWSLambdaBasicExecutionRole` managed policy — that policy grants the same actions on `*`, allowing a compromised function to write to any log group in the account.
+
+The role is exposed on the build result:
+
+```ts
+const result = createFunctionBuilder()
+  .runtime(Runtime.NODEJS_22_X)
+  .handler("index.handler")
+  .code(Code.fromAsset("lambda"))
+  .build(stack, "MyFunction");
+
+result.role; // IRole — the execution role attached to the function
+```
+
+CDK continues to layer X-Ray, VPC, KMS-env, DLQ, and EFS permissions onto the role automatically based on the function's other props.
+
+### Extending the default role: `.configureRole(fn)`
+
+For least-privilege grants alongside the defaults:
+
+```ts
+import { createStatementBuilder } from "@composurecdk/iam";
+
+const handler = createFunctionBuilder()
+  .runtime(Runtime.NODEJS_22_X)
+  .handler("index.handler")
+  .code(Code.fromAsset("lambda"))
+  .configureRole((role) =>
+    role.addInlinePolicyStatements("OrdersRead", [
+      createStatementBuilder()
+        .allow()
+        .actions(["dynamodb:GetItem", "dynamodb:Query"])
+        .resources([table.tableArn]),
+    ]),
+  );
+```
+
+The callback receives the internal [`IRoleBuilder`](../iam/README.md). Calling `configureRole` more than once replaces the previous callback. The reserved `LogsWriter` name throws at build time if added a second time.
+
+### Supplying a role: `.role(role)`
+
+For a fully external role. The builder skips creating its own role and **does not** auto-attach the `LogsWriter` policy — the caller takes responsibility for permissions. Accepts a concrete `IRole` or a `ref(...)` for cross-component wiring under `compose`:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createServiceRoleBuilder, type RoleBuilderResult } from "@composurecdk/iam";
+
+compose(
+  {
+    sharedRole: createServiceRoleBuilder("lambda.amazonaws.com"),
+    handler: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("lambda"))
+      .role(ref("sharedRole", (r: RoleBuilderResult) => r.role)),
+  },
+  { sharedRole: [], handler: ["sharedRole"] },
+).build(stack, "MySystem");
+```
+
+### Escape hatch: `.useCdkAutoRole()`
+
+Opt back into CDK's auto-created role attached to `AWSLambdaBasicExecutionRole`. Not the recommended path — it re-introduces the wildcard log surface — but available for matching an existing stack's logical IDs during a phased migration.
+
+`.role()`, `.configureRole()`, and `.useCdkAutoRole()` are mutually exclusive; combining any two throws at build time.
+
 ## Recommended Alarms
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

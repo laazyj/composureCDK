@@ -175,8 +175,8 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
     },
     "DualFunctionAppapiC345E44D": {
       "DependsOn": [
-        "DualFunctionAppapiServiceRoleDefaultPolicy91D1FC15",
-        "DualFunctionAppapiServiceRoleDA932E71",
+        "DualFunctionAppapiExecutionRoleDefaultPolicy916EBC37",
+        "DualFunctionAppapiExecutionRole4FDBC127",
       ],
       "Properties": {
         "Code": {
@@ -193,7 +193,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         "MemorySize": 256,
         "Role": {
           "Fn::GetAtt": [
-            "DualFunctionAppapiServiceRoleDA932E71",
+            "DualFunctionAppapiExecutionRole4FDBC127",
             "Arn",
           ],
         },
@@ -263,6 +263,87 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
+    "DualFunctionAppapiExecutionRole4FDBC127": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "DualFunctionAppapiLogGroup154F590C",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "DualFunctionAppapiLogGroup154F590C",
+                              "Arn",
+                            ],
+                          },
+                          ":log-stream:*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "LogsWriter",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "DualFunctionAppapiExecutionRoleDefaultPolicy916EBC37": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "DualFunctionAppapiExecutionRoleDefaultPolicy916EBC37",
+        "Roles": [
+          {
+            "Ref": "DualFunctionAppapiExecutionRole4FDBC127",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "DualFunctionAppapiHighInvocationsAlarmCD791F1D": {
       "Properties": {
         "AlarmActions": [
@@ -300,61 +381,6 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
       "Type": "AWS::Logs::LogGroup",
       "UpdateReplacePolicy": "Retain",
     },
-    "DualFunctionAppapiServiceRoleDA932E71": {
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "lambda.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "ManagedPolicyArns": [
-          {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
-                {
-                  "Ref": "AWS::Partition",
-                },
-                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-              ],
-            ],
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "DualFunctionAppapiServiceRoleDefaultPolicy91D1FC15": {
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "xray:PutTraceSegments",
-                "xray:PutTelemetryRecords",
-              ],
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "DualFunctionAppapiServiceRoleDefaultPolicy91D1FC15",
-        "Roles": [
-          {
-            "Ref": "DualFunctionAppapiServiceRoleDA932E71",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
-    },
     "DualFunctionAppapiThrottlesAlarmDF6A514E": {
       "Properties": {
         "AlarmActions": [
@@ -386,8 +412,8 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
     },
     "DualFunctionAppworker219B5B02": {
       "DependsOn": [
-        "DualFunctionAppworkerServiceRoleDefaultPolicy9B9601EC",
-        "DualFunctionAppworkerServiceRole2CE81560",
+        "DualFunctionAppworkerExecutionRoleDefaultPolicy2A422730",
+        "DualFunctionAppworkerExecutionRoleAB919041",
       ],
       "Properties": {
         "Code": {
@@ -405,7 +431,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         "ReservedConcurrentExecutions": 50,
         "Role": {
           "Fn::GetAtt": [
-            "DualFunctionAppworkerServiceRole2CE81560",
+            "DualFunctionAppworkerExecutionRoleAB919041",
             "Arn",
           ],
         },
@@ -503,6 +529,87 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DualFunctionAppworkerExecutionRoleAB919041": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "DualFunctionAppworkerLogGroup1F739007",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "DualFunctionAppworkerLogGroup1F739007",
+                              "Arn",
+                            ],
+                          },
+                          ":log-stream:*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "LogsWriter",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "DualFunctionAppworkerExecutionRoleDefaultPolicy2A422730": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "DualFunctionAppworkerExecutionRoleDefaultPolicy2A422730",
+        "Roles": [
+          {
+            "Ref": "DualFunctionAppworkerExecutionRoleAB919041",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
     "DualFunctionAppworkerLogGroup1F739007": {
       "DeletionPolicy": "Retain",
@@ -665,61 +772,6 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
-    },
-    "DualFunctionAppworkerServiceRole2CE81560": {
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "lambda.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "ManagedPolicyArns": [
-          {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
-                {
-                  "Ref": "AWS::Partition",
-                },
-                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-              ],
-            ],
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "DualFunctionAppworkerServiceRoleDefaultPolicy9B9601EC": {
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "xray:PutTraceSegments",
-                "xray:PutTelemetryRecords",
-              ],
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "DualFunctionAppworkerServiceRoleDefaultPolicy9B9601EC",
-        "Roles": [
-          {
-            "Ref": "DualFunctionAppworkerServiceRole2CE81560",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
     },
     "DualFunctionAppworkerThrottlesAlarmCD35C889": {
       "Properties": {

@@ -3,6 +3,7 @@ import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
 import { Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import {
   Architecture,
   Code,
@@ -12,7 +13,14 @@ import {
   Tracing,
 } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Vpc } from "aws-cdk-lib/aws-ec2";
+import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
+import {
+  createServiceRoleBuilder,
+  createStatementBuilder,
+  type RoleBuilderResult,
+} from "@composurecdk/iam";
 import { createFunctionBuilder } from "../src/function-builder.js";
 
 function synthTemplate(
@@ -388,6 +396,283 @@ describe("FunctionBuilder", () => {
       expect(Object.values(logGroups)[0]?.Properties.Tags).toEqual(
         expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
       );
+    });
+  });
+
+  describe("execution role", () => {
+    it("attaches an inline LogsWriter policy scoped to the auto-created log group", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}")),
+      );
+
+      template.hasResourceProperties("AWS::IAM::Role", {
+        Policies: Match.arrayWith([
+          Match.objectLike({
+            PolicyName: "LogsWriter",
+            PolicyDocument: Match.objectLike({
+              Statement: Match.arrayWith([
+                Match.objectLike({
+                  Effect: "Allow",
+                  Action: ["logs:CreateLogStream", "logs:PutLogEvents"],
+                  Resource: Match.arrayWith([
+                    Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["Arn"]) }),
+                  ]),
+                }),
+              ]),
+            }),
+          }),
+        ]),
+      });
+    });
+
+    it("does not attach the AWSLambdaBasicExecutionRole managed policy by default", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}")),
+      );
+
+      const roles = template.findResources("AWS::IAM::Role") as Record<
+        string,
+        { Properties: { ManagedPolicyArns?: unknown[] } }
+      >;
+      const allPolicies = JSON.stringify(Object.values(roles));
+      expect(allPolicies).not.toContain("AWSLambdaBasicExecutionRole");
+    });
+
+    it("does not grant logs:CreateLogGroup", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}")),
+      );
+
+      const roles = template.findResources("AWS::IAM::Role");
+      const serialized = JSON.stringify(Object.values(roles));
+      expect(serialized).not.toContain("logs:CreateLogGroup");
+    });
+
+    it("surfaces the auto-created role on the build result", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .build(stack, "TestFunction");
+
+      expect(result.role).toBeDefined();
+      expect(result.role).toBe(result.function.role);
+    });
+
+    it(".configureRole adds inline statements alongside LogsWriter", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}"))
+          .configureRole((rb) =>
+            rb.addInlinePolicyStatements("DynamoAccess", [
+              createStatementBuilder()
+                .allow()
+                .actions(["dynamodb:GetItem"])
+                .resources(["arn:aws:dynamodb:us-east-1:111122223333:table/Orders"]),
+            ]),
+          ),
+      );
+
+      template.hasResourceProperties("AWS::IAM::Role", {
+        Policies: Match.arrayWith([
+          Match.objectLike({ PolicyName: "LogsWriter" }),
+          Match.objectLike({
+            PolicyName: "DynamoAccess",
+            PolicyDocument: Match.objectLike({
+              Statement: Match.arrayWith([
+                Match.objectLike({
+                  Effect: "Allow",
+                  Action: "dynamodb:GetItem",
+                  Resource: "arn:aws:dynamodb:us-east-1:111122223333:table/Orders",
+                }),
+              ]),
+            }),
+          }),
+        ]),
+      });
+    });
+
+    it(".configureRole that supplies a duplicate LogsWriter policy throws at build time", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const builder = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .configureRole((rb) =>
+          rb.addInlinePolicyStatements("LogsWriter", [
+            createStatementBuilder()
+              .allow()
+              .actions(["logs:DescribeLogGroups"])
+              .resources(["*"])
+              .allowWildcardResources(),
+          ]),
+        );
+
+      expect(() => builder.build(stack, "TestFunction")).toThrow(/LogsWriter/);
+    });
+
+    it(".role(myRole) uses the supplied role and does not attach LogsWriter", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const userRole = new Role(stack, "UserRole", {
+        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+      });
+
+      const result = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .role(userRole)
+        .build(stack, "TestFunction");
+
+      expect(result.role).toBe(userRole);
+
+      const template = Template.fromStack(stack);
+      const roles = template.findResources("AWS::IAM::Role") as Record<
+        string,
+        { Properties: { Policies?: { PolicyName: string }[] } }
+      >;
+      for (const role of Object.values(roles)) {
+        const policies = role.Properties.Policies ?? [];
+        expect(policies.find((p) => p.PolicyName === "LogsWriter")).toBeUndefined();
+      }
+    });
+
+    it(".role(ref(...)) resolves through compose", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+
+      const handler = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .role(ref("sharedRole", (r: RoleBuilderResult) => r.role));
+
+      const sharedRole = createServiceRoleBuilder("lambda.amazonaws.com");
+
+      const result = compose(
+        { sharedRole, handler },
+        { sharedRole: [], handler: ["sharedRole"] },
+      ).build(stack, "System");
+
+      expect(result.handler.role).toBe(result.sharedRole.role);
+      expect(result.handler.function.role).toBe(result.sharedRole.role);
+
+      const template = Template.fromStack(stack);
+      template.resourceCountIs("AWS::Lambda::Function", 1);
+      template.resourceCountIs("AWS::IAM::Role", 1);
+    });
+
+    it(".useCdkAutoRole() opts back into AWSLambdaBasicExecutionRole", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .useCdkAutoRole()
+        .build(stack, "TestFunction");
+
+      expect(result.role).toBe(result.function.role);
+
+      const template = Template.fromStack(stack);
+      const roles = template.findResources("AWS::IAM::Role");
+      const serialized = JSON.stringify(Object.values(roles));
+      expect(serialized).toContain("AWSLambdaBasicExecutionRole");
+    });
+
+    it("throws when .role() and .configureRole() are combined", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const userRole = new Role(stack, "UserRole", {
+        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+      });
+
+      const builder = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .role(userRole)
+        .configureRole((rb) => rb.description("nope"));
+
+      expect(() => builder.build(stack, "TestFunction")).toThrow(/mutually exclusive/);
+    });
+
+    it("throws when .role() and .useCdkAutoRole() are combined", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const userRole = new Role(stack, "UserRole", {
+        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+      });
+
+      const builder = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .role(userRole)
+        .useCdkAutoRole();
+
+      expect(() => builder.build(stack, "TestFunction")).toThrow(/mutually exclusive/);
+    });
+
+    it("throws when .configureRole() and .useCdkAutoRole() are combined", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const builder = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .configureRole((rb) => rb.description("nope"))
+        .useCdkAutoRole();
+
+      expect(() => builder.build(stack, "TestFunction")).toThrow(/mutually exclusive/);
+    });
+
+    it("CDK still wires X-Ray permissions onto the explicit role when tracing is active", () => {
+      const template = synthTemplate((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}"))
+          .tracing(Tracing.ACTIVE),
+      );
+
+      const policies = template.findResources("AWS::IAM::Policy");
+      const serialized = JSON.stringify(Object.values(policies));
+      expect(serialized).toContain("xray:PutTraceSegments");
+    });
+
+    it("CDK still wires VPC permissions onto the explicit role when a VPC is configured", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = new Vpc(stack, "Vpc");
+
+      createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .vpc(vpc)
+        .build(stack, "TestFunction");
+
+      const template = Template.fromStack(stack);
+      const roles = template.findResources("AWS::IAM::Role");
+      const serialized = JSON.stringify(Object.values(roles));
+      // CDK attaches AWSLambdaVPCAccessExecutionRole when a VPC is set.
+      expect(serialized).toContain("AWSLambdaVPCAccessExecutionRole");
     });
   });
 

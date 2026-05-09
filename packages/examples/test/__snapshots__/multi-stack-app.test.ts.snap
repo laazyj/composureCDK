@@ -446,8 +446,8 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
   "Resources": {
     "MultiStackApphandler260E0508": {
       "DependsOn": [
-        "MultiStackApphandlerServiceRoleDefaultPolicy0F10DD68",
-        "MultiStackApphandlerServiceRoleC2F86FDD",
+        "MultiStackApphandlerExecutionRoleDefaultPolicy3AC57703",
+        "MultiStackApphandlerExecutionRole358961C5",
       ],
       "Properties": {
         "Code": {
@@ -463,7 +463,7 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
         },
         "Role": {
           "Fn::GetAtt": [
-            "MultiStackApphandlerServiceRoleC2F86FDD",
+            "MultiStackApphandlerExecutionRole358961C5",
             "Arn",
           ],
         },
@@ -541,21 +541,7 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
-    "MultiStackApphandlerLogGroup53CDB07D": {
-      "DeletionPolicy": "Retain",
-      "Properties": {
-        "RetentionInDays": 731,
-        "Tags": [
-          {
-            "Key": "project",
-            "Value": "multi-stack-example",
-          },
-        ],
-      },
-      "Type": "AWS::Logs::LogGroup",
-      "UpdateReplacePolicy": "Retain",
-    },
-    "MultiStackApphandlerServiceRoleC2F86FDD": {
+    "MultiStackApphandlerExecutionRole358961C5": {
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
@@ -569,18 +555,44 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
           ],
           "Version": "2012-10-17",
         },
-        "ManagedPolicyArns": [
+        "MaxSessionDuration": 3600,
+        "Policies": [
           {
-            "Fn::Join": [
-              "",
-              [
-                "arn:",
+            "PolicyDocument": {
+              "Statement": [
                 {
-                  "Ref": "AWS::Partition",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "MultiStackApphandlerLogGroup53CDB07D",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "MultiStackApphandlerLogGroup53CDB07D",
+                              "Arn",
+                            ],
+                          },
+                          ":log-stream:*",
+                        ],
+                      ],
+                    },
+                  ],
                 },
-                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
               ],
-            ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "LogsWriter",
           },
         ],
         "Tags": [
@@ -592,7 +604,7 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
       },
       "Type": "AWS::IAM::Role",
     },
-    "MultiStackApphandlerServiceRoleDefaultPolicy0F10DD68": {
+    "MultiStackApphandlerExecutionRoleDefaultPolicy3AC57703": {
       "Properties": {
         "PolicyDocument": {
           "Statement": [
@@ -607,14 +619,28 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "MultiStackApphandlerServiceRoleDefaultPolicy0F10DD68",
+        "PolicyName": "MultiStackApphandlerExecutionRoleDefaultPolicy3AC57703",
         "Roles": [
           {
-            "Ref": "MultiStackApphandlerServiceRoleC2F86FDD",
+            "Ref": "MultiStackApphandlerExecutionRole358961C5",
           },
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "MultiStackApphandlerLogGroup53CDB07D": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "MultiStackApphandlerThrottlesAlarm959649F7": {
       "Properties": {

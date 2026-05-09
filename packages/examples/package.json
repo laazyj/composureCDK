@@ -29,6 +29,7 @@
     "@composurecdk/core": "^0.7.0",
     "@composurecdk/ec2": "^0.7.0",
     "@composurecdk/events": "^0.7.0",
+    "@composurecdk/iam": "^0.7.0",
     "@composurecdk/lambda": "^0.7.0",
     "@composurecdk/route53": "^0.7.0",
     "@composurecdk/s3": "^0.7.0",

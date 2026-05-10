@@ -45,8 +45,8 @@
   },
   "devDependencies": {
     "@composurecdk/iam": "^0.7.0",
-    "@types/node": "^25.6.0",
-    "aws-cdk-lib": "^2.250.0",
+    "@types/node": "^25.6.2",
+    "aws-cdk-lib": "^2.253.1",
     "constructs": "^10.6.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.4"

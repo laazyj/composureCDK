@@ -31,7 +31,31 @@ Two to four sentences describing the project — what it does, the AWS surface i
 
 -->
 
-_No projects listed yet. Open a PR to add yours._
+### [jasonduffett.net](https://github.com/laazyj/jasonduffett.net)
+
+A static personal site (Eleventy) hosted on S3 + CloudFront with Route 53 DNS, an ACM certificate, health-check alarms, and a hard monthly budget guard — the whole stack composed from ComposureCDK builders. It exercises most of the surface area: `@composurecdk/cloudfront`, `@composurecdk/s3`, `@composurecdk/route53`, `@composurecdk/acm`, `@composurecdk/budgets`, `@composurecdk/sns`, plus `@composurecdk/iam` for the GitHub OIDC deploy role. The builder defaults do most of the heavy lifting — versioned/RETAIN buckets, server access logging, DNS query logging, and scoped IAM — so the stack code stays focused on what's specific to the site (redirects, the `us-east-1` certificate, alarm wiring) instead of restating well-architected baselines.
+
+```ts
+const hostedZone = ref<HostedZoneBuilderResult>("zone").get("hostedZone");
+const bucket = ref<BucketBuilderResult>("bucket").get("bucket");
+const certificate = ref<CertificateBuilderResult>("cert").get("certificate");
+const distribution = ref<DistributionBuilderResult>("cdn").get("distribution");
+
+return compose({
+  zone: createHostedZoneBuilder().zoneName(domain),
+  cert: createCertificateBuilder() // us-east-1, DNS-validated against the zone
+    .domainName(domain)
+    .subjectAlternativeNames([www])
+    .validationZone(hostedZone),
+  bucket: createBucketBuilder(), // versioned, RETAIN, access logs by default
+  cdn: createDistributionBuilder()
+    .domainNames([domain, www])
+    .certificate(certificate)
+    .origin(bucket.map((b) => S3BucketOrigin.withOriginAccessControl(b))),
+  aliasRecords: zoneRecords([ALIAS("@", cloudfrontAliasTarget(distribution))]).zone(hostedZone),
+  // …budgets, SNS topics, health checks, alarms elided
+}).withStacks({ zone: dnsStack, cert: certStack, cdn: siteStack /* … */ });
+```
 
 ## Submitting your project
 

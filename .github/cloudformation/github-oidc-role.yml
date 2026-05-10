@@ -176,6 +176,8 @@ Resources:
               - lambda:RemovePermission
               - lambda:UntagResource
               - lambda:ListTags
+              # Smoke test invokes example functions for verification
+              - lambda:InvokeFunction
             Resource:
               - !Sub arn:${AWS::Partition}:lambda:*:${AWS::AccountId}:function:*
             Condition:
@@ -220,6 +222,8 @@ Resources:
               - logs:UntagResource
               - logs:ListTagsForResource
               - logs:ListTagsLogGroup
+              # Smoke test reads example log groups for verification
+              - logs:FilterLogEvents
             Resource:
               - !Sub arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:*
             Condition:

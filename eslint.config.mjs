@@ -15,7 +15,11 @@ export default defineConfig(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["eslint.config.mjs", "scripts/*.mjs"],
+          allowDefaultProject: [
+            "eslint.config.mjs",
+            "scripts/*.mjs",
+            "packages/examples/test/smoke/*.mjs",
+          ],
         },
       },
     },
@@ -25,7 +29,7 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
-    files: ["scripts/*.mjs"],
+    files: ["scripts/*.mjs", "packages/examples/test/smoke/*.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       globals: {

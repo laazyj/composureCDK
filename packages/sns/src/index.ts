@@ -13,3 +13,4 @@ export {
   type SubscriptionBuilderProps,
   type SubscriptionBuilderResult,
 } from "./subscription-builder.js";
+export { SUBSCRIPTION_DEFAULTS, type SubscriptionDefaults } from "./subscription-defaults.js";

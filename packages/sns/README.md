@@ -50,7 +50,7 @@ The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.
 | `numberOfNotificationsRedrivenToDlq`                | NumberOfNotificationsRedrivenToDlq (Sum, 1 min)                 | > 0               | Always[^dlq] |
 | `numberOfNotificationsFailedToRedriveToDlq`         | NumberOfNotificationsFailedToRedriveToDlq (Sum, 1 min)          | > 0               | Always[^dlq] |
 
-[^dlq]: Metric only emits when a subscription on the topic has a dead-letter queue attached and SNS attempts redrive. `TreatMissingData` defaults to `notBreaching`, so the alarm stays quiet on topics without DLQs. Attach a DLQ via the `SubscriptionBuilder`'s `.deadLetterQueue(...)` — see [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html).
+[^dlq]: Metric only emits when a subscription on the topic has a dead-letter queue attached and SNS attempts redrive. `TreatMissingData` defaults to `notBreaching`, so the alarm stays quiet on topics without DLQs. Attach a DLQ on the `ITopicSubscription` itself (e.g. `new LambdaSubscription(fn, { deadLetterQueue: dlq })`) — see [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html).
 
 The defaults are exported as `TOPIC_ALARM_DEFAULTS` for visibility and testing:
 
@@ -167,31 +167,47 @@ const system = compose(
 
 ## Subscription Builder
 
+Use `createSubscriptionBuilder` when subscribing to a **foreign** topic — one that is not built in the same `compose` system (for example, a topic owned by another stack or account). When the topic and its subscriptions are declared together, prefer [`TopicBuilder.addSubscription`](#adding-subscriptions-to-a-topic) instead.
+
 ```ts
 import { createSubscriptionBuilder } from "@composurecdk/sns";
-import { SubscriptionProtocol } from "aws-cdk-lib/aws-sns";
+import { EmailSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 
 const emailAlerts = createSubscriptionBuilder()
   .topic(budgetTopic)
-  .protocol(SubscriptionProtocol.EMAIL)
-  .endpoint("ops@example.com")
+  .subscription(new EmailSubscription("ops@example.com"))
   .build(stack, "BudgetEmailSubscription");
 ```
 
-Every [SubscriptionProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.SubscriptionProps.html) property is available as a fluent setter. `topic` and `deadLetterQueue` additionally accept a `Ref` so the subscription can be composed with a `TopicBuilder` (or any other component) without post-build wiring:
+The builder accepts any CDK [`ITopicSubscription`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.ITopicSubscription.html) (e.g. `EmailSubscription`, `LambdaSubscription`, `SqsSubscription`) and binds it via `ITopicSubscription.bind(topic)` — the same path CDK uses for `topic.addSubscription(...)`, so endpoint-specific wire-up (Lambda invoke permission, SQS queue policy, KMS decrypt grant) happens automatically. Subscription-specific options — dead-letter queue, filter policy, raw message delivery — are configured on the `ITopicSubscription` itself, matching CDK's own API:
+
+```ts
+import { LambdaSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
+
+createSubscriptionBuilder()
+  .topic(orderEventsTopic)
+  .subscription(
+    new LambdaSubscription(handler, {
+      deadLetterQueue: dlq,
+      filterPolicy: { severity: SubscriptionFilter.stringFilter({ allowlist: ["HIGH"] }) },
+    }),
+  )
+  .build(stack, "OrderEventsHandler");
+```
+
+Both `.topic(...)` and `.subscription(...)` accept a `Ref`, so the builder composes cleanly with a `TopicBuilder` — or with any other component that produces the endpoint resource:
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
 import { createTopicBuilder, createSubscriptionBuilder } from "@composurecdk/sns";
-import { SubscriptionProtocol } from "aws-cdk-lib/aws-sns";
+import { EmailSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 
 const system = compose(
   {
     budget: createTopicBuilder().topicName("budget-alerts"),
     email: createSubscriptionBuilder()
       .topic(ref("budget", (r) => r.topic))
-      .protocol(SubscriptionProtocol.EMAIL)
-      .endpoint("ops@example.com"),
+      .subscription(new EmailSubscription("ops@example.com")),
   },
   { budget: [], email: ["budget"] },
 );
@@ -199,11 +215,9 @@ const system = compose(
 
 ### Subscription reliability
 
-Attaching a dead-letter queue is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)). Pass a queue via `.deadLetterQueue(queue)` or a `ref` to one; the builder does not create a DLQ automatically because the queue resource needs to be caller-owned.
+Attaching a dead-letter queue is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)). Pass a queue to the `ITopicSubscription` constructor (e.g. `new EmailSubscription("ops@example.com", { deadLetterQueue: dlq })`); the builder does not create a DLQ automatically because the queue resource needs to be caller-owned.
 
 The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached.
-
-Also note: `SubscriptionProtocol.HTTP` is allowed for compatibility; prefer `HTTPS` for transport encryption ([SNS security best practices](https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html)).
 
 ## Examples
 

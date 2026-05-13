@@ -8,6 +8,7 @@ import { createEc2App } from "../src/ec2-app.js";
 import { createMockApiApp } from "../src/mock-api-app.js";
 import { createMultiStackApp } from "../src/multi-stack-app.js";
 import { createOpenApiPetstoreApp } from "../src/openapi-petstore-app.js";
+import { createOrderProcessorApp } from "../src/order-processor-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
 import { createTaggedSystemApp } from "../src/tagged-system-app.js";
 
@@ -21,6 +22,7 @@ createEc2App(app);
 createMockApiApp(app);
 createMultiStackApp(app);
 createOpenApiPetstoreApp(app);
+createOrderProcessorApp(app);
 createStaticWebsiteApp(app);
 createTaggedSystemApp(app);
 

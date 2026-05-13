@@ -7,6 +7,7 @@ import {
   type Resolvable,
   resolve,
 } from "@composurecdk/core";
+import { applySubscriptionDefaults } from "./subscription-defaults.js";
 
 /**
  * Configuration properties for the SNS subscription builder.
@@ -104,7 +105,11 @@ class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
 
     const resolvedTopic = resolve(topic, context);
     const resolvedSubscription = resolve(subscription, context);
-    const subscriptionConfig = resolvedSubscription.bind(resolvedTopic);
+    const subscriptionConfig = applySubscriptionDefaults(
+      scope,
+      id,
+      resolvedSubscription.bind(resolvedTopic),
+    );
 
     const built = new Subscription(scope, id, {
       topic: resolvedTopic,

@@ -1,5 +1,4 @@
-import { type ITopic, Subscription, type SubscriptionProps } from "aws-cdk-lib/aws-sns";
-import type { IQueue } from "aws-cdk-lib/aws-sqs";
+import { type ITopic, type ITopicSubscription, Subscription } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -12,14 +11,11 @@ import {
 /**
  * Configuration properties for the SNS subscription builder.
  *
- * Extends the CDK {@link SubscriptionProps} but accepts {@link Resolvable}
- * values for `topic` and `deadLetterQueue` so the builder can be wired to
- * other components via {@link ref} inside a {@link compose}d system.
+ * Both fields are required at build time. Both accept {@link Resolvable}
+ * values so the subscription can be wired to other components via
+ * {@link ref} inside a {@link compose}d system.
  */
-export interface SubscriptionBuilderProps extends Omit<
-  SubscriptionProps,
-  "topic" | "deadLetterQueue"
-> {
+export interface SubscriptionBuilderProps {
   /**
    * The topic to subscribe to. Accepts a concrete {@link ITopic} or a
    * {@link Ref} to another component's output (e.g. a `TopicBuilder`).
@@ -27,19 +23,18 @@ export interface SubscriptionBuilderProps extends Omit<
   topic: Resolvable<ITopic>;
 
   /**
-   * Dead-letter queue for messages that cannot be delivered to the
-   * subscribed endpoint. Accepts a concrete {@link IQueue} or a
-   * {@link Ref} to another component's output.
+   * The subscription to attach. Accepts any CDK
+   * {@link ITopicSubscription} (e.g. `EmailSubscription`,
+   * `LambdaSubscription`, `SqsSubscription`) or a {@link Ref} to one.
    *
-   * Attaching a DLQ is the primary reliability control for SNS
-   * subscriptions. Redrive and redrive-failure alarms are created on the
-   * subscribed {@link TopicBuilder} since the underlying metrics are
-   * topic-level.
-   *
-   * @see https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html
-   * @default - no dead letter queue
+   * The subscription is bound via `ITopicSubscription.bind(topic)`, which
+   * performs the endpoint-specific IAM/resource-policy wire-up (Lambda
+   * invoke permission, SQS queue policy, KMS decrypt grant, etc.).
+   * Subscription-specific options — dead-letter queue, filter policy, raw
+   * message delivery — are configured on the `ITopicSubscription` itself,
+   * matching CDK's own subscription API.
    */
-  deadLetterQueue?: Resolvable<IQueue>;
+  subscription: Resolvable<ITopicSubscription>;
 }
 
 /**
@@ -54,28 +49,33 @@ export interface SubscriptionBuilderResult {
 /**
  * A fluent builder for configuring and creating an AWS SNS subscription.
  *
- * Each configuration property from the CDK {@link SubscriptionProps} is
- * exposed as an overloaded method: call with a value to set it (returns the
- * builder for chaining), or call with no arguments to read the current
- * value.
- *
  * The builder implements {@link Lifecycle}, so it can be used directly as a
  * component in a {@link compose | composed system}. Its `topic` and
- * `deadLetterQueue` properties accept {@link Resolvable} values so they can
- * be supplied by another component's build output via {@link ref}.
+ * `subscription` properties accept {@link Resolvable} values so they can be
+ * supplied by another component's build output via {@link ref}.
+ *
+ * At build time, the configured `ITopicSubscription` is bound to the topic
+ * via `ITopicSubscription.bind(topic)` — the same path CDK uses for
+ * `topic.addSubscription(...)`. This ensures endpoint-specific wire-up
+ * (Lambda invoke permission, SQS queue policy, etc.) happens correctly.
  *
  * Recommended CloudWatch alarms related to subscription delivery (redrive
  * to DLQ, failed redrive to DLQ) are emitted against topic-level metrics,
  * so they live on {@link createTopicBuilder} rather than here.
  *
+ * Use this builder when subscribing to a *foreign* topic — one not built in
+ * the same `compose` system. For the common case where a topic and its
+ * subscriptions are declared together, use `TopicBuilder.addSubscription`.
+ *
  * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Subscription.html
  *
  * @example
  * ```ts
+ * import { EmailSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
+ *
  * const emailAlerts = createSubscriptionBuilder()
  *   .topic(ref("topic", (r: TopicBuilderResult) => r.topic))
- *   .protocol(SubscriptionProtocol.EMAIL)
- *   .endpoint("ops@example.com");
+ *   .subscription(new EmailSubscription("ops@example.com"));
  * ```
  */
 // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::SNS::Subscription has no Tags property
@@ -89,39 +89,29 @@ class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
     id: string,
     context: Record<string, object> = {},
   ): SubscriptionBuilderResult {
-    const { topic, deadLetterQueue, protocol, endpoint, ...rest } = this.props;
+    const { topic, subscription } = this.props;
 
     if (topic === undefined) {
       throw new Error(
         `SubscriptionBuilder "${id}": topic is required. Call .topic(...) with an ITopic or a Ref before building.`,
       );
     }
-    if (protocol === undefined) {
+    if (subscription === undefined) {
       throw new Error(
-        `SubscriptionBuilder "${id}": protocol is required. Call .protocol(...) with a SubscriptionProtocol before building.`,
-      );
-    }
-    if (endpoint === undefined) {
-      throw new Error(
-        `SubscriptionBuilder "${id}": endpoint is required. Call .endpoint(...) with the subscriber endpoint before building.`,
+        `SubscriptionBuilder "${id}": subscription is required. Call .subscription(...) with an ITopicSubscription (e.g. EmailSubscription, LambdaSubscription, SqsSubscription) or a Ref before building.`,
       );
     }
 
     const resolvedTopic = resolve(topic, context);
-    const resolvedDlq =
-      deadLetterQueue !== undefined ? resolve(deadLetterQueue, context) : undefined;
+    const resolvedSubscription = resolve(subscription, context);
+    const subscriptionConfig = resolvedSubscription.bind(resolvedTopic);
 
-    const subscriptionProps: SubscriptionProps = {
-      ...rest,
-      protocol,
-      endpoint,
+    const built = new Subscription(scope, id, {
       topic: resolvedTopic,
-      ...(resolvedDlq !== undefined ? { deadLetterQueue: resolvedDlq } : {}),
-    };
+      ...subscriptionConfig,
+    });
 
-    const subscription = new Subscription(scope, id, subscriptionProps);
-
-    return { subscription };
+    return { subscription: built };
   }
 }
 
@@ -129,22 +119,23 @@ class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
  * Creates a new {@link ISubscriptionBuilder} for configuring an AWS SNS
  * subscription.
  *
- * This is the entry point for defining an SNS subscription component. The
- * returned builder exposes every {@link SubscriptionProps} property as a
- * fluent setter/getter and implements {@link Lifecycle} for use with
- * {@link compose}.
+ * The returned builder exposes `topic` and `subscription` as fluent
+ * setter/getters and implements {@link Lifecycle} for use with
+ * {@link compose}. Subscription-specific options (DLQ, filter policy, raw
+ * message delivery) are configured on the `ITopicSubscription` itself.
  *
  * @returns A fluent builder for an AWS SNS subscription.
  *
  * @example
  * ```ts
+ * import { EmailSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
+ *
  * const system = compose(
  *   {
  *     topic: createTopicBuilder().topicName("budget-alerts"),
  *     email: createSubscriptionBuilder()
  *       .topic(ref("topic", (r: TopicBuilderResult) => r.topic))
- *       .protocol(SubscriptionProtocol.EMAIL)
- *       .endpoint("ops@example.com"),
+ *       .subscription(new EmailSubscription("ops@example.com")),
  *   },
  *   { topic: [], email: ["topic"] },
  * );

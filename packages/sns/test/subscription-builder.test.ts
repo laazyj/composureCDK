@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { SubscriptionFilter, SubscriptionProtocol, Topic } from "aws-cdk-lib/aws-sns";
+import { SubscriptionFilter, Topic } from "aws-cdk-lib/aws-sns";
+import {
+  EmailSubscription,
+  LambdaSubscription,
+  SqsSubscription,
+} from "aws-cdk-lib/aws-sns-subscriptions";
+import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { compose, ref } from "@composurecdk/core";
 import { createTopicBuilder } from "../src/topic-builder.js";
@@ -11,37 +17,36 @@ import {
 } from "../src/subscription-builder.js";
 import type { TopicBuilderResult } from "../src/topic-builder.js";
 
-function buildWithTopic(
-  configureFn?: (
-    builder: ReturnType<typeof createSubscriptionBuilder>,
-    topic: Topic,
-    stack: Stack,
-  ) => void,
-) {
+function buildEmail() {
   const app = new App();
   const stack = new Stack(app, "TestStack");
   const topic = new Topic(stack, "Topic");
-  const builder = createSubscriptionBuilder().topic(topic);
-  configureFn?.(builder, topic, stack);
-  const result = builder.build(stack, "Sub");
+  const result = createSubscriptionBuilder()
+    .topic(topic)
+    .subscription(new EmailSubscription("ops@example.com"))
+    .build(stack, "Sub");
   return { stack, topic, result, template: Template.fromStack(stack) };
+}
+
+function makeLambdaHandler(stack: Stack, id = "Handler") {
+  return new LambdaFunction(stack, id, {
+    runtime: Runtime.NODEJS_20_X,
+    handler: "index.handler",
+    code: Code.fromInline("exports.handler = async () => {};"),
+  });
 }
 
 describe("SubscriptionBuilder", () => {
   describe("build", () => {
     it("returns a SubscriptionBuilderResult with the subscription", () => {
-      const { result } = buildWithTopic((b) =>
-        b.protocol(SubscriptionProtocol.EMAIL).endpoint("ops@example.com"),
-      );
+      const { result } = buildEmail();
 
       expect(result).toBeDefined();
       expect(result.subscription).toBeDefined();
     });
 
     it("creates exactly one SNS subscription", () => {
-      const { template } = buildWithTopic((b) =>
-        b.protocol(SubscriptionProtocol.EMAIL).endpoint("ops@example.com"),
-      );
+      const { template } = buildEmail();
 
       template.resourceCountIs("AWS::SNS::Subscription", 1);
     });
@@ -49,80 +54,58 @@ describe("SubscriptionBuilder", () => {
     it("throws a descriptive error when topic is not set", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
-      const builder = createSubscriptionBuilder()
-        .protocol(SubscriptionProtocol.EMAIL)
-        .endpoint("ops@example.com");
+      const builder = createSubscriptionBuilder().subscription(
+        new EmailSubscription("ops@example.com"),
+      );
 
       expect(() => builder.build(stack, "Sub")).toThrow(
         /SubscriptionBuilder "Sub": topic is required/,
       );
     });
 
-    it("throws a descriptive error when protocol is not set", () => {
+    it("throws a descriptive error when subscription is not set", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const topic = new Topic(stack, "Topic");
-      const builder = createSubscriptionBuilder().topic(topic).endpoint("ops@example.com");
+      const builder = createSubscriptionBuilder().topic(topic);
 
       expect(() => builder.build(stack, "Sub")).toThrow(
-        /SubscriptionBuilder "Sub": protocol is required/,
-      );
-    });
-
-    it("throws a descriptive error when endpoint is not set", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
-      const topic = new Topic(stack, "Topic");
-      const builder = createSubscriptionBuilder().topic(topic).protocol(SubscriptionProtocol.EMAIL);
-
-      expect(() => builder.build(stack, "Sub")).toThrow(
-        /SubscriptionBuilder "Sub": endpoint is required/,
+        /SubscriptionBuilder "Sub": subscription is required/,
       );
     });
   });
 
   describe("synthesised output", () => {
-    it("creates an email subscription matching the requested YAML shape", () => {
-      const { template } = buildWithTopic((b) =>
-        b.protocol(SubscriptionProtocol.EMAIL).endpoint("your-email@example.com"),
-      );
+    it("creates an email subscription with the expected protocol and endpoint", () => {
+      const { template } = buildEmail();
 
       template.hasResourceProperties("AWS::SNS::Subscription", {
         Protocol: "email",
-        Endpoint: "your-email@example.com",
+        Endpoint: "ops@example.com",
         TopicArn: Match.objectLike({ Ref: Match.stringLikeRegexp("^Topic") }),
       });
     });
 
-    it.each([
-      [SubscriptionProtocol.EMAIL, "email", "ops@example.com"],
-      [SubscriptionProtocol.EMAIL_JSON, "email-json", "ops@example.com"],
-      [SubscriptionProtocol.HTTPS, "https", "https://example.com/hook"],
-      [SubscriptionProtocol.HTTP, "http", "http://example.com/hook"],
-      [SubscriptionProtocol.SMS, "sms", "+15551234567"],
-    ])("creates a %s subscription", (protocol, expected, endpoint) => {
-      const { template } = buildWithTopic((b) => b.protocol(protocol).endpoint(endpoint));
+    it("emits the Lambda invoke permission for a LambdaSubscription", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const topic = new Topic(stack, "Topic");
+      const handler = makeLambdaHandler(stack);
 
-      template.hasResourceProperties("AWS::SNS::Subscription", {
-        Protocol: expected,
-        Endpoint: endpoint,
+      createSubscriptionBuilder()
+        .topic(topic)
+        .subscription(new LambdaSubscription(handler))
+        .build(stack, "Sub");
+
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::SNS::Subscription", { Protocol: "lambda" });
+      template.hasResourceProperties("AWS::Lambda::Permission", {
+        Action: "lambda:InvokeFunction",
+        Principal: "sns.amazonaws.com",
       });
     });
 
-    it("applies a filter policy when configured", () => {
-      const { template } = buildWithTopic((b) =>
-        b
-          .protocol(SubscriptionProtocol.EMAIL)
-          .endpoint("ops@example.com")
-          .filterPolicy({ severity: SubscriptionFilter.stringFilter({ allowlist: ["HIGH"] }) }),
-      );
-
-      template.hasResourceProperties("AWS::SNS::Subscription", {
-        FilterPolicy: { severity: ["HIGH"] },
-      });
-    });
-
-    it("enables raw message delivery when explicitly opted in", () => {
+    it("emits the SQS queue policy for an SqsSubscription", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const topic = new Topic(stack, "Topic");
@@ -130,19 +113,46 @@ describe("SubscriptionBuilder", () => {
 
       createSubscriptionBuilder()
         .topic(topic)
-        .protocol(SubscriptionProtocol.SQS)
-        .endpoint(queue.queueArn)
-        .rawMessageDelivery(true)
+        .subscription(new SqsSubscription(queue))
+        .build(stack, "Sub");
+
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::SNS::Subscription", { Protocol: "sqs" });
+      template.hasResourceProperties("AWS::SQS::QueuePolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: "sqs:SendMessage",
+              Effect: "Allow",
+              Principal: { Service: "sns.amazonaws.com" },
+            }),
+          ]),
+        }),
+      });
+    });
+
+    it("forwards subscription options (filter policy) configured on the ITopicSubscription", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const topic = new Topic(stack, "Topic");
+
+      createSubscriptionBuilder()
+        .topic(topic)
+        .subscription(
+          new EmailSubscription("ops@example.com", {
+            filterPolicy: {
+              severity: SubscriptionFilter.stringFilter({ allowlist: ["HIGH"] }),
+            },
+          }),
+        )
         .build(stack, "Sub");
 
       Template.fromStack(stack).hasResourceProperties("AWS::SNS::Subscription", {
-        RawMessageDelivery: true,
+        FilterPolicy: { severity: ["HIGH"] },
       });
     });
-  });
 
-  describe("dead-letter queue", () => {
-    it("attaches a DLQ via RedrivePolicy when provided", () => {
+    it("forwards a dead-letter queue configured on the ITopicSubscription", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const topic = new Topic(stack, "Topic");
@@ -150,13 +160,10 @@ describe("SubscriptionBuilder", () => {
 
       createSubscriptionBuilder()
         .topic(topic)
-        .deadLetterQueue(dlq)
-        .protocol(SubscriptionProtocol.EMAIL)
-        .endpoint("ops@example.com")
+        .subscription(new EmailSubscription("ops@example.com", { deadLetterQueue: dlq }))
         .build(stack, "Sub");
 
-      const template = Template.fromStack(stack);
-      template.hasResourceProperties("AWS::SNS::Subscription", {
+      Template.fromStack(stack).hasResourceProperties("AWS::SNS::Subscription", {
         RedrivePolicy: Match.objectLike({
           deadLetterTargetArn: Match.objectLike({
             "Fn::GetAtt": Match.arrayWith([Match.stringLikeRegexp("^Dlq")]),
@@ -166,15 +173,14 @@ describe("SubscriptionBuilder", () => {
     });
   });
 
-  describe("composition with TopicBuilder via ref", () => {
+  describe("composition via ref", () => {
     it("resolves a topic ref during build", () => {
       const system = compose(
         {
           topic: createTopicBuilder().topicName("budget-alerts").recommendedAlarms(false),
           email: createSubscriptionBuilder()
             .topic(ref<TopicBuilderResult>("topic").get("topic"))
-            .protocol(SubscriptionProtocol.EMAIL)
-            .endpoint("ops@example.com"),
+            .subscription(new EmailSubscription("ops@example.com")),
         },
         { topic: [], email: ["topic"] },
       );
@@ -195,6 +201,44 @@ describe("SubscriptionBuilder", () => {
         Protocol: "email",
         Endpoint: "ops@example.com",
         TopicArn: Match.objectLike({ Ref: Match.stringLikeRegexp("topic") }),
+      });
+    });
+
+    it("resolves a subscription ref to a Lambda built by a sibling component", () => {
+      const system = compose(
+        {
+          topic: createTopicBuilder().topicName("alerts").recommendedAlarms(false),
+          handler: {
+            build: (scope: Stack, id: string) => ({
+              function: new LambdaFunction(scope, id, {
+                runtime: Runtime.NODEJS_20_X,
+                handler: "index.handler",
+                code: Code.fromInline("exports.handler = async () => {};"),
+                timeout: Duration.seconds(5),
+              }),
+            }),
+          },
+          sub: createSubscriptionBuilder()
+            .topic(ref<TopicBuilderResult>("topic").get("topic"))
+            .subscription(
+              ref(
+                "handler",
+                (r: { function: LambdaFunction }) => new LambdaSubscription(r.function),
+              ),
+            ),
+        },
+        { topic: [], handler: [], sub: ["topic", "handler"] },
+      );
+
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      system.build(stack, "System");
+
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::SNS::Subscription", { Protocol: "lambda" });
+      template.hasResourceProperties("AWS::Lambda::Permission", {
+        Action: "lambda:InvokeFunction",
+        Principal: "sns.amazonaws.com",
       });
     });
   });

@@ -13,6 +13,7 @@ import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TopicAlarmConfig } from "./topic-alarm-config.js";
 import { createTopicAlarms } from "./topic-alarms.js";
 import { TOPIC_DEFAULTS } from "./defaults.js";
+import { applySubscriptionDefaults } from "./subscription-defaults.js";
 
 /**
  * Configuration properties for the SNS topic builder.
@@ -161,8 +162,12 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
     const subscriptions: Record<string, Subscription> = {};
     for (const entry of this.#subscriptions) {
       const resolvedSub = resolve(entry.subscription, context ?? {});
-      const subscriptionConfig = resolvedSub.bind(topic);
       const subscriptionId = `${id}${entry.key[0].toUpperCase()}${entry.key.slice(1)}Subscription`;
+      const subscriptionConfig = applySubscriptionDefaults(
+        scope,
+        subscriptionId,
+        resolvedSub.bind(topic),
+      );
       subscriptions[entry.key] = new Subscription(scope, subscriptionId, {
         topic,
         ...subscriptionConfig,

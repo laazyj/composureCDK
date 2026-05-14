@@ -219,6 +219,39 @@ Attaching a dead-letter queue is the primary reliability control for SNS subscri
 
 The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached.
 
+## Subscription Defaults
+
+Both `createSubscriptionBuilder` and `TopicBuilder.addSubscription` apply per-protocol defaults to the `TopicSubscriptionConfig` returned by `ITopicSubscription.bind(topic)`. Defaults are gap-filling: anything the `ITopicSubscription` itself configured (via its constructor options) wins; defaults only apply where the bound config left a field unset.
+
+| Protocol   | Default                    | Rationale                                                                                                                                                                                                                                                                   |
+| ---------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SQS`      | `rawMessageDelivery: true` | Removes the SNS envelope so downstream SQS consumers see the publisher's payload as-is — fewer bytes, no parse step. The typical choice for SNS → SQS fan-out.                                                                                                              |
+| `FIREHOSE` | `rawMessageDelivery: true` | Stores records as the publisher sent them rather than wrapped in an SNS envelope.                                                                                                                                                                                           |
+| `HTTP`     | _(no default applied)_     | Emits a synth-time warning instead — plain HTTP delivery means messages and signed-confirmation tokens travel unencrypted. Prefer `SubscriptionProtocol.HTTPS`. ([SNS security best practices](https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html)) |
+
+`LAMBDA` is intentionally absent — SNS does not support raw delivery to Lambda subscriptions; the handler always receives the SNS envelope. Other protocols (HTTPS, EMAIL, EMAIL_JSON, SMS, APPLICATION) receive no overrides.
+
+These defaults are guided by [SNS raw message delivery](https://docs.aws.amazon.com/sns/latest/dg/sns-large-payload-raw-message-delivery.html) and the [AWS SNS security best practices](https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html).
+
+The map is exported as `SUBSCRIPTION_DEFAULTS` for visibility and testing:
+
+```ts
+import { SUBSCRIPTION_DEFAULTS } from "@composurecdk/sns";
+```
+
+### Overriding a default
+
+Any default is individually overridable through the `ITopicSubscription`'s own constructor options:
+
+```ts
+import { SqsSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
+
+createSubscriptionBuilder()
+  .topic(orders)
+  .subscription(new SqsSubscription(queue, { rawMessageDelivery: false }))
+  .build(stack, "OrdersToQueue");
+```
+
 ## Examples
 
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with TopicBuilder for alarm actions

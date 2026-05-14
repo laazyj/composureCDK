@@ -1,4 +1,5 @@
 import type { IEventSource } from "aws-cdk-lib/aws-lambda";
+import type { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import type { Resolvable } from "@composurecdk/core";
 
 /**
@@ -22,9 +23,8 @@ const COMPOSURE_EVENT_SOURCE = Symbol.for("composurecdk.lambda.eventSource");
  * Follows the `events/targets` factory shape — the factory wraps the
  * underlying CDK event source and resolves any `ref()` to a sibling
  * component at build time — and additionally tags it with a
- * {@link EventSourceKind} discriminator (plus an optional mapping-id reader)
- * so `FunctionBuilder` can pick the right contextual alarms without
- * inspecting CDK internals.
+ * {@link EventSourceKind} discriminator so `FunctionBuilder` can pick the
+ * right contextual alarms without inspecting CDK internals.
  *
  * Construct one via a factory rather than by hand; the brand is private.
  */
@@ -40,25 +40,36 @@ export interface ComposureEventSource {
    * the factory was handed a `ref()` to a sibling component's output.
    */
   readonly source: Resolvable<IEventSource>;
-
-  /**
-   * Reads the event source mapping UUID off the source once it has been
-   * bound to a function. Defined only for kinds whose per-mapping ESM
-   * metrics back contextual alarms (currently SQS); the builder invokes it
-   * after `addEventSource` so the binding exists. Keeping it here lets the
-   * builder stay kind-agnostic — no `instanceof` of CDK source classes.
-   */
-  readonly readMappingId?: (bound: IEventSource) => string;
 }
 
 /** @internal — assembles a branded {@link ComposureEventSource}. */
 export function composureEventSource(
   kind: EventSourceKind,
   source: Resolvable<IEventSource>,
-  readMappingId?: (bound: IEventSource) => string,
 ): ComposureEventSource {
-  return { [COMPOSURE_EVENT_SOURCE]: true, kind, source, readMappingId };
+  return { [COMPOSURE_EVENT_SOURCE]: true, kind, source };
 }
+
+/**
+ * Reads the event source mapping UUID off a bound CDK source, keyed by
+ * {@link EventSourceKind}. Defined only for kinds whose per-mapping ESM
+ * metrics back contextual alarms (currently SQS); `FunctionBuilder` invokes
+ * the reader after `addEventSource` so the binding exists. Keying off `kind`
+ * — like {@link EVENT_SOURCE_ALARM_SPECS} — keeps the builder from
+ * `instanceof`-ing CDK source classes.
+ *
+ * @internal
+ */
+export const EVENT_SOURCE_MAPPING_ID_READERS: Record<
+  EventSourceKind,
+  ((bound: IEventSource) => string) | undefined
+> = {
+  // Safe: the `"sqs"` kind is only ever assigned by `sqsEventSource()`, which
+  // constructs the `SqsEventSource` in the same call — kind and concrete class
+  // move in lockstep.
+  sqs: (bound) => (bound as SqsEventSource).eventSourceMappingId,
+  unknown: undefined,
+};
 
 /**
  * Type guard distinguishing a {@link ComposureEventSource} from a bare

@@ -82,9 +82,5 @@ export function sqsEventSource(
   const source: Resolvable<IEventSource> = isRef(queue)
     ? queue.map((resolved) => new SqsEventSource(resolved, merged))
     : new SqsEventSource(queue, merged);
-  return composureEventSource(
-    "sqs",
-    source,
-    (bound) => (bound as SqsEventSource).eventSourceMappingId,
-  );
+  return composureEventSource("sqs", source);
 }

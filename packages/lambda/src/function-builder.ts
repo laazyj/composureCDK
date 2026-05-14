@@ -22,6 +22,7 @@ import { FUNCTION_DEFAULTS } from "./defaults.js";
 import {
   type AttachedEventSource,
   type ComposureEventSource,
+  EVENT_SOURCE_MAPPING_ID_READERS,
   isComposureEventSource,
 } from "./event-sources/composure-event-source.js";
 
@@ -338,11 +339,9 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
 
       let kind: AttachedEventSource["kind"] = "unknown";
       let eventSource: IEventSource;
-      let readMappingId: ComposureEventSource["readMappingId"];
       if (isComposureEventSource(outer)) {
         kind = outer.kind;
         eventSource = resolve(outer.source, context);
-        readMappingId = outer.readMappingId;
       } else {
         eventSource = outer;
       }
@@ -356,7 +355,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       attachedEventSources.push({
         key: entry.key,
         kind,
-        eventSourceMappingId: readMappingId?.(eventSource),
+        eventSourceMappingId: EVENT_SOURCE_MAPPING_ID_READERS[kind]?.(eventSource),
       });
     }
 

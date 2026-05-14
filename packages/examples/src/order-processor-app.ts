@@ -1,12 +1,11 @@
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
-import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
-import { compose } from "@composurecdk/core";
+import { compose, ref } from "@composurecdk/core";
 import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
-import { createFunctionBuilder } from "@composurecdk/lambda";
+import { createFunctionBuilder, sqsEventSource } from "@composurecdk/lambda";
 import { createTopicBuilder } from "@composurecdk/sns";
-import { createQueueBuilder } from "@composurecdk/sqs";
+import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
 
 /**
  * A primary SQS work queue feeding a Lambda consumer, paired with an SNS
@@ -14,25 +13,26 @@ import { createQueueBuilder } from "@composurecdk/sqs";
  * default (oldest-message age, in-flight near-quota); the processor gets
  * the recommended Lambda alarms (errors, throttles — the duration alarm
  * is timeout-relative and the processor leaves timeout at the CDK
- * default, so it is not emitted); a custom alarm watches empty-receive
- * rate as a low-traffic signal. `alarmActionsPolicy` wires every alarm in
- * the stack to publish to the alert topic, so adding more alarms later is
- * automatic.
+ * default, so it is not emitted) plus the event-source contextual alarms
+ * (failed-invocation, dropped-event) once the queue is wired in; a custom
+ * alarm watches empty-receive rate as a low-traffic signal.
+ * `alarmActionsPolicy` wires every alarm in the stack to publish to the
+ * alert topic, so adding more alarms later is automatic.
  *
  * Demonstrates:
  * - `createQueueBuilder` with secure defaults (enforceSSL, SSE-SQS, long polling)
  * - Custom retention via `.retentionPeriod`
  * - Tuning a recommended alarm threshold via `recommendedAlarms`
  * - Adding a workload-specific alarm via `addAlarm`
- * - Wiring the queue to a `createFunctionBuilder` consumer as an SQS event
- *   source (see the wiring note below)
+ * - Wiring the queue to a `createFunctionBuilder` consumer via
+ *   `sqsEventSource` and a `ref` to the sibling queue
  * - Composing the queue alongside `createTopicBuilder` and routing all
  *   alarm actions through `alarmActionsPolicy`
  */
 export function createOrderProcessorApp(app = new App()) {
   const stack = new Stack(app, "ComposureCDK-OrderProcessorStack");
 
-  const { alerts, orders, processor } = compose(
+  const { alerts } = compose(
     {
       alerts: createTopicBuilder().displayName("Order Processor Alerts"),
 
@@ -77,16 +77,17 @@ export function createOrderProcessorApp(app = new App()) {
           ),
         )
         .memorySize(256)
-        .description("Order processor — consumes and processes order messages"),
+        .description("Order processor — consumes and processes order messages")
+        // The event source is declared as data: `sqsEventSource` resolves
+        // the sibling queue `ref` at build time and `addEventSource` grants
+        // the consume permission onto the function's least-privilege role.
+        .addEventSource(
+          "orders",
+          sqsEventSource(ref("orders", (r: QueueBuilderResult) => r.queue)),
+        ),
     },
-    { alerts: [], orders: [], processor: [] },
+    { alerts: [], orders: [], processor: ["orders"] },
   ).build(stack, "OrderProcessor");
-
-  // SQS-to-Lambda wiring. ComposureCDK has no event-source helper yet
-  // (see https://github.com/laazyj/composureCDK/issues/118), so the event
-  // source is attached directly to the built function. `SqsEventSource`
-  // also grants the execution role permission to consume the queue.
-  processor.function.addEventSource(new SqsEventSource(orders.queue));
 
   alarmActionsPolicy(stack, {
     defaults: { alarmActions: [new SnsAction(alerts.topic)] },

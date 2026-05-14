@@ -1,6 +1,10 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IRole, ManagedPolicy } from "aws-cdk-lib/aws-iam";
-import { Function as LambdaFunction, type FunctionProps } from "aws-cdk-lib/aws-lambda";
+import {
+  Function as LambdaFunction,
+  type FunctionProps,
+  type IEventSource,
+} from "aws-cdk-lib/aws-lambda";
 import type { ILogGroup, LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
@@ -15,6 +19,12 @@ import { createLogGroupBuilder } from "@composurecdk/logs";
 import type { FunctionAlarmConfig } from "./alarm-config.js";
 import { createFunctionAlarms } from "./function-alarms.js";
 import { FUNCTION_DEFAULTS } from "./defaults.js";
+import {
+  type AttachedEventSource,
+  type ComposureEventSource,
+  EVENT_SOURCE_MAPPING_ID_READERS,
+  isComposureEventSource,
+} from "./event-sources/composure-event-source.js";
 
 const LOGS_WRITER_POLICY_NAME = "LogsWriter";
 
@@ -51,8 +61,12 @@ export interface FunctionBuilderProps extends Omit<FunctionProps, "role"> {
    * methods are user-specific. Access alarms from the build result
    * or use an `afterBuild` hook to apply actions.
    *
-   * Contextual alarms (duration, concurrentExecutions) are only created
-   * when the corresponding function configuration is present.
+   * Contextual alarms are only created when the corresponding function
+   * configuration is present: `duration` when `timeout` is set,
+   * `concurrentExecutions` when `reservedConcurrentExecutions` is set, and
+   * the event-source alarms (`eventSourceFailedInvocations`,
+   * `eventSourceDroppedEvents`) once an event source is attached via
+   * {@link IFunctionBuilder.addEventSource}.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda
    */
@@ -107,6 +121,18 @@ export interface FunctionBuilderResult {
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda
    */
   alarms: Record<string, Alarm>;
+
+  /**
+   * Event sources attached to the function via
+   * {@link IFunctionBuilder.addEventSource}, keyed by the key passed to that
+   * call. Each value is the resolved CDK {@link IEventSource} — for sources
+   * built by a ComposureCDK factory (e.g. {@link sqsEventSource}) the
+   * concrete type is preserved, so callers can read back post-`bind()` state
+   * such as `eventSourceMappingId`.
+   *
+   * Always present — `{}` when no event sources were added.
+   */
+  eventSources: Record<string, IEventSource>;
 }
 
 /**
@@ -166,9 +192,15 @@ export interface FunctionBuilderResult {
  */
 export type IFunctionBuilder = ITaggedBuilder<FunctionBuilderProps, FunctionBuilder>;
 
+interface EventSourceEntry {
+  key: string;
+  source: Resolvable<ComposureEventSource | IEventSource>;
+}
+
 class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   props: Partial<FunctionBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<LambdaFunction>[] = [];
+  readonly #eventSources: EventSourceEntry[] = [];
   #configureRole?: (rb: IRoleBuilder) => unknown;
   #useCdkAutoRole = false;
 
@@ -179,6 +211,35 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     ) => AlarmDefinitionBuilder<LambdaFunction>,
   ): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<LambdaFunction>(key)));
+    return this;
+  }
+
+  /**
+   * Register an event source to be attached to the function at build time.
+   *
+   * A Lambda function can have many event sources of mixed types, so this
+   * hook is repeatable and typed to the common {@link IEventSource}. Pass a
+   * {@link ComposureEventSource} from a ComposureCDK factory (e.g. {@link sqsEventSource})
+   * or a bare concrete {@link IEventSource}.
+   *
+   * At build time the source is resolved and attached *after* the function
+   * (and its least-privilege execution role) exist, so the `source.bind(fn)`
+   * that `addEventSource` performs grants the consume permission onto the
+   * builder's role. The resolved source is exposed on
+   * {@link FunctionBuilderResult.eventSources} under `key`.
+   *
+   * Sources built by a recognised factory also enable contextual alarms —
+   * see {@link FunctionBuilderProps.recommendedAlarms}.
+   *
+   * @throws If `key` was already used by a previous `addEventSource` call.
+   */
+  addEventSource(key: string, source: Resolvable<ComposureEventSource | IEventSource>): this {
+    if (this.#eventSources.some((e) => e.key === key)) {
+      throw new Error(
+        `FunctionBuilder.addEventSource: duplicate key "${key}". Each event source must use a unique key.`,
+      );
+    }
+    this.#eventSources.push({ key, source });
     return this;
   }
 
@@ -220,6 +281,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: FunctionBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
+    target.#eventSources.push(...this.#eventSources);
     target.#configureRole = this.#configureRole;
     target.#useCdkAutoRole = this.#useCdkAutoRole;
   }
@@ -270,12 +332,40 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
 
     const fn = new LambdaFunction(scope, id, mergedProps);
 
+    const eventSources: Record<string, IEventSource> = {};
+    const attachedEventSources: AttachedEventSource[] = [];
+    for (const entry of this.#eventSources) {
+      const outer = resolve(entry.source, context);
+
+      let kind: AttachedEventSource["kind"] = "unknown";
+      let eventSource: IEventSource;
+      if (isComposureEventSource(outer)) {
+        kind = outer.kind;
+        eventSource = resolve(outer.source, context);
+      } else {
+        eventSource = outer;
+      }
+
+      // Attach after the function exists so the `source.bind(fn)` that
+      // `addEventSource` performs grants the consume permission onto the
+      // builder's least-privilege role; the mapping UUID is only readable
+      // once bound.
+      fn.addEventSource(eventSource);
+      eventSources[entry.key] = eventSource;
+      attachedEventSources.push({
+        key: entry.key,
+        kind,
+        eventSourceMappingId: EVENT_SOURCE_MAPPING_ID_READERS[kind]?.(eventSource),
+      });
+    }
+
     const alarms = createFunctionAlarms(
       scope,
       id,
       fn,
       alarmConfig,
       mergedProps,
+      attachedEventSources,
       this.#customAlarms,
     );
 
@@ -284,7 +374,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       throw new Error(`FunctionBuilder "${id}": Lambda function has no execution role.`);
     }
 
-    return { function: fn, role: resolvedRole, logGroup, alarms };
+    return { function: fn, role: resolvedRole, logGroup, alarms, eventSources };
   }
 
   #buildDefaultRole(

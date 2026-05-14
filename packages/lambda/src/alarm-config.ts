@@ -87,4 +87,36 @@ export interface FunctionAlarmConfig {
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda
    */
   concurrentExecutions?: PercentageAlarmConfig | false;
+
+  /**
+   * Alarm when an event source fails to invoke the function.
+   *
+   * Contextual: one alarm is created per event source attached via
+   * {@link IFunctionBuilder.addEventSource} whose kind emits per-mapping ESM
+   * metrics (currently SQS). The created alarm's key is the event source's
+   * key suffixed with `FailedInvocations` (e.g. `ordersFailedInvocations`);
+   * this config tunes every such alarm.
+   *
+   * Metric: `AWS/Lambda FailedInvokeEventCount`, statistic Sum, period 1
+   * minute, dimensioned on the event source mapping. Default threshold: > 0.
+   *
+   * @see https://aws.amazon.com/blogs/compute/introducing-new-event-source-mapping-esm-metrics-for-aws-lambda/
+   */
+  eventSourceFailedInvocations?: AlarmConfig | false;
+
+  /**
+   * Alarm when an event source drops events after exhausting retries or TTL.
+   *
+   * Contextual: one alarm is created per event source attached via
+   * {@link IFunctionBuilder.addEventSource} whose kind emits per-mapping ESM
+   * metrics (currently SQS). The created alarm's key is the event source's
+   * key suffixed with `DroppedEvents` (e.g. `ordersDroppedEvents`); this
+   * config tunes every such alarm.
+   *
+   * Metric: `AWS/Lambda DroppedEventCount`, statistic Sum, period 1 minute,
+   * dimensioned on the event source mapping. Default threshold: > 0.
+   *
+   * @see https://aws.amazon.com/blogs/compute/introducing-new-event-source-mapping-esm-metrics-for-aws-lambda/
+   */
+  eventSourceDroppedEvents?: AlarmConfig | false;
 }

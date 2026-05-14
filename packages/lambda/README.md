@@ -125,12 +125,16 @@ Opt back into CDK's auto-created role attached to `AWSLambdaBasicExecutionRole`.
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.
 
-| Alarm                  | Metric                            | Default threshold           | Created when                          |
-| ---------------------- | --------------------------------- | --------------------------- | ------------------------------------- |
-| `errors`               | Errors (Sum, 1 min)               | > 0                         | Always                                |
-| `throttles`            | Throttles (Sum, 1 min)            | > 0                         | Always                                |
-| `duration`             | Duration (p99, 1 min)             | > 90% of configured timeout | `timeout` is set                      |
-| `concurrentExecutions` | ConcurrentExecutions (Max, 1 min) | >= 80% of reserved limit    | `reservedConcurrentExecutions` is set |
+| Alarm                    | Metric                            | Default threshold           | Created when                          |
+| ------------------------ | --------------------------------- | --------------------------- | ------------------------------------- |
+| `errors`                 | Errors (Sum, 1 min)               | > 0                         | Always                                |
+| `throttles`              | Throttles (Sum, 1 min)            | > 0                         | Always                                |
+| `duration`               | Duration (p99, 1 min)             | > 90% of configured timeout | `timeout` is set                      |
+| `concurrentExecutions`   | ConcurrentExecutions (Max, 1 min) | >= 80% of reserved limit    | `reservedConcurrentExecutions` is set |
+| `<key>FailedInvocations` | FailedInvokeEventCount (Sum)      | > 0                         | An SQS event source is attached       |
+| `<key>DroppedEvents`     | DroppedEventCount (Sum)           | > 0                         | An SQS event source is attached       |
+
+The event-source alarms are contextual: one pair is created per event source attached via `addEventSource` (see [Event sources](#event-sources)) whose kind emits per-mapping ESM metrics. Each alarm's key is the event source's key suffixed with `FailedInvocations` / `DroppedEvents` — e.g. an event source added as `"orders"` produces `ordersFailedInvocations` and `ordersDroppedEvents`. The `eventSourceFailedInvocations` / `eventSourceDroppedEvents` fields on `recommendedAlarms` tune every such alarm.
 
 The defaults are exported as `FUNCTION_ALARM_DEFAULTS` for visibility and testing:
 
@@ -216,7 +220,63 @@ for (const alarm of Object.values(result.alarms)) {
 }
 ```
 
+## Event sources
+
+`addEventSource(key, source)` wires a queue or stream to the function. A Lambda
+function can have many event sources of mixed types, so the hook is repeatable
+and keyed — the resolved sources are exposed on `result.eventSources`.
+
+Pass a `ComposureEventSource` from a factory (`sqsEventSource`), which carries
+its own `Resolvable` so the source queue can be a `ref()` to a sibling
+component, or a bare CDK `IEventSource` as an escape hatch.
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createFunctionBuilder, sqsEventSource } from "@composurecdk/lambda";
+import { createQueueBuilder } from "@composurecdk/sqs";
+
+const system = compose(
+  {
+    orders: createQueueBuilder().queueName("orders"),
+    processor: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("lambda"))
+      .addEventSource("orders", sqsEventSource(ref("orders", (r) => r.queue))),
+  },
+  { orders: [], processor: ["orders"] },
+);
+```
+
+The source is attached _after_ the function and its least-privilege execution
+role exist, so the `source.bind(fn)` that `addEventSource` performs grants the
+queue-consume permission onto the builder's role rather than CDK's auto-role.
+
+### Secure defaults
+
+`sqsEventSource` applies AWS-recommended defaults, each overridable via the
+second `props` argument and exported as `DEFAULT_SQS_EVENT_SOURCE_PROPS`:
+
+| Property                  | Default                     | Rationale                                                                                          |
+| ------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------- |
+| `reportBatchItemFailures` | `true`                      | A single poison message fails only its own record, not the whole batch. CDK defaults this `false`. |
+| `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                  |
+
+### Cross-component invariants
+
+AWS Well-Architected guidance spans the queue and the function — the source
+queue's visibility timeout should be ≥ 6× the function timeout, and its redrive
+`maxReceiveCount` should be ≥ 5 before the DLQ. These are **not** enforced
+today (the queue often arrives as an unresolved `ref()`); they are tracked in
+[#123](https://github.com/laazyj/composureCDK/issues/123) and
+[#124](https://github.com/laazyj/composureCDK/issues/124).
+
+`kinesisEventSource` / `dynamoEventSource` and the stream-only `IteratorAge`
+alarm are deferred — see [#120](https://github.com/laazyj/composureCDK/issues/120)
+and [#121](https://github.com/laazyj/composureCDK/issues/121).
+
 ## Examples
 
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with recommended alarms, custom alarms, and SNS alarm actions
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — Lambda split across stacks via `.withStacks()`, wired with `ref`
+- [OrderProcessorStack](../examples/src/order-processor-app.ts) — SQS queue wired to a Lambda consumer via `sqsEventSource`

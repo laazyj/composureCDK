@@ -21,13 +21,7 @@ import type { AttachedEventSource } from "./event-sources/composure-event-source
 const METRIC_PERIOD = Duration.minutes(1);
 const METRIC_PERIOD_LABEL = `${String(METRIC_PERIOD.toMinutes())} minute`;
 
-/**
- * Per-event-source contextual alarms, keyed by source kind. Each entry
- * derives an `AWS/Lambda` ESM metric dimensioned on the event source
- * mapping.
- *
- * @see https://aws.amazon.com/blogs/compute/introducing-new-event-source-mapping-esm-metrics-for-aws-lambda/
- */
+/** One contextual alarm derived from a per-mapping ESM metric. */
 interface EventSourceAlarmSpec {
   /** Suffix appended to the event source key to form the alarm key. */
   keySuffix: string;
@@ -37,6 +31,12 @@ interface EventSourceAlarmSpec {
   describe: (eventSourceKey: string, threshold: number) => string;
 }
 
+/**
+ * Contextual alarm specs keyed by source kind: each attached event source
+ * of a kind contributes one alarm per spec, dimensioned on its mapping UUID.
+ *
+ * @see https://aws.amazon.com/blogs/compute/introducing-new-event-source-mapping-esm-metrics-for-aws-lambda/
+ */
 const EVENT_SOURCE_ALARM_SPECS: Record<AttachedEventSource["kind"], EventSourceAlarmSpec[]> = {
   sqs: [
     {

@@ -8,6 +8,8 @@ interface FunctionAlarmDefaults {
   throttles: AlarmConfigDefaults;
   duration: PercentageAlarmConfigDefaults;
   concurrentExecutions: PercentageAlarmConfigDefaults;
+  eventSourceFailedInvocations: AlarmConfigDefaults;
+  eventSourceDroppedEvents: AlarmConfigDefaults;
 }
 
 /**
@@ -53,6 +55,22 @@ export const FUNCTION_ALARM_DEFAULTS: FunctionAlarmDefaults = {
     thresholdPercent: 0.8,
     evaluationPeriods: 3,
     datapointsToAlarm: 3,
+    treatMissingData: TreatMissingData.NOT_BREACHING,
+  },
+
+  /** Any failed invocation from an event source is worth investigating; threshold 0. */
+  eventSourceFailedInvocations: {
+    threshold: 0,
+    evaluationPeriods: 1,
+    datapointsToAlarm: 1,
+    treatMissingData: TreatMissingData.NOT_BREACHING,
+  },
+
+  /** Any dropped event is lost work; threshold 0. */
+  eventSourceDroppedEvents: {
+    threshold: 0,
+    evaluationPeriods: 1,
+    datapointsToAlarm: 1,
     treatMissingData: TreatMissingData.NOT_BREACHING,
   },
 };

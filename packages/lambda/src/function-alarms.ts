@@ -2,6 +2,7 @@ import { Duration } from "aws-cdk-lib";
 import {
   type Alarm,
   ComparisonOperator,
+  Metric,
   Stats,
   TreatMissingData,
 } from "aws-cdk-lib/aws-cloudwatch";
@@ -15,9 +16,48 @@ import type {
   PercentageAlarmConfigDefaults,
 } from "./alarm-config.js";
 import { FUNCTION_ALARM_DEFAULTS } from "./alarm-defaults.js";
+import type { AttachedEventSource } from "./event-sources/composure-event-source.js";
 
 const METRIC_PERIOD = Duration.minutes(1);
 const METRIC_PERIOD_LABEL = `${String(METRIC_PERIOD.toMinutes())} minute`;
+
+/**
+ * Per-event-source contextual alarms, keyed by source kind. Each entry
+ * derives an `AWS/Lambda` ESM metric dimensioned on the event source
+ * mapping.
+ *
+ * @see https://aws.amazon.com/blogs/compute/introducing-new-event-source-mapping-esm-metrics-for-aws-lambda/
+ */
+interface EventSourceAlarmSpec {
+  /** Suffix appended to the event source key to form the alarm key. */
+  keySuffix: string;
+  /** `FunctionAlarmConfig` field tuning this alarm. */
+  configKey: "eventSourceFailedInvocations" | "eventSourceDroppedEvents";
+  metricName: string;
+  describe: (eventSourceKey: string, threshold: number) => string;
+}
+
+const EVENT_SOURCE_ALARM_SPECS: Record<AttachedEventSource["kind"], EventSourceAlarmSpec[]> = {
+  sqs: [
+    {
+      keySuffix: "FailedInvocations",
+      configKey: "eventSourceFailedInvocations",
+      metricName: "FailedInvokeEventCount",
+      describe: (key, threshold) =>
+        `Lambda event source "${key}" is failing to invoke the function. ` +
+        `Threshold: > ${String(threshold)} failed invocations in ${METRIC_PERIOD_LABEL}.`,
+    },
+    {
+      keySuffix: "DroppedEvents",
+      configKey: "eventSourceDroppedEvents",
+      metricName: "DroppedEventCount",
+      describe: (key, threshold) =>
+        `Lambda event source "${key}" is dropping events after exhausting retries or TTL. ` +
+        `Threshold: > ${String(threshold)} dropped events in ${METRIC_PERIOD_LABEL}.`,
+    },
+  ],
+  unknown: [],
+};
 
 /**
  * Resolves the recommended alarm configuration into fully-resolved
@@ -28,6 +68,7 @@ export function resolveFunctionAlarmDefinitions(
   fn: LambdaFunction,
   config: FunctionAlarmConfig | undefined,
   props: Pick<FunctionProps, "timeout" | "reservedConcurrentExecutions">,
+  eventSources: AttachedEventSource[] = [],
 ): AlarmDefinition[] {
   if (config?.enabled === false) return [];
 
@@ -103,7 +144,47 @@ export function resolveFunctionAlarmDefinitions(
     });
   }
 
+  for (const eventSource of eventSources) {
+    // The ESM metrics that back these alarms are dimensioned on the mapping
+    // UUID; without it (e.g. a bare escape-hatch source) there is nothing to
+    // alarm on.
+    if (eventSource.eventSourceMappingId === undefined) continue;
+
+    for (const spec of EVENT_SOURCE_ALARM_SPECS[eventSource.kind]) {
+      const userConfig = config?.[spec.configKey];
+      if (userConfig === false) continue;
+
+      const cfg = resolveAlarmConfig(userConfig, FUNCTION_ALARM_DEFAULTS[spec.configKey]);
+      definitions.push({
+        key: `${eventSource.key}${spec.keySuffix}`,
+        alarmName: cfg.alarmName,
+        metric: eventSourceMetric(eventSource.eventSourceMappingId, spec.metricName),
+        threshold: cfg.threshold,
+        comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
+        evaluationPeriods: cfg.evaluationPeriods,
+        datapointsToAlarm: cfg.datapointsToAlarm,
+        treatMissingData: cfg.treatMissingData,
+        description: spec.describe(eventSource.key, cfg.threshold),
+      });
+    }
+  }
+
   return definitions;
+}
+
+/**
+ * Builds an `AWS/Lambda` event source mapping metric. These per-mapping ESM
+ * metrics are dimensioned on `EventSourceMappingUUID` rather than
+ * `FunctionName`, so they cannot use the function's built-in metric helpers.
+ */
+function eventSourceMetric(eventSourceMappingId: string, metricName: string): Metric {
+  return new Metric({
+    namespace: "AWS/Lambda",
+    metricName,
+    dimensionsMap: { EventSourceMappingUUID: eventSourceMappingId },
+    statistic: Stats.SUM,
+    period: METRIC_PERIOD,
+  });
 }
 
 /**
@@ -115,6 +196,8 @@ export function resolveFunctionAlarmDefinitions(
  * @param fn - The Lambda function to create alarms for.
  * @param config - User-provided alarm configuration, or `false` to disable all.
  * @param props - The merged function props, used for contextual alarm thresholds.
+ * @param eventSources - Event sources attached to the function, used for
+ *   per-event-source contextual alarms.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
  * @returns A record mapping alarm keys to their created Alarm constructs.
  *
@@ -126,6 +209,7 @@ export function createFunctionAlarms(
   fn: LambdaFunction,
   config: FunctionAlarmConfig | false | undefined,
   props: Pick<FunctionProps, "timeout" | "reservedConcurrentExecutions">,
+  eventSources: AttachedEventSource[] = [],
   customAlarms: AlarmDefinitionBuilder<LambdaFunction>[] = [],
 ): Record<string, Alarm> {
   if (config === false) return {};
@@ -133,7 +217,7 @@ export function createFunctionAlarms(
   const enabled = config?.enabled ?? FUNCTION_ALARM_DEFAULTS.enabled;
   if (!enabled) return {};
 
-  const recommended = resolveFunctionAlarmDefinitions(fn, config, props);
+  const recommended = resolveFunctionAlarmDefinitions(fn, config, props, eventSources);
   const custom = customAlarms.map((b) => b.resolve(fn));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

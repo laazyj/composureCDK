@@ -14,6 +14,17 @@ describe("order-processor-app", () => {
     template.resourceCountIs("AWS::SNS::Topic", 1);
   });
 
+  it("creates one Lambda consumer wired to the queue via an event source", () => {
+    template.resourceCountIs("AWS::Lambda::Function", 1);
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Runtime: "nodejs22.x",
+      Handler: "index.handler",
+      MemorySize: 256,
+      Description: "Order processor — consumes and processes order messages",
+    });
+    template.resourceCountIs("AWS::Lambda::EventSourceMapping", 1);
+  });
+
   it("configures the queue with the requested visibility timeout and retention", () => {
     template.hasResourceProperties("AWS::SQS::Queue", {
       QueueName: "orders",
@@ -73,8 +84,15 @@ describe("order-processor-app", () => {
     });
   });
 
-  it("creates the four SNS topic recommended alarms plus the three queue alarms", () => {
-    // Topic ships 4 recommended alarms; queue ships 2 recommended + 1 custom.
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 7);
+  it("creates the recommended Lambda alarms for the consumer", () => {
+    // errors + throttles. The duration alarm is timeout-relative and the
+    // consumer leaves timeout at the CDK default, so it is not emitted.
+    template.resourcePropertiesCountIs("AWS::CloudWatch::Alarm", { Namespace: "AWS/Lambda" }, 2);
+  });
+
+  it("creates the topic, queue, and consumer recommended alarms", () => {
+    // Topic ships 4 recommended; queue ships 2 recommended + 1 custom;
+    // the Lambda consumer ships 2 recommended (errors, throttles).
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 9);
   });
 });

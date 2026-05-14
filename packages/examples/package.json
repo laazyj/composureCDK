@@ -32,7 +32,8 @@
     "@composurecdk/lambda": "^0.7.0",
     "@composurecdk/route53": "^0.7.0",
     "@composurecdk/s3": "^0.7.0",
-    "@composurecdk/sns": "^0.7.0"
+    "@composurecdk/sns": "^0.7.0",
+    "@composurecdk/sqs": "^0.7.0"
   },
   "devDependencies": {
     "@types/node": "^25.6.2",

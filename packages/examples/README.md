@@ -15,6 +15,7 @@ All example stacks use the `ComposureCDK-` name prefix. This convention enables 
 | [`ComposureCDK-Ec2Stack`](src/ec2-app.ts)                                                           | VPC + EC2 instance with well-architected defaults, recommended alarms, and SNS alert wiring                                          |
 | [`ComposureCDK-AgentVolumeStack`](src/agent-volume-app.ts)                                          | VPC + EC2 instance with a persistent EBS data volume attached via `attachVolume` + alarm wiring                                      |
 | [`ComposureCDK-TaggedSystemStack`](src/tagged-system-app.ts)                                        | Builder-level selector tags via `.tag()` plus system-wide cost-allocation tags via `tags()`                                          |
+| [`ComposureCDK-OrderProcessorStack`](src/order-processor-app.ts)                                    | SQS work queue feeding a Lambda consumer via an SQS event source, with recommended alarms wired to a sibling SNS alert topic         |
 
 ## Prerequisites
 

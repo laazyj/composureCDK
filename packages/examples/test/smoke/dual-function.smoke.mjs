@@ -3,7 +3,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { findStackResources, pollUntil } from "./_helpers.mjs";
+import { findStackResources, pollUntil, resolveLambdaLogGroup } from "./_helpers.mjs";
 
 const STACK = "ComposureCDK-DualFunctionStack";
 
@@ -20,17 +20,7 @@ export default {
     }
 
     const fnName = apiFn.PhysicalResourceId;
-    const cfg = aws(
-      "lambda",
-      "get-function-configuration",
-      "--function-name",
-      fnName,
-      "--output",
-      "json",
-    );
-    // Lambda's default log group is /aws/lambda/<name>; this stack overrides
-    // it via LoggingConfig so resolve from the live config rather than guess.
-    const logGroup = cfg.LoggingConfig?.LogGroup ?? `/aws/lambda/${fnName}`;
+    const logGroup = resolveLambdaLogGroup(aws, fnName);
 
     const outputFile = join(tmpdir(), `composurecdk-smoke-invoke-${process.pid}.json`);
     const invokeStartMs = Date.now();

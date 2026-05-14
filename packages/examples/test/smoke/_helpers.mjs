@@ -67,6 +67,24 @@ export function findStackResources(aws, stackName, { type, namePattern } = {}) {
   });
 }
 
+/**
+ * Resolves a Lambda function's CloudWatch log group from its live config.
+ * Lambda's default log group is `/aws/lambda/<name>`, but examples may
+ * override it via `LoggingConfig` — resolve from the live config rather
+ * than guess.
+ */
+export function resolveLambdaLogGroup(aws, fnName) {
+  const cfg = aws(
+    "lambda",
+    "get-function-configuration",
+    "--function-name",
+    fnName,
+    "--output",
+    "json",
+  );
+  return cfg.LoggingConfig?.LogGroup ?? `/aws/lambda/${fnName}`;
+}
+
 export async function pollUntil(predicate, { timeoutMs = 30_000, intervalMs = 2_000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {

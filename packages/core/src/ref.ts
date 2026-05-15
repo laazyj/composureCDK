@@ -1,4 +1,14 @@
 /**
+ * @internal Brands every {@link Ref} instance so {@link isRef} can recognise
+ * one without `instanceof`. `instanceof` is realm-bound: when `@composurecdk/core`
+ * is loaded as both ESM and CommonJS in the same process (the dual-package
+ * hazard), each copy has its own `Ref` class and `instanceof` fails across the
+ * boundary. A `Symbol.for(...)` brand is registered in the global symbol
+ * registry, so a `Ref` minted by either copy is still recognised by either.
+ */
+export const REF_BRAND = Symbol.for("composurecdk.ref");
+
+/**
  * A lazy reference to a value produced by another component at build time.
  *
  * `Ref` enables declarative cross-component wiring: a builder can capture a
@@ -26,6 +36,9 @@
  * ```
  */
 export class Ref<T> {
+  /** @internal Realm-agnostic brand — see {@link REF_BRAND}. */
+  readonly [REF_BRAND] = true;
+
   readonly #resolver: (context: Record<string, object>) => T;
 
   private constructor(resolver: (context: Record<string, object>) => T) {
@@ -134,9 +147,14 @@ export type Resolvable<T> = T | Ref<T>;
 
 /**
  * Type guard that checks whether a value is a {@link Ref}.
+ *
+ * Recognises a `Ref` by its {@link REF_BRAND} symbol rather than `instanceof`,
+ * so it works across the dual-package boundary — a `Ref` produced by the ESM
+ * copy of `@composurecdk/core` is still recognised by the CommonJS copy and
+ * vice versa.
  */
 export function isRef<T>(value: Resolvable<T>): value is Ref<T> {
-  return value instanceof Ref;
+  return typeof value === "object" && value !== null && REF_BRAND in value;
 }
 
 /**

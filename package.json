@@ -1,7 +1,6 @@
 {
   "name": "composurecdk",
   "description": "",
-  "main": "index.js",
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
@@ -21,7 +20,7 @@
   "keywords": [],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/laazyj/composureCDK/issues"
   },

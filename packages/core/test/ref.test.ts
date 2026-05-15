@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ref, resolve, isRef, type Resolvable } from "../src/ref.js";
+import { ref, resolve, isRef, REF_BRAND, type Resolvable } from "../src/ref.js";
 
 interface FakeResult {
   value: string;
@@ -109,6 +109,14 @@ describe("Resolvable utilities", () => {
       const value: Resolvable<FakeResult> = { value: "hello", nested: { id: 1 } };
 
       expect(isRef(value)).toBe(false);
+    });
+
+    it("recognises a Ref by its shared brand, not by instanceof", () => {
+      // Simulates a Ref minted by a different realm's copy of the module (the
+      // dual-package hazard): same Symbol.for brand, different class identity.
+      const foreignRef = { [REF_BRAND]: true };
+
+      expect(isRef(foreignRef as unknown as Resolvable<FakeResult>)).toBe(true);
     });
   });
 

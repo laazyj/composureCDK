@@ -12,6 +12,7 @@ export const recommended: Linter.Config = {
     "composurecdk/builder-must-be-tagged": "error",
     "composurecdk/builder-must-implement-copy-state": "error",
     "composurecdk/lifecycle-build-context-required": "error",
+    "composurecdk/no-cjs-incompatible-syntax": "error",
     // Bans the TypeScript `private` modifier in favour of ECMAScript private
     // fields (#field). TS `private` members appear in `keyof T` and leak into
     // emitted .d.ts files via mapped types (builder types), producing TS4094

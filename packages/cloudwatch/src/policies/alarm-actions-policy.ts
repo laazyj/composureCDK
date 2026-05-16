@@ -93,17 +93,24 @@ function visitAlarms(scope: IConstruct, visit: AlarmVisitor): void {
 }
 
 /**
- * Attaches CloudWatch alarm actions to every `Alarm` and `CompositeAlarm`
- * (L2) construct in the subtree under `scope`.
+ * Registers a CDK {@link https://docs.aws.amazon.com/cdk/v2/guide/aspects.html | Aspect}
+ * on `scope` that attaches CloudWatch alarm actions to every `Alarm` and
+ * `CompositeAlarm` (L2) construct in the subtree at synth time. Call once
+ * with any scope — an `App`, a `Stack`, or the scope passed to `.build()`
+ * for a composed system; alarms added after the call still pick up the
+ * policy, so call ordering is irrelevant as
+ * long as it happens before `app.synth()`. In particular, there is no need
+ * to wrap this call in `afterBuild` — the Aspect runs after the construct
+ * tree is finalised, not at call time. The only temporal constraint is that
+ * any `IAlarmAction` instances in `config` (e.g. `new SnsAction(topic)`)
+ * must reference constructs that already exist when the policy is called.
  *
- * The policy installs a CDK {@link https://docs.aws.amazon.com/cdk/v2/guide/aspects.html | Aspect}
- * that fires during the synth prepare phase, so late-added alarms are also
- * covered. Detection uses the jsii type guards
- * `CfnAlarm.isCfnAlarm` / `CfnCompositeAlarm.isCfnCompositeAlarm` on the L1
- * resource; the L2 parent is found via duck-typing on `addAlarmAction`.
- * Actions are attached through the L2 so that `IAlarmAction.bind()` runs and
- * permissions are wired correctly. Bare `CfnAlarm` nodes (created without an
- * L2 wrapper) are detected but silently skipped.
+ * Detection uses the jsii type guards `CfnAlarm.isCfnAlarm` /
+ * `CfnCompositeAlarm.isCfnCompositeAlarm` on the L1 resource; the L2 parent
+ * is found via duck-typing on `addAlarmAction`. Actions are attached through
+ * the L2 so that `IAlarmAction.bind()` runs and permissions are wired
+ * correctly. Bare `CfnAlarm` nodes (created without an L2 wrapper) are
+ * detected but silently skipped.
  *
  * `defaults` apply to every matched alarm; `rules` append additional actions.
  * A rule matches if any of its `match` entries matches. Set

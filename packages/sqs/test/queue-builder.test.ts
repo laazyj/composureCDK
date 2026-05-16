@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
+import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { type IQueue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
+import { type IQueue, Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createQueueBuilder } from "../src/queue-builder.js";
@@ -158,6 +158,61 @@ describe("QueueBuilder", () => {
         build: (b) => b.build(new Stack(new App(), "S"), "Queue"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
+    });
+  });
+
+  describe("redrive policy maxReceiveCount warning", () => {
+    function buildWithDlq(maxReceiveCount: number, id = "Orders"): Stack {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const dlq = new Queue(stack, "Dlq");
+      createQueueBuilder().deadLetterQueue({ queue: dlq, maxReceiveCount }).build(stack, id);
+      return stack;
+    }
+
+    it.each([1, 2, 3, 4])(
+      "warns when maxReceiveCount is %i (below the AWS-recommended minimum of 5)",
+      (maxReceiveCount) => {
+        const stack = buildWithDlq(maxReceiveCount);
+
+        // The ack tag is what callers use to suppress the warning via
+        // `Annotations.of(scope).acknowledgeWarning(...)`, so the ID is part of
+        // the public surface — guard against accidental rename.
+        Annotations.fromStack(stack).hasWarning(
+          "/TestStack",
+          Match.stringLikeRegexp(
+            `QueueBuilder "Orders": redrive policy maxReceiveCount is ${String(maxReceiveCount)}.*` +
+              "\\[ack: @composurecdk/sqs:redrive-low-max-receive-count\\]",
+          ),
+        );
+      },
+    );
+
+    it.each([5, 10, 100])("does not warn when maxReceiveCount is %i (at or above 5)", (n) => {
+      const stack = buildWithDlq(n);
+
+      expect(Annotations.fromStack(stack).findWarning("*", Match.anyValue())).toEqual([]);
+    });
+
+    it("does not warn when no dead-letter queue is configured", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      createQueueBuilder().build(stack, "TestQueue");
+
+      expect(Annotations.fromStack(stack).findWarning("*", Match.anyValue())).toEqual([]);
+    });
+
+    it("does not warn when maxReceiveCount is an unresolved token", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const dlq = new Queue(stack, "Dlq");
+      const param = new CfnParameter(stack, "MaxReceives", { type: "Number", default: 3 });
+
+      createQueueBuilder()
+        .deadLetterQueue({ queue: dlq, maxReceiveCount: param.valueAsNumber })
+        .build(stack, "TestQueue");
+
+      expect(Annotations.fromStack(stack).findWarning("*", Match.anyValue())).toEqual([]);
     });
   });
 

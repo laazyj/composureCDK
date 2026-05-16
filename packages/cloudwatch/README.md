@@ -123,6 +123,8 @@ alarmActionsPolicy(app, {
 });
 ```
 
+The policy is implemented as a CDK [Aspect](https://docs.aws.amazon.com/cdk/v2/guide/aspects.html) — it has no dependency on `@composurecdk/core` and works in any CDK app. Because aspects fire during synth, the policy can be registered before or after the alarms it targets, and there is **no need to wrap the call in `afterBuild`** — calling `alarmActionsPolicy(app, …)` at app scope outside any `compose()` chain is the recommended shape. The only constraint is that any `IAlarmAction` instances in the config (e.g. `new SnsAction(topic)`) must reference constructs that already exist when the policy is called.
+
 Per-alarm routing is expressed as rules. Matchers can be a substring (tested against both the alarm's `id` and `path`), a `RegExp` (tested against `path`), or a predicate receiving the full match context. Rules append actions on top of `defaults`; set `replaceDefaults: true` on a rule to suppress defaults for its matched alarms.
 
 ```ts
@@ -137,7 +139,30 @@ alarmActionsPolicy(app, {
 
 All three action states are supported: `alarmActions`, `okActions`, and `insufficientDataActions`.
 
-The policy is implemented as a CDK [Aspect](https://docs.aws.amazon.com/cdk/v2/guide/aspects.html) — it has no dependency on `@composurecdk/core` and works in any CDK app. Because aspects fire during synth, the policy can be registered before or after the alarms it targets. The only constraint is that any `IAlarmAction` instances in the config (e.g. `new SnsAction(topic)`) must reference constructs that already exist when the policy is called.
+### Per-scope routing: different topics for different stacks
+
+Rules route by _alarm identity_ (id, path, predicate). When you instead need to route by _scope_ — e.g. one SNS topic for everything in `us-east-1` and another for the primary region — call `alarmActionsPolicy` multiple times, once per target scope. If the topics are themselves built by the composed system, this is the case where wrapping in [`afterBuild`](../core/README.md) is load-bearing: the closure captures the build `results` so each call can reference its topic.
+
+```ts
+compose(
+  { usEast1Alerts: createTopicBuilder(), siteAlerts: createTopicBuilder() },
+  {
+    /* … */
+  },
+)
+  .withStacks({ usEast1Alerts: usEast1AlertsStack, siteAlerts: siteStack })
+  .afterBuild((_scope, _id, results) => {
+    alarmActionsPolicy(usEast1AlertsStack, {
+      defaults: { alarmActions: [new SnsAction(results.usEast1Alerts.topic)] },
+    });
+    alarmActionsPolicy(siteStack, {
+      defaults: { alarmActions: [new SnsAction(results.siteAlerts.topic)] },
+    });
+  })
+  .build(app, "MySystem");
+```
+
+If a _single_ topic covers the whole app, prefer the top-level form above — `afterBuild` adds nothing in that case.
 
 ### Limitation: L2 alarms only
 

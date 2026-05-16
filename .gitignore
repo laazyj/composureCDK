@@ -1,6 +1,8 @@
 node_modules
 dist
 .nx
+.tshy
+.tshy-build
 cdk.out
 .vscode/
 .claude/

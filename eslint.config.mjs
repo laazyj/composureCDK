@@ -7,7 +7,16 @@ import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import composurecdk from "@composurecdk/eslint-plugin";
 
 export default defineConfig(
-  { ignores: ["**/dist/", "**/node_modules/", "**/cdk.out/"] },
+  {
+    ignores: [
+      "**/dist/",
+      "**/node_modules/",
+      "**/cdk.out/",
+      // Hand-written ESM/CJS consumption fixtures — each is deliberately a
+      // specific module system and is exercised by spawning `node`, not linted.
+      "packages/module-compat/test/fixtures/",
+    ],
+  },
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,

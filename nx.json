@@ -7,7 +7,7 @@
       "cache": true
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build"],
       "cache": true
     },
     "test": {

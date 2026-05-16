@@ -7,27 +7,16 @@
     "url": "https://github.com/laazyj/composureCDK",
     "directory": "packages/core"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./testing": {
-      "import": "./dist/testing.js",
-      "types": "./dist/testing.d.ts"
-    }
-  },
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "clean": "rm -rf dist",
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist .tshy .tshy-build",
+    "build": "tshy",
     "typecheck": "tsc --noEmit",
+    "check:exports": "attw --pack . --profile node16 && publint",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -44,6 +33,16 @@
     "access": "public"
   },
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "tshy": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": "./src/index.ts",
+      "./testing": "./src/testing.ts"
+    }
+  },
   "peerDependencies": {
     "constructs": "^10.6.0"
   },
@@ -54,5 +53,31 @@
   },
   "dependencies": {
     "@dagrejs/graphlib": "^4.0.1"
-  }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/esm/testing.d.ts",
+        "default": "./dist/esm/testing.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/testing.d.ts",
+        "default": "./dist/commonjs/testing.js"
+      }
+    }
+  },
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "module": "./dist/esm/index.js"
 }

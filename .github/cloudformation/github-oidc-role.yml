@@ -261,6 +261,20 @@ Resources:
               StringLike:
                 aws:ResourceTag/aws:cloudformation:stack-name: ComposureCDK-*
 
+          # SQS — smoke test publishes a message to the orders queue to
+          # verify the consumer Lambda. CloudFormation's aws:cloudformation:*
+          # system tags do not propagate to SQS queues in a form IAM can
+          # evaluate via aws:ResourceTag (unlike Lambda/Logs/IAM), so this
+          # uses an ARN scope. The role is already restricted to the
+          # `sandbox` environment by the OIDC trust policy above, so the
+          # blast radius is the sandbox account's queues only.
+          - Sid: SQSSendMessage
+            Effect: Allow
+            Action:
+              - sqs:SendMessage
+            Resource:
+              - !Sub arn:${AWS::Partition}:sqs:*:${AWS::AccountId}:*
+
           # CDK bootstrap roles — assumed by CDK CLI for asset publishing
           # and CloudFormation execution
           - Sid: CDKAssetRoles

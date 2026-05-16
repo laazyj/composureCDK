@@ -7,11 +7,16 @@
       "cache": true
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build"],
       "cache": true
     },
     "test": {
       "dependsOn": ["^build", "typecheck"],
+      "cache": true
+    },
+    "check:exports": {
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/dist/**/*", "{projectRoot}/package.json"],
       "cache": true
     },
     "test:update": {

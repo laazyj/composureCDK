@@ -322,6 +322,8 @@ api.addMethod(
 
 Internally, the builder stores the `Resolvable<T>` as-is. At build time, it calls `resolve(value, context)`, which either returns the concrete value unchanged or evaluates the `Ref`.
 
+`resolve` distinguishes a `Ref` from a concrete value via the `isRef` guard. `isRef` recognises a `Ref` by a `Symbol.for("composurecdk.ref")` brand rather than `instanceof` — because packages are published dual ESM/CJS ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)), the ESM and CommonJS copies of `@composurecdk/core` can both load in one process, and `instanceof` is realm-bound. The `Symbol.for(...)` brand is shared across realms, so a `Ref` minted by either copy is still recognised.
+
 ### Implementing Ref support in a builder
 
 A builder that accepts cross-component references follows this pattern:

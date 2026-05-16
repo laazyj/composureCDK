@@ -7,23 +7,16 @@
     "url": "https://github.com/laazyj/composureCDK",
     "directory": "packages/ec2"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "clean": "rm -rf dist",
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist .tshy .tshy-build",
+    "build": "tshy",
     "typecheck": "tsc --noEmit",
+    "check:exports": "attw --pack . --profile node16 && publint",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
   },
@@ -34,6 +27,15 @@
     "access": "public"
   },
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "tshy": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": "./src/index.ts"
+    }
+  },
   "peerDependencies": {
     "@composurecdk/cloudformation": "^0.7.0",
     "@composurecdk/cloudwatch": "^0.7.0",
@@ -48,5 +50,21 @@
     "constructs": "^10.6.0",
     "typescript": "^6.0.2",
     "vitest": "^4.1.2"
-  }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    }
+  },
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "module": "./dist/esm/index.js"
 }

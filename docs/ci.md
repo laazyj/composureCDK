@@ -18,7 +18,7 @@ ci.yml ──► deploy-test.yml ──► release.yml ◄── tag push (PAT o
                                           release-prepare.yml (workflow_dispatch → opens PR)
 ```
 
-- **`ci.yml`** — runs format/typecheck/build/lint/test on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream.
+- **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20 + 24 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)).
 - **`deploy-test.yml`** — manual `workflow_dispatch`. Calls CI, then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`.
 - **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it tags the commit and creates a GitHub Release from the matching `CHANGELOG.md` section. The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
@@ -214,9 +214,22 @@ npm run verify         # all CI checks in one go
 npm run format:check   # or run individually
 npm run typecheck
 npm run build
+npm run check:exports
 npm run lint
 npm run test
 ```
+
+`npm run verify` chains the exact targets `ci.yml` runs, so a green `verify`
+locally means a green CI. A husky `pre-push` hook runs `npm run verify`
+automatically — a regression cannot reach GitHub without the maintainer seeing
+it first. The only check `verify` cannot reproduce is CI's Node 20 + 24 matrix.
+
+`check:exports` runs `attw` + `publint` per package against the built `dist/`,
+catching broken or masquerading `exports` maps and dual-package issues. The
+`@composurecdk/module-compat` package (run by `npm run test`) spawns `node` to
+load every package under both `require()` and `import`, and synthesizes a CDK
+app under each module system. Together they enforce the dual-publish standard
+([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)).
 
 Deploy examples to your own account:
 

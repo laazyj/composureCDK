@@ -254,7 +254,7 @@ npx nx cdk examples -- destroy --all
 
 - **OIDC everywhere** — both AWS and npm. No long-lived credentials in GitHub.
 - **Environment-scoped trust** — the AWS role restricts assumption to the `sandbox` environment; npm trusted publishers restrict publishing to `release.yml` in the `npm` environment.
-- **Tag-based resource scoping** — Lambda, CloudWatch Logs, and IAM permissions use `aws:cloudformation:stack-name` tag conditions limited to `ComposureCDK-*`.
+- **Tag-based resource scoping** — Lambda, CloudWatch Logs, and IAM permissions use `aws:cloudformation:stack-name` tag conditions limited to `ComposureCDK-*`. SQS smoke-test access is ARN-scoped to the sandbox account (CloudFormation system tags don't propagate to SQS in a form IAM evaluates).
 - **npm provenance** — published packages include provenance attestations linking them to this repo and workflow run.
 - **Action pinning** — all GitHub Actions are pinned by commit SHA, kept current by Dependabot.
 - **Concurrency** — deploy-test uses `cancel-in-progress: false` so an in-flight deployment cannot be interrupted into an inconsistent state.

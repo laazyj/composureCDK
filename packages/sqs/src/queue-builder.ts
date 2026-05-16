@@ -1,3 +1,4 @@
+import { Annotations, Token } from "aws-cdk-lib";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IQueue, Queue, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { type IConstruct } from "constructs";
@@ -7,6 +8,17 @@ import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { QueueAlarmConfig } from "./queue-alarm-config.js";
 import { createQueueAlarms } from "./queue-alarms.js";
 import { QUEUE_DEFAULTS } from "./defaults.js";
+
+/**
+ * AWS-recommended minimum for `maxReceiveCount` on an SQS redrive
+ * policy. A consumer needs a few retries before SQS gives up and
+ * forwards the message to the dead-letter queue; anything below this
+ * tends to surface as a flood of "poison" messages from transient
+ * errors that would have succeeded on retry.
+ *
+ * @see https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html
+ */
+const RECOMMENDED_MIN_MAX_RECEIVE_COUNT = 5;
 
 /**
  * Configuration properties for the SQS queue builder.
@@ -105,6 +117,8 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
       ...queueProps,
     } as QueueBuilderProps;
 
+    warnIfLowMaxReceiveCount(scope, id, mergedProps);
+
     const queue = new Queue(scope, id, mergedProps);
 
     const alarms = createQueueAlarms(scope, id, queue, alarmConfig, this.#customAlarms);
@@ -140,4 +154,33 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
  */
 export function createQueueBuilder(): IQueueBuilder {
   return taggedBuilder<QueueBuilderProps, QueueBuilder>(QueueBuilder);
+}
+
+/**
+ * Annotates `scope` with a non-fatal warning when a redrive policy is
+ * configured with `maxReceiveCount` below the AWS-recommended floor
+ * of {@link RECOMMENDED_MIN_MAX_RECEIVE_COUNT}.
+ *
+ * The builder owns the redrive policy directly, so this is a true
+ * check rather than a contextual reminder — the actual configured
+ * value is compared. Short-circuits on unresolved tokens so stacks
+ * that thread `maxReceiveCount` through CFN parameters aren't spammed.
+ */
+function warnIfLowMaxReceiveCount(
+  scope: IConstruct,
+  id: string,
+  props: Partial<QueueBuilderProps>,
+): void {
+  const dlq = props.deadLetterQueue;
+  if (!dlq) return;
+  const maxReceiveCount = dlq.maxReceiveCount;
+  if (Token.isUnresolved(maxReceiveCount)) return;
+  if (maxReceiveCount >= RECOMMENDED_MIN_MAX_RECEIVE_COUNT) return;
+  Annotations.of(scope).addWarningV2(
+    "@composurecdk/sqs:redrive-low-max-receive-count",
+    `QueueBuilder "${id}": redrive policy maxReceiveCount is ${String(maxReceiveCount)}; ` +
+      `AWS recommends >= ${String(RECOMMENDED_MIN_MAX_RECEIVE_COUNT)} so the consumer ` +
+      `has room to retry before messages hit the dead-letter queue. ` +
+      `See https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html`,
+  );
 }

@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/sqs",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Composable SQS queue builder with well-architected defaults",
   "repository": {
     "type": "git",
@@ -37,9 +37,9 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.7.0",
-    "@composurecdk/cloudwatch": "^0.7.0",
-    "@composurecdk/core": "^0.7.0",
+    "@composurecdk/cloudformation": "^0.8.0",
+    "@composurecdk/cloudwatch": "^0.8.0",
+    "@composurecdk/core": "^0.8.0",
     "aws-cdk-lib": "^2.0.0",
     "constructs": "^10.0.0"
   },

@@ -1,3 +1,40 @@
+## 0.8.0 (2026-05-16)
+
+### 🚀 Features
+
+- dual ESM/CJS publishing as an enforced project-wide standard ([#126](https://github.com/laazyj/composureCDK/pull/126), [#119](https://github.com/laazyj/composureCDK/issues/119))
+- **eslint-plugin:** ban CJS-incompatible syntax in library src ([#119](https://github.com/laazyj/composureCDK/issues/119))
+- ⚠️ **lambda:** scope execution-role logs permissions to the function's own log group ([#105](https://github.com/laazyj/composureCDK/pull/105), [#41](https://github.com/laazyj/composureCDK/issues/41))
+- **lambda:** SQS event source wiring with contextual alarms ([#125](https://github.com/laazyj/composureCDK/pull/125), [#118](https://github.com/laazyj/composureCDK/issues/118))
+- **route53:** default-on DNS query logging with shared resource policy ([#101](https://github.com/laazyj/composureCDK/pull/101), [#44](https://github.com/laazyj/composureCDK/issues/44))
+- **sns:** protocol-specific subscription defaults ([#116](https://github.com/laazyj/composureCDK/pull/116), [#35](https://github.com/laazyj/composureCDK/issues/35))
+- **sqs:** add @composurecdk/sqs with QueueBuilder ([#115](https://github.com/laazyj/composureCDK/pull/115), [#112](https://github.com/laazyj/composureCDK/issues/112))
+
+### 🩹 Fixes
+
+- **ci:** trigger release.yml via tag push instead of workflow_call ([7a6eeb4](https://github.com/laazyj/composureCDK/commit/7a6eeb4))
+- ⚠️ **sns:** route SubscriptionBuilder through ITopicSubscription.bind() ([#39](https://github.com/laazyj/composureCDK/issues/39), [#38](https://github.com/laazyj/composureCDK/issues/38))
+
+### ⚠️ Breaking Changes
+
+- **sns:** route SubscriptionBuilder through ITopicSubscription.bind() ([#39](https://github.com/laazyj/composureCDK/issues/39), [#38](https://github.com/laazyj/composureCDK/issues/38))
+- **lambda:** scope execution-role logs permissions to the function's own log group ([#105](https://github.com/laazyj/composureCDK/pull/105), [#41](https://github.com/laazyj/composureCDK/issues/41))
+  the IAM role's CloudFormation logical id changes from
+  "<id>ServiceRole<hash>" (nested under the function) to
+  "<id>ExecutionRole<hash>" (sibling). Existing stacks will replace the
+  role on upgrade. Use .useCdkAutoRole() to opt back into CDK's prior
+  behaviour during a phased migration.
+  BREAKING CHANGE: FunctionBuilderProps.role is widened from IRole to
+  Resolvable<IRole>; the .role() setter is mutually exclusive with
+  .configureRole() and .useCdkAutoRole().
+  Closes #41
+
+### ❤️ Thank You
+
+- Claude (laazyj)
+- Claude Opus 4.7 (1M context)
+- Jason Duffett
+
 ## 0.7.0 (2026-05-08)
 
 ### 🚀 Features

@@ -9,8 +9,9 @@
     "typecheck": "npx nx run-many -t typecheck",
     "test": "npx nx run-many -t test",
     "build": "npx nx run-many -t build",
+    "check:exports": "npx nx run-many -t check:exports",
     "clean": "npx nx run-many -t clean",
-    "verify": "npm run format:check && npm run build && npm run lint && npm run test",
+    "verify": "npm run format:check && npm run build && npm run check:exports && npm run lint && npm run test",
     "prepare": "husky"
   },
   "repository": {
@@ -32,6 +33,7 @@
     "*.{ts,tsx,js,jsx,json,md,yaml,yml}": "prettier --write"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@composurecdk/eslint-plugin": "*",
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
     "@eslint/js": "^10.0.1",
@@ -42,6 +44,8 @@
     "lint-staged": "^17.0.4",
     "nx": "22.7.1",
     "prettier": "^3.8.3",
+    "publint": "^0.3.21",
+    "tshy": "^4.1.2",
     "typescript-eslint": "^8.59.2"
   }
 }

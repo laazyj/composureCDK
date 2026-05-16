@@ -1,0 +1,32 @@
+{
+  "name": "@composurecdk/module-compat",
+  "version": "0.7.0",
+  "description": "Executable consumption tests asserting every @composurecdk/* package resolves under both ESM import and CommonJS require",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laazyj/composureCDK",
+    "directory": "packages/module-compat"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules/.vite",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "Jason Duffett (https://github.com/laazyj)",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@composurecdk/cloudwatch": "^0.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/module-compat",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Executable consumption tests asserting every @composurecdk/* package resolves under both ESM import and CommonJS require",
   "private": true,
   "repository": {
@@ -22,26 +22,26 @@
     "node": ">=20"
   },
   "peerDependencies": {
-    "@composurecdk/acm": "^0.7.0",
-    "@composurecdk/apigateway": "^0.7.0",
-    "@composurecdk/budgets": "^0.7.0",
-    "@composurecdk/cloudformation": "^0.7.0",
-    "@composurecdk/cloudfront": "^0.7.0",
-    "@composurecdk/cloudwatch": "^0.7.0",
-    "@composurecdk/core": "^0.7.0",
-    "@composurecdk/ec2": "^0.7.0",
-    "@composurecdk/events": "^0.7.0",
-    "@composurecdk/iam": "^0.7.0",
-    "@composurecdk/lambda": "^0.7.0",
-    "@composurecdk/logs": "^0.7.0",
-    "@composurecdk/route53": "^0.7.0",
-    "@composurecdk/s3": "^0.7.0",
-    "@composurecdk/sns": "^0.7.0",
-    "@composurecdk/sqs": "^0.7.0"
+    "@composurecdk/acm": "^0.8.0",
+    "@composurecdk/apigateway": "^0.8.0",
+    "@composurecdk/budgets": "^0.8.0",
+    "@composurecdk/cloudformation": "^0.8.0",
+    "@composurecdk/cloudfront": "^0.8.0",
+    "@composurecdk/cloudwatch": "^0.8.0",
+    "@composurecdk/core": "^0.8.0",
+    "@composurecdk/ec2": "^0.8.0",
+    "@composurecdk/events": "^0.8.0",
+    "@composurecdk/iam": "^0.8.0",
+    "@composurecdk/lambda": "^0.8.0",
+    "@composurecdk/logs": "^0.8.0",
+    "@composurecdk/route53": "^0.8.0",
+    "@composurecdk/s3": "^0.8.0",
+    "@composurecdk/sns": "^0.8.0",
+    "@composurecdk/sqs": "^0.8.0"
   },
   "devDependencies": {
     "@types/node": "^25.6.2",
-    "aws-cdk-lib": "^2.253.1",
+    "aws-cdk-lib": "^2.254.0",
     "constructs": "^10.6.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.4"

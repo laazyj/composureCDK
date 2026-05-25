@@ -1,20 +1,20 @@
-import { ComparisonOperator, type Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import type { AlarmDefinition } from "./alarm-definition.js";
+import { ComparisonOperator, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import type { AlarmDefinition, AlarmMetric } from "./alarm-definition.js";
 import type { AlarmName } from "./alarm-name.js";
 
 /**
  * Fluent builder for constructing deferred {@link AlarmDefinition}s.
  *
- * Stores a metric factory `(construct: T) => Metric` at configuration time.
- * Call {@link resolve} during build to invoke the factory and produce a
- * complete {@link AlarmDefinition}.
+ * Stores a metric factory `(construct: T) => AlarmMetric` at configuration time
+ * (a `Metric` or a `MathExpression`). Call {@link resolve} during build to
+ * invoke the factory and produce a complete {@link AlarmDefinition}.
  *
  * @typeParam TConstruct - The construct type the metric factory receives.
  */
 export class AlarmDefinitionBuilder<TConstruct> {
   readonly #key: string;
   #alarmName?: AlarmName;
-  #metricFactory?: (construct: TConstruct) => Metric;
+  #metricFactory?: (construct: TConstruct) => AlarmMetric;
   #threshold = 0;
   #comparisonOperator = ComparisonOperator.GREATER_THAN_THRESHOLD;
   #evaluationPeriods = 1;
@@ -26,7 +26,7 @@ export class AlarmDefinitionBuilder<TConstruct> {
     this.#key = key;
   }
 
-  metric(factory: (construct: TConstruct) => Metric): this {
+  metric(factory: (construct: TConstruct) => AlarmMetric): this {
     this.#metricFactory = factory;
     return this;
   }

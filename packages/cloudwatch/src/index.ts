@@ -1,5 +1,5 @@
 export type { AlarmConfig, AlarmConfigDefaults } from "./alarm-config.js";
-export type { AlarmDefinition } from "./alarm-definition.js";
+export type { AlarmDefinition, AlarmMetric } from "./alarm-definition.js";
 export { AlarmDefinitionBuilder } from "./alarm-definition-builder.js";
 export { type AlarmName, alarmName } from "./alarm-name.js";
 export { defaultAlarmName } from "./default-alarm-name.js";

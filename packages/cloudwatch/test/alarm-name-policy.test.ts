@@ -4,6 +4,7 @@ import { Alarm, ComparisonOperator, Metric, TreatMissingData } from "aws-cdk-lib
 import { Template } from "aws-cdk-lib/assertions";
 import { alarmName } from "../src/alarm-name.js";
 import { alarmNamePolicy } from "../src/policies/alarm-name-policy.js";
+import { withoutIsCfnStatics } from "./_simulate-old-cdk.js";
 
 function makeMetric(): Metric {
   return new Metric({ namespace: "Test", metricName: "Count", period: Duration.minutes(1) });
@@ -44,6 +45,20 @@ describe("alarmNamePolicy", () => {
     for (const name of Object.values(names)) {
       expect(name.startsWith("prod-")).toBe(true);
     }
+  });
+
+  it("applies on aws-cdk-lib < 2.231.0, where isCfn* statics are absent (#146)", () => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack");
+    makeAlarm(stack, "Errors", "stack/svc/errors");
+
+    withoutIsCfnStatics(() => {
+      alarmNamePolicy(app, { defaults: { prefix: "prod" } });
+      // The aspect runs during synth; on the old code this threw
+      // "TypeError: CfnAlarm.isCfnAlarm is not a function".
+      const names = alarmNamesByLogicalId(Template.fromStack(stack));
+      expect(Object.values(names)).toContain("prod-stack/svc/errors");
+    });
   });
 
   it("applies defaults.suffix", () => {

@@ -15,6 +15,7 @@ import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { Template } from "aws-cdk-lib/assertions";
 import { alarmActionsPolicy } from "../src/policies/alarm-actions-policy.js";
+import { withoutIsCfnStatics } from "./_simulate-old-cdk.js";
 
 function makeMetric(): Metric {
   return new Metric({ namespace: "Test", metricName: "Count", period: Duration.minutes(1) });
@@ -107,6 +108,20 @@ describe("alarmActionsPolicy", () => {
       const resources = template.findResources("AWS::CloudWatch::Alarm");
       const bare = Object.values(resources)[0] as { Properties: { AlarmActions?: unknown[] } };
       expect(bare.Properties.AlarmActions).toBeUndefined();
+    });
+
+    it("applies on aws-cdk-lib < 2.231.0, where isCfn* statics are absent (#146)", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const topic = new Topic(stack, "Topic");
+      makeAlarm(stack, "Errors");
+
+      withoutIsCfnStatics(() => {
+        alarmActionsPolicy(app, { defaults: { alarmActions: [new SnsAction(topic)] } });
+        // The aspect runs during synth; on the old code this threw
+        // "TypeError: CfnAlarm.isCfnAlarm is not a function".
+        expect(getAlarmActions(Template.fromStack(stack), "Errors")).toHaveLength(1);
+      });
     });
 
     it("does not affect non-alarm constructs", () => {

@@ -46,6 +46,40 @@ The `description` method also accepts a factory for contextual descriptions:
 builder.description((def) => `Alert when invocations >= ${def.threshold} per minute`);
 ```
 
+### Rate and ratio alarms
+
+The metric factory may return either a `Metric` or a `MathExpression` (the
+exported `AlarmMetric` union), so rate/ratio alarms share the same definition
+shape:
+
+```ts
+import { MathExpression } from "aws-cdk-lib/aws-cloudwatch";
+
+new AlarmDefinitionBuilder<LambdaFunction>("errorRate")
+  // Guard the denominator: a divide-by-zero data point is dropped, which would
+  // otherwise push the alarm into INSUFFICIENT_DATA when there are no invocations.
+  .metric(
+    (fn) =>
+      new MathExpression({
+        expression: "IF(invocations > 0, errors / invocations, 0)",
+        usingMetrics: {
+          errors: fn.metricErrors(),
+          invocations: fn.metricInvocations(),
+        },
+        // Set the period on the expression — it overrides the period of every
+        // metric in usingMetrics (default 5 minutes otherwise).
+        period: Duration.minutes(1),
+      }),
+  )
+  .threshold(0.05)
+  .greaterThanOrEqual()
+  .treatMissingData(TreatMissingData.NOT_BREACHING);
+```
+
+Only single-time-series expressions can be alarmed: a `MathExpression` whose
+expression uses `SEARCH(...)` (or otherwise returns multiple series) is rejected
+by CloudWatch at deploy time.
+
 ## createAlarms
 
 Factory function that creates CDK [Alarm](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudwatch.Alarm.html) constructs from fully-resolved `AlarmDefinition`s. Returns a `Record<string, Alarm>` keyed by each definition's key.

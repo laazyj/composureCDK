@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
-import { ComparisonOperator, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import { Template } from "aws-cdk-lib/assertions";
+import {
+  ComparisonOperator,
+  MathExpression,
+  Metric,
+  TreatMissingData,
+} from "aws-cdk-lib/aws-cloudwatch";
+import { Match, Template } from "aws-cdk-lib/assertions";
 import { alarmName } from "../src/alarm-name.js";
 import { createAlarms } from "../src/create-alarms.js";
 import type { AlarmDefinition } from "../src/alarm-definition.js";
@@ -83,6 +88,44 @@ describe("createAlarms", () => {
     ]);
     Template.fromStack(stack).hasResourceProperties("AWS::CloudWatch::Alarm", {
       AlarmName: "custom-name",
+    });
+  });
+
+  it("creates an alarm from a MathExpression metric", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const errors = new Metric({
+      namespace: "Test",
+      metricName: "Errors",
+      period: Duration.minutes(1),
+    });
+    const invocations = new Metric({
+      namespace: "Test",
+      metricName: "Invocations",
+      period: Duration.minutes(1),
+    });
+
+    const result = createAlarms(stack, "Fn", [
+      makeDefinition({
+        key: "errorRate",
+        metric: new MathExpression({
+          expression: "IF(invocations > 0, errors / invocations, 0)",
+          usingMetrics: { errors, invocations },
+          period: Duration.minutes(1),
+        }),
+        threshold: 0.05,
+        comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      }),
+    ]);
+
+    expect(result.errorRate).toBeDefined();
+    Template.fromStack(stack).hasResourceProperties("AWS::CloudWatch::Alarm", {
+      // Math-expression alarms are emitted as a Metrics array, not the
+      // top-level MetricName/Namespace/Statistic of a single-metric alarm.
+      MetricName: Match.absent(),
+      Statistic: Match.absent(),
+      Metrics: Match.arrayWith([
+        Match.objectLike({ Expression: "IF(invocations > 0, errors / invocations, 0)" }),
+      ]),
     });
   });
 

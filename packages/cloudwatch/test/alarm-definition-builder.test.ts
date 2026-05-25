@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { Duration } from "aws-cdk-lib";
-import { ComparisonOperator, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import {
+  ComparisonOperator,
+  MathExpression,
+  Metric,
+  TreatMissingData,
+} from "aws-cdk-lib/aws-cloudwatch";
 import { AlarmDefinitionBuilder } from "../src/alarm-definition-builder.js";
 import { alarmName } from "../src/alarm-name.js";
 
@@ -32,6 +37,25 @@ describe("AlarmDefinitionBuilder", () => {
       treatMissingData: TreatMissingData.BREACHING,
       description: "Test alarm description",
     });
+  });
+
+  it("accepts a MathExpression from the metric factory", () => {
+    const expression = new MathExpression({
+      expression: "errors / invocations",
+      usingMetrics: {
+        errors: new Metric({ namespace: "Test", metricName: "Errors" }),
+        invocations: new Metric({ namespace: "Test", metricName: "Invocations" }),
+      },
+      period: Duration.minutes(1),
+    });
+
+    const definition = new AlarmDefinitionBuilder<string>("errorRate")
+      .metric(() => expression)
+      .threshold(0.05)
+      .greaterThanOrEqual()
+      .resolve("unused");
+
+    expect(definition.metric).toBe(expression);
   });
 
   it("applies sensible defaults", () => {

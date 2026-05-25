@@ -10,6 +10,7 @@
     "test": "npx nx run-many -t test",
     "test:cdk-floor": "node scripts/cdk-floor-test.mjs",
     "test:cdk-floor-suites": "node scripts/cdk-floor-suites.mjs",
+    "cdk-floors:establish": "node scripts/cdk-floors.mjs establish",
     "build": "npx nx run-many -t build",
     "check:exports": "npx nx run-many -t check:exports",
     "clean": "npx nx run-many -t clean",

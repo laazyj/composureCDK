@@ -1,0 +1,84 @@
+{
+  "$comment": "Per-package aws-cdk-lib import-time floors, from `node scripts/cdk-floors.mjs establish`. Ladder-granular; floor is the lowest probed release that loads, gatedBy is the API missing one rung lower.",
+  "ladder": [
+    "2.230.0",
+    "2.200.0",
+    "2.180.0",
+    "2.160.0",
+    "2.140.0",
+    "2.131.0",
+    "2.120.0",
+    "2.100.0",
+    "2.80.0",
+    "2.60.0",
+    "2.46.0",
+    "2.20.0",
+    "2.1.0"
+  ],
+  "floors": {
+    "acm": {
+      "floor": "2.120.0",
+      "gatedBy": "The requested module 'aws-cdk-lib/aws-certificatemanager' does not provide an export named 'KeyAlgorithm'"
+    },
+    "apigateway": {
+      "floor": "2.60.0",
+      "gatedBy": "The requested module 'aws-cdk-lib/aws-cloudwatch' does not provide an export named 'Stats'"
+    },
+    "budgets": {
+      "floor": "2.1.0",
+      "gatedBy": "<=2.1.0 (no lower rung probed)"
+    },
+    "cloudformation": {
+      "floor": "2.1.0",
+      "gatedBy": "<=2.1.0 (no lower rung probed)"
+    },
+    "cloudfront": {
+      "floor": "2.120.0",
+      "gatedBy": "The requested module 'aws-cdk-lib/aws-cloudfront' does not provide an export named 'FunctionRuntime'"
+    },
+    "cloudwatch": {
+      "floor": "2.1.0",
+      "gatedBy": "<=2.1.0 (no lower rung probed)"
+    },
+    "core": {
+      "floor": "2.1.0",
+      "gatedBy": "<=2.1.0 (no lower rung probed)"
+    },
+    "ec2": {
+      "floor": "2.60.0",
+      "gatedBy": "The requested module 'aws-cdk-lib/aws-cloudwatch' does not provide an export named 'Stats'"
+    },
+    "events": {
+      "floor": "2.1.0",
+      "gatedBy": "<=2.1.0 (no lower rung probed)"
+    },
+    "iam": {
+      "floor": "2.1.0",
+      "gatedBy": "<=2.1.0 (no lower rung probed)"
+    },
+    "lambda": {
+      "floor": "2.180.0",
+      "gatedBy": "The requested module 'aws-cdk-lib/aws-lambda' does not provide an export named 'MetricType'"
+    },
+    "logs": {
+      "floor": "2.1.0",
+      "gatedBy": "<=2.1.0 (no lower rung probed)"
+    },
+    "route53": {
+      "floor": "2.230.0",
+      "gatedBy": "The requested module 'aws-cdk-lib/aws-route53' does not provide an export named 'HttpsRecord'"
+    },
+    "s3": {
+      "floor": "2.60.0",
+      "gatedBy": "The requested module 'aws-cdk-lib/aws-cloudwatch' does not provide an export named 'Stats'"
+    },
+    "sns": {
+      "floor": "2.1.0",
+      "gatedBy": "<=2.1.0 (no lower rung probed)"
+    },
+    "sqs": {
+      "floor": "2.1.0",
+      "gatedBy": "<=2.1.0 (no lower rung probed)"
+    }
+  }
+}

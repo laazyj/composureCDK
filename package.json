@@ -8,6 +8,8 @@
     "format:check": "prettier --check .",
     "typecheck": "npx nx run-many -t typecheck",
     "test": "npx nx run-many -t test",
+    "test:cdk-floor": "node scripts/cdk-floor-test.mjs",
+    "test:cdk-floor-suites": "node scripts/cdk-floor-suites.mjs",
     "build": "npx nx run-many -t build",
     "check:exports": "npx nx run-many -t check:exports",
     "clean": "npx nx run-many -t clean",

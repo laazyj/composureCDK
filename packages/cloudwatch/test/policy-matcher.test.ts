@@ -1,11 +1,60 @@
 import { describe, it, expect } from "vitest";
-import type { CfnAlarm, CfnCompositeAlarm, IAlarm } from "aws-cdk-lib/aws-cloudwatch";
+import { App, Stack } from "aws-cdk-lib";
+import { CfnAlarm, CfnCompositeAlarm, type IAlarm } from "aws-cdk-lib/aws-cloudwatch";
+import { CfnBucket } from "aws-cdk-lib/aws-s3";
 import {
   type AlarmMatchContext,
   type AlarmRuleScope,
+  isCfnAlarm,
+  isCfnCompositeAlarm,
   matchesOne,
   ruleMatches,
 } from "../src/policies/policy-matcher.js";
+import { withoutIsCfnStatics } from "./_simulate-old-cdk.js";
+
+function makeCfnAlarm(scope: Stack, id: string): CfnAlarm {
+  return new CfnAlarm(scope, id, {
+    comparisonOperator: "GreaterThanThreshold",
+    evaluationPeriods: 1,
+    metricName: "Count",
+    namespace: "Test",
+    period: 60,
+    statistic: "Sum",
+    threshold: 1,
+  });
+}
+
+describe("isCfnAlarm / isCfnCompositeAlarm", () => {
+  it("identifies each L1 alarm kind and rejects the other", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const alarm = makeCfnAlarm(stack, "Alarm");
+    const composite = new CfnCompositeAlarm(stack, "Composite", { alarmRule: "ALARM(x)" });
+
+    expect(isCfnAlarm(alarm)).toBe(true);
+    expect(isCfnCompositeAlarm(alarm)).toBe(false);
+    expect(isCfnCompositeAlarm(composite)).toBe(true);
+    expect(isCfnAlarm(composite)).toBe(false);
+  });
+
+  it("rejects non-alarm resources", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const bucket = new CfnBucket(stack, "Bucket");
+
+    expect(isCfnAlarm(bucket)).toBe(false);
+    expect(isCfnCompositeAlarm(bucket)).toBe(false);
+  });
+
+  it("works on aws-cdk-lib < 2.250 (no isCfn* statics)", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const alarm = makeCfnAlarm(stack, "Alarm");
+    const composite = new CfnCompositeAlarm(stack, "Composite", { alarmRule: "ALARM(x)" });
+
+    withoutIsCfnStatics(() => {
+      expect(isCfnAlarm(alarm)).toBe(true);
+      expect(isCfnCompositeAlarm(composite)).toBe(true);
+    });
+  });
+});
 
 function ctx(overrides: Partial<AlarmMatchContext> = {}): AlarmMatchContext {
   return {

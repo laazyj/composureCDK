@@ -1,8 +1,14 @@
 import { Aspects, Stack } from "aws-cdk-lib";
-import { CfnAlarm, CfnCompositeAlarm } from "aws-cdk-lib/aws-cloudwatch";
+import type { CfnAlarm, CfnCompositeAlarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IConstruct } from "constructs";
 import { type AlarmName, alarmName as brandAlarmName } from "../alarm-name.js";
-import { type AlarmMatchContext, type AlarmRuleScope, ruleMatches } from "./policy-matcher.js";
+import {
+  type AlarmMatchContext,
+  type AlarmRuleScope,
+  isCfnAlarm,
+  isCfnCompositeAlarm,
+  ruleMatches,
+} from "./policy-matcher.js";
 
 /** Context passed to {@link AlarmNameRule.transform}. */
 export interface AlarmNameTransformContext extends AlarmMatchContext {
@@ -105,8 +111,8 @@ export function alarmNamePolicy(scope: IConstruct, config: AlarmNamePolicyConfig
 
   Aspects.of(scope).add({
     visit(node: IConstruct): void {
-      const isAlarm = CfnAlarm.isCfnAlarm(node);
-      const isComposite = CfnCompositeAlarm.isCfnCompositeAlarm(node);
+      const isAlarm = isCfnAlarm(node);
+      const isComposite = isCfnCompositeAlarm(node);
       if (!isAlarm && !isComposite) return;
       const cfn = node;
       if (processed.has(cfn)) return;

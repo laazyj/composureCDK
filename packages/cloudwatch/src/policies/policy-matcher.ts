@@ -1,4 +1,27 @@
-import type { CfnAlarm, CfnCompositeAlarm, IAlarm } from "aws-cdk-lib/aws-cloudwatch";
+import { CfnResource } from "aws-cdk-lib";
+import { CfnAlarm, CfnCompositeAlarm, type IAlarm } from "aws-cdk-lib/aws-cloudwatch";
+import type { IConstruct } from "constructs";
+
+/**
+ * Version-portable replacement for `CfnAlarm.isCfnAlarm`, which only exists in
+ * aws-cdk-lib >= ~2.250 and throws `TypeError` on older versions inside our
+ * declared `^2.0.0` peer range (issue #146). Checks the foundational
+ * `CfnResource.isCfnResource` guard plus a `cfnResourceType` compare — exactly
+ * what the modern static does internally — so it works across the full range.
+ */
+export function isCfnAlarm(x: IConstruct): x is CfnAlarm {
+  return CfnResource.isCfnResource(x) && x.cfnResourceType === CfnAlarm.CFN_RESOURCE_TYPE_NAME;
+}
+
+/**
+ * Version-portable replacement for `CfnCompositeAlarm.isCfnCompositeAlarm`.
+ * See {@link isCfnAlarm} for why this exists.
+ */
+export function isCfnCompositeAlarm(x: IConstruct): x is CfnCompositeAlarm {
+  return (
+    CfnResource.isCfnResource(x) && x.cfnResourceType === CfnCompositeAlarm.CFN_RESOURCE_TYPE_NAME
+  );
+}
 
 /**
  * Selects which alarms a rule applies to.

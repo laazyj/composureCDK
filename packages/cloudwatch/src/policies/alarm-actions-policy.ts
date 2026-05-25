@@ -1,13 +1,13 @@
 import { Aspects, Stack } from "aws-cdk-lib";
-import {
-  CfnAlarm,
-  CfnCompositeAlarm,
-  type IAlarm,
-  type IAlarmAction,
-} from "aws-cdk-lib/aws-cloudwatch";
+import type { CfnAlarm, CfnCompositeAlarm, IAlarm, IAlarmAction } from "aws-cdk-lib/aws-cloudwatch";
 import { type IConstruct } from "constructs";
-import { type AlarmRuleScope, ruleMatches } from "./policy-matcher.js";
-import type { AlarmMatchContext } from "./policy-matcher.js";
+import {
+  type AlarmMatchContext,
+  type AlarmRuleScope,
+  isCfnAlarm,
+  isCfnCompositeAlarm,
+  ruleMatches,
+} from "./policy-matcher.js";
 
 export type { AlarmMatchContext, AlarmMatcher } from "./policy-matcher.js";
 
@@ -82,8 +82,8 @@ type AlarmVisitor = (
 function visitAlarms(scope: IConstruct, visit: AlarmVisitor): void {
   Aspects.of(scope).add({
     visit(node: IConstruct): void {
-      const isAlarm = CfnAlarm.isCfnAlarm(node);
-      const isComposite = CfnCompositeAlarm.isCfnCompositeAlarm(node);
+      const isAlarm = isCfnAlarm(node);
+      const isComposite = isCfnCompositeAlarm(node);
       if (!isAlarm && !isComposite) return;
       const parent = node.node.scope;
       const l2 = isL2AlarmLike(parent) ? parent : undefined;
@@ -105,9 +105,10 @@ function visitAlarms(scope: IConstruct, visit: AlarmVisitor): void {
  * any `IAlarmAction` instances in `config` (e.g. `new SnsAction(topic)`)
  * must reference constructs that already exist when the policy is called.
  *
- * Detection uses the jsii type guards `CfnAlarm.isCfnAlarm` /
- * `CfnCompositeAlarm.isCfnCompositeAlarm` on the L1 resource; the L2 parent
- * is found via duck-typing on `addAlarmAction`. Actions are attached through
+ * Detection uses the version-portable `isCfnAlarm` / `isCfnCompositeAlarm`
+ * guards (`CfnResource.isCfnResource` + `cfnResourceType`, so they work below
+ * aws-cdk-lib 2.250) on the L1 resource; the L2 parent is found via
+ * duck-typing on `addAlarmAction`. Actions are attached through
  * the L2 so that `IAlarmAction.bind()` runs and permissions are wired
  * correctly. Bare `CfnAlarm` nodes (created without an L2 wrapper) are
  * detected but silently skipped.

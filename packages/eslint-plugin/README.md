@@ -22,12 +22,13 @@ File-level overrides (e.g. disabling a rule on a specific file) belong in the co
 
 ## Rules
 
-| Rule                                             | What it flags                                                                               |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| `composurecdk/builder-must-be-tagged`            | `Builder` / `IBuilder` from `@composurecdk/core` in library builders (use `taggedBuilder`). |
-| `composurecdk/builder-must-implement-copy-state` | Builder classes with private fields but no `[COPY_STATE]` hook (see ADR-0005).              |
-| `composurecdk/lifecycle-build-context-required`  | `Lifecycle.build()` missing the `context` param when the class uses `Resolvable<…>`.        |
-| `composurecdk/no-cjs-incompatible-syntax`        | `import.meta` / top-level `await` in library `src/` — neither emits to CommonJS (ADR-0007). |
+| Rule                                             | What it flags                                                                                                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `composurecdk/builder-must-be-tagged`            | `Builder` / `IBuilder` from `@composurecdk/core` in library builders (use `taggedBuilder`).                                                                         |
+| `composurecdk/builder-must-implement-copy-state` | Builder classes with private fields but no `[COPY_STATE]` hook (see ADR-0005).                                                                                      |
+| `composurecdk/lifecycle-build-context-required`  | `Lifecycle.build()` missing the `context` param when the class uses `Resolvable<…>`.                                                                                |
+| `composurecdk/no-cdk-api-above-floor`            | `aws-cdk-lib` APIs newer than the supported peer floor (e.g. the per-resource `isCfn<Resource>` L1 static guards) — they throw on older versions in the peer range. |
+| `composurecdk/no-cjs-incompatible-syntax`        | `import.meta` / top-level `await` in library `src/` — neither emits to CommonJS (ADR-0007).                                                                         |
 
 The `recommended` preset also bans the TypeScript `private` modifier via `no-restricted-syntax` (use ECMAScript `#field` instead — TS `private` leaks through `keyof T` into emitted `.d.ts`, producing TS4094 downstream).
 

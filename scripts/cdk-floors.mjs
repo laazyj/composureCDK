@@ -1,22 +1,25 @@
 #!/usr/bin/env node
 
 /**
- * Per-package aws-cdk-lib floor tooling.
+ * Per-package aws-cdk-lib floor tooling. cdk-floors.json is the curated source
+ * of truth (package -> { floor, gatedBy }); four modes feed, apply and guard it:
  *
- * `establish` sweeps a descending ladder of real aws-cdk-lib versions and, for
- * each publishable @composurecdk package, records the lowest version it still
- * loads on plus the API that gates it (the named export missing one rung
- * lower). It writes that to cdk-floors.json — the source of truth from which
- * per-package `peerDependencies` are set and enforced.
+ * - `establish` sweeps a descending ladder of real aws-cdk-lib versions and,
+ *   for each publishable @composurecdk package, records the lowest version it
+ *   still loads on plus the API that gates it (the named export missing one
+ *   rung lower). It writes a ladder-granular draft to cdk-floors.discovered.json
+ *   to be refined into cdk-floors.json — re-running it never clobbers curation.
+ * - `apply` writes each package's peerDependencies.aws-cdk-lib from the manifest.
+ * - `check` asserts package.json ranges match the manifest (a cheap CI gate).
+ * - `enforce` loads each package at its own declared floor and fails if any
+ *   doesn't — the "don't breach the floor" guard.
  *
- * This measures the import-time floor (named exports a package pulls from
- * aws-cdk-lib), which is where every floor constraint we have hit lives. The
- * runtime-complete guard is `enforce` (runs each package's suite at its
- * declared floor); a runtime-only gap there raises the floor above what
- * `establish` found.
+ * `establish`/`enforce` measure the import-time floor (named exports a package
+ * pulls from aws-cdk-lib), which is where every floor constraint we have hit
+ * lives. A runtime-only gap would surface in a package's suite run at its floor.
  *
- * Usage: node scripts/cdk-floors.mjs establish
- * Run `npm run build` first (it packs from each package's dist).
+ * Usage: node scripts/cdk-floors.mjs <establish|apply|check|enforce>
+ * `establish`/`enforce` need `npm run build` first (they pack from each dist).
  */
 
 import { execFileSync } from "node:child_process";
@@ -36,6 +39,10 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..");
 const PACKAGES_DIR = join(REPO_ROOT, "packages");
 const MANIFEST = join(REPO_ROOT, "cdk-floors.json");
+// `establish` writes its raw discovery here; cdk-floors.json is the curated,
+// refined source of truth that `apply`/`check` consume — so re-running
+// `establish` never clobbers hand-refined floors.
+const DISCOVERED = join(REPO_ROOT, "cdk-floors.discovered.json");
 const CONSTRUCTS_RANGE = "^10.0.0";
 
 // Descending ladder of real aws-cdk-lib releases to probe. Floors land on a
@@ -96,7 +103,10 @@ function probeAtVersion(version, tarballs, cacheDir) {
       `${JSON.stringify({ name: "cdk-floor-probe", private: true, type: "module", dependencies }, null, 2)}\n`,
     );
     copyFileSync(join(SCRIPT_DIR, "cdk-floor", "probe.mjs"), join(rig, "probe.mjs"));
-    execFileSync("npm", ["install", "--no-audit", "--no-fund"], {
+    // --legacy-peer-deps: we deliberately install at versions that violate the
+    // packages' own declared peer floors — the point is to test whether the
+    // imports resolve at `version`, not whether the declared ranges agree.
+    execFileSync("npm", ["install", "--no-audit", "--no-fund", "--legacy-peer-deps"], {
       cwd: rig,
       stdio: ["ignore", "ignore", "inherit"],
     });
@@ -145,12 +155,12 @@ function establish() {
     }
 
     writeFileSync(
-      MANIFEST,
+      DISCOVERED,
       `${JSON.stringify(
         {
           $comment:
-            "Per-package aws-cdk-lib import-time floors, from `node scripts/cdk-floors.mjs establish`. " +
-            "Ladder-granular; floor is the lowest probed release that loads, gatedBy is the API missing one rung lower.",
+            "Raw discovery from `node scripts/cdk-floors.mjs establish` — ladder-granular. " +
+            "Refine the floors to the exact introducing release and copy into cdk-floors.json (the curated source of truth).",
           ladder: LADDER,
           floors,
         },
@@ -159,7 +169,7 @@ function establish() {
       )}\n`,
     );
 
-    console.log(`\nWrote ${MANIFEST}\n`);
+    console.log(`\nWrote ${DISCOVERED} (draft — refine into cdk-floors.json)\n`);
     for (const [pkg, { floor, gatedBy }] of Object.entries(floors)) {
       console.log(`  ${pkg.padEnd(16)} >= ${floor.padEnd(10)} ${gatedBy ?? ""}`);
     }
@@ -168,10 +178,100 @@ function establish() {
   }
 }
 
+function pkgJsonPath(pkg) {
+  return join(PACKAGES_DIR, pkg, "package.json");
+}
+
+function readFloors() {
+  return JSON.parse(readFileSync(MANIFEST, "utf8")).floors;
+}
+
+/** Writes each package's peerDependencies.aws-cdk-lib from the curated manifest. */
+function apply() {
+  for (const [pkg, { floor }] of Object.entries(readFloors())) {
+    const path = pkgJsonPath(pkg);
+    const json = JSON.parse(readFileSync(path, "utf8"));
+    if (json.peerDependencies?.["aws-cdk-lib"] === undefined) {
+      console.log(`  ${pkg.padEnd(16)} skipped (no aws-cdk-lib peer — constructs only)`);
+      continue;
+    }
+    json.peerDependencies["aws-cdk-lib"] = `^${floor}`;
+    writeFileSync(path, `${JSON.stringify(json, null, 2)}\n`);
+    console.log(`  ${pkg.padEnd(16)} aws-cdk-lib ^${floor}`);
+  }
+  console.log("\nApplied to package.json files (run `npm run format` to normalise).");
+}
+
+/** Asserts each package.json peer range matches the manifest; non-zero on drift. */
+function check() {
+  const floors = readFloors();
+  const mismatches = [];
+  for (const [pkg, { floor }] of Object.entries(floors)) {
+    const actual = JSON.parse(readFileSync(pkgJsonPath(pkg), "utf8")).peerDependencies?.[
+      "aws-cdk-lib"
+    ];
+    if (actual !== `^${floor}`) {
+      mismatches.push(
+        `  ${pkg}: package.json has "${actual ?? "(unset)"}", manifest expects "^${floor}"`,
+      );
+    }
+  }
+  if (mismatches.length > 0) {
+    console.error(
+      `cdk-floors check failed — run \`npm run cdk-floors:apply\`:\n${mismatches.join("\n")}`,
+    );
+    process.exit(1);
+  }
+  console.log(
+    `cdk-floors check passed (${Object.keys(floors).length} packages match the manifest)`,
+  );
+}
+
+/**
+ * Loads each package against a real install of its *own* declared floor and
+ * fails if any doesn't — the "don't breach the floor" guard. Catches a change
+ * that reaches for an aws-cdk-lib API newer than the package promises.
+ */
+function enforce() {
+  const byFloor = new Map();
+  for (const [pkg, { floor }] of Object.entries(readFloors())) {
+    if (!byFloor.has(floor)) byFloor.set(floor, []);
+    byFloor.get(floor).push(`@composurecdk/${pkg}`);
+  }
+  const cacheDir = mkdtempSync(join(tmpdir(), "composurecdk-floor-tarballs-"));
+  try {
+    console.log("Packing publishable packages …");
+    const tarballs = packAll(cacheDir);
+    const failures = [];
+    for (const [floor, group] of [...byFloor].sort()) {
+      process.stdout.write(`Enforcing aws-cdk-lib@${floor} for ${group.length} package(s) … `);
+      const loaded = probeAtVersion(floor, tarballs, cacheDir).filter((r) =>
+        group.includes(r.name),
+      );
+      const failed = loaded.filter((r) => !r.ok);
+      console.log(failed.length === 0 ? "ok" : `${failed.length} FAILED`);
+      for (const r of failed) failures.push(`  ${r.name} @ ${floor}: ${r.error}`);
+    }
+    if (failures.length > 0) {
+      console.error(
+        `\ncdk-floors enforce failed — a package needs a newer aws-cdk-lib than its declared floor:\n${failures.join("\n")}\n\n` +
+          "Either avoid the newer API, or raise the floor (update cdk-floors.json, run `npm run cdk-floors:apply`).",
+      );
+      process.exit(1);
+    }
+    console.log("\ncdk-floors enforce passed (every package loads at its declared floor)");
+  } finally {
+    rmSync(cacheDir, { recursive: true, force: true });
+  }
+}
+
 const mode = process.argv[2];
-if (mode === "establish") {
-  establish();
+const modes = { establish, apply, check, enforce };
+if (modes[mode] !== undefined) {
+  modes[mode]();
 } else {
-  console.error(`Unknown mode "${mode ?? ""}". Usage: node scripts/cdk-floors.mjs establish`);
+  console.error(
+    `Unknown mode "${mode ?? ""}". Usage: node scripts/cdk-floors.mjs <establish|apply|check|enforce>`,
+  );
   process.exit(1);
 }

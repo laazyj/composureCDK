@@ -6,3 +6,6 @@ dist
 cdk.out
 .vscode/
 .claude/
+
+# cdk-floors establish draft (curated values live in cdk-floors.json)
+cdk-floors.discovered.json

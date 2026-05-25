@@ -58,6 +58,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Cheap gate: each package's peerDependencies.aws-cdk-lib must match the
+      # cdk-floors.json manifest.
+      - name: Check CDK floor ranges in sync
+        run: npm run cdk-floors:check
+
       - name: Test
         run: npm run test
 
@@ -90,3 +95,8 @@ jobs:
       # catching published packages that reach for a too-new CDK API (#146).
       - name: Synth against the aws-cdk-lib floor
         run: npm run test:cdk-floor
+
+      # Loads each package at its own declared per-package floor — fails if a
+      # change reaches for an API newer than the package promises.
+      - name: Enforce per-package floors
+        run: npm run cdk-floors:enforce

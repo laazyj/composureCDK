@@ -91,7 +91,12 @@ try {
   copyFileSync(join(SCRIPT_DIR, "cdk-floor", "synth.mjs"), join(rig, "synth.mjs"));
 
   console.log(`Installing aws-cdk-lib@${FLOOR} + ${packed.length} packed packages …`);
-  execFileSync("npm", ["install", "--no-audit", "--no-fund"], { cwd: rig, stdio: "inherit" });
+  // --legacy-peer-deps so a CDK_FLOOR below some package's declared floor still
+  // installs (we want to test whether the synth resolves, not the peer ranges).
+  execFileSync("npm", ["install", "--no-audit", "--no-fund", "--legacy-peer-deps"], {
+    cwd: rig,
+    stdio: "inherit",
+  });
 
   console.log("Synthesising the composed system against the floor …");
   execFileSync(process.execPath, ["synth.mjs"], { cwd: rig, stdio: "inherit" });

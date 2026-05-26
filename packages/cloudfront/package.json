@@ -41,7 +41,7 @@
     "@composurecdk/cloudwatch": "^0.8.0",
     "@composurecdk/core": "^0.8.0",
     "@composurecdk/s3": "^0.8.0",
-    "aws-cdk-lib": "^2.0.0",
+    "aws-cdk-lib": "^2.118.0",
     "constructs": "^10.0.0"
   },
   "devDependencies": {

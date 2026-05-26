@@ -58,5 +58,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Cheap gate: each package's peerDependencies.aws-cdk-lib must match the
+      # cdk-floors.json manifest (ADR-0008).
+      - name: Check CDK floor ranges in sync
+        run: npm run cdk-floors:check
+
       - name: Test
         run: npm run test

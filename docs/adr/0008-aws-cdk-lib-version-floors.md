@@ -39,22 +39,20 @@ and enforces it.** Floors are monotonic with the peer graph — a package's floo
 is the max of its own aws-cdk-lib usage and its `@composurecdk` peers' floors,
 which holds automatically because a package can only load once its peers do.
 
-`scripts/cdk-floors.mjs` provides four modes (npm scripts `cdk-floors:*`),
-landing across a small sequence of PRs:
+`scripts/cdk-floors.mjs` provides the modes (npm scripts `cdk-floors:*`):
 
 - **`apply`** — writes each package's `peerDependencies.aws-cdk-lib` from the
-  manifest. _(This PR.)_
+  manifest.
 - **`check`** — asserts package.json ranges match the manifest. Cheap; runs in
-  the main CI job and `verify`. _(This PR.)_
-- **`enforce`** — loads each package against a real install of its own declared
-  floor and fails if any doesn't. The "don't breach the floor" PR gate.
-  _(Follow-up PR.)_
-- **`establish`** — packs the graph and loads every package against a
-  descending ladder of real aws-cdk-lib releases, recording the lowest each
-  loads on and the gating export. Writes a ladder-granular draft
-  (`cdk-floors.discovered.json`) to be refined into `cdk-floors.json`. Re-run
-  it to **prove a new, lower floor** when deliberately grandfathering older
-  support. _(Follow-up PR — discovery / floor-research tool.)_
+  the main CI job and `verify`.
+- **`enforce`** — loads each package against a real install of its own
+  declared floor and fails if any doesn't. The "don't breach the floor" PR
+  gate, in its own CI job (network installs per floor).
+- **`establish`** _(follow-up tool)_ — packs the graph and loads every
+  package against a descending ladder of real aws-cdk-lib releases, recording
+  the lowest each loads on and the gating export. Writes a ladder-granular
+  draft to be refined into `cdk-floors.json`. Re-run it to **prove a new,
+  lower floor** when deliberately grandfathering older support.
 
 Floor values are measured at the **import-time** boundary (named exports a
 package pulls from aws-cdk-lib), where every constraint observed so far lives.
@@ -74,9 +72,9 @@ blocks known version-gated APIs at lint time, so they can't be written into
 
 - Consumers get honest, per-package ranges; low-floor packages stay broadly
   installable.
-- The ranges become regression-proof in two layers: `check` (this PR) stops
-  package.json drifting from the manifest, and `enforce` (follow-up PR) stops
-  a package quietly requiring a newer CDK than its declared floor.
+- The ranges become regression-proof in two layers: `check` stops package.json
+  drifting from the manifest, and `enforce` stops a package quietly requiring
+  a newer CDK than its declared floor.
 - Lowering a floor is a deliberate, evidenced act: remove the requiring API,
   re-run `establish` against the candidate floor, validate the composed synth
   against it, refine the manifest, `apply`.

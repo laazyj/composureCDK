@@ -15,6 +15,9 @@ export default defineConfig(
       // Hand-written ESM/CJS consumption fixtures — each is deliberately a
       // specific module system and is exercised by spawning `node`, not linted.
       "packages/module-compat/test/fixtures/",
+      // cdk-floors rig probe — imports rig-only deps and runs inside a
+      // throwaway project (scripts/cdk-floors.mjs `enforce`), not linted here.
+      "scripts/cdk-floor/",
     ],
   },
   eslint.configs.recommended,

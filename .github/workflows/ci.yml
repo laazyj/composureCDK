@@ -65,3 +65,36 @@ jobs:
 
       - name: Test
         run: npm run test
+
+  cdk-floors-enforce:
+    # Real-install per-package floor guard: packs the @composurecdk graph,
+    # installs each package at its own declared aws-cdk-lib floor, and asserts
+    # every package imports. The runtime complement to `cdk-floors:check` —
+    # see ADR-0008. Kept as a separate job because it does network installs
+    # per floor (~7 today) and has different failure-mode logs.
+    name: CDK floors enforce
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NX_DAEMON: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Packs from each package's dist, so the build must run first.
+      - name: Build
+        run: npm run build
+
+      - name: Enforce per-package floors
+        run: npm run cdk-floors:enforce

@@ -1,3 +1,21 @@
+## 0.8.1 (2026-05-26)
+
+### 🚀 Features
+
+- **cloudwatch:** accept MathExpression in AlarmDefinition metric ([#144](https://github.com/laazyj/composureCDK/issues/144))
+- **eslint-plugin:** ban CDK APIs above the floor ([#151](https://github.com/laazyj/composureCDK/pull/151), [#146](https://github.com/laazyj/composureCDK/issues/146))
+- **sqs:** warn when redrive maxReceiveCount is below 5 ([#124](https://github.com/laazyj/composureCDK/issues/124))
+
+### 🩹 Fixes
+
+- **cloudwatch:** support older aws-cdk-lib ([#146](https://github.com/laazyj/composureCDK/issues/146))
+- **release:** hoist nx release git config to release.git ([91dc0ae](https://github.com/laazyj/composureCDK/commit/91dc0ae))
+- **release:** break nx git-config deadlock between CI and local preview ([#71](https://github.com/laazyj/composureCDK/issues/71))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.8.0 (2026-05-16)
 
 ### 🚀 Features

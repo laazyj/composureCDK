@@ -12,6 +12,7 @@
     "check:exports": "npx nx run-many -t check:exports",
     "clean": "npx nx run-many -t clean",
     "verify": "npm run format:check && npm run build && npm run check:exports && npm run lint && npm run test",
+    "release:dryrun": "node scripts/release-dryrun.mjs",
     "prepare": "husky"
   },
   "repository": {

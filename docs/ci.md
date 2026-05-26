@@ -44,10 +44,10 @@ Scopes are optional and do not affect the bump.
 1. **Preview locally.**
 
    ```sh
-   npx nx release --dry-run
+   npm run release:dryrun
    ```
 
-   Prints the planned version, changelog, and per-package bumps. Safe any time. `nx.json` sets `commit/tag/push` to `false` under `release.git`, so a non-`--dry-run` local invocation modifies files but does not commit, tag, or push — `git restore` undoes it.
+   Prints the planned version, changelog, and per-package bumps. Safe any time. The script calls `releaseVersion` then `releaseChangelog` via nx's programmatic API — the same path the CI workflow uses as subcommands. `nx release --dry-run` (the top-level command) is intentionally not used; see the comment in [`scripts/release-dryrun.mjs`](../scripts/release-dryrun.mjs) for the nx@22 config-shape constraint that forces this. `nx.json` sets `commit/tag/push` to `false` under both `release.version.git` and `release.changelog.git`, so a non-dry-run local invocation modifies files but does not commit, tag, or push — `git restore` undoes it.
 
 2. **Open the release PR.** Trigger **Actions → Release Prepare → Run workflow**:
    - Leave inputs blank for a normal conventional-commits-driven release.

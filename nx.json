@@ -30,21 +30,26 @@
   "release": {
     "projectsRelationship": "fixed",
     "projects": ["packages/*"],
-    "git": {
-      "commit": false,
-      "tag": false,
-      "push": false
-    },
     "version": {
       "conventionalCommits": true,
       "fallbackCurrentVersionResolver": "disk",
-      "preVersionCommand": "npm run verify"
+      "preVersionCommand": "npm run verify",
+      "git": {
+        "commit": false,
+        "tag": false,
+        "push": false
+      }
     },
     "releaseTagPattern": "v{version}",
     "changelog": {
       "automaticFromRef": true,
       "projectChangelogs": false,
-      "workspaceChangelog": true
+      "workspaceChangelog": true,
+      "git": {
+        "commit": false,
+        "tag": false,
+        "push": false
+      }
     }
   },
   "analytics": false

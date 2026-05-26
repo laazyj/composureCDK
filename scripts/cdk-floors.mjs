@@ -20,6 +20,11 @@
  *   CI runs it as a matrix, one floor per shard. Locally it requires `--force`
  *   and restores package.json / package-lock.json / node_modules when done
  *   (and on Ctrl-C). See ADR-0008.
+ * - `establish` is the discovery side: packs the graph and probes every package
+ *   against a descending ladder of real aws-cdk-lib releases, recording the
+ *   lowest each loads on and the gating export. Writes a ladder-granular
+ *   draft (`cdk-floors.discovered.json`) to be refined into `cdk-floors.json`.
+ *   Manual; used when establishing or deliberately lowering a floor.
  *
  * Usage:
  *   node scripts/cdk-floors.mjs apply
@@ -28,16 +33,33 @@
  *   node scripts/cdk-floors.mjs enforce 2.118.0      # one floor (CI matrix shard)
  *   CDK_FLOORS_FLOOR=2.118.0 node scripts/cdk-floors.mjs enforce
  *   node scripts/cdk-floors.mjs enforce --force      # local: also restores after
+ *   node scripts/cdk-floors.mjs establish            # write cdk-floors.discovered.json
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { packPublishablePackages } from "./cdk-floor/packages.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGES_DIR = join(REPO_ROOT, "packages");
 const MANIFEST = join(REPO_ROOT, "cdk-floors.json");
+// `establish` writes its raw discovery here; cdk-floors.json is the curated,
+// refined source of truth that the other modes consume — so re-running
+// `establish` never clobbers hand-refined floors.
+const DISCOVERED = join(REPO_ROOT, "cdk-floors.discovered.json");
+const CONSTRUCTS_RANGE = "^10.0.0";
+
+// Descending ladder of real aws-cdk-lib releases that `establish` probes.
+// Floors land on a rung; refine by adding rungs around a boundary. Override
+// with CDK_FLOOR_LADDER="2.230.0,2.200.0,…".
+const LADDER = (
+  process.env.CDK_FLOOR_LADDER ??
+  "2.230.0,2.200.0,2.180.0,2.160.0,2.140.0,2.131.0,2.120.0,2.100.0,2.80.0,2.60.0,2.46.0,2.20.0,2.1.0"
+).split(",");
 
 function pkgJsonPath(pkg) {
   return join(PACKAGES_DIR, pkg, "package.json");
@@ -238,13 +260,121 @@ function enforce() {
   process.exit(exitCode);
 }
 
+/**
+ * Probes whether every packed package can be loaded against aws-cdk-lib at the
+ * given version. Creates a throwaway rig with the pinned aws-cdk-lib plus the
+ * packed tarballs, npm-installs (`--legacy-peer-deps` so packages whose
+ * declared floor exceeds the probed version still install), then dynamically
+ * imports each. Returns `[{ name, ok, error? }]` -- one row per package.
+ */
+function probeAtVersion(version, tarballs, cacheDir) {
+  const rig = mkdtempSync(join(cacheDir, `probe-${version.replace(/\./g, "-")}-`));
+  const dependencies = { "aws-cdk-lib": version, constructs: CONSTRUCTS_RANGE };
+  for (const [name, tarball] of Object.entries(tarballs)) {
+    dependencies[name] = `file:${join(cacheDir, tarball)}`;
+  }
+  writeFileSync(
+    join(rig, "package.json"),
+    `${JSON.stringify(
+      { name: `probe-${version}`, private: true, type: "module", dependencies },
+      null,
+      2,
+    )}\n`,
+  );
+  try {
+    execFileSync("npm", ["install", "--no-audit", "--no-fund", "--legacy-peer-deps"], {
+      cwd: rig,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+  } catch (e) {
+    const msg = `npm install failed: ${e.message.split("\n")[0]}`;
+    return Object.keys(tarballs).map((name) => ({ name, ok: false, error: msg }));
+  }
+  return Object.keys(tarballs).map((name) => {
+    try {
+      const probe = `import(${JSON.stringify(name)}).then(() => process.stdout.write("OK"), (e) => process.stdout.write("FAIL:" + (e.message ?? String(e))));`;
+      const out = execFileSync(process.execPath, ["--input-type=module", "-e", probe], {
+        cwd: rig,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+      return out.startsWith("OK") ? { name, ok: true } : { name, ok: false, error: out.slice(5) };
+    } catch (e) {
+      return { name, ok: false, error: e.message.split("\n")[0] };
+    }
+  });
+}
+
+/**
+ * Discovers per-package floors by probing each publishable package against a
+ * descending ladder of real aws-cdk-lib releases. Writes a ladder-granular
+ * draft to `cdk-floors.discovered.json`; refine and copy into
+ * `cdk-floors.json` (the curated source of truth) — re-running `establish`
+ * never clobbers the curated manifest.
+ */
+function establish() {
+  const cacheDir = mkdtempSync(join(tmpdir(), "composurecdk-floor-tarballs-"));
+  try {
+    console.log("Packing publishable packages …");
+    const tarballs = packPublishablePackages(cacheDir);
+    const names = Object.keys(tarballs);
+
+    // results[name] = ordered (high -> low) list of { version, ok, error }
+    const results = Object.fromEntries(names.map((n) => [n, []]));
+    for (const version of LADDER) {
+      process.stdout.write(`Probing aws-cdk-lib@${version} … `);
+      const probed = probeAtVersion(version, tarballs, cacheDir);
+      for (const { name, ok, error } of probed) results[name].push({ version, ok, error });
+      console.log(`${probed.filter((r) => r.ok).length}/${names.length} packages load`);
+    }
+
+    const floors = {};
+    for (const name of names) {
+      const rungs = results[name]; // high -> low
+      let floor;
+      let gatedBy;
+      for (const [i, rung] of rungs.entries()) {
+        if (!rung.ok) break;
+        floor = rung.version;
+        gatedBy = rungs[i + 1]?.error; // why the next rung down fails
+      }
+      floors[name.replace("@composurecdk/", "")] =
+        floor === undefined
+          ? { floor: `>${LADDER[0]}`, gatedBy: rungs[0]?.error }
+          : { floor, gatedBy: gatedBy ?? `<=${LADDER[LADDER.length - 1]} (no lower rung probed)` };
+    }
+
+    writeFileSync(
+      DISCOVERED,
+      `${JSON.stringify(
+        {
+          $comment:
+            "Raw discovery from `node scripts/cdk-floors.mjs establish` — ladder-granular. " +
+            "Refine the floors to the exact introducing release and copy into cdk-floors.json (the curated source of truth).",
+          ladder: LADDER,
+          floors,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    console.log(`\nWrote ${DISCOVERED} (draft — refine into cdk-floors.json)\n`);
+    for (const [pkg, { floor, gatedBy }] of Object.entries(floors)) {
+      console.log(`  ${pkg.padEnd(16)} >= ${floor.padEnd(10)} ${gatedBy ?? ""}`);
+    }
+  } finally {
+    rmSync(cacheDir, { recursive: true, force: true });
+  }
+}
+
 const mode = process.argv[2];
-const modes = { apply, check, enforce };
+const modes = { apply, check, enforce, establish };
 if (modes[mode] !== undefined) {
   modes[mode]();
 } else {
   console.error(
-    `Unknown mode "${mode ?? ""}". Usage: node scripts/cdk-floors.mjs <apply|check|enforce>`,
+    `Unknown mode "${mode ?? ""}". Usage: node scripts/cdk-floors.mjs <apply|check|enforce|establish>`,
   );
   process.exit(1);
 }

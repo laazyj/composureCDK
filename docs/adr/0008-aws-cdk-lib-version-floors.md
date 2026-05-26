@@ -83,10 +83,14 @@ at the latest CDK.
   and policies via partial-matcher assertions, so this catches both import-time
   (missing named export) and runtime (a too-new method call, e.g. the #146
   `CfnAlarm.isCfnAlarm` inside an Aspect) version-gated APIs.
-- **`establish`** _(planned)_ — discovery tool: probes every package against a
-  descending ladder of real aws-cdk-lib releases to record the lowest each
-  loads on and the gating export, as a draft to refine into `cdk-floors.json`.
-  Used when establishing or **deliberately lowering** a floor.
+- **`establish`** — discovery tool: packs every publishable `@composurecdk/*`
+  package and probes each against a descending ladder of real aws-cdk-lib
+  releases (default 13 rungs from 2.230 down to 2.1; override via
+  `CDK_FLOOR_LADDER`). Records the lowest version each package loads on and the
+  gating export, writing a ladder-granular draft (`cdk-floors.discovered.json`)
+  to be refined into `cdk-floors.json`. Manual; used when establishing initial
+  floors or **deliberately lowering** an existing one (drop the requiring API,
+  re-establish to prove the lower floor, refine, `apply`).
 
 Why `overrides` + a from-scratch install: every package also carries
 `aws-cdk-lib` as a `devDependency` at the latest version, so simply downgrading
@@ -95,6 +99,15 @@ resolve instead — `enforce` would then silently pass against the wrong version
 An `overrides` entry forces the floor across the whole tree, but npm only honours
 it on a clean install; hence the from-scratch reinstall and the post-install
 resolution assertion that fails loudly if the floor did not actually bind.
+
+A complementary `scripts/cdk-floor-validate.mjs` (`npm run cdk-floor:validate`,
+also a `workflow_dispatch` workflow) synthesises a representative `compose()`
+system against any chosen aws-cdk-lib version. On-demand only — for bug repro,
+candidate-floor validation before editing the manifest, and release prep.
+**Not a PR gate**, because no single fixed CDK version is the right one to
+test against continuously; `enforce` (per-package, per-floor) is the gate.
+Defaults to `max(declared floors)` from the manifest — the composed-system
+floor — when no version is supplied.
 
 This complements the static guard already in place: the
 `composurecdk/no-cdk-api-above-floor` ESLint rule (`@composurecdk/eslint-plugin`)

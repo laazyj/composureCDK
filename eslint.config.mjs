@@ -27,6 +27,7 @@ export default defineConfig(
           allowDefaultProject: [
             "eslint.config.mjs",
             "scripts/*.mjs",
+            "scripts/cdk-floor/*.mjs",
             "packages/examples/test/smoke/*.mjs",
           ],
         },
@@ -38,7 +39,7 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
-    files: ["scripts/*.mjs", "packages/examples/test/smoke/*.mjs"],
+    files: ["scripts/*.mjs", "scripts/cdk-floor/*.mjs", "packages/examples/test/smoke/*.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       globals: {

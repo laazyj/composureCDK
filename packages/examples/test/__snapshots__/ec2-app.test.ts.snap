@@ -271,6 +271,93 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::SNS::TopicPolicy",
     },
+    "Ec2Appbastion62C411EA": {
+      "Properties": {
+        "GroupDescription": "Bastion host - operator SSH entry point",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "255.255.255.255/32",
+            "Description": "Disallow all traffic",
+            "FromPort": 252,
+            "IpProtocol": "icmp",
+            "ToPort": 86,
+          },
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "192.0.2.10/32",
+            "Description": "Operator SSH",
+            "FromPort": 22,
+            "IpProtocol": "tcp",
+            "ToPort": 22,
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "Ec2Appdatabase802BE9D4": {
+      "Properties": {
+        "GroupDescription": "Database tier - Postgres ingress from bastion only",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "255.255.255.255/32",
+            "Description": "Disallow all traffic",
+            "FromPort": 252,
+            "IpProtocol": "icmp",
+            "ToPort": 86,
+          },
+        ],
+        "VpcId": {
+          "Ref": "Ec2Appnetwork88B7C786",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "Ec2AppdatabasefromComposureCDKEc2StackEc2AppbastionAC45BA8854328941C525": {
+      "Properties": {
+        "Description": "Bastion to Postgres",
+        "FromPort": 5432,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "Ec2Appdatabase802BE9D4",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "Ec2Appbastion62C411EA",
+            "GroupId",
+          ],
+        },
+        "ToPort": 5432,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "Ec2AppdatabasefromComposureCDKEc2StackEc2AppdatabaseF4ED4D895432C6ADDD86": {
+      "Properties": {
+        "Description": "Intra-tier replication",
+        "FromPort": 5432,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "Ec2Appdatabase802BE9D4",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "Ec2Appdatabase802BE9D4",
+            "GroupId",
+          ],
+        },
+        "ToPort": 5432,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
     "Ec2Appnetwork88B7C786": {
       "Properties": {
         "CidrBlock": "10.0.0.0/16",
@@ -719,7 +806,7 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
         "SecurityGroupIds": [
           {
             "Fn::GetAtt": [
-              "Ec2AppserverInstanceSecurityGroup67724A4B",
+              "Ec2Appbastion62C411EA",
               "GroupId",
             ],
           },
@@ -872,28 +959,6 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
         ],
       },
       "Type": "AWS::IAM::Role",
-    },
-    "Ec2AppserverInstanceSecurityGroup67724A4B": {
-      "Properties": {
-        "GroupDescription": "ComposureCDK-Ec2Stack/Ec2App--server/InstanceSecurityGroup",
-        "SecurityGroupEgress": [
-          {
-            "CidrIp": "0.0.0.0/0",
-            "Description": "Allow all outbound traffic by default",
-            "IpProtocol": "-1",
-          },
-        ],
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "ComposureCDK-Ec2Stack/Ec2App--server",
-          },
-        ],
-        "VpcId": {
-          "Ref": "Ec2Appnetwork88B7C786",
-        },
-      },
-      "Type": "AWS::EC2::SecurityGroup",
     },
     "Ec2AppserverLaunchTemplateDDE5D6EF": {
       "Properties": {

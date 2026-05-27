@@ -4,18 +4,18 @@ Example applications demonstrating ComposureCDK patterns. Each example is a self
 
 All example stacks use the `ComposureCDK-` name prefix. This convention enables the CI deploy-test pipeline to scope IAM permissions and discover stacks automatically — see [CI documentation](../../docs/ci.md#stack-naming-convention) for details. **New examples must follow this prefix.**
 
-| Stack                                                                                               | Description                                                                                                                          |
-| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| [`ComposureCDK-DualFunctionStack`](src/dual-function-app.ts)                                        | Two Lambda functions (API handler + async worker) with different configurations; worker on an EventBridge schedule via `RuleBuilder` |
-| [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations and recommended alarms                                                                          |
-| [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                                                                        |
-| [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment                                                         |
-| [`ComposureCDK-OpenApiPetstoreStack`](src/openapi-petstore-app.ts)                                  | PetStore REST API defined by an inline OpenAPI 3.0 specification                                                                     |
-| [`ComposureCDK-DnsZoneStack`](src/dns-zone-app.ts)                                                  | Public Route 53 zone built with the BIND-style zone DSL, including a CloudFront `ALIAS` at `www`                                     |
-| [`ComposureCDK-Ec2Stack`](src/ec2-app.ts)                                                           | VPC + EC2 instance with well-architected defaults, recommended alarms, and SNS alert wiring                                          |
-| [`ComposureCDK-AgentVolumeStack`](src/agent-volume-app.ts)                                          | VPC + EC2 instance with a persistent EBS data volume attached via `attachVolume` + alarm wiring                                      |
-| [`ComposureCDK-TaggedSystemStack`](src/tagged-system-app.ts)                                        | Builder-level selector tags via `.tag()` plus system-wide cost-allocation tags via `tags()`                                          |
-| [`ComposureCDK-OrderProcessorStack`](src/order-processor-app.ts)                                    | SQS work queue feeding a Lambda consumer via an SQS event source, with recommended alarms wired to a sibling SNS alert topic         |
+| Stack                                                                                               | Description                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`ComposureCDK-DualFunctionStack`](src/dual-function-app.ts)                                        | Two Lambda functions (API handler + async worker) with different configurations; worker on an EventBridge schedule via `RuleBuilder`                |
+| [`ComposureCDK-MockApiStack`](src/mock-api-app.ts)                                                  | CRUD REST API with mock integrations and recommended alarms                                                                                         |
+| [`ComposureCDK-MultiStackServiceStack` / `ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts) | REST API + Lambda split across two stacks via `.withStacks()`                                                                                       |
+| [`ComposureCDK-StaticWebsiteStack`](src/static-website/app.ts)                                      | S3 + CloudFront static website with OAC, error pages, and content deployment                                                                        |
+| [`ComposureCDK-OpenApiPetstoreStack`](src/openapi-petstore-app.ts)                                  | PetStore REST API defined by an inline OpenAPI 3.0 specification                                                                                    |
+| [`ComposureCDK-DnsZoneStack`](src/dns-zone-app.ts)                                                  | Public Route 53 zone built with the BIND-style zone DSL, including a CloudFront `ALIAS` at `www`                                                    |
+| [`ComposureCDK-Ec2Stack`](src/ec2-app.ts)                                                           | VPC + bastion/database SGs + EC2 instance demonstrating peer-SG-via-`ref` wiring, closed-egress defaults, recommended alarms, and SNS alert routing |
+| [`ComposureCDK-AgentVolumeStack`](src/agent-volume-app.ts)                                          | VPC + EC2 instance with a persistent EBS data volume attached via `attachVolume` + alarm wiring                                                     |
+| [`ComposureCDK-TaggedSystemStack`](src/tagged-system-app.ts)                                        | Builder-level selector tags via `.tag()` plus system-wide cost-allocation tags via `tags()`                                                         |
+| [`ComposureCDK-OrderProcessorStack`](src/order-processor-app.ts)                                    | SQS work queue feeding a Lambda consumer via an SQS event source, with recommended alarms wired to a sibling SNS alert topic                        |
 
 ## Prerequisites
 
@@ -39,4 +39,4 @@ To skip IAM approval prompts (e.g. in CI): add `--require-approval never` to dep
 
 ## Costs
 
-These examples create minimal resources (Lambda functions, API Gateway endpoints, S3 buckets, CloudFront distributions) and should fall within the [AWS Free Tier](https://aws.amazon.com/free/). Destroy stacks when done to avoid unexpected charges.
+These examples create minimal resources (Lambda functions, API Gateway endpoints, S3 buckets, CloudFront distributions, t3.micro EC2 instances) and should fall within the [AWS Free Tier](https://aws.amazon.com/free/) for the first 12 months. EC2 instances and VPC flow logs (CloudWatch Logs ingestion + storage) accrue charges once the free-tier window closes, so destroy stacks when done to avoid unexpected charges.

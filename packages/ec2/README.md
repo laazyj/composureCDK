@@ -220,6 +220,74 @@ createVpcBuilder().flowLogs(false);
 
 For multiple flow logs against the same VPC, omit this config and create additional `FlowLog` constructs directly against the returned `vpc`.
 
+## Security Group Builder
+
+```ts
+import { createSecurityGroupBuilder } from "@composurecdk/ec2";
+import { Peer, Port } from "aws-cdk-lib/aws-ec2";
+
+const web = createSecurityGroupBuilder()
+  .vpc(vpc)
+  .description("Public web tier")
+  .addIngressRule(Peer.anyIpv4(), Port.tcp(443), "Public HTTPS")
+  .addEgressRule(Peer.anyIpv4(), Port.tcp(443), "HTTPS to origin")
+  .build(stack, "WebSg");
+```
+
+Every [SecurityGroupProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ec2.SecurityGroupProps.html) property is available as a fluent setter on the builder, except `vpc` which is set via the dedicated `.vpc()` method to support cross-component wiring with `ref<T>(...)`.
+
+Ingress and egress rules are accumulated via `addIngressRule`, `addEgressRule`, and `addSelfIngress` (for the intra-SG "allow within the cluster" pattern). Each peer is a `Resolvable<IPeer>`, so it can be a concrete `IPeer` (a CIDR via `Peer.ipv4(...)`, another `ISecurityGroup`, a prefix list, …) or a `Ref` to a sibling component's output.
+
+### Security Group Defaults
+
+| Property           | Default | Rationale                                                                                                                                                |
+| ------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowAllOutbound` | `false` | Closes the implicit `0.0.0.0/0` egress rule CDK ships by default. Every outbound flow becomes an explicit `addEgressRule` — the least-privilege default. |
+
+Two properties intentionally have no default — they are application-specific and must be supplied explicitly:
+
+- `vpc` (via the `.vpc()` method)
+- `description` (a short, human-readable summary of the SG's purpose; whitespace-only values are rejected)
+
+The defaults are exported as `SECURITY_GROUP_DEFAULTS` for visibility and testing:
+
+```ts
+import { SECURITY_GROUP_DEFAULTS } from "@composurecdk/ec2";
+```
+
+### Wiring two SGs via `ref`
+
+The canonical cross-component pattern — a bastion SG and a database SG that talks to it — declares the dependency in `compose()` and resolves the peer at build time:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createSecurityGroupBuilder, createVpcBuilder } from "@composurecdk/ec2";
+import type { SecurityGroupBuilderResult, VpcBuilderResult } from "@composurecdk/ec2";
+import { Port } from "aws-cdk-lib/aws-ec2";
+
+compose(
+  {
+    network: createVpcBuilder(),
+    bastion: createSecurityGroupBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .description("Bastion host"),
+    database: createSecurityGroupBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .description("Database")
+      .addIngressRule(
+        ref<SecurityGroupBuilderResult>("bastion").get("securityGroup"),
+        Port.tcp(5432),
+        "Bastion to Postgres",
+      ),
+  },
+  { network: [], bastion: ["network"], database: ["network", "bastion"] },
+).build(stack, "App");
+```
+
+### Recommended Alarms
+
+The Security Group builder does **not** create CloudWatch alarms. Security groups do not emit CloudWatch metrics — the [AWS recommended-alarms reference](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) has no SG entry. Operational visibility for SGs comes from adjacent signals (VPC Flow Logs, GuardDuty findings, CloudTrail `AuthorizeSecurityGroupIngress`/`Egress` events), none of which belong on the builder result.
+
 ## Volume Builder
 
 ```ts

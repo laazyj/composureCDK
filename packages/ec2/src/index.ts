@@ -29,3 +29,11 @@ export {
   type VpcBuilderResult,
 } from "./vpc-builder.js";
 export { VPC_DEFAULTS } from "./vpc-defaults.js";
+
+export {
+  createSecurityGroupBuilder,
+  type ISecurityGroupBuilder,
+  type SecurityGroupBuilderProps,
+  type SecurityGroupBuilderResult,
+} from "./security-group-builder.js";
+export { SECURITY_GROUP_DEFAULTS } from "./security-group-defaults.js";

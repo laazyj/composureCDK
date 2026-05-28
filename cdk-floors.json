@@ -28,8 +28,8 @@
       "gatedBy": "aws-s3-deployment.BucketDeploymentProps.logGroup (introduced 2.123.0). Builder tags reaching alarms degrade gracefully below 2.138.0 (when AWS::CloudWatch::Alarm became taggable) and are not floor-gating."
     },
     "cloudfront": {
-      "floor": "2.118.0",
-      "gatedBy": "aws-cloudfront.FunctionRuntime (introduced 2.118.0)"
+      "floor": "2.124.0",
+      "gatedBy": "aws-cloudfront.FunctionProps.keyValueStore association wiring (introduced 2.124.0); also peers @composurecdk/s3 at 2.123.0. Builder tags reaching CloudFront Functions degrade gracefully below 2.251.0 and are not floor-gating."
     },
     "acm": {
       "floor": "2.119.0",

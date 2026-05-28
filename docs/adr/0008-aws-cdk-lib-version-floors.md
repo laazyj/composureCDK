@@ -57,6 +57,13 @@ version (or `cloudfront` at 2.251.0) purely to render tags would needlessly puni
 the far more common case of a consumer who tags nothing. Consumers who need tags on
 those resources must run an aws-cdk-lib new enough to support tagging them.
 
+Functional gaps are treated differently from cosmetic ones. Where a too-old CDK
+would silently produce a **broken** resource rather than a merely-untagged one,
+the requiring feature _does_ raise the floor — e.g. `cloudfront` floors at 2.124.0
+because `aws-cloudfront.FunctionProps.keyValueStore` only wires the key-value-store
+association from that release, and a function silently missing its store is a
+runtime defect, not cosmetic.
+
 The unit suites encode this: tag-propagation tests probe (by synthesis) whether the
 installed CDK tags the resource and assert tags-present-or-gracefully-absent
 accordingly, so `enforce` stays green at the floor without weakening the assertion

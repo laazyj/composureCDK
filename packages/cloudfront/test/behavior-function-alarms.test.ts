@@ -3,7 +3,7 @@ import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { S3BucketOrigin, HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { FunctionCode, FunctionEventType } from "aws-cdk-lib/aws-cloudfront";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
 
@@ -27,7 +27,7 @@ function buildResult(
 function withOrigin(builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) {
   const bucket = new Bucket(stack, "TestBucket");
   builder
-    .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+    .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
     .accessLogs(false)
     // Suppress only the distribution-level alarms so each test can focus on
     // function alarms. Note: `.recommendedAlarms(false)` would also disable
@@ -353,7 +353,7 @@ describe("region signposting", () => {
   it("emits no warning when no alarms are created, regardless of region", () => {
     const stack = buildInRegion("us-west-2", (b, stack) => {
       const bucket = new Bucket(stack, "TestBucket");
-      b.origin(S3BucketOrigin.withOriginAccessControl(bucket))
+      b.origin(new HttpOrigin(bucket.bucketRegionalDomainName))
         .accessLogs(false)
         .recommendedAlarms(false);
     });

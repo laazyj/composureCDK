@@ -1,3 +1,14 @@
+## 0.8.2 (2026-05-28)
+
+### 🚀 Features
+
+- per-package aws-cdk-lib peer floors (ADR-0008) ([#146](https://github.com/laazyj/composureCDK/issues/146))
+- **ec2:** SecurityGroup builder with closed-egress default ([#152](https://github.com/laazyj/composureCDK/issues/152))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.8.1 (2026-05-26)
 
 ### 🚀 Features

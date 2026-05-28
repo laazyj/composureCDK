@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
+import { App, Duration, RemovalPolicy, Stack, Tags } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBucketBuilder } from "../src/bucket-builder.js";
@@ -15,6 +15,28 @@ function synthTemplate(
   configureFn(builder);
   builder.build(stack, "TestBucket");
   return Template.fromStack(stack);
+}
+
+/**
+ * Whether the installed aws-cdk-lib renders tags onto `AWS::CloudWatch::Alarm`.
+ * The resource only became taggable in aws-cdk-lib 2.138.0 — above this
+ * package's floor — so below that, builder tags are silently dropped rather
+ * than failing synth (documented graceful degradation). Probing by synthesis
+ * (rather than `TagManager.isTaggable`, which only detects the v1 taggable
+ * interface) keeps the test correct across the whole supported range.
+ */
+function alarmsAreTaggable(): boolean {
+  const probe = new Stack(new App(), "TagProbe");
+  const alarm = new Alarm(probe, "Probe", {
+    metric: new Metric({ namespace: "AWS/S3", metricName: "AllRequests" }),
+    threshold: 1,
+    evaluationPeriods: 1,
+  });
+  Tags.of(alarm).add("probe", "1");
+  const probed = Object.values(
+    Template.fromStack(probe).findResources("AWS::CloudWatch::Alarm"),
+  )[0] as { Properties?: { Tags?: unknown } } | undefined;
+  return probed?.Properties?.Tags !== undefined;
 }
 
 /** Disables access logging so tests that don't need it get a single-bucket template. */
@@ -508,12 +530,19 @@ describe("BucketBuilder", () => {
       const template = Template.fromStack(stack);
       const alarms = template.findResources("AWS::CloudWatch::Alarm");
       expect(Object.keys(alarms).length).toBeGreaterThan(0);
+      const taggable = alarmsAreTaggable();
       for (const resource of Object.values(alarms) as {
         Properties: { Tags?: { Key: string; Value: string }[] };
       }[]) {
-        expect(resource.Properties.Tags).toEqual(
-          expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
-        );
+        if (taggable) {
+          expect(resource.Properties.Tags).toEqual(
+            expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
+          );
+        } else {
+          // Below aws-cdk-lib 2.138.0 the L1 carries no Tags; the builder's
+          // tags are silently dropped rather than breaking synth.
+          expect(resource.Properties.Tags).toBeUndefined();
+        }
       }
     });
 

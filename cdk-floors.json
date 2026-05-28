@@ -23,7 +23,10 @@
     },
     "apigateway": { "floor": "2.54.0", "gatedBy": "aws-cloudwatch.Stats (introduced 2.54.0)" },
     "ec2": { "floor": "2.54.0", "gatedBy": "aws-cloudwatch.Stats (introduced 2.54.0)" },
-    "s3": { "floor": "2.54.0", "gatedBy": "aws-cloudwatch.Stats (introduced 2.54.0)" },
+    "s3": {
+      "floor": "2.123.0",
+      "gatedBy": "aws-s3-deployment.BucketDeploymentProps.logGroup (introduced 2.123.0). Builder tags reaching alarms degrade gracefully below 2.138.0 (when AWS::CloudWatch::Alarm became taggable) and are not floor-gating."
+    },
     "cloudfront": {
       "floor": "2.118.0",
       "gatedBy": "aws-cloudfront.FunctionRuntime (introduced 2.118.0)"

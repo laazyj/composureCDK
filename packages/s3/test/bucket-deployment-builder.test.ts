@@ -3,7 +3,7 @@ import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Distribution } from "aws-cdk-lib/aws-cloudfront";
-import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Source } from "aws-cdk-lib/aws-s3-deployment";
 import { Ref, ref } from "@composurecdk/core";
@@ -112,7 +112,7 @@ describe("BucketDeploymentBuilder", () => {
       const bucket = new Bucket(stack, "Bucket");
       const distribution = new Distribution(stack, "CDN", {
         defaultBehavior: {
-          origin: S3BucketOrigin.withOriginAccessControl(bucket),
+          origin: new HttpOrigin(bucket.bucketRegionalDomainName),
         },
       });
 
@@ -147,7 +147,7 @@ describe("BucketDeploymentBuilder", () => {
       const bucket = new Bucket(stack, "Bucket");
       const distribution = new Distribution(stack, "CDN", {
         defaultBehavior: {
-          origin: S3BucketOrigin.withOriginAccessControl(bucket),
+          origin: new HttpOrigin(bucket.bucketRegionalDomainName),
         },
       });
 
@@ -200,7 +200,7 @@ describe("BucketDeploymentBuilder", () => {
       const bucket = new Bucket(stack, "Bucket");
       const distribution = new Distribution(stack, "CDN", {
         defaultBehavior: {
-          origin: S3BucketOrigin.withOriginAccessControl(bucket),
+          origin: new HttpOrigin(bucket.bucketRegionalDomainName),
         },
       });
 

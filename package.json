@@ -10,6 +10,7 @@
     "test": "npx nx run-many -t test",
     "cdk-floors:apply": "node scripts/cdk-floors.mjs apply",
     "cdk-floors:check": "node scripts/cdk-floors.mjs check",
+    "cdk-floors:enforce": "node scripts/cdk-floors.mjs enforce",
     "build": "npx nx run-many -t build",
     "check:exports": "npx nx run-many -t check:exports",
     "clean": "npx nx run-many -t clean && npx nx reset && rm -rf node_modules",

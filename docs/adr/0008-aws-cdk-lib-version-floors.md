@@ -69,31 +69,32 @@ installed CDK tags the resource and assert tags-present-or-gracefully-absent
 accordingly, so `enforce` stays green at the floor without weakening the assertion
 at the latest CDK.
 
-`scripts/cdk-floors.mjs` provides four modes (npm scripts `cdk-floors:*`),
-landing across a small sequence of PRs:
+`scripts/cdk-floors.mjs` provides the modes (npm scripts `cdk-floors:*`):
 
 - **`apply`** — writes each package's `peerDependencies.aws-cdk-lib` from the
-  manifest. _(This PR.)_
+  manifest.
 - **`check`** — asserts package.json ranges match the manifest. Cheap; runs in
-  the main CI job and `verify`. _(This PR.)_
-- **`enforce`** — loads each package against a real install of its own declared
-  floor and fails if any doesn't. The "don't breach the floor" PR gate.
-  _(Follow-up PR.)_
-- **`establish`** — packs the graph and loads every package against a
-  descending ladder of real aws-cdk-lib releases, recording the lowest each
-  loads on and the gating export. Writes a ladder-granular draft
-  (`cdk-floors.discovered.json`) to be refined into `cdk-floors.json`. Re-run
-  it to **prove a new, lower floor** when deliberately grandfathering older
-  support. _(Follow-up PR — discovery / floor-research tool.)_
+  the main CI job and `verify`.
+- **`enforce`** — for each declared floor, forces aws-cdk-lib to it (a temporary
+  npm `overrides` on a from-scratch install, which binds every copy in the tree
+  rather than just the hoisted one), asserts the floor actually bound, then runs
+  that floor's package group's unit suite against it. The "don't breach the
+  floor" PR gate, sharded one floor per CI job. The suites synthesise builders
+  and policies via partial-matcher assertions, so this catches both import-time
+  (missing named export) and runtime (a too-new method call, e.g. the #146
+  `CfnAlarm.isCfnAlarm` inside an Aspect) version-gated APIs.
+- **`establish`** _(planned)_ — discovery tool: probes every package against a
+  descending ladder of real aws-cdk-lib releases to record the lowest each
+  loads on and the gating export, as a draft to refine into `cdk-floors.json`.
+  Used when establishing or **deliberately lowering** a floor.
 
-Floor values are measured at the **import-time** boundary (named exports a
-package pulls from aws-cdk-lib), where every constraint observed so far lives.
-The per-package unit suites — run on every commit against the latest CDK —
-catch runtime regressions in the supported range. A separate on-demand
-diagnostic synth tool exists for ad-hoc validation at any chosen aws-cdk-lib
-version (bug repro, candidate-floor validation, release prep); it is not a PR
-gate, because no single fixed CDK version is the right one to test against
-continuously.
+Why `overrides` + a from-scratch install: every package also carries
+`aws-cdk-lib` as a `devDependency` at the latest version, so simply downgrading
+the hoisted root copy leaves a nested latest copy that the package's suite would
+resolve instead — `enforce` would then silently pass against the wrong version.
+An `overrides` entry forces the floor across the whole tree, but npm only honours
+it on a clean install; hence the from-scratch reinstall and the post-install
+resolution assertion that fails loudly if the floor did not actually bind.
 
 This complements the static guard already in place: the
 `composurecdk/no-cdk-api-above-floor` ESLint rule (`@composurecdk/eslint-plugin`)
@@ -104,16 +105,16 @@ blocks known version-gated APIs at lint time, so they can't be written into
 
 - Consumers get honest, per-package ranges; low-floor packages stay broadly
   installable.
-- The ranges become regression-proof in two layers: `check` (this PR) stops
-  package.json drifting from the manifest, and `enforce` (follow-up PR) stops
-  a package quietly requiring a newer CDK than its declared floor.
+- The ranges become regression-proof in two layers: `check` stops package.json
+  drifting from the manifest, and `enforce` stops a package quietly requiring a
+  newer CDK than its declared floor — at both the import-time and runtime
+  boundaries, since it runs the real unit suites at the floor.
 - Lowering a floor is a deliberate, evidenced act: remove the requiring API,
-  re-run `establish` against the candidate floor, validate the composed synth
-  against it, refine the manifest, `apply`.
-- The import probe is a lower bound; a runtime-only requirement could push a
-  floor above the measured value. The per-package unit suites at latest CDK
-  catch new regressions; the diagnostic synth tool validates candidate floors
-  before they're applied.
+  use `establish` to prove the lower floor, refine the manifest, `apply`.
+- `enforce` mutates the tree (override + reinstall per floor). In CI each shard
+  is a throwaway checkout; locally it requires `--force` and restores
+  package.json / package-lock.json / node_modules afterwards (and on Ctrl-C),
+  so it never leaves a stray override or a floor-pinned install behind.
 - Floors are pinned to the exact introducing release. They will rise over time
   as packages adopt newer CDK features — that is expected and intentional, and
   the tooling makes each change measured rather than assumed.

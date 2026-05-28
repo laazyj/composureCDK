@@ -39,6 +39,29 @@ and enforces it.** Floors are monotonic with the peer graph — a package's floo
 is the max of its own aws-cdk-lib usage and its `@composurecdk` peers' floors,
 which holds automatically because a package can only load once its peers do.
 
+### What a floor guarantees
+
+A floor guarantees the builders **do not hard-fail** (throw at synth, or fail to
+import a missing export) on that aws-cdk-lib version. It does **not** promise that
+every convenience renders identically all the way down.
+
+The distinction matters for **tag propagation**. Builder `.tag()`/`.tags()` reach
+a construct via the CDK Tags aspect, which can only write tags onto an L1 that AWS
+has made taggable. Several L1s gained tag support well after they first shipped —
+e.g. `AWS::CloudWatch::Alarm` only became taggable in aws-cdk-lib **2.138.0** and
+`AWS::CloudFront::Function` in **2.251.0**. Below those versions, builder tags on
+those resources are **silently dropped** — the template synthesises correctly,
+the tags just do not appear. This is benign graceful degradation, not a crash, so
+it does **not** gate the floor: pinning `cloudwatch`/`s3` at the alarm-tagging
+version (or `cloudfront` at 2.251.0) purely to render tags would needlessly punish
+the far more common case of a consumer who tags nothing. Consumers who need tags on
+those resources must run an aws-cdk-lib new enough to support tagging them.
+
+The unit suites encode this: tag-propagation tests probe (by synthesis) whether the
+installed CDK tags the resource and assert tags-present-or-gracefully-absent
+accordingly, so `enforce` stays green at the floor without weakening the assertion
+at the latest CDK.
+
 `scripts/cdk-floors.mjs` provides four modes (npm scripts `cdk-floors:*`),
 landing across a small sequence of PRs:
 

@@ -12,7 +12,7 @@
     "cdk-floors:check": "node scripts/cdk-floors.mjs check",
     "build": "npx nx run-many -t build",
     "check:exports": "npx nx run-many -t check:exports",
-    "clean": "npx nx run-many -t clean",
+    "clean": "npx nx run-many -t clean && npx nx reset && rm -rf node_modules",
     "verify": "npm run format:check && npm run build && npm run check:exports && npm run lint && npm run cdk-floors:check && npm run test",
     "release:dryrun": "node scripts/release-dryrun.mjs",
     "prepare": "husky"

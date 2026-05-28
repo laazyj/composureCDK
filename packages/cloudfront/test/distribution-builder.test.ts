@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { HttpOrigin, S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import {
   CachePolicy,
   type Distribution,
@@ -29,7 +29,7 @@ function synthTemplate(
 
 function withBucketOrigin(stack: Stack) {
   const bucket = new Bucket(stack, "TestBucket");
-  return S3BucketOrigin.withOriginAccessControl(bucket);
+  return new HttpOrigin(bucket.bucketRegionalDomainName);
 }
 
 describe("DistributionBuilder", () => {
@@ -38,7 +38,7 @@ describe("DistributionBuilder", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const bucket = new Bucket(stack, "TestBucket");
-      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+      const origin = new HttpOrigin(bucket.bucketRegionalDomainName);
 
       const builder = createDistributionBuilder().origin(origin).accessLogs(false);
       const result = builder.build(stack, "TestDistribution");
@@ -244,7 +244,7 @@ describe("DistributionBuilder", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const bucket = new Bucket(stack, "TestBucket");
-      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+      const origin = new HttpOrigin(bucket.bucketRegionalDomainName);
 
       const result = createDistributionBuilder().origin(origin).build(stack, "TestDistribution");
 
@@ -255,7 +255,7 @@ describe("DistributionBuilder", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const bucket = new Bucket(stack, "TestBucket");
-      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+      const origin = new HttpOrigin(bucket.bucketRegionalDomainName);
 
       const result = createDistributionBuilder()
         .origin(origin)
@@ -270,7 +270,7 @@ describe("DistributionBuilder", () => {
       const stack = new Stack(app, "TestStack");
       const bucket = new Bucket(stack, "TestBucket");
       const logBucket = new Bucket(stack, "LogBucket");
-      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+      const origin = new HttpOrigin(bucket.bucketRegionalDomainName);
 
       const result = createDistributionBuilder()
         .origin(origin)
@@ -307,7 +307,7 @@ describe("DistributionBuilder", () => {
       const stack = new Stack(app, "TestStack");
       const bucket = new Bucket(stack, "TestBucket");
       const logBucket = new Bucket(stack, "LogBucket");
-      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+      const origin = new HttpOrigin(bucket.bucketRegionalDomainName);
 
       createDistributionBuilder()
         .origin(origin)
@@ -351,7 +351,7 @@ describe("DistributionBuilder", () => {
       const stack = new Stack(app, "TestStack");
       const bucket = new Bucket(stack, "TestBucket");
       const logBucket = new Bucket(stack, "LogBucket");
-      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+      const origin = new HttpOrigin(bucket.bucketRegionalDomainName);
 
       expect(() =>
         createDistributionBuilder()
@@ -420,8 +420,8 @@ describe("DistributionBuilder", () => {
 
       const builder = createDistributionBuilder()
         .origin(
-          ref<BucketBuilderResult>("site").map((r) =>
-            S3BucketOrigin.withOriginAccessControl(r.bucket),
+          ref<BucketBuilderResult>("site").map(
+            (r) => new HttpOrigin(r.bucket.bucketRegionalDomainName),
           ),
         )
         .accessLogs(false);
@@ -436,7 +436,7 @@ describe("DistributionBuilder", () => {
         DistributionConfig: Match.objectLike({
           Origins: Match.arrayWith([
             Match.objectLike({
-              S3OriginConfig: Match.anyValue(),
+              CustomOriginConfig: Match.anyValue(),
             }),
           ]),
         }),
@@ -508,7 +508,7 @@ describe("DistributionBuilder", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const bucket = new Bucket(stack, "TestBucket");
-      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+      const origin = new HttpOrigin(bucket.bucketRegionalDomainName);
 
       const builder = createDistributionBuilder().origin(origin);
       builder.build(stack, "TestDistribution");
@@ -541,7 +541,7 @@ describe("DistributionBuilder", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const bucket = new Bucket(stack, "TestBucket");
-      const origin = S3BucketOrigin.withOriginAccessControl(bucket);
+      const origin = new HttpOrigin(bucket.bucketRegionalDomainName);
 
       const builder = createDistributionBuilder().origin(origin).accessLogs(false);
       builder.build(stack, "TestDistribution");

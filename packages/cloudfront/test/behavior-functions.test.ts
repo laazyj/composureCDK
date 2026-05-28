@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Stack, Tags } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { S3BucketOrigin, HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import {
   CachePolicy,
+  Function as CfFunction,
   FunctionCode,
   FunctionEventType,
   FunctionRuntime,
-  ImportSource,
   KeyValueStore,
 } from "aws-cdk-lib/aws-cloudfront";
 import { ref } from "@composurecdk/core";
@@ -23,7 +23,7 @@ const INLINE_CODE = `
 
 function withBucketOrigin(stack: Stack) {
   const bucket = new Bucket(stack, "TestBucket");
-  return S3BucketOrigin.withOriginAccessControl(bucket);
+  return new HttpOrigin(bucket.bucketRegionalDomainName);
 }
 
 function synthTemplate(
@@ -172,9 +172,9 @@ describe("default behavior inline functions", () => {
   it("associates a KeyValueStore with the Function", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
-    const kvs = new KeyValueStore(stack, "Kvs", {
-      source: ImportSource.fromInline(JSON.stringify({ data: [{ key: "a", value: "b" }] })),
-    });
+    // No seed source: the test asserts only the store/function association, and
+    // ImportSource.fromInline postdates this package's aws-cdk-lib floor.
+    const kvs = new KeyValueStore(stack, "Kvs", {});
 
     createDistributionBuilder()
       .origin(withBucketOrigin(stack))
@@ -284,9 +284,7 @@ describe("default behavior inline functions", () => {
   it("throws when keyValueStore is used with a non-JS_2_0 runtime", () => {
     expect(() =>
       synthTemplate((b, stack) => {
-        const kvs = new KeyValueStore(stack, "Kvs", {
-          source: ImportSource.fromInline(JSON.stringify({ data: [{ key: "a", value: "b" }] })),
-        });
+        const kvs = new KeyValueStore(stack, "Kvs", {});
         b.origin(withBucketOrigin(stack))
           .accessLogs(false)
           .recommendedAlarms(false)
@@ -474,8 +472,8 @@ describe("additional path-pattern behaviors", () => {
       .accessLogs(false)
       .recommendedAlarms(false)
       .behavior("/api/*", {
-        origin: ref<BucketBuilderResult>("api").map((r) =>
-          S3BucketOrigin.withOriginAccessControl(r.bucket),
+        origin: ref<BucketBuilderResult>("api").map(
+          (r) => new HttpOrigin(r.bucket.bucketRegionalDomainName),
         ),
       })
       .build(stack, "TestDistribution", {
@@ -503,6 +501,24 @@ describe("additional path-pattern behaviors", () => {
     });
   });
 });
+
+/**
+ * Whether the installed aws-cdk-lib renders tags onto `AWS::CloudFront::Function`.
+ * The resource only became taggable in aws-cdk-lib 2.251.0 — far above this
+ * package's floor — so below that, builder tags are silently dropped rather
+ * than failing synth (documented graceful degradation). Probing by synthesis
+ * (rather than `TagManager.isTaggable`, which only detects the v1 taggable
+ * interface) keeps the test correct across the whole supported range.
+ */
+function cloudFrontFunctionsAreTaggable(): boolean {
+  const probe = new Stack(new App(), "TagProbe");
+  const fn = new CfFunction(probe, "Probe", { code: FunctionCode.fromInline(INLINE_CODE) });
+  Tags.of(fn).add("probe", "1");
+  const probed = Object.values(
+    Template.fromStack(probe).findResources("AWS::CloudFront::Function"),
+  )[0] as { Properties?: { Tags?: unknown } } | undefined;
+  return probed?.Properties?.Tags !== undefined;
+}
 
 describe("builder-level tags reach inline CloudFront Functions", () => {
   it("applies .tag()/.tags() to every CloudFront Function created by the builder", () => {
@@ -540,13 +556,20 @@ describe("builder-level tags reach inline CloudFront Functions", () => {
       { Properties?: { Tags?: CfnTagEntry[] } }
     >;
     expect(Object.keys(fns)).toHaveLength(2);
+    const taggable = cloudFrontFunctionsAreTaggable();
     for (const fn of Object.values(fns)) {
-      expect(fn.Properties?.Tags).toEqual(
-        expect.arrayContaining([
-          { Key: "Project", Value: "claude-rig" },
-          { Key: "Owner", Value: "platform" },
-        ]),
-      );
+      if (taggable) {
+        expect(fn.Properties?.Tags).toEqual(
+          expect.arrayContaining([
+            { Key: "Project", Value: "claude-rig" },
+            { Key: "Owner", Value: "platform" },
+          ]),
+        );
+      } else {
+        // Below aws-cdk-lib 2.251.0 the L1 carries no Tags; the builder's tags
+        // are silently dropped rather than breaking synth.
+        expect(fn.Properties?.Tags).toBeUndefined();
+      }
     }
   });
 });

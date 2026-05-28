@@ -4,7 +4,7 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
 
 function buildResult(
@@ -20,7 +20,7 @@ function buildResult(
 
 function withOrigin(builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) {
   const bucket = new Bucket(stack, "TestBucket");
-  builder.origin(S3BucketOrigin.withOriginAccessControl(bucket)).accessLogs(false);
+  builder.origin(new HttpOrigin(bucket.bucketRegionalDomainName)).accessLogs(false);
 }
 
 describe("recommended alarms", () => {

@@ -3,7 +3,7 @@ import { App, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { HttpOrigin, S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { type Distribution, FunctionCode, FunctionEventType } from "aws-cdk-lib/aws-cloudfront";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
@@ -34,7 +34,7 @@ function buildDistribution(
   const stack = new Stack(app, "TestStack");
   const builder = createDistributionBuilder().recommendedAlarms(false);
   const bucket = new Bucket(stack, "TestBucket");
-  builder.origin(S3BucketOrigin.withOriginAccessControl(bucket)).accessLogs(false);
+  builder.origin(new HttpOrigin(bucket.bucketRegionalDomainName)).accessLogs(false);
   configureFn?.(builder);
   const result = builder.build(stack, "TestDistribution");
   return { app, stack, result };
@@ -175,7 +175,7 @@ describe("createCloudFrontAlarmBuilder", () => {
       const distStack = new Stack(app, "DistStack", distStackProps);
       const bucket = new Bucket(distStack, "TestBucket");
       const result = createDistributionBuilder()
-        .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+        .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
         .accessLogs(false)
         .recommendedAlarms(false)
         .defaultBehavior({
@@ -231,7 +231,7 @@ describe("createCloudFrontAlarmBuilder", () => {
       const system = compose(
         {
           cdn: createDistributionBuilder()
-            .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+            .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
             .accessLogs(false)
             .recommendedAlarms(false)
             .defaultBehavior({
@@ -280,7 +280,7 @@ describe("createCloudFrontAlarmBuilder", () => {
       compose(
         {
           cdn: createDistributionBuilder()
-            .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+            .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
             .accessLogs(false)
             .recommendedAlarms(false)
             .defaultBehavior({
@@ -326,7 +326,7 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     const stack = new Stack(app, "TestStack");
     const bucket = new Bucket(stack, "TestBucket");
     const result = createDistributionBuilder()
-      .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+      .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
       .accessLogs(false)
       .defaultBehavior({
         functions: [viewerRequestFn],
@@ -344,7 +344,7 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     const stack = new Stack(app, "TestStack");
     const bucket = new Bucket(stack, "TestBucket");
     const result = createDistributionBuilder()
-      .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+      .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
       .accessLogs(false)
       .recommendedAlarms(false)
       .defaultBehavior({
@@ -361,7 +361,7 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     const stack = new Stack(app, "TestStack");
     const bucket = new Bucket(stack, "TestBucket");
     const result = createDistributionBuilder()
-      .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+      .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
       .accessLogs(false)
       .recommendedAlarms(false)
       .addAlarm("custom4xx", (a) =>
@@ -388,7 +388,7 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     const stack = new Stack(app, "TestStack");
     const bucket = new Bucket(stack, "TestBucket");
     const result = createDistributionBuilder()
-      .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+      .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
       .accessLogs(false)
       .recommendedAlarms(false)
       .defaultBehavior({

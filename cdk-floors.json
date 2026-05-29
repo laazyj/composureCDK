@@ -22,7 +22,10 @@
       "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-budgets)"
     },
     "apigateway": { "floor": "2.54.0", "gatedBy": "aws-cloudwatch.Stats (introduced 2.54.0)" },
-    "ec2": { "floor": "2.54.0", "gatedBy": "aws-cloudwatch.Stats (introduced 2.54.0)" },
+    "ec2": {
+      "floor": "2.140.0",
+      "gatedBy": "aws-ec2.InstanceProps.ebsOptimized (introduced 2.140.0); also IKeyPair / InstanceProps.keyPair (2.116.0)"
+    },
     "s3": {
       "floor": "2.123.0",
       "gatedBy": "aws-s3-deployment.BucketDeploymentProps.logGroup (introduced 2.123.0). Builder tags reaching alarms degrade gracefully below 2.138.0 (when AWS::CloudWatch::Alarm became taggable) and are not floor-gating."

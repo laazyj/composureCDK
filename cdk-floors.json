@@ -13,7 +13,10 @@
       "floor": "2.178.0",
       "gatedBy": "aws-sns.TopicProps.enforceSSL builder default — the prop typechecks from 2.129.0 but the L2 only wires the SSL-enforcing TopicPolicy from 2.178.0, below which the security default silently no-ops. Also Annotations.addWarningV2 (2.93.0)"
     },
-    "sqs": { "floor": "2.1.0", "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-sqs)" },
+    "sqs": {
+      "floor": "2.93.0",
+      "gatedBy": "Annotations.addWarningV2 used by queue-builder.ts (introduced 2.93.0); also QueueEncryption.SQS_MANAGED (~2.45) and QueueProps.enforceSSL (~2.50) builder defaults"
+    },
     "iam": {
       "floor": "2.26.0",
       "gatedBy": "aws-iam.PolicyStatement.resources getter used by statement-builder.test.ts (introduced 2.26.0); also Match.stringLikeRegexp used by role-builder.test.ts (2.9.0)"

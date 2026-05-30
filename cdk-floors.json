@@ -10,7 +10,10 @@
       "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-cloudwatch)"
     },
     "sns": { "floor": "2.1.0", "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-sns)" },
-    "sqs": { "floor": "2.1.0", "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-sqs)" },
+    "sqs": {
+      "floor": "2.93.0",
+      "gatedBy": "Annotations.addWarningV2 used by queue-builder.ts (introduced 2.93.0); also QueueEncryption.SQS_MANAGED (~2.45) and QueueProps.enforceSSL (~2.50) builder defaults"
+    },
     "iam": { "floor": "2.1.0", "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-iam)" },
     "logs": {
       "floor": "2.1.0",

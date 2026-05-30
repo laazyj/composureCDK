@@ -9,7 +9,10 @@
       "floor": "2.1.0",
       "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-cloudwatch)"
     },
-    "sns": { "floor": "2.1.0", "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-sns)" },
+    "sns": {
+      "floor": "2.178.0",
+      "gatedBy": "aws-sns.TopicProps.enforceSSL builder default — the prop typechecks from 2.129.0 but the L2 only wires the SSL-enforcing TopicPolicy from 2.178.0, below which the security default silently no-ops. Also Annotations.addWarningV2 (2.93.0)"
+    },
     "sqs": { "floor": "2.1.0", "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-sqs)" },
     "iam": { "floor": "2.1.0", "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-iam)" },
     "logs": {

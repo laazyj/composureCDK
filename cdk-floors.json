@@ -24,8 +24,8 @@
       "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-events)"
     },
     "budgets": {
-      "floor": "2.1.0",
-      "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-budgets)"
+      "floor": "2.93.0",
+      "gatedBy": "Annotations.addWarningV2 used by budget-alarm-builder.ts and currency.ts (introduced 2.93.0)"
     },
     "apigateway": { "floor": "2.54.0", "gatedBy": "aws-cloudwatch.Stats (introduced 2.54.0)" },
     "ec2": {

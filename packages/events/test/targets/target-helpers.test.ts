@@ -22,9 +22,9 @@ function newStack(): Stack {
 
 function makeFn(stack: Stack, id = "Handler"): LambdaFn {
   return new LambdaFn(stack, id, {
-    runtime: Runtime.NODEJS_20_X,
-    handler: "index.handler",
-    code: Code.fromInline("exports.handler = async () => {};"),
+    runtime: Runtime.PROVIDED_AL2,
+    handler: "bootstrap",
+    code: Code.fromAsset("test/fixtures/lambda"),
   });
 }
 

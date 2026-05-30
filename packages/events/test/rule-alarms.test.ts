@@ -13,9 +13,9 @@ function newStack(): Stack {
 
 function makeFn(stack: Stack): LambdaFn {
   return new LambdaFn(stack, "Handler", {
-    runtime: Runtime.NODEJS_20_X,
-    handler: "index.handler",
-    code: Code.fromInline("exports.handler = async () => {};"),
+    runtime: Runtime.PROVIDED_AL2,
+    handler: "bootstrap",
+    code: Code.fromAsset("test/fixtures/lambda"),
   });
 }
 

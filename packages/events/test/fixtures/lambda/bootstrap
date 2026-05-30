@@ -1,0 +1,5 @@
+#!/bin/sh
+# Placeholder bootstrap for a PROVIDED_AL2 Lambda. The events tests use this
+# only to construct a valid Function fixture as a rule target; it is never
+# invoked. PROVIDED_AL2 rejects Code.fromInline, hence the on-disk asset.
+exec true

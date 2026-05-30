@@ -28,7 +28,10 @@ describe("isCfnAlarm / isCfnCompositeAlarm", () => {
   it("identifies each L1 alarm kind and rejects the other", () => {
     const stack = new Stack(new App(), "TestStack");
     const alarm = makeCfnAlarm(stack, "Alarm");
-    const composite = new CfnCompositeAlarm(stack, "Composite", { alarmRule: "ALARM(x)" });
+    const composite = new CfnCompositeAlarm(stack, "Composite", {
+      alarmName: "TestComposite",
+      alarmRule: "ALARM(x)",
+    });
 
     expect(isCfnAlarm(alarm)).toBe(true);
     expect(isCfnCompositeAlarm(alarm)).toBe(false);
@@ -47,7 +50,10 @@ describe("isCfnAlarm / isCfnCompositeAlarm", () => {
   it("works on aws-cdk-lib < 2.231.0 (no isCfn* statics)", () => {
     const stack = new Stack(new App(), "TestStack");
     const alarm = makeCfnAlarm(stack, "Alarm");
-    const composite = new CfnCompositeAlarm(stack, "Composite", { alarmRule: "ALARM(x)" });
+    const composite = new CfnCompositeAlarm(stack, "Composite", {
+      alarmName: "TestComposite",
+      alarmRule: "ALARM(x)",
+    });
 
     withoutIsCfnStatics(() => {
       expect(isCfnAlarm(alarm)).toBe(true);

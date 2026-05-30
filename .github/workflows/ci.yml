@@ -65,3 +65,66 @@ jobs:
 
       - name: Test
         run: npm run test
+
+  # Derive the distinct floors from cdk-floors.json so the enforce matrix
+  # stays in sync without duplicating values in YAML.
+  cdk-floors-list:
+    name: List CDK floors
+    runs-on: ubuntu-latest
+    outputs:
+      floors: ${{ steps.read.outputs.floors }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Read distinct floors from manifest
+        id: read
+        run: |
+          node -e '
+            const m = JSON.parse(require("node:fs").readFileSync("cdk-floors.json", "utf8")).floors;
+            const rows = Object.entries(m)
+              .sort((a, b) => a[0].localeCompare(b[0]))
+              .map(([pkg, e]) => `  ${pkg.padEnd(16)} ${e.floor}  (${e.gatedBy})`)
+              .join("\n");
+            const floors = [...new Set(Object.values(m).map((e) => e.floor))];
+            console.log("Per-package aws-cdk-lib floors (cdk-floors.json):\n" + rows);
+            console.log("\nDistinct floors -> enforce matrix shards: " + JSON.stringify(floors));
+            require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, "floors=" + JSON.stringify(floors) + "\n");
+          '
+
+  # For each declared floor, pin aws-cdk-lib to it (npm overrides, clean install)
+  # and run that floor's package group's unit suite against it. The suites
+  # synthesise builders + policies via partial-matcher assertions, so this
+  # catches both import-time (missing named export) and runtime (calling a
+  # too-new method, e.g. the #146 Aspect call) version-gated APIs. One floor per
+  # shard; the shard's fresh checkout is the clean tree the override needs.
+  cdk-floors-enforce:
+    name: Enforce aws-cdk-lib@${{ matrix.floor }}
+    needs: cdk-floors-list
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NX_DAEMON: false
+      CDK_FLOORS_FLOOR: ${{ matrix.floor }}
+    strategy:
+      fail-fast: false
+      matrix:
+        floor: ${{ fromJSON(needs.cdk-floors-list.outputs.floors) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      # No `npm ci` — enforce does the floor-pinned install itself, and the
+      # fresh checkout is the clean tree the npm override requires.
+      - name: Enforce
+        run: npm run cdk-floors:enforce

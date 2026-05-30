@@ -23,8 +23,8 @@
       "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-logs)"
     },
     "events": {
-      "floor": "2.1.0",
-      "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-events)"
+      "floor": "2.85.0",
+      "gatedBy": "aws-stepfunctions.DefinitionBody used by target-helpers.test (introduced 2.85.0); also Match.stringLikeRegexp used by rule-alarms.test (2.9.0)"
     },
     "budgets": {
       "floor": "2.1.0",

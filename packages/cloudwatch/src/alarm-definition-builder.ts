@@ -14,6 +14,7 @@ import type { AlarmName } from "./alarm-name.js";
 export class AlarmDefinitionBuilder<TConstruct> {
   readonly #key: string;
   #alarmName?: AlarmName;
+  #constructId?: string;
   #metricFactory?: (construct: TConstruct) => AlarmMetric;
   #threshold = 0;
   #comparisonOperator = ComparisonOperator.GREATER_THAN_THRESHOLD;
@@ -38,6 +39,18 @@ export class AlarmDefinitionBuilder<TConstruct> {
    */
   alarmName(name: AlarmName): this {
     this.#alarmName = name;
+    return this;
+  }
+
+  /**
+   * Sets an explicit construct id for the created alarm, used verbatim. When
+   * unset, {@link createAlarms} derives `` `${id}${Capitalize(key)}Alarm` ``.
+   *
+   * Set this to preserve an existing CloudFormation logical ID when
+   * grandfathering alarms into a stack.
+   */
+  constructId(id: string): this {
+    this.#constructId = id;
     return this;
   }
 
@@ -102,6 +115,7 @@ export class AlarmDefinitionBuilder<TConstruct> {
     const definition: AlarmDefinition = {
       key: this.#key,
       alarmName: this.#alarmName,
+      constructId: this.#constructId,
       metric: this.#metricFactory(construct),
       threshold: this.#threshold,
       comparisonOperator: this.#comparisonOperator,

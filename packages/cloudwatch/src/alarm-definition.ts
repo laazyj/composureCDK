@@ -21,12 +21,16 @@ export type AlarmMetric = Metric | MathExpression;
  * A fully-resolved alarm descriptor. All fields are required —
  * this is the canonical form consumed by {@link createAlarms}.
  *
- * `alarmName` is the only optional field: when omitted, {@link createAlarms}
- * derives a default via `defaultAlarmName(scope, id, key)`.
+ * `alarmName` and `constructId` are the optional fields:
+ * - `alarmName`: when omitted, {@link createAlarms} derives a default via
+ *   `defaultAlarmName(scope, id, key)`.
+ * - `constructId`: when omitted, {@link createAlarms} derives the construct id
+ *   as `` `${id}${Capitalize(key)}Alarm` ``.
  */
 export interface AlarmDefinition {
   key: string;
   alarmName?: AlarmName;
+  constructId?: string;
   metric: AlarmMetric;
   threshold: number;
   comparisonOperator: ComparisonOperator;

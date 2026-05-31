@@ -93,6 +93,18 @@ const alarms = createAlarms(scope, "MyFunction", definitions);
 
 Construct IDs follow the pattern `${id}${Capitalize(key)}Alarm` (e.g., `MyFunctionErrorsAlarm`).
 
+### Construct IDs
+
+Set `constructId` on a definition to override that pattern — the value is used verbatim:
+
+```ts
+const alarms = createAlarms(scope, "MyFunction", [
+  { key: "errors", constructId: "LegacyErrorsAlarm" /* …rest of the definition */ },
+]);
+```
+
+This exists for grandfathering: a CloudFormation logical ID is derived from the construct ID, and changing it replaces (drops + recreates) the alarm on deploy. Pinning `constructId` to the existing ID lets you adopt `createAlarms` for alarms already in a deployed stack without churn. Unlike the alarm _name_ — which can be rewritten at synth time by [alarmNamePolicy](#alarmnamepolicy) — the construct ID is fixed at construction, so it can only be set here, per definition. `AlarmDefinitionBuilder` exposes the same control via `.constructId(id)`.
+
 ### Alarm names
 
 Each alarm receives an explicit, hierarchical name of the form `${stackName}/${kebab(id)}/${kebab(key)}` (e.g. `payments-prod/checkout-fn/errors`) instead of CloudFormation's hash-suffixed default. Slashes render hierarchy in the console; segments are kebab-cased so names scan cleanly in dashboards, oncall pages, and email subjects, where word separation matters more than in code.

@@ -72,6 +72,32 @@ describe("createAlarms", () => {
     expect(logicalIds.some((id) => id.startsWith("MyFuncErrorsAlarm"))).toBe(true);
   });
 
+  it("uses an explicit constructId verbatim, leaving alarmName to derive its default", () => {
+    const stack = new Stack(new App(), "MyServiceStack");
+    const definitions = [makeDefinition({ key: "errors", constructId: "LegacyErrorsAlarm" })];
+
+    createAlarms(stack, "siteAlerts", definitions);
+    const template = Template.fromStack(stack);
+
+    const logicalIds = Object.keys(template.findResources("AWS::CloudWatch::Alarm"));
+    expect(logicalIds.some((id) => id.startsWith("LegacyErrorsAlarm"))).toBe(true);
+    // The default formula must NOT be used when constructId is supplied...
+    expect(logicalIds.some((id) => id.startsWith("siteAlertsErrorsAlarm"))).toBe(false);
+    // ...and the override is independent of alarmName, which still derives its default.
+    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "my-service-stack/site-alerts/errors",
+    });
+  });
+
+  it("throws when a supplied constructId is empty", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const definitions = [makeDefinition({ key: "errors", constructId: "" })];
+
+    expect(() => createAlarms(stack, "MyFunc", definitions)).toThrow(
+      'Alarm "errors": constructId, when set, must be non-empty.',
+    );
+  });
+
   it("derives a default AlarmName from stack/id/key when none is supplied", () => {
     const stack = new Stack(new App(), "MyServiceStack");
     createAlarms(stack, "siteAlerts", [makeDefinition({ key: "errors" })]);

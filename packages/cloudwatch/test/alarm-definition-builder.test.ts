@@ -147,6 +147,25 @@ describe("AlarmDefinitionBuilder", () => {
     expect(definition.alarmName).toBeUndefined();
   });
 
+  it("propagates constructId when set", () => {
+    const metric = new Metric({ namespace: "Test", metricName: "Count" });
+    const definition = new AlarmDefinitionBuilder<string>("custom")
+      .metric(() => metric)
+      .constructId("LegacyErrorsAlarm")
+      .resolve("unused");
+
+    expect(definition.constructId).toBe("LegacyErrorsAlarm");
+  });
+
+  it("leaves constructId undefined by default", () => {
+    const metric = new Metric({ namespace: "Test", metricName: "Count" });
+    const definition = new AlarmDefinitionBuilder<string>("noId")
+      .metric(() => metric)
+      .resolve("unused");
+
+    expect(definition.constructId).toBeUndefined();
+  });
+
   it("supports all comparison operators", () => {
     const metric = new Metric({ namespace: "Test", metricName: "Count" });
     const builder = () => new AlarmDefinitionBuilder<string>("op").metric(() => metric);

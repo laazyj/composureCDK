@@ -3,6 +3,11 @@ dist
 .nx
 .tshy
 .tshy-build
+# tshy writes packages/*/src/package.json (a CJS-mode shim) during `npm pack`.
+packages/*/src/package.json
 cdk.out
 .vscode/
 .claude/
+
+# cdk-floors establish draft (curated values live in cdk-floors.json)
+cdk-floors.discovered.json

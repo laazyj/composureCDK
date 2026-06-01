@@ -1,3 +1,28 @@
+## 0.8.3 (2026-06-01)
+
+### 🚀 Features
+
+- aws-cdk-lib floor diagnostics (ADR-0008) ([#161](https://github.com/laazyj/composureCDK/pull/161))
+- **ci:** per-package floor enforcement via the unit suites (ADR-0008) ([#170](https://github.com/laazyj/composureCDK/pull/170), [#146](https://github.com/laazyj/composureCDK/issues/146))
+- **cloudwatch:** per-alarm constructId override ([#185](https://github.com/laazyj/composureCDK/pull/185), [#149](https://github.com/laazyj/composureCDK/issues/149))
+- **examples:** exercise SG builder in Ec2Stack (avoid duplicate deploy) ([#164](https://github.com/laazyj/composureCDK/issues/164))
+
+### 🩹 Fixes
+
+- **budgets:** raise aws-cdk-lib floor to 2.93.0 ([#179](https://github.com/laazyj/composureCDK/pull/179))
+- **cloudformation:** raise aws-cdk-lib floor to 2.1.0 ([4a5290c](https://github.com/laazyj/composureCDK/commit/4a5290c))
+- **cloudfront:** bump aws-cdk-lib floor to 2.124.0 ([5d0fe84](https://github.com/laazyj/composureCDK/commit/5d0fe84))
+- **ec2:** raise aws-cdk-lib floor to 2.140.0 ([13e2f95](https://github.com/laazyj/composureCDK/commit/13e2f95))
+- **events:** raise aws-cdk-lib floor to 2.85.0 ([#181](https://github.com/laazyj/composureCDK/pull/181))
+- **iam:** raise aws-cdk-lib floor to 2.26.0 ([#180](https://github.com/laazyj/composureCDK/pull/180))
+- **s3:** raise aws-cdk-lib floor to 2.123.0 ([4620ec3](https://github.com/laazyj/composureCDK/commit/4620ec3))
+- **sns:** raise aws-cdk-lib floor to 2.178.0 ([541dc10](https://github.com/laazyj/composureCDK/commit/541dc10))
+- **sqs:** raise aws-cdk-lib floor to 2.93.0 ([#178](https://github.com/laazyj/composureCDK/pull/178))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.8.2 (2026-05-28)
 
 ### 🚀 Features

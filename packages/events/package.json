@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/events",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Composable EventBridge rule builder with well-architected defaults",
   "repository": {
     "type": "git",

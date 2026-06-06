@@ -38,6 +38,13 @@ const TAG_VALUE = stringConstraint({
   flags: "u",
 });
 
+// Exported as public catalogue entries — symmetric with per-resource
+// constraints like SECURITY_GROUP_DESCRIPTION. They let callers validate tag
+// strings directly (`validateString(key, TAG_KEY)`) and make tags appear in
+// the generated catalogue (ADR-0009). The `validate*` entry point stays
+// `validateTag`, which layers the empty-key and reserved-prefix rules on top.
+export { TAG_KEY, TAG_VALUE };
+
 /**
  * Validates a single tag key/value pair against AWS tag constraints.
  *

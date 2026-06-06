@@ -51,6 +51,10 @@
       "gatedBy": "aws-certificatemanager.KeyAlgorithm (introduced 2.119.0)"
     },
     "lambda": { "floor": "2.168.0", "gatedBy": "aws-lambda.MetricType (introduced 2.168.0)" },
+    "neptune": {
+      "floor": "2.257.0",
+      "gatedBy": "@aws-cdk/aws-neptune-alpha is version-locked to its matching aws-cdk-lib release (the 2.257.0-alpha.0 peer requires aws-cdk-lib 2.257.0), so the floor tracks that exact release rather than an introducing API"
+    },
     "route53": { "floor": "2.216.0", "gatedBy": "aws-route53.HttpsRecord (introduced 2.216.0)" }
   }
 }

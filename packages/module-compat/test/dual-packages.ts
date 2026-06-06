@@ -18,6 +18,7 @@ export const DUAL_PACKAGES = [
   { name: "@composurecdk/iam", probe: "createRoleBuilder" },
   { name: "@composurecdk/lambda", probe: "createFunctionBuilder" },
   { name: "@composurecdk/logs", probe: "createLogGroupBuilder" },
+  { name: "@composurecdk/neptune", probe: "createClusterBuilder" },
   { name: "@composurecdk/route53", probe: "createHostedZoneBuilder" },
   { name: "@composurecdk/s3", probe: "createBucketBuilder" },
   { name: "@composurecdk/sns", probe: "createTopicBuilder" },

@@ -5,7 +5,7 @@
 Every entry below validates an AWS-property string at synth time, so a malformed value
 fails in `cdk synth` at the authoring call site instead of at CloudFormation deploy time.
 The mechanism lives in `@composurecdk/cloudformation`; per-resource entries live in the
-package that owns the builder. See [ADR-0009](adr/0009-aws-property-constraints.md).
+package that owns the builder. See [ADR-0010](adr/0010-aws-property-constraints.md).
 
 Call a constraint's validator from the package that owns it — e.g.
 `import { validateSecurityGroupDescription } from "@composurecdk/ec2"`, or

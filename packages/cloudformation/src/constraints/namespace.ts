@@ -6,7 +6,7 @@
  * pattern (`constraints.validate.*` / `constraints.sanitize.*`) is identical
  * everywhere and a consumer imports only the package they already use. The
  * browsable index of the whole catalogue is a generated doc, not an import.
- * See ADR-0009.
+ * See ADR-0010.
  */
 export interface ConstraintNamespace {
   /** Throwing validators for user-authored values the author can fix. */

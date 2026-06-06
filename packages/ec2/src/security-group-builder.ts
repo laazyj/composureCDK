@@ -213,7 +213,7 @@ class SecurityGroupBuilder implements Lifecycle<SecurityGroupBuilderResult> {
     }
 
     // Fail at synth, at the authoring call site, instead of CREATE_FAILED at
-    // deploy time. The validators skip unresolved tokens (ADR-0009).
+    // deploy time. The validators skip unresolved tokens (ADR-0010).
     validateSecurityGroupDescription(this.props.description);
     if (this.props.securityGroupName !== undefined) {
       validateSecurityGroupName(this.props.securityGroupName);

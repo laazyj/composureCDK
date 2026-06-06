@@ -151,4 +151,34 @@ describe("VpcBuilder", () => {
       ).toThrow(/configure.*cannot be combined with.*destination/);
     });
   });
+
+  describe("availabilityZones", () => {
+    it("synthesizes with pinned AZs without a context lookup", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack", {
+        env: { account: "111111111111", region: "us-east-1" },
+      });
+
+      createVpcBuilder().availabilityZones(["us-east-1a", "us-east-1b"]).build(stack, "Network");
+      const template = Template.fromStack(stack);
+
+      // The default maxAzs yields to the pinned AZs: 2 AZs x (public + private)
+      // = 4 subnets, and synth succeeds without the maxAzs/availabilityZones clash.
+      template.resourceCountIs("AWS::EC2::Subnet", 4);
+    });
+
+    it("throws when both availabilityZones and maxAzs are set", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack", {
+        env: { account: "111111111111", region: "us-east-1" },
+      });
+
+      expect(() =>
+        createVpcBuilder()
+          .availabilityZones(["us-east-1a", "us-east-1b"])
+          .maxAzs(2)
+          .build(stack, "Network"),
+      ).toThrow(/availabilityZones\(\) and \.maxAzs\(\) are mutually exclusive/);
+    });
+  });
 });

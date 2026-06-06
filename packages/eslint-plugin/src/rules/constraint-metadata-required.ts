@@ -5,7 +5,7 @@ import type { CallExpression, Expression, Pattern, Property } from "estree";
  * Requires every `stringConstraint({ ... })` call to set a non-empty `name`,
  * `allowed`, and `source`. These three fields are what make a synth-time
  * validation error useful — it names the property, lists the allowed character
- * set, and links the AWS doc (ADR-0009).
+ * set, and links the AWS doc (ADR-0010).
  *
  * The factory's type already makes the keys required, so this rule's real job
  * is the part the type checker cannot see: a present-but-empty string literal
@@ -41,10 +41,10 @@ export const rule: Rule.RuleModule = {
     messages: {
       missingField:
         "stringConstraint() is missing required `{{field}}`. Every catalogue entry must set " +
-        "name, allowed, and source (ADR-0009) so synth-time errors name the allowed set and link the AWS doc.",
+        "name, allowed, and source (ADR-0010) so synth-time errors name the allowed set and link the AWS doc.",
       emptyField:
         "stringConstraint() `{{field}}` is empty. It is surfaced verbatim in the validation " +
-        "error message (ADR-0009) — give it a meaningful value.",
+        "error message (ADR-0010) — give it a meaningful value.",
     },
   },
   create(ctx) {

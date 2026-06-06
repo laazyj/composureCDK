@@ -8,7 +8,7 @@
  *
  * A fragment graduates to this file only once a *second* property needs it —
  * promotion is a one-line move plus an import change in the owning packages.
- * See ADR-0009.
+ * See ADR-0010.
  */
 
 /** ASCII letters and digits — the base of nearly every AWS name/description. */

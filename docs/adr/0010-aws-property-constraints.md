@@ -1,4 +1,4 @@
-# ADR 0009: AWS-property constraints — a catalogue with central mechanism and local data
+# ADR 0010: AWS-property constraints — a catalogue with central mechanism and local data
 
 - **Status:** Accepted
 - **Date:** 2026-06-06

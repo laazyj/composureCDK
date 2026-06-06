@@ -97,11 +97,25 @@ class VpcBuilder implements Lifecycle<VpcBuilderResult> {
 
     const { flowLogsLogGroup, flowLogProps } = resolveFlowLogs(scope, id, flowLogsConfig);
 
+    // CDK accepts `availabilityZones` or `maxAzs`, but not both. When the user
+    // pins AZs explicitly, the default `maxAzs` must yield to their intent;
+    // setting both is a genuine conflict and fails fast.
+    const userPinnedAzs = vpcProps.availabilityZones !== undefined;
+    if (userPinnedAzs && vpcProps.maxAzs !== undefined) {
+      throw new Error(
+        `VpcBuilder "${id}": .availabilityZones() and .maxAzs() are mutually exclusive — ` +
+          `CDK accepts one or the other, not both.`,
+      );
+    }
+
     const mergedProps = {
       ...VPC_DEFAULTS,
       ...flowLogProps,
       ...vpcProps,
     };
+    if (userPinnedAzs) {
+      delete mergedProps.maxAzs;
+    }
 
     return {
       vpc: new Vpc(scope, id, mergedProps),

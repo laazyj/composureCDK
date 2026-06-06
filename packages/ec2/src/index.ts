@@ -54,7 +54,7 @@ export {
  * This package's AWS-property constraints, grouped by application strategy.
  * The `constraints.validate.*` / `constraints.sanitize.*` shape is identical
  * in every builder package, so it is discoverable without importing anything
- * beyond the package you already use. See ADR-0009.
+ * beyond the package you already use. See ADR-0010.
  */
 export const constraints = {
   validate: {

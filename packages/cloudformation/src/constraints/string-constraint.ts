@@ -10,7 +10,7 @@
  * per-resource constraint *data* lives in the package that owns the builder
  * (e.g. `SECURITY_GROUP_DESCRIPTION` in `@composurecdk/ec2`). Cross-cutting
  * constraints that apply to every resource — tags — are the exception and
- * live alongside this mechanism. See ADR-0009.
+ * live alongside this mechanism. See ADR-0010.
  */
 
 /**

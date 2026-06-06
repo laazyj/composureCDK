@@ -37,3 +37,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0006: Decorator pattern for cross-cutting builder features](0006-decorator-builder-pattern.md)
 - [ADR-0007: Dual ESM/CJS publishing as an enforced standard](0007-dual-esm-cjs-publishing.md)
 - [ADR-0008: Per-package aws-cdk-lib version floors](0008-aws-cdk-lib-version-floors.md)
+- [ADR-0009: Defaults yield to a mutually-exclusive user-set sibling prop](0009-defaults-yield-to-mutually-exclusive-siblings.md)

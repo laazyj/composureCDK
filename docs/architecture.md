@@ -225,6 +225,7 @@ For nested properties like `deployOptions`, the builder performs a targeted deep
 - **Every default property has a JSDoc annotation** linking to the specific AWS recommendation it implements, preferring the [AWS Well-Architected Framework](https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html) and its lenses (e.g. Serverless Applications Lens, Security Pillar) as the primary source. This keeps each default traceable and auditable.
 - **Defaults are exported** so consumers can inspect them, reference them in documentation, or use them in tests.
 - **Build-time resources** (such as the `LogGroup` auto-created for API Gateway access logging) are only created when the user has not provided their own. This avoids creating unused resources when the user has a custom setup.
+- **A default yields to a mutually-exclusive sibling.** Same-key override falls out of the spread, but when a default is mutually exclusive with a _different_ prop the user sets (e.g. a VPC's `maxAzs` default vs. user-set `availabilityZones`), `build()` drops the conflicting default so user intent still wins; setting both keys explicitly throws. See [ADR-0009](adr/0009-defaults-yield-to-mutually-exclusive-siblings.md).
 
 ## Ref
 

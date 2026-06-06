@@ -9,6 +9,10 @@ import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { SECURITY_GROUP_DEFAULTS } from "./security-group-defaults.js";
+import {
+  validateSecurityGroupDescription,
+  validateSecurityGroupName,
+} from "./security-group-constraints.js";
 
 /**
  * Configuration properties for the security group builder.
@@ -206,6 +210,13 @@ class SecurityGroupBuilder implements Lifecycle<SecurityGroupBuilderResult> {
         `SecurityGroupBuilder "${id}" requires a description. ` +
           "Call .description() with a short summary of the SG's purpose.",
       );
+    }
+
+    // Fail at synth, at the authoring call site, instead of CREATE_FAILED at
+    // deploy time. The validators skip unresolved tokens (ADR-0009).
+    validateSecurityGroupDescription(this.props.description);
+    if (this.props.securityGroupName !== undefined) {
+      validateSecurityGroupName(this.props.securityGroupName);
     }
 
     // Drop keys whose value is `undefined` so a fluent call like

@@ -1,3 +1,9 @@
+import type { ConstraintNamespace } from "@composurecdk/cloudformation";
+import {
+  validateSecurityGroupDescription,
+  validateSecurityGroupName,
+} from "./security-group-constraints.js";
+
 export {
   createInstanceBuilder,
   type IInstanceBuilder,
@@ -37,3 +43,23 @@ export {
   type SecurityGroupBuilderResult,
 } from "./security-group-builder.js";
 export { SECURITY_GROUP_DEFAULTS } from "./security-group-defaults.js";
+export {
+  SECURITY_GROUP_DESCRIPTION,
+  SECURITY_GROUP_NAME,
+  validateSecurityGroupDescription,
+  validateSecurityGroupName,
+} from "./security-group-constraints.js";
+
+/**
+ * This package's AWS-property constraints, grouped by application strategy.
+ * The `constraints.validate.*` / `constraints.sanitize.*` shape is identical
+ * in every builder package, so it is discoverable without importing anything
+ * beyond the package you already use. See ADR-0009.
+ */
+export const constraints = {
+  validate: {
+    securityGroupDescription: validateSecurityGroupDescription,
+    securityGroupName: validateSecurityGroupName,
+  },
+  sanitize: {},
+} satisfies ConstraintNamespace;

@@ -7,14 +7,17 @@ fails in `cdk synth` at the authoring call site instead of at CloudFormation dep
 The mechanism lives in `@composurecdk/cloudformation`; per-resource entries live in the
 package that owns the builder. See [ADR-0010](adr/0010-aws-property-constraints.md).
 
-Call a constraint's validator from the package that owns it — e.g.
-`import { validateSecurityGroupDescription } from "@composurecdk/ec2"`, or
-`pkg.constraints.validate.*` for the uniform per-package namespace. Importing a service
-package pulls in only that package, never the whole catalogue.
+Each package exposes its constraints through a uniform `constraints` namespace, so you
+import only the package you already use — e.g.
+`import { constraints } from "@composurecdk/ec2"`, then
+`constraints.validate.securityGroupDescription(value)`. The `validate*` functions throw;
+the `sanitize*` functions return a cleaned copy. Each thrown error names the allowed
+character set and links the relevant AWS doc.
 
-| Constraint                         | Package                        | Constant                     | Length | Allowed                                                                       | AWS reference                                                                              |
-| ---------------------------------- | ------------------------------ | ---------------------------- | ------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Tag key                            | `@composurecdk/cloudformation` | `TAG_KEY`                    | ≤ 128  | `the AWS tag character set: letters, digits, whitespace, and _ . : / = + - @` | [ref](https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html)                      |
-| Tag value                          | `@composurecdk/cloudformation` | `TAG_VALUE`                  | ≤ 256  | `the AWS tag character set: letters, digits, whitespace, and _ . : / = + - @` | [ref](https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html)                      |
-| EC2 SecurityGroup GroupDescription | `@composurecdk/ec2`            | `SECURITY_GROUP_DESCRIPTION` | ≤ 255  | `ASCII letters, digits, spaces and ._-:/()#,@[]+=&;{}!$*`                     | [ref](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateSecurityGroup.html) |
-| EC2 SecurityGroup GroupName        | `@composurecdk/ec2`            | `SECURITY_GROUP_NAME`        | 1–255  | `ASCII letters, digits, spaces and ._-:/()#,@[]+=&;{}!$*`                     | [ref](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateSecurityGroup.html) |
+Cross-cutting tag key/value validation is not listed here; it is applied automatically by
+`taggedBuilder` and reachable directly via `validateTag` in `@composurecdk/cloudformation`.
+
+| Package             | Constraint                 | Validate                                        | Sanitize |
+| ------------------- | -------------------------- | ----------------------------------------------- | -------- |
+| `@composurecdk/ec2` | `securityGroupDescription` | `constraints.validate.securityGroupDescription` | —        |
+| `@composurecdk/ec2` | `securityGroupName`        | `constraints.validate.securityGroupName`        | —        |

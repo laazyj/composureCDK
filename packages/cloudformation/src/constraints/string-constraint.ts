@@ -2,15 +2,15 @@
  * The shared mechanism behind the AWS-property constraint catalogue.
  *
  * AWS rejects malformed property strings (bad character sets, over-length
- * values) at deploy time, hours after `cdk synth`. A {@link StringConstraint}
+ * values) at deploy time, after a successful `cdk synth`. A {@link StringConstraint}
  * captures one AWS property's character-set and length rules as data, so a
  * builder can fail at synth — at the authoring call site — instead.
  *
  * The catalogue is deliberately split: this mechanism lives here, while the
  * per-resource constraint *data* lives in the package that owns the builder
  * (e.g. `SECURITY_GROUP_DESCRIPTION` in `@composurecdk/ec2`). Cross-cutting
- * constraints that apply to every resource — tags — are the exception and
- * live alongside this mechanism. See ADR-0010.
+ * constraints that apply to every resource (such as tags) live alongside this
+ * mechanism instead. See ADR-0010.
  */
 
 /**

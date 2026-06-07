@@ -4,5 +4,5 @@ export {
   validateString,
   sanitizeString,
 } from "./string-constraint.js";
-export { ALNUM, AWS_NAME_PUNCT } from "./char-sets.js";
+export { charSets } from "./char-sets.js";
 export { type ConstraintNamespace } from "./namespace.js";

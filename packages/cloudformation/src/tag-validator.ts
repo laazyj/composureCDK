@@ -17,8 +17,9 @@ const TAG_SOURCE = "https://docs.aws.amazon.com/general/latest/gr/aws_tagging.ht
 /**
  * Tags are cross-cutting — they apply to every resource — so unlike per-resource
  * constraints they live alongside the catalogue mechanism rather than in a
- * service package. Both entries ride {@link validateString}; the empty-key and
- * reserved-prefix rules below are tag-specific and stay bespoke. See ADR-0010.
+ * service package. Both entries are module-private and reached only through
+ * {@link validateTag}, which layers the tag-specific empty-key and reserved-
+ * prefix rules on top of {@link validateString}. See ADR-0010.
  */
 const TAG_KEY = stringConstraint({
   name: "Tag key",
@@ -37,13 +38,6 @@ const TAG_VALUE = stringConstraint({
   source: TAG_SOURCE,
   flags: "u",
 });
-
-// Exported as public catalogue entries — symmetric with per-resource
-// constraints like SECURITY_GROUP_DESCRIPTION. They let callers validate tag
-// strings directly (`validateString(key, TAG_KEY)`) and make tags appear in
-// the generated catalogue (ADR-0010). The `validate*` entry point stays
-// `validateTag`, which layers the empty-key and reserved-prefix rules on top.
-export { TAG_KEY, TAG_VALUE };
 
 /**
  * Validates a single tag key/value pair against AWS tag constraints.

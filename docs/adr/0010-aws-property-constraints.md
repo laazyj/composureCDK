@@ -5,7 +5,7 @@
 
 ## Context
 
-AWS rejects malformed property strings — character sets beyond an allowed set, over-length values — at deploy time, hours after `cdk synth`. While integration-testing the SecurityGroup builder, an em-dash (`—`) in a `GroupDescription` reached CloudFormation and failed at CREATE*FAILED with *"Character sets beyond ASCII are not supported."\_ A synth-time check would have caught it at the authoring call site.
+AWS rejects malformed property strings — character sets beyond an allowed set, over-length values — at deploy time, after a successful `cdk synth`. While integration-testing the SecurityGroup builder, an em-dash (`—`) in a `GroupDescription` reached CloudFormation and failed at CREATE*FAILED with *"Character sets beyond ASCII are not supported."\_ A synth-time check would have caught it at the authoring call site.
 
 The monorepo already had three such validators, added in isolation, with three return conventions and three homes:
 

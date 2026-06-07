@@ -1,11 +1,5 @@
 import { Token } from "aws-cdk-lib";
-import {
-  ALNUM,
-  AWS_NAME_PUNCT,
-  stringConstraint,
-  type StringConstraint,
-  validateString,
-} from "@composurecdk/cloudformation";
+import { charSets, stringConstraint, validateString } from "@composurecdk/cloudformation";
 
 /**
  * AWS-property constraints for EC2 security groups.
@@ -17,17 +11,20 @@ import {
  * `validate*` call in `build()` turns that into a `cdk synth` error. See
  * ADR-0010.
  *
+ * The constraints themselves are module-private; the package exposes only the
+ * `validate*` functions (via the `constraints` namespace in the package index).
+ *
  * `GroupDescription` and `GroupName` share the same EC2 character set, so they
  * spread the same class fragments; the comma/bracket tail beyond the shared
- * {@link AWS_NAME_PUNCT} spine is EC2-specific and stays local.
+ * `charSets.AWS_NAME_PUNCT` spine is EC2-specific and stays local.
  */
 const SG_TAIL = ",\\[\\]&;{}!$*";
-const SG_CHAR_CLASS = `${ALNUM}${AWS_NAME_PUNCT}${SG_TAIL}`;
+const SG_CHAR_CLASS = `${charSets.ALNUM}${charSets.AWS_NAME_PUNCT}${SG_TAIL}`;
 const SG_ALLOWED = "ASCII letters, digits, spaces and ._-:/()#,@[]+=&;{}!$*";
 const SG_SOURCE =
   "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateSecurityGroup.html";
 
-export const SECURITY_GROUP_DESCRIPTION: StringConstraint = stringConstraint({
+const SECURITY_GROUP_DESCRIPTION = stringConstraint({
   name: "EC2 SecurityGroup GroupDescription",
   charClass: SG_CHAR_CLASS,
   maxLength: 255,
@@ -35,7 +32,7 @@ export const SECURITY_GROUP_DESCRIPTION: StringConstraint = stringConstraint({
   source: SG_SOURCE,
 });
 
-export const SECURITY_GROUP_NAME: StringConstraint = stringConstraint({
+const SECURITY_GROUP_NAME = stringConstraint({
   name: "EC2 SecurityGroup GroupName",
   charClass: SG_CHAR_CLASS,
   minLength: 1,

@@ -1,3 +1,5 @@
+import { charSets, stringConstraint, validateString } from "@composurecdk/cloudformation";
+
 declare const alarmNameBrand: unique symbol;
 
 /**
@@ -7,30 +9,37 @@ declare const alarmNameBrand: unique symbol;
  */
 export type AlarmName = string & { readonly [alarmNameBrand]: true };
 
-const VALID_CHARS = /^[A-Za-z0-9\-_./#:()+ =@]+$/;
-const MAX_LEN = 255;
+/**
+ * The CloudWatch AlarmName constraint. Its character set is exactly the shared
+ * `charSets.ALNUM` + `charSets.AWS_NAME_PUNCT` spine with no property-specific
+ * tail — a clean reuse of the catalogue fragments. See ADR-0010.
+ */
+const ALARM_NAME = stringConstraint({
+  name: "CloudWatch AlarmName",
+  charClass: `${charSets.ALNUM}${charSets.AWS_NAME_PUNCT}`,
+  minLength: 1,
+  maxLength: 255,
+  allowed: "A-Z a-z 0-9 space and - _ . / # : ( ) + = @",
+  source:
+    "https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricAlarm.html",
+});
+
+/** Validates a CloudWatch alarm name against {@link ALARM_NAME}. @throws on invalid input. */
+export function validateAlarmName(value: string): void {
+  validateString(value, ALARM_NAME);
+}
 
 /**
- * Validates and brands a string as an {@link AlarmName}. The string is used
- * verbatim — no sanitisation — so what the caller writes is exactly what
- * appears in CloudWatch.
+ * Validates and brands a string as an {@link AlarmName}. Surrounding whitespace
+ * is trimmed, then the value is used verbatim — so what the caller writes is
+ * exactly what appears in CloudWatch.
  *
  * @throws If the input is empty, exceeds 255 chars, or contains characters
- * outside CloudWatch's allowed set: `[A-Za-z0-9-_./#:()+ =@]`.
+ * outside CloudWatch's allowed set.
  */
 export function alarmName(input: string): AlarmName {
   const trimmed = input.trim();
-  if (trimmed.length === 0) {
-    throw new Error("alarm name cannot be empty");
-  }
-  if (trimmed.length > MAX_LEN) {
-    throw new Error(`alarm name exceeds ${String(MAX_LEN)} chars: "${trimmed}"`);
-  }
-  if (!VALID_CHARS.test(trimmed)) {
-    throw new Error(
-      `alarm name contains invalid characters (allowed: A-Z a-z 0-9 - _ . / # : ( ) + = @ space): "${trimmed}"`,
-    );
-  }
+  validateAlarmName(trimmed);
   return trimmed as AlarmName;
 }
 

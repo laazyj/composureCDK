@@ -9,6 +9,7 @@ import { MockIntegration, RestApi } from "aws-cdk-lib/aws-apigateway";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
 import { createAgentVolumeApp } from "../src/agent-volume-app.js";
 import { createMockApiApp } from "../src/mock-api-app.js";
+import { createNeptuneGraphApp } from "../src/neptune-graph-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
 
 function buildWithPolicy(buildFn: (stack: Stack) => void): Template {
@@ -54,6 +55,21 @@ describe("cleanDeskPolicy", () => {
     template.hasResource("AWS::EC2::Volume", {
       DeletionPolicy: "Delete",
       UpdateReplacePolicy: "Delete",
+    });
+  });
+
+  it("sets the neptune-graph stack's cluster to Delete and clears deletion protection", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createNeptuneGraphApp(app);
+    const template = Template.fromStack(stack);
+
+    template.hasResource("AWS::Neptune::DBCluster", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+    template.hasResourceProperties("AWS::Neptune::DBCluster", {
+      DeletionProtection: false,
     });
   });
 

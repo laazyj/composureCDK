@@ -273,6 +273,40 @@ describe("ClusterBuilder", () => {
         }),
       });
     });
+
+    it("opens only the network path (no IAM connect grant) when IAM auth is disabled", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = isolatedVpc(stack);
+      const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
+      const peerRole = new Role(stack, "PeerRole", {
+        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+      });
+      const peer = { connections: peerSg.connections, grantPrincipal: peerRole.grantPrincipal };
+
+      createClusterBuilder()
+        .vpc(vpc)
+        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+        .instanceType(InstanceType.R6G_LARGE)
+        .iamAuthentication(false)
+        .allowAccessFrom(peer)
+        .build(stack, "Graph");
+
+      const template = Template.fromStack(stack);
+      // Network path is still opened.
+      template.hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
+        IpProtocol: "tcp",
+        SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
+      });
+      // But no neptune-db connect grant is emitted — it would be inert.
+      const policies = Object.values(template.findResources("AWS::IAM::Policy"));
+      const hasConnectGrant = policies.some((p) => {
+        const doc = (p as { Properties?: { PolicyDocument?: { Statement?: unknown } } }).Properties
+          ?.PolicyDocument?.Statement;
+        return JSON.stringify(doc ?? []).includes("neptune-db:");
+      });
+      expect(hasConnectGrant).toBe(false);
+    });
   });
 
   describe("compose / Ref wiring", () => {

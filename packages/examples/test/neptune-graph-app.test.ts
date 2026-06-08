@@ -30,12 +30,12 @@ describe("neptune-graph-app", () => {
     });
   });
 
-  it("overrides the stateful defaults so the CI stack can be torn down", () => {
+  it("keeps the stateful RETAIN/deletionProtection defaults (teardown is cleanDeskPolicy's job)", () => {
     template.hasResourceProperties("AWS::Neptune::DBCluster", {
-      DeletionProtection: false,
+      DeletionProtection: true,
     });
     template.hasResource("AWS::Neptune::DBCluster", {
-      DeletionPolicy: "Delete",
+      DeletionPolicy: "Retain",
     });
   });
 
@@ -56,12 +56,6 @@ describe("neptune-graph-app", () => {
   it("creates the serverless capacity recommended alarm", () => {
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
       MetricName: "ServerlessDatabaseCapacity",
-    });
-  });
-
-  it("creates an SNS topic for alarm actions", () => {
-    template.hasResourceProperties("AWS::SNS::Topic", {
-      DisplayName: "Neptune Alerts",
     });
   });
 

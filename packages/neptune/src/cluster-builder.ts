@@ -262,7 +262,12 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
     for (const resolvable of this.#accessors) {
       const peer = resolve(resolvable, context);
       cluster.connections.allowDefaultPortFrom(peer);
-      cluster.grantConnect(peer);
+      // The IAM `connect` grant is only meaningful when IAM authentication is
+      // enabled (the default). If a user has turned it off, opening the
+      // network path is the whole grant — a grantConnect policy would be inert.
+      if (mergedProps.iamAuthentication !== false) {
+        cluster.grantConnect(peer);
+      }
     }
 
     const alarms = createClusterAlarms(

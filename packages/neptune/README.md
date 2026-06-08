@@ -12,7 +12,7 @@ npm install @composurecdk/neptune @aws-cdk/aws-neptune-alpha aws-cdk-lib
 
 ## Cluster Builder
 
-A Neptune cluster owns its writer/reader instances (the CDK L2 creates them from the instance type and instance count), so a single cluster builder covers both serverless and provisioned topologies — see [ADR-0010](../../docs/adr/0010-neptune-cluster-builder.md) for why this package ships one builder rather than a separate cluster/instance split.
+A Neptune cluster owns its writer/reader instances — the CDK L2 creates them from the instance type and instance count — so a single cluster builder covers both serverless and provisioned topologies. There is intentionally no separate instance builder: in-region read replicas are added via the instance count (`.instances(n)`), and cross-region scale-out is a [Neptune Global Database](https://docs.aws.amazon.com/neptune/latest/userguide/neptune-global-database.html) (separate read-only clusters per region, future work), not extra instances on one cluster.
 
 ### Serverless
 
@@ -102,6 +102,8 @@ const system = compose(
 ```
 
 The `peer` is any `IConnectable & IGrantable` (an EC2 instance, a Lambda function, a Fargate task, …). At build time the builder applies `cluster.connections.allowDefaultPortFrom(peer)` and `cluster.grantConnect(peer)`.
+
+If you disable IAM authentication (`.iamAuthentication(false)`), `allowAccessFrom` adapts: it opens only the network path and skips the `grantConnect` IAM policy, which would be inert without IAM auth. Authentication then falls to whatever mechanism you've configured on the cluster.
 
 ## Recommended Alarms
 

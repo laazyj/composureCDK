@@ -187,169 +187,6 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
-    "NeptuneGraphAppalertsA2FE64B0": {
-      "Properties": {
-        "DisplayName": "Neptune Alerts",
-      },
-      "Type": "AWS::SNS::Topic",
-    },
-    "NeptuneGraphAppalertsNumberOfNotificationsFailedAlarm865A0281": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
-        "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
-        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/alerts/number-of-notifications-failed",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "NeptuneGraphAppalertsA2FE64B0",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsFailed",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
-    "NeptuneGraphAppalertsNumberOfNotificationsFailedToRedriveToDlqAlarm58117873": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
-        "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
-        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/alerts/number-of-notifications-failed-to-redrive-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "NeptuneGraphAppalertsA2FE64B0",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsFailedToRedriveToDlq",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
-    "NeptuneGraphAppalertsNumberOfNotificationsFilteredOutInvalidAttributesAlarmBCB296A1": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
-        "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
-        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/alerts/number-of-notifications-filtered-out-invalid-attributes",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "NeptuneGraphAppalertsA2FE64B0",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
-    "NeptuneGraphAppalertsNumberOfNotificationsRedrivenToDlqAlarm04D1E4E3": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
-        "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
-        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/alerts/number-of-notifications-redriven-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "NeptuneGraphAppalertsA2FE64B0",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsRedrivenToDlq",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
-    "NeptuneGraphAppalertsPolicyAF2F2AC9": {
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sns:Publish",
-              "Condition": {
-                "Bool": {
-                  "aws:SecureTransport": "false",
-                },
-              },
-              "Effect": "Deny",
-              "Principal": "*",
-              "Resource": {
-                "Ref": "NeptuneGraphAppalertsA2FE64B0",
-              },
-              "Sid": "AllowPublishThroughSSLOnly",
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "Topics": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
-      },
-      "Type": "AWS::SNS::TopicPolicy",
-    },
     "NeptuneGraphAppbastion33F9E2DF": {
       "DependsOn": [
         "NeptuneGraphAppbastionInstanceRoleDefaultPolicy6DFAA993",
@@ -417,11 +254,6 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppbastionAttachedEbsStatusCheckFailedAlarm9511A555": {
       "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
         "AlarmDescription": "EC2 instance attached EBS volume(s) are unreachable or unable to complete I/O. Threshold: >= 1 failed checks (max) over 10 x 1 minute.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/bastion/attached-ebs-status-check-failed",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
@@ -446,11 +278,6 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppbastionCpuCreditBalanceAlarmAEAD4CAA": {
       "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
         "AlarmDescription": "EC2 burstable instance CPU credit balance is low — baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/bastion/cpu-credit-balance",
         "ComparisonOperator": "LessThanThreshold",
@@ -475,11 +302,6 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppbastionCpuUtilizationAlarmCE1FE5FB": {
       "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
         "AlarmDescription": "EC2 instance CPU utilization is sustained at a high level. Threshold: > 80% average over 5 x 1 minute.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/bastion/cpu-utilization",
         "ComparisonOperator": "GreaterThanThreshold",
@@ -631,11 +453,6 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppbastionStatusCheckFailedAlarm73FA3488": {
       "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
         "AlarmDescription": "EC2 instance is failing its status checks. Threshold: > 0 failed checks over 2 x 1 minute.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/bastion/status-check-failed",
         "ComparisonOperator": "GreaterThanThreshold",
@@ -659,7 +476,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
       "Type": "AWS::CloudWatch::Alarm",
     },
     "NeptuneGraphAppgraph2EE8F381": {
-      "DeletionPolicy": "Delete",
+      "DeletionPolicy": "Retain",
       "Properties": {
         "BackupRetentionPeriod": 7,
         "CopyTagsToSnapshot": true,
@@ -669,7 +486,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
         "DBSubnetGroupName": {
           "Ref": "NeptuneGraphAppgraphSubnetsF0A494B3",
         },
-        "DeletionProtection": false,
+        "DeletionProtection": true,
         "EnableCloudwatchLogsExports": [
           "audit",
         ],
@@ -689,15 +506,10 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
         ],
       },
       "Type": "AWS::Neptune::DBCluster",
-      "UpdateReplacePolicy": "Delete",
+      "UpdateReplacePolicy": "Retain",
     },
     "NeptuneGraphAppgraphBufferCacheHitRatioAlarm0F1DA8C6": {
       "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
         "AlarmDescription": "Neptune cluster buffer cache hit ratio is low; working set may exceed memory. Threshold: < 99.9% over 1 minute periods.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/buffer-cache-hit-ratio",
         "ComparisonOperator": "LessThanThreshold",
@@ -722,11 +534,6 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppgraphClusterReplicaLagAlarm0069236B": {
       "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
         "AlarmDescription": "Neptune read replica is lagging the writer. Threshold: > 30000 ms over 1 minute periods.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/cluster-replica-lag",
         "ComparisonOperator": "GreaterThanThreshold",
@@ -751,11 +558,6 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppgraphCpuUtilizationAlarm16CCE756": {
       "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
         "AlarmDescription": "Neptune cluster CPU utilization is high. Threshold: >= 80% over 1 minute periods.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/cpu-utilization",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
@@ -779,7 +581,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
       "Type": "AWS::CloudWatch::Alarm",
     },
     "NeptuneGraphAppgraphInstance152ED0D64": {
-      "DeletionPolicy": "Delete",
+      "DeletionPolicy": "Retain",
       "DependsOn": [
         "NeptuneGraphAppnetworkisolatedSubnet1RouteTableAssociationD39ABE8F",
         "NeptuneGraphAppnetworkisolatedSubnet2RouteTableAssociationDC872302",
@@ -792,15 +594,10 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
         "DBInstanceClass": "db.serverless",
       },
       "Type": "AWS::Neptune::DBInstance",
-      "UpdateReplacePolicy": "Delete",
+      "UpdateReplacePolicy": "Retain",
     },
     "NeptuneGraphAppgraphMainRequestQueuePendingRequestsAlarmC82CCA12": {
       "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
         "AlarmDescription": "Neptune cluster request queue is backing up. Threshold: > 100 pending requests over 1 minute periods.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/main-request-queue-pending-requests",
         "ComparisonOperator": "GreaterThanThreshold",
@@ -882,11 +679,6 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppgraphServerlessDatabaseCapacityAlarm652BDB4E": {
       "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "NeptuneGraphAppalertsA2FE64B0",
-          },
-        ],
         "AlarmDescription": "Neptune serverless capacity is sustained near its 2.5 NCU ceiling. Threshold: >= 2.25 NCU over 1 minute periods.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/serverless-database-capacity",
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
@@ -910,6 +702,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
       "Type": "AWS::CloudWatch::Alarm",
     },
     "NeptuneGraphAppgraphSubnetsF0A494B3": {
+      "DeletionPolicy": "Retain",
       "Properties": {
         "DBSubnetGroupDescription": "Subnets for NeptuneGraphApp/graph database",
         "SubnetIds": [
@@ -922,6 +715,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
         ],
       },
       "Type": "AWS::Neptune::DBSubnetGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "NeptuneGraphAppgraphauditLogRetention76CAB7A8": {
       "Properties": {

@@ -17,7 +17,8 @@ character set and links the relevant AWS doc.
 Cross-cutting tag key/value validation is not listed here; it is applied automatically by
 `taggedBuilder` and reachable directly via `validateTag` in `@composurecdk/cloudformation`.
 
-| Package             | Constraint                 | Validate                                        | Sanitize |
-| ------------------- | -------------------------- | ----------------------------------------------- | -------- |
-| `@composurecdk/ec2` | `securityGroupDescription` | `constraints.validate.securityGroupDescription` | —        |
-| `@composurecdk/ec2` | `securityGroupName`        | `constraints.validate.securityGroupName`        | —        |
+| Package                    | Constraint                 | Validate                                        | Sanitize |
+| -------------------------- | -------------------------- | ----------------------------------------------- | -------- |
+| `@composurecdk/cloudwatch` | `alarmName`                | `constraints.validate.alarmName`                | —        |
+| `@composurecdk/ec2`        | `securityGroupDescription` | `constraints.validate.securityGroupDescription` | —        |
+| `@composurecdk/ec2`        | `securityGroupName`        | `constraints.validate.securityGroupName`        | —        |

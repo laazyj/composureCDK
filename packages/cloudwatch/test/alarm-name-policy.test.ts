@@ -181,6 +181,6 @@ describe("alarmNamePolicy", () => {
 
     alarmNamePolicy(app, { defaults: { suffix: "bad!suffix" } });
 
-    expect(() => Template.fromStack(stack)).toThrow(/invalid characters/);
+    expect(() => Template.fromStack(stack)).toThrow(/is invalid/);
   });
 });

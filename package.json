@@ -15,8 +15,10 @@
     "cdk-floor:validate": "node scripts/cdk-floor-validate.mjs",
     "build": "npx nx run-many -t build",
     "check:exports": "npx nx run-many -t check:exports",
+    "catalogue": "node scripts/gen-constraint-catalogue.mjs",
+    "catalogue:check": "node scripts/gen-constraint-catalogue.mjs --check",
     "clean": "npx nx run-many -t clean && npx nx reset && rm -rf node_modules",
-    "verify": "npm run format:check && npm run build && npm run check:exports && npm run lint && npm run cdk-floors:check && npm run test",
+    "verify": "npm run format:check && npm run build && npm run catalogue:check && npm run check:exports && npm run lint && npm run cdk-floors:check && npm run test",
     "release:dryrun": "node scripts/release-dryrun.mjs",
     "prepare": "husky"
   },

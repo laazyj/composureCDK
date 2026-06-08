@@ -11,6 +11,7 @@ export const recommended: Linter.Config = {
   rules: {
     "composurecdk/builder-must-be-tagged": "error",
     "composurecdk/builder-must-implement-copy-state": "error",
+    "composurecdk/constraint-metadata-required": "error",
     "composurecdk/lifecycle-build-context-required": "error",
     "composurecdk/no-cdk-api-above-floor": "error",
     "composurecdk/no-cjs-incompatible-syntax": "error",

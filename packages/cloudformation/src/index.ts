@@ -9,3 +9,11 @@ export { taggedBuilder, type ITaggedBuilder, TAG_OVERRIDE_WARNING_NAME } from ".
 export { applyBuilderTags } from "./apply-builder-tags.js";
 export { validateTag } from "./tag-validator.js";
 export { tags, type TagDefinitions } from "./tags.js";
+export {
+  type StringConstraint,
+  stringConstraint,
+  validateString,
+  sanitizeString,
+  charSets,
+  type ConstraintNamespace,
+} from "./constraints/index.js";

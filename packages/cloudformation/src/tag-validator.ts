@@ -1,20 +1,43 @@
+import { stringConstraint, validateString } from "./constraints/index.js";
+
 /**
  * AWS allows letters, digits, whitespace, and the symbols `_ . : / = + - @`
  * in tag keys and values, with non-ASCII letters/digits permitted via
- * Unicode classes. Empty values are permitted by AWS for `Value`, but
- * empty `Key` is not. The character set is validated against this regex.
+ * Unicode classes.
  *
- * `\p{Z}` matches the full Unicode separator class — slightly more
- * permissive than AWS's documented "white space," but errors on the side
- * of accepting input that the AWS API may yet reject at deploy time. The
- * extra rejections happen later but are reported in the API response.
- *
- * @see https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html
+ * `\p{Z}` matches the full Unicode separator class — slightly more permissive
+ * than AWS's documented "white space," but errs on the side of accepting input
+ * the AWS API may yet reject at deploy time, where the failure is reported in
+ * the API response.
  */
-const TAG_CHAR_RE = /^[\p{L}\p{Z}\p{N}_.:/=+\-@]*$/u;
+const TAG_CHARS = "\\p{L}\\p{Z}\\p{N}_.:/=+@\\-";
+const TAG_ALLOWED = "the AWS tag character set: letters, digits, whitespace, and _ . : / = + - @";
+const TAG_SOURCE = "https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html";
 
-const KEY_MAX = 128;
-const VALUE_MAX = 256;
+/**
+ * Tags are cross-cutting — they apply to every resource — so unlike per-resource
+ * constraints they live alongside the catalogue mechanism rather than in a
+ * service package. Both entries are module-private and reached only through
+ * {@link validateTag}, which layers the tag-specific empty-key and reserved-
+ * prefix rules on top of {@link validateString}. See ADR-0010.
+ */
+const TAG_KEY = stringConstraint({
+  name: "Tag key",
+  charClass: TAG_CHARS,
+  maxLength: 128,
+  allowed: TAG_ALLOWED,
+  source: TAG_SOURCE,
+  flags: "u",
+});
+
+const TAG_VALUE = stringConstraint({
+  name: "Tag value",
+  charClass: TAG_CHARS,
+  maxLength: 256,
+  allowed: TAG_ALLOWED,
+  source: TAG_SOURCE,
+  flags: "u",
+});
 
 /**
  * Validates a single tag key/value pair against AWS tag constraints.
@@ -22,42 +45,24 @@ const VALUE_MAX = 256;
  * Throws synchronously at the call site so authors see the failure where the
  * bad value was written, not at deploy time. Validates:
  *
- * - `key` is non-empty and at most {@link KEY_MAX} characters.
- * - `key` does not start with the reserved `aws:` prefix (case-insensitive).
- * - `value` is at most {@link VALUE_MAX} characters.
- * - both `key` and `value` use only the AWS-permitted character set.
+ * - `key` is non-empty and does not start with the reserved `aws:` prefix
+ *   (case-insensitive) — both tag-specific rules.
+ * - `key` and `value` length and character set, via the shared catalogue
+ *   mechanism. Empty values are permitted; empty keys are not.
  *
- * The regex matches Unicode letters, digits, and whitespace plus the
- * documented punctuation set, so non-ASCII tags are accepted as AWS
- * supports them.
+ * Non-ASCII letters, digits, and whitespace are accepted, matching AWS.
  */
 export function validateTag(key: string, value: string): void {
   if (key.length === 0) {
     throw new Error("Tag key must be non-empty.");
-  }
-  if (key.length > KEY_MAX) {
-    throw new Error(`Tag key "${key}" exceeds ${String(KEY_MAX)}-character limit.`);
   }
   if (key.toLowerCase().startsWith("aws:")) {
     throw new Error(
       `Tag key "${key}" uses reserved "aws:" prefix; AWS rejects user tags with this prefix.`,
     );
   }
-  if (!TAG_CHAR_RE.test(key)) {
-    throw new Error(
-      `Tag key "${key}" contains characters outside the AWS tag character set ` +
-        "(letters, digits, whitespace, and `_ . : / = + - @`).",
-    );
-  }
-  if (value.length > VALUE_MAX) {
-    throw new Error(`Tag value for key "${key}" exceeds ${String(VALUE_MAX)}-character limit.`);
-  }
-  if (!TAG_CHAR_RE.test(value)) {
-    throw new Error(
-      `Tag value for key "${key}" contains characters outside the AWS tag character set ` +
-        "(letters, digits, whitespace, and `_ . : / = + - @`).",
-    );
-  }
+  validateString(key, TAG_KEY);
+  validateString(value, TAG_VALUE);
 }
 
 /**

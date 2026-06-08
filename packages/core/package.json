@@ -47,9 +47,9 @@
     "constructs": "^10.6.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
+    "@types/node": "^25.9.2",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "@dagrejs/graphlib": "^4.0.1"

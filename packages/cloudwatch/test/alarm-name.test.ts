@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { alarmName, joinAlarmName, kebab } from "../src/alarm-name.js";
+import { constraints } from "../src/index.js";
 
 describe("alarmName", () => {
   it("returns the input verbatim when valid", () => {
@@ -11,12 +12,12 @@ describe("alarmName", () => {
   });
 
   it("rejects empty input", () => {
-    expect(() => alarmName("")).toThrow(/empty/);
-    expect(() => alarmName("   ")).toThrow(/empty/);
+    expect(() => alarmName("")).toThrow(/minimum/);
+    expect(() => alarmName("   ")).toThrow(/minimum/);
   });
 
   it("rejects names longer than 255 chars", () => {
-    expect(() => alarmName("x".repeat(256))).toThrow(/255/);
+    expect(() => alarmName("x".repeat(256))).toThrow(/255-character limit/);
   });
 
   it("accepts the full CloudWatch character set", () => {
@@ -24,9 +25,9 @@ describe("alarmName", () => {
   });
 
   it("rejects characters outside CloudWatch's allowed set", () => {
-    expect(() => alarmName("oops!")).toThrow(/invalid characters/);
-    expect(() => alarmName("a&b")).toThrow(/invalid characters/);
-    expect(() => alarmName("a\nb")).toThrow(/invalid characters/);
+    expect(() => alarmName("oops!")).toThrow(/is invalid/);
+    expect(() => alarmName("a&b")).toThrow(/is invalid/);
+    expect(() => alarmName("a\nb")).toThrow(/is invalid/);
   });
 });
 
@@ -68,6 +69,17 @@ describe("joinAlarmName", () => {
   });
 
   it("validates the result", () => {
-    expect(() => joinAlarmName([])).toThrow(/empty/);
+    expect(() => joinAlarmName([])).toThrow(/minimum/);
+  });
+});
+
+describe("constraints.validate.alarmName", () => {
+  it("is exposed through the package constraints namespace", () => {
+    expect(() => {
+      constraints.validate.alarmName("payments-prod/lambda/errors");
+    }).not.toThrow();
+    expect(() => {
+      constraints.validate.alarmName("oops!");
+    }).toThrow(/CloudWatch AlarmName/);
   });
 });

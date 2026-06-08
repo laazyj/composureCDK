@@ -1,3 +1,6 @@
+import type { ConstraintNamespace } from "@composurecdk/cloudformation";
+import { validateEmail } from "./email.js";
+
 export {
   createBudgetBuilder,
   type IBudgetBuilder,
@@ -23,3 +26,14 @@ export {
   type NotifySubscribers,
   type ResolvedSubscribers,
 } from "./notifications.js";
+
+/**
+ * This package's AWS-property constraints, grouped by application strategy.
+ * The `constraints.validate.*` / `constraints.sanitize.*` shape is identical in
+ * every builder package; the underlying constraint definition stays
+ * module-private — this namespace is its only public surface. See ADR-0010.
+ */
+export const constraints = {
+  validate: { email: validateEmail },
+  sanitize: {},
+} satisfies ConstraintNamespace;

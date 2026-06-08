@@ -19,6 +19,7 @@ Cross-cutting tag key/value validation is not listed here; it is applied automat
 
 | Package                    | Constraint                 | Validate                                        | Sanitize |
 | -------------------------- | -------------------------- | ----------------------------------------------- | -------- |
+| `@composurecdk/budgets`    | `email`                    | `constraints.validate.email`                    | —        |
 | `@composurecdk/cloudwatch` | `alarmName`                | `constraints.validate.alarmName`                | —        |
 | `@composurecdk/ec2`        | `securityGroupDescription` | `constraints.validate.securityGroupDescription` | —        |
 | `@composurecdk/ec2`        | `securityGroupName`        | `constraints.validate.securityGroupName`        | —        |

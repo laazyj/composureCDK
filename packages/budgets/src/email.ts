@@ -19,10 +19,15 @@ export type Email = string & { readonly [emailBrand]: true };
  * missing TLD) is rejected, but any address AWS Budgets will plausibly accept
  * passes. The 50-char cap matches the Budgets API's documented per-subscriber
  * limit. See ADR-0010.
+ *
+ * The domain is matched as dot-separated labels (`[^\s@.]+(\.[^\s@.]+)+`) rather
+ * than `[^\s@]+\.[^\s@]+`: excluding `.` from each label removes the overlapping
+ * quantifiers that make the latter a super-linear (ReDoS-prone) pattern, while
+ * accepting exactly the same addresses.
  */
 const EMAIL: StringConstraint = {
   name: "Budgets subscriber email",
-  pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  pattern: /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/,
   maxLength: 50,
   allowed: "an email address of the form local@domain.tld",
   source:

@@ -59,6 +59,19 @@ describe("neptune-graph-app", () => {
     });
   });
 
+  it("adds the three SSM interface endpoints so the isolated bastion is reachable", () => {
+    template.resourceCountIs("AWS::EC2::VPCEndpoint", 3);
+    template.hasResourceProperties("AWS::EC2::VPCEndpoint", {
+      VpcEndpointType: "Interface",
+    });
+  });
+
+  it("gives the bastion a dedicated security group (not the cluster's)", () => {
+    template.hasResourceProperties("AWS::EC2::SecurityGroup", {
+      GroupDescription: Match.stringLikeRegexp("Neptune bastion"),
+    });
+  });
+
   it("matches the expected synthesised template", () => {
     expect(template.toJSON()).toMatchSnapshot();
   });

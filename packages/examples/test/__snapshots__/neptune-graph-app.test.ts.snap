@@ -232,7 +232,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
         "SecurityGroupIds": [
           {
             "Fn::GetAtt": [
-              "NeptuneGraphAppbastionInstanceSecurityGroupA9504F19",
+              "NeptuneGraphAppbastionSgA2525585",
               "GroupId",
             ],
           },
@@ -418,28 +418,6 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
-    "NeptuneGraphAppbastionInstanceSecurityGroupA9504F19": {
-      "Properties": {
-        "GroupDescription": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--bastion/InstanceSecurityGroup",
-        "SecurityGroupEgress": [
-          {
-            "CidrIp": "0.0.0.0/0",
-            "Description": "Allow all outbound traffic by default",
-            "IpProtocol": "-1",
-          },
-        ],
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--bastion",
-          },
-        ],
-        "VpcId": {
-          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
-        },
-      },
-      "Type": "AWS::EC2::SecurityGroup",
-    },
     "NeptuneGraphAppbastionLaunchTemplate5EFDB6B7": {
       "Properties": {
         "LaunchTemplateData": {
@@ -450,6 +428,109 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
         "LaunchTemplateName": "NeptuneGraphApp--bastionLaunchTemplate",
       },
       "Type": "AWS::EC2::LaunchTemplate",
+    },
+    "NeptuneGraphAppbastionSgA2525585": {
+      "Properties": {
+        "GroupDescription": "Neptune bastion - SSM-managed, egress only to Neptune and SSM endpoints",
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NeptuneGraphAppbastionSgtoComposureCDKNeptuneGraphStackNeptuneGraphAppgraphSecurityGroupD151DD39IndirectPort57EB8748": {
+      "Properties": {
+        "Description": "to ComposureCDKNeptuneGraphStackNeptuneGraphAppgraphSecurityGroupD151DD39:{IndirectPort}",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppgraphSecurityGroupE922E691",
+            "GroupId",
+          ],
+        },
+        "FromPort": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppgraph2EE8F381",
+            "Port",
+          ],
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppgraph2EE8F381",
+            "Port",
+          ],
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "NeptuneGraphAppbastionSgtoComposureCDKNeptuneGraphStackNeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroupEA3F3F7E4437C5FF002": {
+      "Properties": {
+        "Description": "Ec2Messages from Neptune bastion",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroup593DE067",
+            "GroupId",
+          ],
+        },
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "NeptuneGraphAppbastionSgtoComposureCDKNeptuneGraphStackNeptuneGraphAppnetworkSsmEndpointSecurityGroup600CC412443273E81A5": {
+      "Properties": {
+        "Description": "Ssm from Neptune bastion",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkSsmEndpointSecurityGroup96376F45",
+            "GroupId",
+          ],
+        },
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "NeptuneGraphAppbastionSgtoComposureCDKNeptuneGraphStackNeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupB3945BC44434D3EC25D": {
+      "Properties": {
+        "Description": "SsmMessages from Neptune bastion",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupA985331A",
+            "GroupId",
+          ],
+        },
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
     },
     "NeptuneGraphAppbastionStatusCheckFailedAlarm73FA3488": {
       "Properties": {
@@ -646,9 +727,9 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::EC2::SecurityGroup",
     },
-    "NeptuneGraphAppgraphSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionInstanceSecurityGroup85FAB10EIndirectPortD2932D60": {
+    "NeptuneGraphAppgraphSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA7198IndirectPort8A150FDF": {
       "Properties": {
-        "Description": "from ComposureCDKNeptuneGraphStackNeptuneGraphAppbastionInstanceSecurityGroup85FAB10E:{IndirectPort}",
+        "Description": "from ComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA7198:{IndirectPort}",
         "FromPort": {
           "Fn::GetAtt": [
             "NeptuneGraphAppgraph2EE8F381",
@@ -664,7 +745,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
         "IpProtocol": "tcp",
         "SourceSecurityGroupId": {
           "Fn::GetAtt": [
-            "NeptuneGraphAppbastionInstanceSecurityGroupA9504F19",
+            "NeptuneGraphAppbastionSgA2525585",
             "GroupId",
           ],
         },
@@ -835,6 +916,93 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
+    "NeptuneGraphAppnetworkEc2MessagesEndpointB9744A5D": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroup593DE067",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": {
+          "Fn::Join": [
+            "",
+            [
+              "com.amazonaws.",
+              {
+                "Ref": "AWS::Region",
+              },
+              ".ec2messages",
+            ],
+          ],
+        },
+        "SubnetIds": [
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E",
+          },
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet2Subnet1C86C7A4",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroup593DE067": {
+      "Properties": {
+        "GroupDescription": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/Ec2MessagesEndpoint/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA71984435BFFF54F": {
+      "Properties": {
+        "Description": "Ec2Messages from Neptune bastion",
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroup593DE067",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
     "NeptuneGraphAppnetworkFlowLogsLogGroup24FFC645": {
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -864,6 +1032,180 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
       },
       "Type": "Custom::VpcRestrictDefaultSG",
       "UpdateReplacePolicy": "Delete",
+    },
+    "NeptuneGraphAppnetworkSsmEndpointC2160135": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "NeptuneGraphAppnetworkSsmEndpointSecurityGroup96376F45",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": {
+          "Fn::Join": [
+            "",
+            [
+              "com.amazonaws.",
+              {
+                "Ref": "AWS::Region",
+              },
+              ".ssm",
+            ],
+          ],
+        },
+        "SubnetIds": [
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E",
+          },
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet2Subnet1C86C7A4",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "NeptuneGraphAppnetworkSsmEndpointSecurityGroup96376F45": {
+      "Properties": {
+        "GroupDescription": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/SsmEndpoint/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NeptuneGraphAppnetworkSsmEndpointSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA7198443670183A7": {
+      "Properties": {
+        "Description": "Ssm from Neptune bastion",
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkSsmEndpointSecurityGroup96376F45",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "NeptuneGraphAppnetworkSsmMessagesEndpoint50696562": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupA985331A",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": {
+          "Fn::Join": [
+            "",
+            [
+              "com.amazonaws.",
+              {
+                "Ref": "AWS::Region",
+              },
+              ".ssmmessages",
+            ],
+          ],
+        },
+        "SubnetIds": [
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E",
+          },
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet2Subnet1C86C7A4",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupA985331A": {
+      "Properties": {
+        "GroupDescription": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/SsmMessagesEndpoint/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA71984439DE54F16": {
+      "Properties": {
+        "Description": "SsmMessages from Neptune bastion",
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupA985331A",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
     },
     "NeptuneGraphAppnetworkisolatedSubnet1RouteTableAD136CDE": {
       "Properties": {

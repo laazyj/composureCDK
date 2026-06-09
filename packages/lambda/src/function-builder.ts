@@ -25,6 +25,7 @@ import {
   EVENT_SOURCE_MAPPING_ID_READERS,
   isComposureEventSource,
 } from "./event-sources/composure-event-source.js";
+import { EVENT_SOURCE_INVARIANT_WARNERS } from "./event-sources/event-source-warnings.js";
 
 const LOGS_WRITER_POLICY_NAME = "LogsWriter";
 
@@ -357,6 +358,12 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
         kind,
         eventSourceMappingId: EVENT_SOURCE_MAPPING_ID_READERS[kind]?.(eventSource),
       });
+
+      // Surface any cross-component invariant that spans this source and the
+      // function (e.g. the SQS visibility-timeout ≥ 6× function-timeout rule)
+      // as a synth-time reminder, dispatched on kind so no CDK internals are
+      // inspected.
+      EVENT_SOURCE_INVARIANT_WARNERS[kind]?.(scope, id, entry.key, mergedProps);
     }
 
     const alarms = createFunctionAlarms(

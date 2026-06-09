@@ -35,6 +35,8 @@ Resources that are created but not returned are invisible to the rest of the sys
 
 The rule: **if a builder creates it, the result should expose it.**
 
+This extends to resolved _configuration_, not just constructs. A CDK L2 construct often does not re-expose the props that configured it (CDK treats props as a write-only struct), so a value like an SQS queue's `visibilityTimeout` is unrecoverable from the `Queue` alone. To keep cross-component invariants checkable, a builder result exposes the defaulted, resolved configuration it handed to its construct under a uniform `resolvedProps: ResolvedProps<TConstructProps>` field. A consumer that receives the result via `ref()` can then read a write-only prop and perform a real comparison (token-guarded) instead of emitting a contextual reminder. See [ADR-0011](adr/0011-resolved-props-on-results.md).
+
 ### Why an interface, not a base class
 
 Components are composed, not inherited. A component is any object with a `build` method that matches the signature. This keeps the coupling to ComposureCDK minimal — a component does not need to extend a framework class, call `super()`, or conform to a class hierarchy. It just implements a single method.

@@ -146,6 +146,37 @@ export function ref<T extends object, U>(
 export type Resolvable<T> = T | Ref<T>;
 
 /**
+ * Collapses a property type to its resolved form: a {@link Ref}`<U>` (or a
+ * {@link Resolvable}`<U>`) becomes `U`; a concrete `T` is unchanged.
+ *
+ * Used by {@link ResolvedProps} so a configuration snapshot reflects the value
+ * that was passed to the construct, not the pre-resolution `T | Ref<T>` union.
+ */
+export type Resolved<T> = T extends Ref<infer U> ? U : T;
+
+/**
+ * The post-default, post-resolve configuration a builder hands to its CDK
+ * construct, exposed on the builder's result so a consuming component can read
+ * a value the L2 construct does not re-surface as a public readonly member
+ * (for example an SQS queue's `visibilityTimeout`).
+ *
+ * Derived from a props interface `P`:
+ * - **every key is optional** — a builder may leave a prop unset, and not
+ *   every prop carries a default;
+ * - **every key is read-only** — the snapshot is a record of what was built,
+ *   not a mutable handle;
+ * - **`Resolvable` values are collapsed** ({@link Resolved}) — the snapshot
+ *   holds the resolved value handed to the construct.
+ *
+ * Values may still be unresolved CDK `Token`s (e.g. threaded from a
+ * CloudFormation parameter); a consumer comparing them must guard with
+ * `Token.isUnresolved`. See ADR-0011 for the result-type contract.
+ */
+export type ResolvedProps<P extends object> = Readonly<{
+  [K in keyof P]?: Resolved<P[K]>;
+}>;
+
+/**
  * Type guard that checks whether a value is a {@link Ref}.
  *
  * Recognises a `Ref` by its {@link REF_BRAND} symbol rather than `instanceof`,

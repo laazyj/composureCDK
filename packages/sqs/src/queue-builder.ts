@@ -2,7 +2,7 @@ import { Annotations, Token } from "aws-cdk-lib";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IQueue, Queue, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, type ResolvedProps } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { QueueAlarmConfig } from "./queue-alarm-config.js";
@@ -63,6 +63,23 @@ export interface QueueBuilderResult {
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SQS
    */
   alarms: Record<string, Alarm>;
+
+  /**
+   * The defaulted, resolved configuration handed to the {@link Queue}
+   * construct — `{ ...QUEUE_DEFAULTS, ...userProps }`.
+   *
+   * Exposes values the CDK {@link Queue} does not re-surface as public
+   * readonly members (e.g. {@link QueueProps.visibilityTimeout}), so a
+   * consuming component that receives this result via `ref()` can perform a
+   * real cross-component invariant check rather than emitting a contextual
+   * reminder — for instance comparing this queue's `visibilityTimeout`
+   * against a consumer function's `timeout`.
+   *
+   * Values may be unresolved CDK {@link Token}s when threaded from a
+   * CloudFormation parameter; guard with `Token.isUnresolved` before
+   * comparing. See ADR-0011.
+   */
+  resolvedProps: ResolvedProps<QueueProps>;
 }
 
 /**
@@ -112,10 +129,10 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
   build(scope: IConstruct, id: string): QueueBuilderResult {
     const { recommendedAlarms: alarmConfig, ...queueProps } = this.props;
 
-    const mergedProps = {
+    const mergedProps: Partial<QueueProps> = {
       ...QUEUE_DEFAULTS,
       ...queueProps,
-    } as QueueBuilderProps;
+    };
 
     warnIfLowMaxReceiveCount(scope, id, mergedProps);
 
@@ -123,7 +140,7 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
 
     const alarms = createQueueAlarms(scope, id, queue, alarmConfig, this.#customAlarms);
 
-    return { queue, alarms };
+    return { queue, alarms, resolvedProps: { ...mergedProps } };
   }
 }
 

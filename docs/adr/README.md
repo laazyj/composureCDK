@@ -39,3 +39,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0008: Per-package aws-cdk-lib version floors](0008-aws-cdk-lib-version-floors.md)
 - [ADR-0009: Defaults yield to a mutually-exclusive user-set sibling prop](0009-defaults-yield-to-mutually-exclusive-siblings.md)
 - [ADR-0010: AWS-property constraints — a catalogue with central mechanism and local data](0010-aws-property-constraints.md)
+- [ADR-0011: Expose a builder's resolved configuration on its result](0011-resolved-props-on-results.md)

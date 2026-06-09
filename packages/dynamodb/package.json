@@ -1,0 +1,69 @@
+{
+  "name": "@composurecdk/dynamodb",
+  "version": "0.8.3",
+  "description": "Composable DynamoDB table builder with well-architected defaults",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laazyj/composureCDK",
+    "directory": "packages/dynamodb"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist .tshy .tshy-build",
+    "build": "tshy",
+    "typecheck": "tsc --noEmit",
+    "check:exports": "attw --pack . --profile node16 && publint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "Jason Duffett (https://github.com/laazyj)",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "tshy": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": "./src/index.ts"
+    }
+  },
+  "peerDependencies": {
+    "@composurecdk/cloudformation": "^0.8.0",
+    "@composurecdk/cloudwatch": "^0.8.0",
+    "@composurecdk/core": "^0.8.0",
+    "aws-cdk-lib": "^2.170.0",
+    "constructs": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "aws-cdk-lib": "^2.257.0",
+    "constructs": "^10.6.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    }
+  },
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "module": "./dist/esm/index.js"
+}

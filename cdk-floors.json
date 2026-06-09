@@ -51,6 +51,10 @@
       "gatedBy": "aws-certificatemanager.KeyAlgorithm (introduced 2.119.0)"
     },
     "lambda": { "floor": "2.168.0", "gatedBy": "aws-lambda.MetricType (introduced 2.168.0)" },
-    "route53": { "floor": "2.216.0", "gatedBy": "aws-route53.HttpsRecord (introduced 2.216.0)" }
+    "route53": { "floor": "2.216.0", "gatedBy": "aws-route53.HttpsRecord (introduced 2.216.0)" },
+    "dynamodb": {
+      "floor": "2.170.0",
+      "gatedBy": "aws-dynamodb.TableProps.pointInTimeRecoverySpecification builder default (the recovery-period-capable PITR spec, ~2.169.0). DRAFT ESTIMATE — validate with `node scripts/cdk-floors.mjs establish` before release. Also deletionProtection (~2.97.0)."
+    }
   }
 }

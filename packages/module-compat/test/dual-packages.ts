@@ -13,6 +13,7 @@ export const DUAL_PACKAGES = [
   { name: "@composurecdk/cloudformation", probe: "createStackBuilder" },
   { name: "@composurecdk/cloudfront", probe: "createDistributionBuilder" },
   { name: "@composurecdk/cloudwatch", probe: "createAlarms" },
+  { name: "@composurecdk/dynamodb", probe: "createTableBuilder" },
   { name: "@composurecdk/ec2", probe: "createInstanceBuilder" },
   { name: "@composurecdk/events", probe: "createRuleBuilder" },
   { name: "@composurecdk/iam", probe: "createRoleBuilder" },

@@ -13,8 +13,13 @@ const STACK = "ComposureCDK-NeptuneGraphStack";
  * reachability via the interface endpoints, the bastion's closed-egress SG,
  * the `allowAccessFrom` network + IAM grant, and the running graph engine.
  *
- * The signing is done with the Python standard library (no awscurl/boto3),
- * since the bastion sits in an isolated VPC with no internet egress.
+ * The request is SigV4-signed with the Python standard library rather than
+ * reusing `awscurl`. This is a deliberate trade-off, not reinvention: the
+ * bastion sits in an isolated VPC with no internet egress, so installing
+ * `awscurl` (a pip package) would mean either standing up a NAT gateway
+ * purely to reach PyPI — recurring cost on a CI-deployed example — or
+ * staging the package through S3. A ~40-line stdlib signer is the cheaper,
+ * dependency-free substitute. See the discussion on #189.
  */
 
 // Standalone Python SigV4 client (stdlib only). Reads instance-role creds

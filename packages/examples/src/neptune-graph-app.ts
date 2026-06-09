@@ -99,6 +99,10 @@ export function createNeptuneGraphApp(app = new App()) {
   // endpoints for the three services the agent needs. Each opens :443 to the
   // bastion only, which also adds the matching egress rule on the bastion's
   // closed-egress SG.
+  //
+  // NOTE: this is post-build glue — interface endpoints have no builder, so
+  // they can't yet be declared inside compose(). Tracked by #194 (a
+  // first-class endpoint builder); once it lands this folds into the graph.
   addSsmEndpoints(result.network.vpc, result.bastion.instance);
 
   return { stack };

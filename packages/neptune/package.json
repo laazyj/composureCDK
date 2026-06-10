@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/neptune",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "Composable Amazon Neptune cluster builder with well-architected defaults",
   "repository": {
     "type": "git",

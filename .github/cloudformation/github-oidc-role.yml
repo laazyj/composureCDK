@@ -152,6 +152,48 @@ Resources:
               - ec2:DescribeSecurityGroups
             Resource: "*"
 
+          # Neptune — read-only describe for the smoke test against
+          # ComposureCDK-NeptuneGraphStack. Neptune's control plane shares the
+          # RDS API namespace, so describing the cluster is an `rds:` action.
+          # RDS Describe* actions do not support resource-level permissions, so
+          # Resource is "*" (same constraint as EC2Read above). Cluster
+          # creation/mutation runs under the CDK cfn-exec role (not this OIDC
+          # role) via AssumeRole below.
+          - Sid: NeptuneRead
+            Effect: Allow
+            Action:
+              - rds:DescribeDBClusters
+            Resource: "*"
+
+          # SSM Run Command — the Neptune smoke test SSMs to the bastion and
+          # runs a SigV4-signed OpenCypher health query against the cluster.
+          # SendCommand is granted across two resource scopes: the AWS-managed
+          # `AWS-RunShellScript` document (public, carries no tag) and the
+          # target instances, restricted to ComposureCDK-* stacks via the
+          # CloudFormation stack-name tag on the bastion. GetCommandInvocation
+          # does not support resource-level permissions, so it is granted on
+          # "*" (read-only command status).
+          - Sid: SSMSendCommandDocument
+            Effect: Allow
+            Action:
+              - ssm:SendCommand
+            Resource:
+              - !Sub arn:${AWS::Partition}:ssm:*::document/AWS-RunShellScript
+          - Sid: SSMSendCommandInstances
+            Effect: Allow
+            Action:
+              - ssm:SendCommand
+            Resource:
+              - !Sub arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:instance/*
+            Condition:
+              StringLike:
+                ssm:resourceTag/aws:cloudformation:stack-name: ComposureCDK-*
+          - Sid: SSMCommandStatus
+            Effect: Allow
+            Action:
+              - ssm:GetCommandInvocation
+            Resource: "*"
+
           # Lambda — scoped by CloudFormation stack-name tag.
           # CreateFunction accepts Tags, so aws:RequestTag works at
           # creation time. Mutations use aws:ResourceTag on the

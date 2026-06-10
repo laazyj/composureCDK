@@ -288,6 +288,79 @@ compose(
 
 The Security Group builder does **not** create CloudWatch alarms. Security groups do not emit CloudWatch metrics — the [AWS recommended-alarms reference](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) has no SG entry. Operational visibility for SGs comes from adjacent signals (VPC Flow Logs, GuardDuty findings, CloudTrail `AuthorizeSecurityGroupIngress`/`Egress` events), none of which belong on the builder result.
 
+## Interface Endpoint Builders (DRAFT — #194)
+
+> **Draft / API-surface preview.** These two builders are for evaluating the
+> shape proposed in [#194](https://github.com/laazyj/composureCDK/issues/194).
+> Defaults, validation, tests, and a worked example are intentionally not done
+> yet — the goal here is the public API.
+
+VPC interface endpoints (AWS PrivateLink) have no props-time surface in CDK —
+the only way to add them is the post-build `vpc.addInterfaceEndpoint(...)` call,
+whose security group is never exposed. These builders make an endpoint a
+first-class `compose()` component that **owns and exposes its security group**,
+so the access edge is wired declaratively with `ref(...)`.
+
+### Single endpoint
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createInterfaceEndpointBuilder,
+  createSecurityGroupBuilder,
+  createVpcBuilder,
+  type SecurityGroupBuilderResult,
+  type VpcBuilderResult,
+} from "@composurecdk/ec2";
+import { InterfaceVpcEndpointAwsService, SubnetType } from "aws-cdk-lib/aws-ec2";
+
+compose(
+  {
+    network: createVpcBuilder().natGateways(0),
+    bastionSg: createSecurityGroupBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .description("Bastion"),
+    ssm: createInterfaceEndpointBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .service(InterfaceVpcEndpointAwsService.SSM)
+      .subnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+      .allowDefaultPortFrom(ref<SecurityGroupBuilderResult>("bastionSg").get("securityGroup")),
+  },
+  { network: [], bastionSg: ["network"], ssm: ["network", "bastionSg"] },
+).build(stack, "App");
+// result.ssm = { endpoint: InterfaceVpcEndpoint, securityGroup: SecurityGroup }
+```
+
+The owned `securityGroup` is on the result so the **peer's egress side** can
+reference it too (`bastionSg.addEgressRule(ref(...).get("securityGroup"), Port.tcp(443))`).
+
+### SSM bundle (shared SG)
+
+SSM/Session Manager in a NAT-free VPC always needs the same three endpoints with
+identical ingress, so the bundle builder gives them **one shared security group**
+and returns them keyed by service short name:
+
+```ts
+import { createInterfaceEndpointsBuilder } from "@composurecdk/ec2";
+
+ssmAccess: createInterfaceEndpointsBuilder()
+  .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+  .ssmAccess() // == .services(SSM_ACCESS_SERVICES)
+  .subnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+  .allowDefaultPortFrom(ref<SecurityGroupBuilderResult>("bastionSg").get("securityGroup")),
+// result.ssmAccess = { endpoints: { ssm, ssmmessages, ec2messages }, securityGroup }
+```
+
+Both builders own their SG via the same internal `createSecurityGroupBuilder`
+sub-builder (customizable through `.configureSecurityGroup(b => ...)`), default
+`open: false` and `privateDnsEnabled: true`, and `.allowDefaultPortFrom(peer)`
+opens `:443` ingress on that SG — mirroring CDK's
+`connections.allowDefaultPortFrom` and the SG builder's `addIngressRule`.
+
+> **Not in this draft:** gateway endpoints (S3/DynamoDB — proposed as
+> exposing `gatewayEndpoints` on `VpcBuilderResult`), full Well-Architected
+> default docs, validation, tests, and a registered example stack.
+
 ## Volume Builder
 
 ```ts

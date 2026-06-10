@@ -4,6 +4,7 @@ import { Bucket, CfnBucket, type BucketProps } from "aws-cdk-lib/aws-s3";
 import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
 import { RestApi, type RestApiProps } from "aws-cdk-lib/aws-apigateway";
+import { DatabaseCluster, type DatabaseClusterProps } from "@aws-cdk/aws-neptune-alpha";
 import {
   AwsCustomResource,
   AwsCustomResourcePolicy,
@@ -58,6 +59,22 @@ class RestApiRemovalPolicyInjector implements IPropertyInjector {
 
   inject(originalProps: RestApiProps): RestApiProps {
     return { ...originalProps, cloudWatchRoleRemovalPolicy: RemovalPolicy.DESTROY };
+  }
+}
+
+/**
+ * A {@link IPropertyInjector} for Neptune clusters that sets `removalPolicy`
+ * to `DESTROY` and `deletionProtection` to `false`. The builder's secure
+ * defaults retain the cluster and block deletion; teardown of an ephemeral
+ * example stack needs both flipped, so a Neptune-specific injector overrides
+ * them together (the generic removal-policy injector only covers
+ * `removalPolicy`).
+ */
+class NeptuneClusterRemovalPolicyInjector implements IPropertyInjector {
+  readonly constructUniqueId = DatabaseCluster.PROPERTY_INJECTION_ID;
+
+  inject(originalProps: DatabaseClusterProps): DatabaseClusterProps {
+    return { ...originalProps, removalPolicy: RemovalPolicy.DESTROY, deletionProtection: false };
   }
 }
 
@@ -180,6 +197,7 @@ function resolveLogsBucketInStack(
  * - `aws-cdk-lib/aws-logs.LogGroup`
  * - `aws-cdk-lib/aws-ec2.Volume`
  * - `aws-cdk-lib/aws-apigateway.RestApi` (Account + CloudWatch Role)
+ * - `@aws-cdk/aws-neptune-alpha.DatabaseCluster` (also clears `deletionProtection`)
  *
  * If new stateful construct types are added to example stacks (e.g.
  * DynamoDB tables, SQS queues), add a corresponding injector here.
@@ -192,6 +210,7 @@ export function cleanDeskPolicy(scope: IConstruct): void {
   injectors.add(new RemovalPolicyInjector<LogGroupProps>(LogGroup.PROPERTY_INJECTION_ID));
   injectors.add(new RemovalPolicyInjector<VolumeProps>(Volume.PROPERTY_INJECTION_ID));
   injectors.add(new RestApiRemovalPolicyInjector());
+  injectors.add(new NeptuneClusterRemovalPolicyInjector());
 
   Aspects.of(scope).add(new DisableSourceLoggingOnDeleteAspect());
 }

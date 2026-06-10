@@ -34,12 +34,14 @@
     "@composurecdk/iam": "^0.8.0",
     "@composurecdk/lambda": "^0.8.0",
     "@composurecdk/logs": "^0.8.0",
+    "@composurecdk/neptune": "^0.8.0",
     "@composurecdk/route53": "^0.8.0",
     "@composurecdk/s3": "^0.8.0",
     "@composurecdk/sns": "^0.8.0",
     "@composurecdk/sqs": "^0.8.0"
   },
   "devDependencies": {
+    "@aws-cdk/aws-neptune-alpha": "2.257.0-alpha.0",
     "@types/node": "^25.9.1",
     "aws-cdk-lib": "^2.257.0",
     "constructs": "^10.6.0",

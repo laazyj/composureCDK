@@ -1,0 +1,1353 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+    "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter": {
+      "Default": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+      "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+    },
+  },
+  "Resources": {
+    "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E": {
+      "DependsOn": [
+        "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200.zip",
+        },
+        "Description": "Lambda function for removing all inbound/outbound rules from the VPC default security group",
+        "Handler": "__entrypoint__.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+        ],
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "ec2:AuthorizeSecurityGroupIngress",
+                    "ec2:AuthorizeSecurityGroupEgress",
+                    "ec2:RevokeSecurityGroupIngress",
+                    "ec2:RevokeSecurityGroupEgress",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition",
+                          },
+                          ":ec2:",
+                          {
+                            "Ref": "AWS::Region",
+                          },
+                          ":",
+                          {
+                            "Ref": "AWS::AccountId",
+                          },
+                          ":security-group/",
+                          {
+                            "Fn::GetAtt": [
+                              "NeptuneGraphAppnetwork6E4EC8BD",
+                              "DefaultSecurityGroup",
+                            ],
+                          },
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "Inline",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A": {
+      "DependsOn": [
+        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d.zip",
+        },
+        "Handler": "index.handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:PutRetentionPolicy",
+                "logs:DeleteRetentionPolicy",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+        "Roles": [
+          {
+            "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "NeptuneGraphAppbastion33F9E2DF": {
+      "DependsOn": [
+        "NeptuneGraphAppbastionInstanceRoleDefaultPolicy6DFAA993",
+        "NeptuneGraphAppbastionInstanceRole1DE27A04",
+      ],
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/xvda",
+            "Ebs": {
+              "Encrypted": true,
+              "VolumeSize": 8,
+              "VolumeType": "gp3",
+            },
+          },
+        ],
+        "EbsOptimized": true,
+        "IamInstanceProfile": {
+          "Ref": "NeptuneGraphAppbastionInstanceProfile5C73911C",
+        },
+        "ImageId": {
+          "Ref": "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter",
+        },
+        "InstanceType": "t3.micro",
+        "LaunchTemplate": {
+          "LaunchTemplateName": "NeptuneGraphApp--bastionLaunchTemplate",
+          "Version": {
+            "Fn::GetAtt": [
+              "NeptuneGraphAppbastionLaunchTemplate5EFDB6B7",
+              "LatestVersionNumber",
+            ],
+          },
+        },
+        "Monitoring": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "NeptuneGraphAppbastionSgA2525585",
+              "GroupId",
+            ],
+          },
+        ],
+        "SubnetId": {
+          "Ref": "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E",
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--bastion",
+          },
+        ],
+        "UserData": {
+          "Fn::Base64": "#!/bin/bash",
+        },
+      },
+      "Type": "AWS::EC2::Instance",
+    },
+    "NeptuneGraphAppbastionAttachedEbsStatusCheckFailedAlarm9511A555": {
+      "Properties": {
+        "AlarmDescription": "EC2 instance attached EBS volume(s) are unreachable or unable to complete I/O. Threshold: >= 1 failed checks (max) over 10 x 1 minute.",
+        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/bastion/attached-ebs-status-check-failed",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 10,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "NeptuneGraphAppbastion33F9E2DF",
+            },
+          },
+        ],
+        "EvaluationPeriods": 10,
+        "MetricName": "StatusCheckFailed_AttachedEBS",
+        "Namespace": "AWS/EC2",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 1,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NeptuneGraphAppbastionCpuCreditBalanceAlarmAEAD4CAA": {
+      "Properties": {
+        "AlarmDescription": "EC2 burstable instance CPU credit balance is low — baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
+        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/bastion/cpu-credit-balance",
+        "ComparisonOperator": "LessThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "NeptuneGraphAppbastion33F9E2DF",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "CPUCreditBalance",
+        "Namespace": "AWS/EC2",
+        "Period": 300,
+        "Statistic": "Minimum",
+        "Threshold": 50,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NeptuneGraphAppbastionCpuUtilizationAlarmCE1FE5FB": {
+      "Properties": {
+        "AlarmDescription": "EC2 instance CPU utilization is sustained at a high level. Threshold: > 80% average over 5 x 1 minute.",
+        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/bastion/cpu-utilization",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "NeptuneGraphAppbastion33F9E2DF",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 80,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NeptuneGraphAppbastionInstanceProfile5C73911C": {
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "NeptuneGraphAppbastionInstanceRole1DE27A04",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::InstanceProfile",
+    },
+    "NeptuneGraphAppbastionInstanceRole1DE27A04": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/AmazonSSMManagedInstanceCore",
+              ],
+            ],
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--bastion",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "NeptuneGraphAppbastionInstanceRoleDefaultPolicy6DFAA993": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "neptune-db:*",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":neptune-db:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":",
+                    {
+                      "Fn::GetAtt": [
+                        "NeptuneGraphAppgraph2EE8F381",
+                        "ClusterResourceId",
+                      ],
+                    },
+                    "/*",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "NeptuneGraphAppbastionInstanceRoleDefaultPolicy6DFAA993",
+        "Roles": [
+          {
+            "Ref": "NeptuneGraphAppbastionInstanceRole1DE27A04",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "NeptuneGraphAppbastionLaunchTemplate5EFDB6B7": {
+      "Properties": {
+        "LaunchTemplateData": {
+          "MetadataOptions": {
+            "HttpTokens": "required",
+          },
+        },
+        "LaunchTemplateName": "NeptuneGraphApp--bastionLaunchTemplate",
+      },
+      "Type": "AWS::EC2::LaunchTemplate",
+    },
+    "NeptuneGraphAppbastionSgA2525585": {
+      "Properties": {
+        "GroupDescription": "Neptune bastion - SSM-managed, egress only to Neptune and SSM endpoints",
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NeptuneGraphAppbastionSgtoComposureCDKNeptuneGraphStackNeptuneGraphAppgraphSecurityGroupD151DD39IndirectPort57EB8748": {
+      "Properties": {
+        "Description": "to ComposureCDKNeptuneGraphStackNeptuneGraphAppgraphSecurityGroupD151DD39:{IndirectPort}",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppgraphSecurityGroupE922E691",
+            "GroupId",
+          ],
+        },
+        "FromPort": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppgraph2EE8F381",
+            "Port",
+          ],
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppgraph2EE8F381",
+            "Port",
+          ],
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "NeptuneGraphAppbastionSgtoComposureCDKNeptuneGraphStackNeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroupEA3F3F7E4437C5FF002": {
+      "Properties": {
+        "Description": "Ec2Messages from Neptune bastion",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroup593DE067",
+            "GroupId",
+          ],
+        },
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "NeptuneGraphAppbastionSgtoComposureCDKNeptuneGraphStackNeptuneGraphAppnetworkSsmEndpointSecurityGroup600CC412443273E81A5": {
+      "Properties": {
+        "Description": "Ssm from Neptune bastion",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkSsmEndpointSecurityGroup96376F45",
+            "GroupId",
+          ],
+        },
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "NeptuneGraphAppbastionSgtoComposureCDKNeptuneGraphStackNeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupB3945BC44434D3EC25D": {
+      "Properties": {
+        "Description": "SsmMessages from Neptune bastion",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupA985331A",
+            "GroupId",
+          ],
+        },
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress",
+    },
+    "NeptuneGraphAppbastionStatusCheckFailedAlarm73FA3488": {
+      "Properties": {
+        "AlarmDescription": "EC2 instance is failing its status checks. Threshold: > 0 failed checks over 2 x 1 minute.",
+        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/bastion/status-check-failed",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 2,
+        "Dimensions": [
+          {
+            "Name": "InstanceId",
+            "Value": {
+              "Ref": "NeptuneGraphAppbastion33F9E2DF",
+            },
+          },
+        ],
+        "EvaluationPeriods": 2,
+        "MetricName": "StatusCheckFailed",
+        "Namespace": "AWS/EC2",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NeptuneGraphAppgraph2EE8F381": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "BackupRetentionPeriod": 7,
+        "CopyTagsToSnapshot": true,
+        "DBClusterParameterGroupName": {
+          "Ref": "NeptuneGraphAppgraphParameterGroupB7117546",
+        },
+        "DBSubnetGroupName": {
+          "Ref": "NeptuneGraphAppgraphSubnetsF0A494B3",
+        },
+        "DeletionProtection": true,
+        "EnableCloudwatchLogsExports": [
+          "audit",
+        ],
+        "IamAuthEnabled": true,
+        "ServerlessScalingConfiguration": {
+          "MaxCapacity": 2.5,
+          "MinCapacity": 1,
+        },
+        "StorageEncrypted": true,
+        "VpcSecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "NeptuneGraphAppgraphSecurityGroupE922E691",
+              "GroupId",
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::Neptune::DBCluster",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "NeptuneGraphAppgraphBufferCacheHitRatioAlarm0F1DA8C6": {
+      "Properties": {
+        "AlarmDescription": "Neptune cluster buffer cache hit ratio is low; working set may exceed memory. Threshold: < 99.9% over 1 minute periods.",
+        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/buffer-cache-hit-ratio",
+        "ComparisonOperator": "LessThanThreshold",
+        "DatapointsToAlarm": 10,
+        "Dimensions": [
+          {
+            "Name": "DBClusterIdentifier",
+            "Value": {
+              "Ref": "NeptuneGraphAppgraph2EE8F381",
+            },
+          },
+        ],
+        "EvaluationPeriods": 15,
+        "MetricName": "BufferCacheHitRatio",
+        "Namespace": "AWS/Neptune",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 99.9,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NeptuneGraphAppgraphClusterReplicaLagAlarm0069236B": {
+      "Properties": {
+        "AlarmDescription": "Neptune read replica is lagging the writer. Threshold: > 30000 ms over 1 minute periods.",
+        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/cluster-replica-lag",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "DBClusterIdentifier",
+            "Value": {
+              "Ref": "NeptuneGraphAppgraph2EE8F381",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "ClusterReplicaLag",
+        "Namespace": "AWS/Neptune",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 30000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NeptuneGraphAppgraphCpuUtilizationAlarm16CCE756": {
+      "Properties": {
+        "AlarmDescription": "Neptune cluster CPU utilization is high. Threshold: >= 80% over 1 minute periods.",
+        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/cpu-utilization",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "DBClusterIdentifier",
+            "Value": {
+              "Ref": "NeptuneGraphAppgraph2EE8F381",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/Neptune",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 80,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NeptuneGraphAppgraphInstance152ED0D64": {
+      "DeletionPolicy": "Retain",
+      "DependsOn": [
+        "NeptuneGraphAppnetworkisolatedSubnet1RouteTableAssociationD39ABE8F",
+        "NeptuneGraphAppnetworkisolatedSubnet2RouteTableAssociationDC872302",
+      ],
+      "Properties": {
+        "AutoMinorVersionUpgrade": true,
+        "DBClusterIdentifier": {
+          "Ref": "NeptuneGraphAppgraph2EE8F381",
+        },
+        "DBInstanceClass": "db.serverless",
+      },
+      "Type": "AWS::Neptune::DBInstance",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "NeptuneGraphAppgraphMainRequestQueuePendingRequestsAlarmC82CCA12": {
+      "Properties": {
+        "AlarmDescription": "Neptune cluster request queue is backing up. Threshold: > 100 pending requests over 1 minute periods.",
+        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/main-request-queue-pending-requests",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "DBClusterIdentifier",
+            "Value": {
+              "Ref": "NeptuneGraphAppgraph2EE8F381",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "MainRequestQueuePendingRequests",
+        "Namespace": "AWS/Neptune",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 100,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NeptuneGraphAppgraphParameterGroupB7117546": {
+      "Properties": {
+        "Description": "Cluster parameter group for neptune db cluster",
+        "Family": "neptune1.4",
+        "Parameters": {
+          "neptune_enable_audit_log": "1",
+        },
+      },
+      "Type": "AWS::Neptune::DBClusterParameterGroup",
+    },
+    "NeptuneGraphAppgraphSecurityGroupE922E691": {
+      "Properties": {
+        "GroupDescription": "Neptune security group",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NeptuneGraphAppgraphSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA7198IndirectPort8A150FDF": {
+      "Properties": {
+        "Description": "from ComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA7198:{IndirectPort}",
+        "FromPort": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppgraph2EE8F381",
+            "Port",
+          ],
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppgraphSecurityGroupE922E691",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "ToPort": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppgraph2EE8F381",
+            "Port",
+          ],
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "NeptuneGraphAppgraphServerlessDatabaseCapacityAlarm652BDB4E": {
+      "Properties": {
+        "AlarmDescription": "Neptune serverless capacity is sustained near its 2.5 NCU ceiling. Threshold: >= 2.25 NCU over 1 minute periods.",
+        "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/graph/serverless-database-capacity",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 10,
+        "Dimensions": [
+          {
+            "Name": "DBClusterIdentifier",
+            "Value": {
+              "Ref": "NeptuneGraphAppgraph2EE8F381",
+            },
+          },
+        ],
+        "EvaluationPeriods": 15,
+        "MetricName": "ServerlessDatabaseCapacity",
+        "Namespace": "AWS/Neptune",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 2.25,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "NeptuneGraphAppgraphSubnetsF0A494B3": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "DBSubnetGroupDescription": "Subnets for NeptuneGraphApp/graph database",
+        "SubnetIds": [
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E",
+          },
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet2Subnet1C86C7A4",
+          },
+        ],
+      },
+      "Type": "AWS::Neptune::DBSubnetGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "NeptuneGraphAppgraphauditLogRetention76CAB7A8": {
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/neptune/",
+              {
+                "Ref": "NeptuneGraphAppgraph2EE8F381",
+              },
+              "/audit",
+            ],
+          ],
+        },
+        "RetentionInDays": 30,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::LogRetention",
+    },
+    "NeptuneGraphAppnetwork6E4EC8BD": {
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+      },
+      "Type": "AWS::EC2::VPC",
+    },
+    "NeptuneGraphAppnetworkDefaultFlowLog7F58008D": {
+      "Properties": {
+        "DeliverLogsPermissionArn": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkDefaultFlowLogIAMRole4BBEDE41",
+            "Arn",
+          ],
+        },
+        "LogDestinationType": "cloud-watch-logs",
+        "LogGroupName": {
+          "Ref": "NeptuneGraphAppnetworkFlowLogsLogGroup24FFC645",
+        },
+        "ResourceId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+        "ResourceType": "VPC",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/DefaultFlowLog",
+          },
+        ],
+        "TrafficType": "ALL",
+      },
+      "Type": "AWS::EC2::FlowLog",
+    },
+    "NeptuneGraphAppnetworkDefaultFlowLogIAMRole4BBEDE41": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "vpc-flow-logs.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/DefaultFlowLog",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "NeptuneGraphAppnetworkDefaultFlowLogIAMRoleDefaultPolicy6FD21263": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "NeptuneGraphAppnetworkFlowLogsLogGroup24FFC645",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "NeptuneGraphAppnetworkDefaultFlowLogIAMRoleDefaultPolicy6FD21263",
+        "Roles": [
+          {
+            "Ref": "NeptuneGraphAppnetworkDefaultFlowLogIAMRole4BBEDE41",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "NeptuneGraphAppnetworkEc2MessagesEndpointB9744A5D": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroup593DE067",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": {
+          "Fn::Join": [
+            "",
+            [
+              "com.amazonaws.",
+              {
+                "Ref": "AWS::Region",
+              },
+              ".ec2messages",
+            ],
+          ],
+        },
+        "SubnetIds": [
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E",
+          },
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet2Subnet1C86C7A4",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroup593DE067": {
+      "Properties": {
+        "GroupDescription": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/Ec2MessagesEndpoint/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA71984435BFFF54F": {
+      "Properties": {
+        "Description": "Ec2Messages from Neptune bastion",
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkEc2MessagesEndpointSecurityGroup593DE067",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "NeptuneGraphAppnetworkFlowLogsLogGroup24FFC645": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "NeptuneGraphAppnetworkRestrictDefaultSecurityGroupCustomResourceBCA807D0": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "Account": {
+          "Ref": "AWS::AccountId",
+        },
+        "DefaultSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetwork6E4EC8BD",
+            "DefaultSecurityGroup",
+          ],
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "Custom::VpcRestrictDefaultSG",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "NeptuneGraphAppnetworkSsmEndpointC2160135": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "NeptuneGraphAppnetworkSsmEndpointSecurityGroup96376F45",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": {
+          "Fn::Join": [
+            "",
+            [
+              "com.amazonaws.",
+              {
+                "Ref": "AWS::Region",
+              },
+              ".ssm",
+            ],
+          ],
+        },
+        "SubnetIds": [
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E",
+          },
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet2Subnet1C86C7A4",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "NeptuneGraphAppnetworkSsmEndpointSecurityGroup96376F45": {
+      "Properties": {
+        "GroupDescription": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/SsmEndpoint/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NeptuneGraphAppnetworkSsmEndpointSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA7198443670183A7": {
+      "Properties": {
+        "Description": "Ssm from Neptune bastion",
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkSsmEndpointSecurityGroup96376F45",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "NeptuneGraphAppnetworkSsmMessagesEndpoint50696562": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupA985331A",
+              "GroupId",
+            ],
+          },
+        ],
+        "ServiceName": {
+          "Fn::Join": [
+            "",
+            [
+              "com.amazonaws.",
+              {
+                "Ref": "AWS::Region",
+              },
+              ".ssmmessages",
+            ],
+          ],
+        },
+        "SubnetIds": [
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E",
+          },
+          {
+            "Ref": "NeptuneGraphAppnetworkisolatedSubnet2Subnet1C86C7A4",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::VPCEndpoint",
+    },
+    "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupA985331A": {
+      "Properties": {
+        "GroupDescription": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/SsmMessagesEndpoint/SecurityGroup",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1",
+          },
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::SecurityGroup",
+    },
+    "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA71984439DE54F16": {
+      "Properties": {
+        "Description": "SsmMessages from Neptune bastion",
+        "FromPort": 443,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppnetworkSsmMessagesEndpointSecurityGroupA985331A",
+            "GroupId",
+          ],
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "NeptuneGraphAppbastionSgA2525585",
+            "GroupId",
+          ],
+        },
+        "ToPort": 443,
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress",
+    },
+    "NeptuneGraphAppnetworkisolatedSubnet1RouteTableAD136CDE": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/isolatedSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "NeptuneGraphAppnetworkisolatedSubnet1RouteTableAssociationD39ABE8F": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "NeptuneGraphAppnetworkisolatedSubnet1RouteTableAD136CDE",
+        },
+        "SubnetId": {
+          "Ref": "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "NeptuneGraphAppnetworkisolatedSubnet1SubnetBE50669E": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.0.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "isolated",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/isolatedSubnet1",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+    "NeptuneGraphAppnetworkisolatedSubnet2RouteTable139FFA6D": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/isolatedSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::RouteTable",
+    },
+    "NeptuneGraphAppnetworkisolatedSubnet2RouteTableAssociationDC872302": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "NeptuneGraphAppnetworkisolatedSubnet2RouteTable139FFA6D",
+        },
+        "SubnetId": {
+          "Ref": "NeptuneGraphAppnetworkisolatedSubnet2Subnet1C86C7A4",
+        },
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+    },
+    "NeptuneGraphAppnetworkisolatedSubnet2Subnet1C86C7A4": {
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": "",
+            },
+          ],
+        },
+        "CidrBlock": "10.0.1.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "isolated",
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated",
+          },
+          {
+            "Key": "Name",
+            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--network/isolatedSubnet2",
+          },
+        ],
+        "VpcId": {
+          "Ref": "NeptuneGraphAppnetwork6E4EC8BD",
+        },
+      },
+      "Type": "AWS::EC2::Subnet",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

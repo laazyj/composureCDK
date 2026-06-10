@@ -44,6 +44,21 @@ export {
 } from "./security-group-builder.js";
 export { SECURITY_GROUP_DEFAULTS } from "./security-group-defaults.js";
 
+export {
+  createInterfaceEndpointBuilder,
+  type IInterfaceEndpointBuilder,
+  type InterfaceEndpointBuilderProps,
+  type InterfaceEndpointBuilderResult,
+} from "./interface-endpoint-builder.js";
+export {
+  createInterfaceEndpointsBuilder,
+  type IInterfaceEndpointsBuilder,
+  type InterfaceEndpointsBuilderProps,
+  type InterfaceEndpointsBuilderResult,
+  SSM_ACCESS_SERVICES,
+} from "./interface-endpoints-builder.js";
+export { INTERFACE_ENDPOINT_DEFAULTS } from "./interface-endpoint-defaults.js";
+
 /**
  * This package's AWS-property constraints, grouped by application strategy.
  * The `constraints.validate.*` / `constraints.sanitize.*` shape is identical

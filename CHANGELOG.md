@@ -1,3 +1,18 @@
+## 0.8.4 (2026-06-10)
+
+### 🚀 Features
+
+- **constraints:** AWS-property constraint catalogue ([#188](https://github.com/laazyj/composureCDK/pull/188), [#166](https://github.com/laazyj/composureCDK/issues/166))
+- **neptune:** add Amazon Neptune cluster builder ([#189](https://github.com/laazyj/composureCDK/pull/189), [#141](https://github.com/laazyj/composureCDK/issues/141))
+
+### 🩹 Fixes
+
+- **ec2:** let user-pinned availabilityZones override default maxAzs ([#187](https://github.com/laazyj/composureCDK/pull/187), [#153](https://github.com/laazyj/composureCDK/issues/153))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.8.3 (2026-06-01)
 
 ### 🚀 Features

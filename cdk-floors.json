@@ -1,5 +1,5 @@
 {
-  "$comment": "Per-package aws-cdk-lib floors — the source of truth for each package's peerDependencies.aws-cdk-lib range. `node scripts/cdk-floors.mjs establish` discovers these (ladder-granular); the values here are refined to the exact introducing release and validated by loading each package against real installs. `apply` writes them to package.json; `check` asserts package.json matches. To grandfather older support, drop the requiring API, re-run establish to prove the lower floor, then apply.",
+  "$comment": "Per-package aws-cdk-lib floors — the source of truth for each package's peerDependencies.aws-cdk-lib range. `node scripts/cdk-floors.mjs establish` discovers these (ladder-granular); the values here are refined to the exact introducing release and validated by loading each package against real installs. `apply` writes them to package.json; `check` asserts package.json matches. To grandfather older support, drop the requiring API, re-run establish to prove the lower floor, then apply. An optional `peerFloors` map declares additional peerDependencies that move in lockstep with the aws-cdk-lib floor (e.g. a version-locked `@aws-cdk/aws-*-alpha` module); like `floor`, each value is the exact version — `apply` writes it as a `^` range, `check` asserts it, and `enforce` pins it (exact) alongside aws-cdk-lib when probing the floor.",
   "floors": {
     "cloudformation": {
       "floor": "2.1.0",
@@ -52,8 +52,11 @@
     },
     "lambda": { "floor": "2.168.0", "gatedBy": "aws-lambda.MetricType (introduced 2.168.0)" },
     "neptune": {
-      "floor": "2.257.0",
-      "gatedBy": "@aws-cdk/aws-neptune-alpha is version-locked to its matching aws-cdk-lib release (the 2.257.0-alpha.0 peer requires aws-cdk-lib 2.257.0), so the floor tracks that exact release rather than an introducing API"
+      "floor": "2.190.0",
+      "gatedBy": "ParameterGroupFamily.NEPTUNE_1_4 (used as the default parameter-group family in cluster-parameter-group-defaults.ts) and EngineVersion.V1_4_0_0 were introduced in @aws-cdk/aws-neptune-alpha 2.190.0-alpha.0, whose own aws-cdk-lib peer is ^2.190.0; the alpha just below (2.189.x-alpha.0) lacks both symbols so the package fails to compile. @aws-cdk/aws-neptune-alpha is version-locked to its matching aws-cdk-lib release, so the alpha peer (see peerFloors) tracks the same 2.190.0 line.",
+      "peerFloors": {
+        "@aws-cdk/aws-neptune-alpha": "2.190.0-alpha.0"
+      }
     },
     "route53": { "floor": "2.216.0", "gatedBy": "aws-route53.HttpsRecord (introduced 2.216.0)" }
   }

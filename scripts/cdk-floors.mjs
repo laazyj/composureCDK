@@ -71,7 +71,7 @@ function readFloors() {
 
 /** Writes each package's peerDependencies.aws-cdk-lib from the curated manifest. */
 function apply() {
-  for (const [pkg, { floor }] of Object.entries(readFloors())) {
+  for (const [pkg, { floor, peerFloors }] of Object.entries(readFloors())) {
     const path = pkgJsonPath(pkg);
     const json = JSON.parse(readFileSync(path, "utf8"));
     if (json.peerDependencies?.["aws-cdk-lib"] === undefined) {
@@ -79,8 +79,17 @@ function apply() {
       continue;
     }
     json.peerDependencies["aws-cdk-lib"] = `^${floor}`;
+    // Lockstep peers (e.g. a version-locked @aws-cdk/aws-*-alpha) are stored exact
+    // in the manifest, like `floor`, and written as a caret range here.
+    const extras = [];
+    for (const [name, version] of Object.entries(peerFloors ?? {})) {
+      json.peerDependencies[name] = `^${version}`;
+      extras.push(`${name} ^${version}`);
+    }
     writeFileSync(path, `${JSON.stringify(json, null, 2)}\n`);
-    console.log(`  ${pkg.padEnd(16)} aws-cdk-lib ^${floor}`);
+    console.log(
+      `  ${pkg.padEnd(16)} aws-cdk-lib ^${floor}${extras.length > 0 ? ` + ${extras.join(", ")}` : ""}`,
+    );
   }
   console.log("\nApplied to package.json files (run `npm run format` to normalise).");
 }
@@ -89,14 +98,19 @@ function apply() {
 function check() {
   const floors = readFloors();
   const mismatches = [];
-  for (const [pkg, { floor }] of Object.entries(floors)) {
-    const actual = JSON.parse(readFileSync(pkgJsonPath(pkg), "utf8")).peerDependencies?.[
-      "aws-cdk-lib"
-    ];
-    if (actual !== `^${floor}`) {
+  for (const [pkg, { floor, peerFloors }] of Object.entries(floors)) {
+    const peers = JSON.parse(readFileSync(pkgJsonPath(pkg), "utf8")).peerDependencies ?? {};
+    if (peers["aws-cdk-lib"] !== `^${floor}`) {
       mismatches.push(
-        `  ${pkg}: package.json has "${actual ?? "(unset)"}", manifest expects "^${floor}"`,
+        `  ${pkg}: package.json has aws-cdk-lib "${peers["aws-cdk-lib"] ?? "(unset)"}", manifest expects "^${floor}"`,
       );
+    }
+    for (const [name, version] of Object.entries(peerFloors ?? {})) {
+      if (peers[name] !== `^${version}`) {
+        mismatches.push(
+          `  ${pkg}: package.json has ${name} "${peers[name] ?? "(unset)"}", manifest expects "^${version}"`,
+        );
+      }
     }
   }
   if (mismatches.length > 0) {
@@ -119,12 +133,27 @@ function groupByFloor(floors) {
   return byFloor;
 }
 
-/** The aws-cdk-lib version `pkgName` actually resolves, from inside its own dir. */
-function resolvedVersionFor(pkgName) {
+/**
+ * Lockstep peer overrides (e.g. a version-locked `@aws-cdk/aws-*-alpha`) for each
+ * floor, as `{ [floor]: { [peer]: exactVersion } }`. The manifest stores each peer
+ * exact (like `floor`), which is exactly what `enforce` pins — without pinning the
+ * alpha too, a lowered aws-cdk-lib floor would be probed against a mismatched
+ * (latest) alpha and the result would be meaningless.
+ */
+function peerOverridesByFloor(floors) {
+  const byFloor = {};
+  for (const { floor, peerFloors } of Object.values(floors)) {
+    byFloor[floor] = { ...byFloor[floor], ...peerFloors };
+  }
+  return byFloor;
+}
+
+/** The version of `dep` that `pkgName` actually resolves, from inside its own dir. */
+function resolvedVersionFor(pkgName, dep = "aws-cdk-lib") {
   const cwd = join(PACKAGES_DIR, pkgName.replace("@composurecdk/", ""));
   return execFileSync(
     process.execPath,
-    ["-e", "process.stdout.write(require('aws-cdk-lib/package.json').version)"],
+    ["-e", `process.stdout.write(require(${JSON.stringify(`${dep}/package.json`)}).version)`],
     { cwd, encoding: "utf8" },
   ).trim();
 }
@@ -143,7 +172,9 @@ function resolvedVersionFor(pkgName) {
 function enforce() {
   const requested = process.env.CDK_FLOORS_FLOOR ?? process.argv[3];
   const hasRequested = requested !== undefined && requested !== "" && requested !== "--force";
-  const byFloor = groupByFloor(readFloors());
+  const floors = readFloors();
+  const byFloor = groupByFloor(floors);
+  const peerByFloor = peerOverridesByFloor(floors);
   if (hasRequested && !byFloor.has(requested)) {
     console.error(
       `cdk-floors enforce: no packages declare aws-cdk-lib floor ${requested}.\n` +
@@ -196,9 +227,15 @@ function enforce() {
 
       // Derive the override from the pristine backup each time (so floors don't
       // compound) and install from scratch — overrides only bind on a clean tree.
+      // Lockstep peers (e.g. a version-locked alpha module) are pinned in the same
+      // override so the floor is probed against a coherent peer graph.
+      const peerOverrides = peerByFloor[floor] ?? {};
       const manifest = JSON.parse(pkgBackup);
-      manifest.overrides = { ...manifest.overrides, "aws-cdk-lib": floor };
+      manifest.overrides = { ...manifest.overrides, "aws-cdk-lib": floor, ...peerOverrides };
       writeFileSync(PKG, `${JSON.stringify(manifest, null, 2)}\n`);
+      for (const [name, version] of Object.entries(peerOverrides)) {
+        console.log(`  pinning lockstep peer ${name}@${version}`);
+      }
       // Both must go for npm to re-resolve under the override: with node_modules
       // present npm reports "up to date", and with the lockfile present it
       // installs the locked (latest) version regardless of the override.
@@ -209,17 +246,19 @@ function enforce() {
         stdio: "inherit",
       });
 
-      // Hard gate: confirm the floor bound for this group (not a nested latest
-      // copy), so the run can never silently pass against the wrong version.
+      // Hard gate: confirm every pinned version bound for this group (not a nested
+      // latest copy), so the run can never silently pass against the wrong version.
       const sample = group[0];
-      const got = resolvedVersionFor(sample);
-      if (got !== floor) {
-        throw new Error(
-          `floor pin failed: ${sample} resolves aws-cdk-lib ${got}, expected ${floor} — ` +
-            "the override did not bind (stale node_modules?).",
-        );
+      for (const [dep, want] of Object.entries({ "aws-cdk-lib": floor, ...peerOverrides })) {
+        const got = resolvedVersionFor(sample, dep);
+        if (got !== want) {
+          throw new Error(
+            `pin failed: ${sample} resolves ${dep} ${got}, expected ${want} — ` +
+              "the override did not bind (stale node_modules?).",
+          );
+        }
+        console.log(`  ${sample} resolves ${dep} ${got} ✓`);
       }
-      console.log(`  ${sample} resolves aws-cdk-lib ${got} ✓`);
 
       try {
         execFileSync(

@@ -114,6 +114,33 @@ This complements the static guard already in place: the
 blocks known version-gated APIs at lint time, so they can't be written into
 `src/` in the first place.
 
+### Lockstep alpha peers
+
+`@composurecdk/neptune` also depends on `@aws-cdk/aws-neptune-alpha`, an L2 module
+AWS publishes one-per-`aws-cdk-lib`-release: `@aws-cdk/aws-neptune-alpha@X.Y.Z-alpha.0`
+declares `peerDependencies.aws-cdk-lib` of `^X.Y.Z`. The two move in lockstep, so
+the package's real floor is "the lowest alpha that still carries every symbol the
+builder uses" and its matching aws-cdk-lib release. Neptune's floor is **2.190.0**:
+`ParameterGroupFamily.NEPTUNE_1_4` (the default parameter-group family) and
+`EngineVersion.V1_4_0_0` first ship in `@aws-cdk/aws-neptune-alpha@2.190.0-alpha.0`;
+the alpha immediately below (`2.189.x-alpha.0`) lacks both and the package fails to
+compile.
+
+A manifest entry may therefore carry an optional **`peerFloors`** map of lockstep
+peers, each stored as an exact version exactly like `floor`
+(here `{ "@aws-cdk/aws-neptune-alpha": "2.190.0-alpha.0" }`). `apply` writes it to
+`peerDependencies` as a `^` range and `check` asserts it, while `enforce` pins the
+exact version in the same `overrides` block it uses for aws-cdk-lib — otherwise a
+lowered aws-cdk-lib floor would be probed against the still-latest alpha
+devDependency, and the run would prove nothing.
+
+A subtlety drives the range shape: because alpha versions are prerelease-tagged,
+`^2.190.0-alpha.0` only matches the `2.190.x` alpha line under default semver — no
+single caret/`>=` range spans an arbitrary span of `-alpha.0` minors. The
+`aws-cdk-lib` peer stays a clean stable range (`^2.190.0`, satisfied by the latest
+devDependency), so the package still tests at the latest CDK; the alpha peer is the
+narrow lockstep pin, matching how the alpha ecosystem is consumed in practice.
+
 ## Consequences
 
 - Consumers get honest, per-package ranges; low-floor packages stay broadly

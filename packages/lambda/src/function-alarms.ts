@@ -9,7 +9,12 @@ import {
 import type { Function as LambdaFunction, FunctionProps } from "aws-cdk-lib/aws-lambda";
 import type { IConstruct } from "constructs";
 import type { AlarmDefinition, AlarmName } from "@composurecdk/cloudwatch";
-import { AlarmDefinitionBuilder, createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
+import {
+  AlarmDefinitionBuilder,
+  createAlarms,
+  resolveAlarmConfig,
+  resolveAlarmThresholdBasis,
+} from "@composurecdk/cloudwatch";
 import type {
   FunctionAlarmConfig,
   PercentageAlarmConfig,
@@ -104,44 +109,71 @@ export function resolveFunctionAlarmDefinitions(
     });
   }
 
-  const timeoutMs = props.timeout?.toMilliseconds();
-  if (config?.duration !== false && timeoutMs !== undefined) {
-    const cfg = resolvePercentageAlarmConfig(config?.duration, FUNCTION_ALARM_DEFAULTS.duration);
-    const threshold = Math.round(timeoutMs * cfg.thresholdPercent);
-    definitions.push({
-      key: "duration",
-      alarmName: cfg.alarmName,
-      metric: fn.metricDuration({ period: METRIC_PERIOD, statistic: Stats.percentile(99) }),
-      threshold,
-      comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
-      evaluationPeriods: cfg.evaluationPeriods,
-      datapointsToAlarm: cfg.datapointsToAlarm,
-      treatMissingData: cfg.treatMissingData,
-      description: `Lambda function p99 duration is approaching the configured timeout. Threshold: > ${String(threshold)}ms (${String(cfg.thresholdPercent * 100)}% of ${String(timeoutMs)}ms timeout).`,
+  // Threshold is a percentage of the timeout, so it needs a concrete `Duration`.
+  // Check the `duration !== false` escape hatch *before* touching the timeout, so
+  // disabling always works even when the conversion below would throw. The shared
+  // helper then omits the alarm (and warns) for a token-valued timeout, which has
+  // no millisecond threshold at synth time.
+  if (config?.duration !== false) {
+    const timeoutMs = resolveAlarmThresholdBasis({
+      scope: fn,
+      value: props.timeout,
+      isUnresolved: (timeout) => timeout.isUnresolved(),
+      resolve: (timeout) => timeout.toMilliseconds(),
+      warningId: "@composurecdk/lambda:token-timeout-duration-alarm",
+      alarmLabel: "Lambda duration",
+      suppressHint: "recommendedAlarms({ duration: false })",
     });
+    if (timeoutMs !== undefined) {
+      const cfg = resolvePercentageAlarmConfig(config?.duration, FUNCTION_ALARM_DEFAULTS.duration);
+      const threshold = Math.round(timeoutMs * cfg.thresholdPercent);
+      definitions.push({
+        key: "duration",
+        alarmName: cfg.alarmName,
+        metric: fn.metricDuration({ period: METRIC_PERIOD, statistic: Stats.percentile(99) }),
+        threshold,
+        comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
+        evaluationPeriods: cfg.evaluationPeriods,
+        datapointsToAlarm: cfg.datapointsToAlarm,
+        treatMissingData: cfg.treatMissingData,
+        description: `Lambda function p99 duration is approaching the configured timeout. Threshold: > ${String(threshold)}ms (${String(cfg.thresholdPercent * 100)}% of ${String(timeoutMs)}ms timeout).`,
+      });
+    }
   }
 
-  const reservedConcurrency = props.reservedConcurrentExecutions;
-  if (config?.concurrentExecutions !== false && reservedConcurrency !== undefined) {
-    const cfg = resolvePercentageAlarmConfig(
-      config?.concurrentExecutions,
-      FUNCTION_ALARM_DEFAULTS.concurrentExecutions,
-    );
-    const threshold = Math.round(reservedConcurrency * cfg.thresholdPercent);
-    definitions.push({
-      key: "concurrentExecutions",
-      alarmName: cfg.alarmName,
-      metric: fn.metric("ConcurrentExecutions", {
-        period: METRIC_PERIOD,
-        statistic: Stats.MAXIMUM,
-      }),
-      threshold,
-      comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-      evaluationPeriods: cfg.evaluationPeriods,
-      datapointsToAlarm: cfg.datapointsToAlarm,
-      treatMissingData: cfg.treatMissingData,
-      description: `Lambda function concurrent executions approaching reserved concurrency limit. Threshold: >= ${String(threshold)} (${String(cfg.thresholdPercent * 100)}% of ${String(reservedConcurrency)} reserved).`,
+  // Same shape, against a raw number. A token-valued `reservedConcurrentExecutions`
+  // wouldn't throw but would yield a meaningless threshold, so the helper skips it
+  // (default `Token.isUnresolved` guard).
+  if (config?.concurrentExecutions !== false) {
+    const reservedConcurrency = resolveAlarmThresholdBasis({
+      scope: fn,
+      value: props.reservedConcurrentExecutions,
+      resolve: (reserved) => reserved,
+      warningId: "@composurecdk/lambda:token-reserved-concurrency-alarm",
+      alarmLabel: "Lambda concurrent-executions",
+      suppressHint: "recommendedAlarms({ concurrentExecutions: false })",
     });
+    if (reservedConcurrency !== undefined) {
+      const cfg = resolvePercentageAlarmConfig(
+        config?.concurrentExecutions,
+        FUNCTION_ALARM_DEFAULTS.concurrentExecutions,
+      );
+      const threshold = Math.round(reservedConcurrency * cfg.thresholdPercent);
+      definitions.push({
+        key: "concurrentExecutions",
+        alarmName: cfg.alarmName,
+        metric: fn.metric("ConcurrentExecutions", {
+          period: METRIC_PERIOD,
+          statistic: Stats.MAXIMUM,
+        }),
+        threshold,
+        comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+        evaluationPeriods: cfg.evaluationPeriods,
+        datapointsToAlarm: cfg.datapointsToAlarm,
+        treatMissingData: cfg.treatMissingData,
+        description: `Lambda function concurrent executions approaching reserved concurrency limit. Threshold: >= ${String(threshold)} (${String(cfg.thresholdPercent * 100)}% of ${String(reservedConcurrency)} reserved).`,
+      });
+    }
   }
 
   for (const eventSource of eventSources) {

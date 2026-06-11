@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
+import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { alarmName } from "@composurecdk/cloudwatch";
+import type { FunctionAlarmConfig } from "../src/alarm-config.js";
 import { createFunctionBuilder } from "../src/function-builder.js";
 
 function buildResult(configureFn: (builder: ReturnType<typeof createFunctionBuilder>) => void) {
@@ -130,6 +131,89 @@ describe("recommended alarms", () => {
       expect(result.alarms.duration).toBeDefined();
       expect(result.alarms.concurrentExecutions).toBeDefined();
       template.resourceCountIs("AWS::CloudWatch::Alarm", 4);
+    });
+  });
+
+  describe("token-valued props", () => {
+    // A timeout threaded through a CfnParameter is an unresolved token: the
+    // duration alarm cannot derive a millisecond threshold from it. build()
+    // must still succeed (the conversion previously threw — see #196), the
+    // alarm must be omitted, and a warning must explain the skip.
+    function buildWithTokenTimeout(config?: FunctionAlarmConfig | false) {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const param = new CfnParameter(stack, "TimeoutSeconds", { type: "Number", default: 30 });
+      const builder = createFunctionBuilder();
+      minimalFunction(builder);
+      builder.timeout(Duration.seconds(param.valueAsNumber));
+      if (config !== undefined) builder.recommendedAlarms(config);
+      const result = builder.build(stack, "TestFunction");
+      return { result, stack };
+    }
+
+    it("builds successfully and omits the duration alarm for a token-valued timeout", () => {
+      const { result } = buildWithTokenTimeout();
+
+      expect(result.alarms.duration).toBeUndefined();
+      expect(result.alarms.errors).toBeDefined();
+      expect(result.alarms.throttles).toBeDefined();
+    });
+
+    it("warns when the duration alarm is skipped for a token-valued timeout", () => {
+      const { stack } = buildWithTokenTimeout();
+
+      // The ack tag is the public suppression handle, so it is asserted here to
+      // guard against an accidental rename.
+      Annotations.fromStack(stack).hasWarning(
+        "*",
+        Match.stringLikeRegexp(
+          "Skipping the recommended Lambda duration alarm.*" +
+            "\\[ack: @composurecdk/lambda:token-timeout-duration-alarm\\]",
+        ),
+      );
+    });
+
+    it("does not warn when duration is disabled, even with a token-valued timeout", () => {
+      // recommendedAlarms({ duration: false }) must short-circuit before the
+      // token is inspected, so it is a reliable escape hatch.
+      const { result, stack } = buildWithTokenTimeout({ duration: false });
+
+      expect(result.alarms.duration).toBeUndefined();
+      expect(Annotations.fromStack(stack).findWarning("*", Match.anyValue())).toEqual([]);
+    });
+
+    function buildWithTokenConcurrency(config?: FunctionAlarmConfig | false) {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const param = new CfnParameter(stack, "Concurrency", { type: "Number", default: 100 });
+      const builder = createFunctionBuilder();
+      minimalFunction(builder);
+      builder.reservedConcurrentExecutions(param.valueAsNumber);
+      if (config !== undefined) builder.recommendedAlarms(config);
+      const result = builder.build(stack, "TestFunction");
+      return { result, stack };
+    }
+
+    it("omits the concurrentExecutions alarm for a token-valued reservedConcurrentExecutions", () => {
+      // A token value would not throw but would silently round to a garbage
+      // threshold, so the alarm is skipped rather than rendered wrong.
+      const { result, stack } = buildWithTokenConcurrency();
+
+      expect(result.alarms.concurrentExecutions).toBeUndefined();
+      Annotations.fromStack(stack).hasWarning(
+        "*",
+        Match.stringLikeRegexp(
+          "Skipping the recommended Lambda concurrent-executions alarm.*" +
+            "\\[ack: @composurecdk/lambda:token-reserved-concurrency-alarm\\]",
+        ),
+      );
+    });
+
+    it("does not warn when concurrentExecutions is disabled, even with a token value", () => {
+      const { result, stack } = buildWithTokenConcurrency({ concurrentExecutions: false });
+
+      expect(result.alarms.concurrentExecutions).toBeUndefined();
+      expect(Annotations.fromStack(stack).findWarning("*", Match.anyValue())).toEqual([]);
     });
   });
 

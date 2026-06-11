@@ -5,6 +5,10 @@ export type { AlarmConfig, AlarmConfigDefaults } from "./alarm-config.js";
 export type { AlarmDefinition, AlarmMetric } from "./alarm-definition.js";
 export { AlarmDefinitionBuilder } from "./alarm-definition-builder.js";
 export { type AlarmName, alarmName } from "./alarm-name.js";
+export {
+  type AlarmThresholdBasisOptions,
+  resolveAlarmThresholdBasis,
+} from "./alarm-threshold-basis.js";
 export { defaultAlarmName } from "./default-alarm-name.js";
 export { createAlarms } from "./create-alarms.js";
 export { resolveAlarmConfig, type ResolvedAlarmConfig } from "./resolve-alarm-config.js";

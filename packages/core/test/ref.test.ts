@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ref, resolve, isRef, REF_BRAND, type Resolvable } from "../src/ref.js";
+import { ref, resolve, isRef, REF_BRAND, type Resolvable, type ResolvedProps } from "../src/ref.js";
 
 interface FakeResult {
   value: string;
@@ -137,6 +137,36 @@ describe("Resolvable utilities", () => {
       const value: Resolvable<FakeResult> = { value: "concrete", nested: { id: 0 } };
 
       expect(resolve(value, fakeContext)).toEqual({ value: "concrete", nested: { id: 0 } });
+    });
+  });
+
+  describe("ResolvedProps", () => {
+    interface Props {
+      timeout: number;
+      role: Resolvable<{ arn: string }>;
+    }
+
+    it("makes every key optional", () => {
+      const snapshot: ResolvedProps<Props> = {};
+
+      expect(snapshot).toEqual({});
+    });
+
+    it("collapses a Resolvable prop to its resolved type", () => {
+      // The snapshot holds the resolved value, not the `T | Ref<T>` union —
+      // a concrete `{ arn }` is accepted; a `Ref` would not type-check here.
+      const snapshot: ResolvedProps<Props> = { timeout: 10, role: { arn: "x" } };
+
+      expect(snapshot.role?.arn).toBe("x");
+    });
+
+    it("is read-only", () => {
+      const snapshot: ResolvedProps<Props> = { timeout: 10 };
+
+      // @ts-expect-error resolvedProps is a read-only snapshot, not a handle
+      snapshot.timeout = 20;
+
+      expect(snapshot.timeout).toBe(20);
     });
   });
 });

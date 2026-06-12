@@ -45,6 +45,49 @@ describe("QueueBuilder", () => {
     });
   });
 
+  describe("resolvedProps", () => {
+    it("exposes the merged defaults handed to the queue construct", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createQueueBuilder().build(stack, "TestQueue");
+
+      expect(result.resolvedProps.enforceSSL).toBe(true);
+      expect(result.resolvedProps.encryption).toBe(QueueEncryption.SQS_MANAGED);
+      expect(result.resolvedProps.receiveMessageWaitTime?.toSeconds()).toBe(20);
+    });
+
+    it("exposes a write-only prop the Queue construct does not re-surface", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createQueueBuilder()
+        .visibilityTimeout(Duration.seconds(90))
+        .build(stack, "TestQueue");
+
+      expect(result.resolvedProps.visibilityTimeout?.toSeconds()).toBe(90);
+    });
+
+    it("lets a user value override a default in the snapshot", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createQueueBuilder()
+        .receiveMessageWaitTime(Duration.seconds(5))
+        .build(stack, "TestQueue");
+
+      expect(result.resolvedProps.receiveMessageWaitTime?.toSeconds()).toBe(5);
+    });
+
+    it("preserves nested values by reference so unresolved tokens pass through", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const visibilityTimeout = Duration.seconds(45);
+      const result = createQueueBuilder()
+        .visibilityTimeout(visibilityTimeout)
+        .build(stack, "TestQueue");
+
+      expect(result.resolvedProps.visibilityTimeout).toBe(visibilityTimeout);
+    });
+  });
+
   describe("secure defaults", () => {
     it("enables enforceSSL by default — deny on aws:SecureTransport=false", () => {
       const template = synthTemplate();

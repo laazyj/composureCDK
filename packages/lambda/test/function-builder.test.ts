@@ -53,6 +53,44 @@ describe("FunctionBuilder", () => {
     });
   });
 
+  describe("resolvedProps", () => {
+    it("exposes merged defaults and the timeout the Function does not re-surface", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const result = createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .timeout(Duration.seconds(30))
+        .build(stack, "TestFunction");
+
+      expect(result.resolvedProps.tracing).toBe(Tracing.ACTIVE);
+      expect(result.resolvedProps.loggingFormat).toBe(LoggingFormat.JSON);
+      expect(result.resolvedProps.timeout?.toSeconds()).toBe(30);
+    });
+
+    it("collapses a ref()'d role to the resolved IRole in the snapshot", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+
+      const system = compose(
+        {
+          sharedRole: createServiceRoleBuilder("lambda.amazonaws.com"),
+          handler: createFunctionBuilder()
+            .runtime(Runtime.NODEJS_22_X)
+            .handler("index.handler")
+            .code(Code.fromInline("exports.handler = async () => {}"))
+            .role(ref<RoleBuilderResult>("sharedRole").get("role")),
+        },
+        { sharedRole: [], handler: ["sharedRole"] },
+      );
+
+      const result = system.build(stack, "Sys");
+
+      expect(result.handler.resolvedProps.role).toBe(result.sharedRole.role);
+    });
+  });
+
   describe("synthesised output", () => {
     it("creates a Lambda function with the specified runtime", () => {
       const template = synthTemplate((b) =>

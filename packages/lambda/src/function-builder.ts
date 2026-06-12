@@ -7,7 +7,13 @@ import {
 } from "aws-cdk-lib/aws-lambda";
 import type { ILogGroup, LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import {
+  COPY_STATE,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+  type ResolvedProps,
+} from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import {
@@ -133,6 +139,23 @@ export interface FunctionBuilderResult {
    * Always present — `{}` when no event sources were added.
    */
   eventSources: Record<string, IEventSource>;
+
+  /**
+   * The defaulted, resolved configuration handed to the {@link LambdaFunction}
+   * construct — `{ ...FUNCTION_DEFAULTS, ...userProps }` with the auto-created
+   * log group and the resolved execution role merged in, and any `ref()`
+   * (e.g. {@link FunctionBuilderProps.role}) collapsed to its resolved value.
+   *
+   * Exposes values the CDK {@link LambdaFunction} does not re-surface as
+   * public readonly members (e.g. {@link FunctionProps.timeout}), so a
+   * consuming component that receives this result via `ref()` can perform a
+   * real cross-component invariant check — for instance comparing a source
+   * queue's `visibilityTimeout` against this function's `timeout`.
+   *
+   * Values may be unresolved CDK tokens when threaded from a CloudFormation
+   * parameter; guard with `Token.isUnresolved` before comparing. See ADR-0011.
+   */
+  resolvedProps: ResolvedProps<FunctionProps>;
 }
 
 /**
@@ -374,7 +397,14 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       throw new Error(`FunctionBuilder "${id}": Lambda function has no execution role.`);
     }
 
-    return { function: fn, role: resolvedRole, logGroup, alarms, eventSources };
+    return {
+      function: fn,
+      role: resolvedRole,
+      logGroup,
+      alarms,
+      eventSources,
+      resolvedProps: { ...mergedProps },
+    };
   }
 
   #buildDefaultRole(

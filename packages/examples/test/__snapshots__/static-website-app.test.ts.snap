@@ -46,7 +46,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
           },
-          "S3Key": "3423a042b818e31c1e34a19d6689ab2e5f9b70fcbe9e71df66f241b20a200bd9.zip",
+          "S3Key": "<asset-hash>.zip",
         },
         "Environment": {
           "Variables": {
@@ -961,7 +961,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           "S3Bucket": {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
           },
-          "S3Key": "e2659170a0721541efa761a8d5d04d5e36cbbf691c4b15a9053002b7c825055d.zip",
+          "S3Key": "<asset-hash>.zip",
         },
         "Description": "/opt/awscli/aws",
       },
@@ -994,7 +994,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
           },
         ],
         "SourceObjectKeys": [
-          "53bdfa46ffcb6cefd70edccc9965b2cb903abb80bace345f9f146251e2b8c25e.zip",
+          "<asset-hash>.zip",
         ],
         "WaitForDistributionInvalidation": true,
       },

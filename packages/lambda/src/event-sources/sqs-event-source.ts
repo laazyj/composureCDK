@@ -44,16 +44,20 @@ export const DEFAULT_SQS_EVENT_SOURCE_PROPS: Pick<
  *
  * Applies {@link DEFAULT_SQS_EVENT_SOURCE_PROPS}; pass `props` to override.
  *
- * ## Cross-component invariants (not enforced)
+ * ## Cross-component invariants
  *
  * AWS Well-Architected guidance spans the queue and the function:
  * - the source queue's visibility timeout should be ≥ 6× the function
  *   timeout, leaving room for Lambda to retry a throttled batch;
  * - the source queue's redrive `maxReceiveCount` should be ≥ 5 before the DLQ.
  *
- * These are not validated here — the queue often arrives as a `ref()` that is
- * not resolvable at configuration time. Tracked in laazyj/composureCDK#123
- * and #124.
+ * The visibility-timeout rule surfaces as a synth-time **reminder** when this
+ * source is attached to a {@link IFunctionBuilder} that has a `timeout` set.
+ * The concrete `Queue` construct does not expose `visibilityTimeout` (only
+ * `QueueProps` carries it), so the consumer cannot read the queue value for a
+ * true comparison — it states the function timeout and the computed 6× target
+ * instead. Upgrading this to a real comparison is tracked in
+ * laazyj/composureCDK#122; the `maxReceiveCount` floor is tracked in #124.
  *
  * @param queue - The source queue, concrete or a `ref()` to a sibling.
  * @param props - Overrides for {@link DEFAULT_SQS_EVENT_SOURCE_PROPS} and any

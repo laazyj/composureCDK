@@ -6,8 +6,8 @@
       "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/assertions, aws-cdk-lib/aws-*) used by the suite. Src itself only needs the root entry (2.0.0), but the enforce model requires the suite to run, and `aws-cdk-lib/assertions` is table stakes for builder tests."
     },
     "cloudwatch": {
-      "floor": "2.1.0",
-      "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-cloudwatch)"
+      "floor": "2.93.0",
+      "gatedBy": "Annotations.addWarningV2 used by alarm-threshold-basis.ts (introduced 2.93.0); also aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-cloudwatch, 2.1.0)"
     },
     "sns": {
       "floor": "2.178.0",
@@ -26,14 +26,17 @@
       "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-logs)"
     },
     "events": {
-      "floor": "2.85.0",
-      "gatedBy": "aws-stepfunctions.DefinitionBody used by target-helpers.test (introduced 2.85.0); also Match.stringLikeRegexp used by rule-alarms.test (2.9.0)"
+      "floor": "2.93.0",
+      "gatedBy": "Annotations.addWarningV2 reached transitively via @composurecdk/cloudwatch's alarm-threshold-basis.ts (introduced 2.93.0); also aws-stepfunctions.DefinitionBody used by target-helpers.test (2.85.0) and Match.stringLikeRegexp used by rule-alarms.test (2.9.0)"
     },
     "budgets": {
       "floor": "2.93.0",
       "gatedBy": "Annotations.addWarningV2 used by budget-alarm-builder.ts and currency.ts (introduced 2.93.0)"
     },
-    "apigateway": { "floor": "2.54.0", "gatedBy": "aws-cloudwatch.Stats (introduced 2.54.0)" },
+    "apigateway": {
+      "floor": "2.93.0",
+      "gatedBy": "Annotations.addWarningV2 reached transitively via @composurecdk/cloudwatch's alarm-threshold-basis.ts (introduced 2.93.0); also aws-cloudwatch.Stats (2.54.0)"
+    },
     "ec2": {
       "floor": "2.140.0",
       "gatedBy": "aws-ec2.InstanceProps.ebsOptimized (introduced 2.140.0); also IKeyPair / InstanceProps.keyPair (2.116.0)"

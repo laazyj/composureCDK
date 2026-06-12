@@ -11,6 +11,6 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true
   },
-  "include": ["bin", "src", "test"],
+  "include": ["bin", "src", "test", "vitest.config.ts", "vitest.setup.ts"],
   "exclude": ["node_modules"]
 }

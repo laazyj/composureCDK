@@ -10,6 +10,12 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-0f0d0c)](https://www.typescriptlang.org/)
 [![node >=20](https://img.shields.io/badge/node-%3E%3D20-0f0d0c)](https://nodejs.org/)
 
+> [!WARNING]
+> **Pre-release (0.x).** ComposureCDK is under active development. The public
+> API may change between minor versions until 1.0. Pin exact versions and
+> expect breaking changes. Early feedback is very welcome —
+> please [open an issue](https://github.com/laazyj/composureCDK/issues).
+
 ComposureCDK is a TypeScript library built on [AWS CDK](https://docs.aws.amazon.com/cdk/) that brings managed lifecycles, explicit dependency graphs, and builder patterns to cloud infrastructure definition. It is inspired by Stuart Sierra's [Component](https://github.com/stuartsierra/component) library for Clojure.
 
 ## The Problem

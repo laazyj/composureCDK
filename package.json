@@ -1,6 +1,6 @@
 {
   "name": "composurecdk",
-  "description": "",
+  "description": "Composable, lifecycle-managed AWS infrastructure built on AWS CDK — monorepo for the @composurecdk/* packages.",
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
@@ -26,7 +26,15 @@
     "type": "git",
     "url": "git+https://github.com/laazyj/composureCDK.git"
   },
-  "keywords": [],
+  "keywords": [
+    "aws",
+    "cdk",
+    "aws-cdk",
+    "infrastructure-as-code",
+    "iac",
+    "composurecdk",
+    "monorepo"
+  ],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
   "type": "module",

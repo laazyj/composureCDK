@@ -76,6 +76,51 @@ If two components depend on each other, that is an architectural problem to be s
 
 - **Infrastructure engineers** who want to standardise patterns, enforce best practices, and reduce configuration drift across an organisation. ComposureCDK's defaults and builder patterns provide a consistent foundation that teams can extend.
 
+## Getting started
+
+ComposureCDK packages declare `aws-cdk-lib`, `constructs`, and their `@composurecdk/*` siblings as **peer dependencies**. Install the CDK peers and the packages you import directly — npm resolves the rest:
+
+```sh
+npm install aws-cdk-lib constructs @composurecdk/core @composurecdk/s3 @composurecdk/cloudfront
+```
+
+Describe your system as a flat map of named **builders** and a separate map of their **dependencies**, then `compose` and `build` it into a stack:
+
+```typescript
+import { App, Stack } from "aws-cdk-lib";
+import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { ViewerProtocolPolicy } from "aws-cdk-lib/aws-cloudfront";
+import { compose, ref } from "@composurecdk/core";
+import { createBucketBuilder } from "@composurecdk/s3";
+import { createDistributionBuilder } from "@composurecdk/cloudfront";
+
+const stack = new Stack(new App(), "SiteStack");
+
+compose(
+  // Components — a flat map of named builders.
+  {
+    bucket: createBucketBuilder(),
+    cdn: createDistributionBuilder()
+      .defaultRootObject("index.html")
+      .origin(ref("bucket", (b) => S3BucketOrigin.withOriginAccessControl(b.bucket)))
+      .defaultBehavior({ viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS }),
+  },
+  // Dependencies — as data.
+  {
+    bucket: [],
+    cdn: ["bucket"],
+  },
+).build(stack, "Site");
+```
+
+The bucket gets ComposureCDK's secure defaults — encryption, blocked public access, versioning — with no extra configuration. The `cdn` component declares that it depends on `bucket`, and `ref` wires the resolved bucket in as a private CloudFront origin (via Origin Access Control). The dependency is data, so the system assembles the components in the right order for you.
+
+### Next steps
+
+- **[Architecture](docs/architecture.md)** — the model in depth: lifecycle, `compose`, `ref`, and builders.
+- **[Examples](packages/examples/README.md)** — runnable, deployable stacks across S3/CloudFront, Lambda, API Gateway, EC2, SQS, Neptune, and more.
+- **[Introducing ComposureCDK](https://jasonduffett.net/tech/introducing-composure-cdk/)** — the motivation and a full worked walkthrough.
+
 ## Who's using ComposureCDK
 
 See [docs/showcase.md](docs/showcase.md) for case studies of projects built with ComposureCDK, and for the badge snippet to add to your own README:

@@ -28,7 +28,7 @@
   },
   "keywords": [],
   "author": "Jason Duffett (https://github.com/laazyj)",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "bugs": {
     "url": "https://github.com/laazyj/composureCDK/issues"

@@ -2,6 +2,14 @@
 
 **Composable, lifecycle-managed AWS infrastructure.**
 
+[![npm version](https://img.shields.io/npm/v/@composurecdk/core)](https://www.npmjs.com/package/@composurecdk/core)
+[![npm downloads](https://img.shields.io/npm/dm/@composurecdk/core)](https://www.npmjs.com/package/@composurecdk/core)
+[![CI](https://github.com/laazyj/composureCDK/actions/workflows/ci.yml/badge.svg)](https://github.com/laazyj/composureCDK/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-0f0d0c)](LICENSE)
+[![ESM + CJS](https://img.shields.io/badge/ESM%20%2B%20CJS-dual-0f0d0c)](docs/adr/0007-dual-esm-cjs-publishing.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-0f0d0c)](https://www.typescriptlang.org/)
+[![node >=20](https://img.shields.io/badge/node-%3E%3D20-0f0d0c)](https://nodejs.org/)
+
 ComposureCDK is a TypeScript library built on [AWS CDK](https://docs.aws.amazon.com/cdk/) that brings managed lifecycles, explicit dependency graphs, and builder patterns to cloud infrastructure definition. It is inspired by Stuart Sierra's [Component](https://github.com/stuartsierra/component) library for Clojure.
 
 ## The Problem

@@ -32,6 +32,25 @@ public API is fluid.
 - **Security issues** — please **do not** open a public issue. Follow the
   process in [SECURITY.md](SECURITY.md).
 
+### Filing a good issue
+
+The web UI offers issue templates, but the most useful reports — however they're
+filed, including via the API or a coding agent — include the same things. A good
+**bug report** has:
+
+- The **affected package and version** (e.g. `@composurecdk/s3@0.8.4`), taken
+  from your lockfile.
+- A **minimal reproduction**: the smallest `compose`/builder snippet that shows
+  the problem, plus any error or relevant `cdk synth` output.
+- **What you expected** to happen instead.
+- Your **environment**: Node version, `aws-cdk-lib` version, OS.
+
+A good **feature request** describes the **problem or use case** first (the
+friction you hit), then a **proposed solution** as a sketch of the builder or
+`compose` usage, and any **alternatives** or prior art you considered. Because
+the API is still stabilising, open these for discussion before writing a large
+PR.
+
 ## Development setup
 
 Prerequisites: **Node.js >= 20** and npm.

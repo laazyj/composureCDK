@@ -104,6 +104,14 @@ See [docs/showcase.md](docs/showcase.md) for case studies of projects built with
 | [`@composurecdk/sns`](https://www.npmjs.com/package/@composurecdk/sns)                       | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/sns?labelColor=b85416&color=0f0d0c)            | SNS topic components with well-architected defaults               |
 | [`@composurecdk/sqs`](https://www.npmjs.com/package/@composurecdk/sqs)                       | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/sqs?labelColor=b85416&color=0f0d0c)            | SQS queue components with well-architected defaults               |
 
+## Contributing
+
+ComposureCDK is pre-release and its architecture is still stabilising, so we
+work **issue-first** — please open an issue or discussion before sending a large
+pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for our community standards. Security
+issues should follow [SECURITY.md](SECURITY.md).
+
 ## License
 
 [MIT](LICENSE)

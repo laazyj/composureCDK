@@ -20,7 +20,19 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": [],
+  "keywords": [
+    "aws",
+    "cdk",
+    "aws-cdk",
+    "infrastructure-as-code",
+    "iac",
+    "composurecdk",
+    "acm",
+    "certificate",
+    "tls",
+    "ssl",
+    "https"
+  ],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
   "publishConfig": {

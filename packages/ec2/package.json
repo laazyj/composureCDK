@@ -20,7 +20,18 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
   },
-  "keywords": [],
+  "keywords": [
+    "aws",
+    "cdk",
+    "aws-cdk",
+    "infrastructure-as-code",
+    "iac",
+    "composurecdk",
+    "ec2",
+    "vpc",
+    "networking",
+    "compute"
+  ],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
   "publishConfig": {

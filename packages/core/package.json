@@ -26,7 +26,19 @@
       "prettier --write"
     ]
   },
-  "keywords": [],
+  "keywords": [
+    "aws",
+    "cdk",
+    "aws-cdk",
+    "infrastructure-as-code",
+    "iac",
+    "composurecdk",
+    "lifecycle",
+    "dependency-injection",
+    "component",
+    "builder",
+    "composition"
+  ],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
   "publishConfig": {

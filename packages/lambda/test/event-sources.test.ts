@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Code, type IEventSource, Runtime } from "aws-cdk-lib/aws-lambda";
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
@@ -324,5 +324,27 @@ describe("SQS visibility-timeout reminder", () => {
     baseBuilder().timeout(Duration.seconds(30)).build(stack, "Fn");
 
     expect(Annotations.fromStack(stack).findWarning("*", Match.anyValue())).toEqual([]);
+  });
+
+  // A token-valued timeout has no concrete 6× target at synth time, so the
+  // reminder stays silent. Only a *seconds* token reaches here: CDK converts a
+  // Lambda timeout to seconds eagerly, so a Duration.minutes(token) throws at
+  // Function construction. The token also drives the duration alarm to warn
+  // under its own ack id, so this asserts the reminder's silence specifically
+  // rather than a global absence of warnings.
+  it("does not emit the reminder for a token-valued seconds timeout", () => {
+    const stack = new Stack(new App(), "S");
+    const param = new CfnParameter(stack, "TimeoutSeconds", { type: "Number", default: 30 });
+    baseBuilder()
+      .timeout(Duration.seconds(param.valueAsNumber))
+      .addEventSource("orders", sqsEventSource(new Queue(stack, "Q")))
+      .build(stack, "Fn");
+
+    expect(
+      Annotations.fromStack(stack).findWarning(
+        "*",
+        Match.stringLikeRegexp("sqs-visibility-timeout"),
+      ),
+    ).toEqual([]);
   });
 });

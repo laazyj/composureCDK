@@ -24,9 +24,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Node 20 is the supported floor; 24 is current. Dual-published
-        # packages must resolve on both — see ADR-0007.
-        node-version: [20, 24]
+        # Node 20 is the supported floor; 24 is current LTS; 26 is next.
+        # Dual-published packages must resolve on all — see ADR-0007.
+        node-version: [20, 22, 24, 26]
 
     steps:
       - name: Checkout

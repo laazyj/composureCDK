@@ -300,8 +300,9 @@ group modes:
 - **BYO** — `.securityGroups([...])` with SGs you fully manage (typically
   sibling `SecurityGroupBuilder`s): full ingress/egress/port control.
 - **Managed shortcut** — omit `.securityGroups()` and the builder auto-creates a
-  closed SG, exposes it on the result, and `.allowDefaultPortFrom(peer)` opens
-  ingress on the service's default port.
+  closed SG, exposes it on the result, and `.allowDefaultPortFrom(peer)` wires
+  bidirectionally: ingress on the managed SG from the peer **and** egress from
+  the peer's SG to the managed SG (on the service's default port, 443).
 
 The two are mutually exclusive (combining them throws). To group several
 endpoints under one access policy, point them at the same security group.
@@ -336,8 +337,10 @@ compose(
 // result.ssm = { endpoint: InterfaceVpcEndpoint, securityGroup: SecurityGroup }
 ```
 
-The managed `securityGroup` is on the result so the **peer's egress side** can
-reference it (`bastionSg.addEgressRule(ref("ssm").get("securityGroup"), Port.tcp(443))`).
+The managed `securityGroup` is present on the result for cases where another
+component needs a direct reference to it (e.g. BYO-mode builders that share
+one SG across several endpoints). The peer's egress rule is wired automatically
+by `.allowDefaultPortFrom()` — no manual `addEgressRule` call needed.
 
 ### SSM access (multiple endpoints, one shared SG)
 

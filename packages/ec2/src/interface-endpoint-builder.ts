@@ -1,11 +1,10 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import {
   InterfaceVpcEndpoint,
+  type IConnectable,
   type InterfaceVpcEndpointProps,
-  type IPeer,
   type ISecurityGroup,
   type IVpc,
-  Port,
   type SecurityGroup,
 } from "aws-cdk-lib/aws-ec2";
 import { type IConstruct } from "constructs";
@@ -50,9 +49,9 @@ export interface InterfaceEndpointBuilderProps extends Omit<
  *
  * `securityGroup` is present only in **managed mode** — i.e. when the caller
  * did *not* supply `.securityGroups(...)`, so the builder auto-created one. It
- * is exposed so a peer's *egress* rule can `ref` it. In **BYO mode** it is
- * `undefined`: the caller already holds refs to the security groups they
- * passed in.
+ * is exposed for cases where sibling builders need to reference the
+ * auto-created SG directly. In **BYO mode** it is `undefined`: the caller
+ * already holds refs to the security groups they passed in.
  */
 export interface InterfaceEndpointBuilderResult {
   endpoint: InterfaceVpcEndpoint;
@@ -61,7 +60,7 @@ export interface InterfaceEndpointBuilderResult {
 }
 
 interface AccessSpec {
-  readonly peer: Resolvable<IPeer>;
+  readonly peer: Resolvable<IConnectable>;
   readonly description?: string;
 }
 
@@ -80,9 +79,10 @@ interface AccessSpec {
  *   `SecurityGroupBuilder`s). Full ingress/egress/port control; the builder
  *   creates no SG and `securityGroup` is absent from the result.
  * - *Managed shortcut* — omit `.securityGroups()` and the builder auto-creates
- *   a closed SG, exposes it on the result, and opens ingress for the peers you
- *   pass to {@link IInterfaceEndpointBuilder.allowDefaultPortFrom} on the
- *   service's default port.
+ *   a closed SG, exposes it on the result, and for each peer you pass to
+ *   {@link IInterfaceEndpointBuilder.allowDefaultPortFrom} it opens ingress on
+ *   the managed SG **and** egress on the peer's SG — matching exactly what CDK's
+ *   `connections.allowDefaultPortFrom(...)` does bidirectionally.
  *
  * The two are mutually exclusive — combining BYO `.securityGroups()` with
  * `.allowDefaultPortFrom()` throws, since the rule would have nowhere it
@@ -136,17 +136,20 @@ class InterfaceEndpointBuilder implements Lifecycle<InterfaceEndpointBuilderResu
   }
 
   /**
-   * Managed-SG shortcut: opens ingress on the auto-created security group from
-   * `peer`, on the endpoint service's default port (443 for AWS services, or
-   * the port the custom service was declared with). Mirrors CDK's
-   * `endpoint.connections.allowDefaultPortFrom(...)`.
+   * Managed-SG shortcut: wires `peer` to the auto-created security group via
+   * CDK's `endpoint.connections.allowDefaultPortFrom(peer)` — opening ingress
+   * on the managed SG from `peer`'s SG **and** egress from `peer`'s SG to the
+   * managed SG, on the service's default port (443 for AWS services).
    *
-   * For an `open: true` equivalent, pass a VPC-CIDR peer
-   * (`Peer.ipv4(vpc.vpcCidrBlock)`). Mutually exclusive with
-   * {@link securityGroups}.
+   * Because this delegates to CDK connections, `peer` must be an
+   * {@link IConnectable} (e.g. a `SecurityGroup` or `Instance`), not a raw
+   * `IPeer` (e.g. `Peer.ipv4(...)`). For CIDR-based rules use BYO mode with
+   * an explicit `addIngressRule` on your own {@link SecurityGroupBuilder}.
+   *
+   * Mutually exclusive with {@link securityGroups}.
    */
-  allowDefaultPortFrom(peer: Resolvable<IPeer>, description?: string): this {
-    this.#access.push({ peer, ...(description !== undefined ? { description } : {}) });
+  allowDefaultPortFrom(peer: Resolvable<IConnectable>, description?: string): this {
+    this.#access.push({ peer, description });
     return this;
   }
 
@@ -212,14 +215,6 @@ class InterfaceEndpointBuilder implements Lifecycle<InterfaceEndpointBuilderResu
         .vpc(resolvedVpc)
         .description(`Interface endpoint ${id}`)
         .build(scope, `${id}Sg`).securityGroup;
-      const defaultPort = Port.tcp(service.port);
-      for (const rule of this.#access) {
-        managedSecurityGroup.addIngressRule(
-          resolve(rule.peer, context),
-          defaultPort,
-          rule.description,
-        );
-      }
       securityGroups = [managedSecurityGroup];
     }
 
@@ -232,6 +227,10 @@ class InterfaceEndpointBuilder implements Lifecycle<InterfaceEndpointBuilderResu
       // Always explicit: `open: true` would silently add a VPC-wide :443 rule.
       open: false,
     });
+
+    for (const rule of this.#access) {
+      endpoint.connections.allowDefaultPortFrom(resolve(rule.peer, context), rule.description);
+    }
 
     const alarms = createInterfaceEndpointAlarms(
       scope,

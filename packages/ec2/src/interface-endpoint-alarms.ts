@@ -25,7 +25,7 @@ function endpointMetric(
   });
 }
 
-export function resolveEndpointAlarmDefinitions(
+function resolveEndpointAlarmDefinitions(
   endpoint: InterfaceVpcEndpoint,
   config: InterfaceEndpointAlarmConfig | undefined,
 ): AlarmDefinition[] {

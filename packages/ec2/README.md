@@ -288,6 +288,203 @@ compose(
 
 The Security Group builder does **not** create CloudWatch alarms. Security groups do not emit CloudWatch metrics — the [AWS recommended-alarms reference](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) has no SG entry. Operational visibility for SGs comes from adjacent signals (VPC Flow Logs, GuardDuty findings, CloudTrail `AuthorizeSecurityGroupIngress`/`Egress` events), none of which belong on the builder result.
 
+## Interface Endpoint Builder
+
+VPC interface endpoints (AWS PrivateLink) have no props-time surface in CDK —
+the only way to add one is the post-build `vpc.addInterfaceEndpoint(...)` call,
+whose security group is never exposed. `createInterfaceEndpointBuilder` makes an
+endpoint a first-class `compose()` component. It maps **1:1 to a CDK
+`InterfaceVpcEndpoint`** (one `service` per endpoint) and supports two security
+group modes:
+
+- **BYO** — `.securityGroups([...])` with SGs you fully manage (typically
+  sibling `SecurityGroupBuilder`s): full ingress/egress/port control.
+- **Managed shortcut** — omit `.securityGroups()` and the builder auto-creates a
+  closed SG, exposes it on the result, and `.allowDefaultPortFrom(peer)` opens
+  ingress on the service's default port.
+
+The two are mutually exclusive (combining them throws). To group several
+endpoints under one access policy, point them at the same security group.
+
+### Minimalist single service (managed shortcut)
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createInterfaceEndpointBuilder,
+  createSecurityGroupBuilder,
+  createVpcBuilder,
+  type SecurityGroupBuilderResult,
+  type VpcBuilderResult,
+} from "@composurecdk/ec2";
+import { InterfaceVpcEndpointAwsService, SubnetType } from "aws-cdk-lib/aws-ec2";
+
+compose(
+  {
+    network: createVpcBuilder().natGateways(0),
+    bastionSg: createSecurityGroupBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .description("Bastion"),
+    ssm: createInterfaceEndpointBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .service(InterfaceVpcEndpointAwsService.SSM)
+      .subnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+      .allowDefaultPortFrom(ref<SecurityGroupBuilderResult>("bastionSg").get("securityGroup")),
+  },
+  { network: [], bastionSg: ["network"], ssm: ["network", "bastionSg"] },
+).build(stack, "App");
+// result.ssm = { endpoint: InterfaceVpcEndpoint, securityGroup: SecurityGroup }
+```
+
+The managed `securityGroup` is on the result so the **peer's egress side** can
+reference it (`bastionSg.addEgressRule(ref("ssm").get("securityGroup"), Port.tcp(443))`).
+
+### SSM access (multiple endpoints, one shared SG)
+
+SSM/Session Manager in a NAT-free VPC needs three endpoints with identical
+ingress. One endpoint per builder — share a single BYO `SecurityGroupBuilder`
+across all three. The access policy lives on the shared SG, not on individual
+endpoints:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createInterfaceEndpointBuilder,
+  createSecurityGroupBuilder,
+  createVpcBuilder,
+  type SecurityGroupBuilderResult,
+  type VpcBuilderResult,
+} from "@composurecdk/ec2";
+import { InterfaceVpcEndpointAwsService, Port, SubnetType } from "aws-cdk-lib/aws-ec2";
+
+compose(
+  {
+    network: createVpcBuilder().natGateways(0),
+    bastionSg: createSecurityGroupBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .description("Bastion"),
+    // One SG shared by all three endpoints — the access policy lives here.
+    endpointSg: createSecurityGroupBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .description("SSM endpoints")
+      .addIngressRule(
+        ref<SecurityGroupBuilderResult>("bastionSg").get("securityGroup"),
+        Port.tcp(443),
+      ),
+    ssm: createInterfaceEndpointBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .service(InterfaceVpcEndpointAwsService.SSM)
+      .subnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+      .securityGroups([ref<SecurityGroupBuilderResult>("endpointSg").get("securityGroup")]),
+    ssmmessages: createInterfaceEndpointBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .service(InterfaceVpcEndpointAwsService.SSM_MESSAGES)
+      .subnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+      .securityGroups([ref<SecurityGroupBuilderResult>("endpointSg").get("securityGroup")]),
+    ec2messages: createInterfaceEndpointBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .service(InterfaceVpcEndpointAwsService.EC2_MESSAGES)
+      .subnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+      .securityGroups([ref<SecurityGroupBuilderResult>("endpointSg").get("securityGroup")]),
+  },
+  {
+    network: [],
+    bastionSg: ["network"],
+    endpointSg: ["network", "bastionSg"],
+    ssm: ["network", "endpointSg"],
+    ssmmessages: ["network", "endpointSg"],
+    ec2messages: ["network", "endpointSg"],
+  },
+).build(stack, "App");
+```
+
+### Complex / custom service (BYO security group)
+
+A custom PrivateLink service on a non-443 port, with precise ingress _and_
+egress controlled by the `SecurityGroupBuilder` you already have:
+
+```ts
+import { InterfaceVpcEndpointService, Port } from "aws-cdk-lib/aws-ec2";
+
+compose(
+  {
+    network: createVpcBuilder(),
+    appSg: createSecurityGroupBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .description("App tier"),
+    endpointSg: createSecurityGroupBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .description("Partner PrivateLink endpoint")
+      .addIngressRule(ref<SecurityGroupBuilderResult>("appSg").get("securityGroup"), Port.tcp(8443))
+      .addEgressRule(ref<SecurityGroupBuilderResult>("appSg").get("securityGroup"), Port.tcp(8443)),
+    partner: createInterfaceEndpointBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .service(
+        new InterfaceVpcEndpointService("com.amazonaws.vpce.eu-west-1.vpce-svc-0abc123", 8443),
+      )
+      .securityGroups([ref<SecurityGroupBuilderResult>("endpointSg").get("securityGroup")]),
+  },
+  {
+    network: [],
+    appSg: ["network"],
+    endpointSg: ["network", "appSg"],
+    partner: ["network", "endpointSg"],
+  },
+).build(stack, "App");
+// result.partner = { endpoint: InterfaceVpcEndpoint }  (no managed securityGroup in BYO mode)
+```
+
+### Interface Endpoint Defaults
+
+`createInterfaceEndpointBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
+
+| Property            | Default | Rationale                                                                                                                                                                                                       |
+| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `privateDnsEnabled` | `true`  | Enables `<service>.<region>.amazonaws.com` to resolve to the endpoint ENIs, keeping traffic on the AWS network without requiring application-level changes. Disabled by default in raw CDK for custom services. |
+
+The defaults are exported as `INTERFACE_ENDPOINT_DEFAULTS` for visibility and testing:
+
+```ts
+import { INTERFACE_ENDPOINT_DEFAULTS } from "@composurecdk/ec2";
+```
+
+### Recommended Alarms
+
+The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#PrivateLinkEndpoints) by default. No alarm actions are configured — wire actions via `alarmActionsPolicy` from `@composurecdk/cloudwatch`, or by accessing alarms from the build result.
+
+| Alarm            | Metric                      | Default threshold            | Created when |
+| ---------------- | --------------------------- | ---------------------------- | ------------ |
+| `packetsDropped` | PacketsDropped (Sum, 1 min) | > 0 over 5 consecutive 1-min | Always       |
+
+If your workload intentionally sends packets larger than 8,500 bytes (the PrivateLink MTU limit), raise the threshold to reduce noise from expected MTU drops:
+
+```ts
+createInterfaceEndpointBuilder()
+  .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+  .service(InterfaceVpcEndpointAwsService.SSM)
+  .recommendedAlarms({ packetsDropped: { threshold: 100 } });
+```
+
+Disable all recommended alarms:
+
+```ts
+builder.recommendedAlarms(false);
+// or
+builder.recommendedAlarms({ enabled: false });
+```
+
+Disable individual alarms:
+
+```ts
+builder.recommendedAlarms({ packetsDropped: false });
+```
+
+The defaults are exported as `INTERFACE_ENDPOINT_ALARM_DEFAULTS` for visibility and testing:
+
+```ts
+import { INTERFACE_ENDPOINT_ALARM_DEFAULTS } from "@composurecdk/ec2";
+```
+
 ## Volume Builder
 
 ```ts

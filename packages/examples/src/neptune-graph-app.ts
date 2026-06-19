@@ -6,14 +6,14 @@ import {
   InterfaceVpcEndpointAwsService,
   MachineImage,
   type ISecurityGroup,
-  type IVpc,
-  SubnetType,
   type Instance,
+  SubnetType,
   type Vpc,
 } from "aws-cdk-lib/aws-ec2";
 import { compose, ref } from "@composurecdk/core";
 import {
   createInstanceBuilder,
+  createInterfaceEndpointBuilder,
   createSecurityGroupBuilder,
   createVpcBuilder,
   type InstanceBuilderResult,
@@ -39,7 +39,13 @@ import { InstanceType as NeptuneInstanceType } from "@aws-cdk/aws-neptune-alpha"
  * - {@link createSecurityGroupBuilder} for the bastion's closed-egress SG.
  *   The only egress rules are the ones the cross-component wiring adds:
  *   `:8182` to Neptune (via `allowAccessFrom`) and `:443` to the SSM
- *   interface endpoints — least privilege, made visible.
+ *   interface endpoints (via `allowDefaultPortFrom`) — least privilege,
+ *   made visible.
+ * - Three {@link createInterfaceEndpointBuilder} components (`ssmEndpoint`,
+ *   `ssmMessagesEndpoint`, `ec2MessagesEndpoint`) that give the isolated
+ *   bastion SSM Session Manager reachability without a NAT gateway. Each
+ *   opens ingress `:443` from `bastionSg` and wires the matching egress
+ *   back onto `bastionSg` — entirely within `compose()`.
  * - A reachable, queryable Neptune in a cost-free isolated VPC (no NAT):
  *   SSM interface endpoints let Session Manager / `SendCommand` reach the
  *   bastion, and the bastion has a network path to the cluster's port. The
@@ -53,7 +59,13 @@ import { InstanceType as NeptuneInstanceType } from "@aws-cdk/aws-neptune-alpha"
 export function createNeptuneGraphApp(app = new App()) {
   const stack = new Stack(app, "ComposureCDK-NeptuneGraphStack");
 
-  const result = compose(
+  const ssmEndpointBase = createInterfaceEndpointBuilder()
+    .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+    .subnets({ subnetType: SubnetType.PRIVATE_ISOLATED });
+
+  const bastionSgRef = ref<SecurityGroupBuilderResult>("bastionSg").get("securityGroup");
+
+  compose(
     {
       network: createVpcBuilder()
         .natGateways(0)
@@ -76,6 +88,21 @@ export function createNeptuneGraphApp(app = new App()) {
           ),
         ),
 
+      ssmEndpoint: ssmEndpointBase
+        .copy()
+        .service(InterfaceVpcEndpointAwsService.SSM)
+        .allowDefaultPortFrom(bastionSgRef, "SSM from Neptune bastion"),
+
+      ssmMessagesEndpoint: ssmEndpointBase
+        .copy()
+        .service(InterfaceVpcEndpointAwsService.SSM_MESSAGES)
+        .allowDefaultPortFrom(bastionSgRef, "SSM Messages from Neptune bastion"),
+
+      ec2MessagesEndpoint: ssmEndpointBase
+        .copy()
+        .service(InterfaceVpcEndpointAwsService.EC2_MESSAGES)
+        .allowDefaultPortFrom(bastionSgRef, "EC2 Messages from Neptune bastion"),
+
       graph: createClusterBuilder()
         .vpc(ref<VpcBuilderResult>("network").map((r: VpcBuilderResult): Vpc => r.vpc))
         .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
@@ -91,35 +118,12 @@ export function createNeptuneGraphApp(app = new App()) {
       network: [],
       bastionSg: ["network"],
       bastion: ["network", "bastionSg"],
+      ssmEndpoint: ["network", "bastionSg"],
+      ssmMessagesEndpoint: ["network", "bastionSg"],
+      ec2MessagesEndpoint: ["network", "bastionSg"],
       graph: ["network", "bastion"],
     },
   ).build(stack, "NeptuneGraphApp");
 
-  // SSM Session Manager reachability without a NAT gateway: interface
-  // endpoints for the three services the agent needs. Each opens :443 to the
-  // bastion only, which also adds the matching egress rule on the bastion's
-  // closed-egress SG.
-  //
-  // NOTE: this is post-build glue — interface endpoints have no builder, so
-  // they can't yet be declared inside compose(). Tracked by #194 (a
-  // first-class endpoint builder); once it lands this folds into the graph.
-  addSsmEndpoints(result.network.vpc, result.bastion.instance);
-
   return { stack };
-}
-
-function addSsmEndpoints(vpc: IVpc, bastion: Instance): void {
-  const services = {
-    Ssm: InterfaceVpcEndpointAwsService.SSM,
-    SsmMessages: InterfaceVpcEndpointAwsService.SSM_MESSAGES,
-    Ec2Messages: InterfaceVpcEndpointAwsService.EC2_MESSAGES,
-  };
-  for (const [id, service] of Object.entries(services)) {
-    const endpoint = vpc.addInterfaceEndpoint(`${id}Endpoint`, {
-      service,
-      subnets: { subnetType: SubnetType.PRIVATE_ISOLATED },
-      open: false,
-    });
-    endpoint.connections.allowDefaultPortFrom(bastion, `${id} from Neptune bastion`);
-  }
 }

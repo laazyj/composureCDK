@@ -1,3 +1,4 @@
+import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type ITable, TableV2, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
@@ -6,7 +7,6 @@ import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TableAlarmConfig } from "./table-alarm-config.js";
 import { createTableAlarms } from "./table-alarms.js";
 import { TABLE_V2_DEFAULTS } from "./defaults.js";
-import type { TableBuilderResultBase } from "./table-result.js";
 
 /**
  * Configuration properties for the DynamoDB {@link TableV2} builder.
@@ -31,13 +31,26 @@ export interface TableV2BuilderProps extends TablePropsV2 {
 }
 
 /**
- * The build output of an {@link ITableV2Builder}. Shares the stream/alarms
- * surface with {@link TableBuilderResult} via {@link TableBuilderResultBase},
- * narrowing `table` to the {@link TableV2} construct.
+ * The build output of an {@link ITableV2Builder}. Contains the CDK constructs
+ * created during {@link Lifecycle.build}, keyed by role.
  */
-export interface TableV2BuilderResult extends TableBuilderResultBase {
+export interface TableV2BuilderResult {
   /** The DynamoDB {@link TableV2} construct created by the builder. */
   table: TableV2;
+
+  /**
+   * The table's DynamoDB Streams ARN, or `undefined` when no stream is
+   * configured. Surfaced directly so a downstream consumer (e.g. a Lambda
+   * `DynamoEventSource`) can be wired via `ref()`.
+   */
+  tableStreamArn?: string;
+
+  /**
+   * CloudWatch alarms created for the table, keyed by alarm name — both the
+   * AWS-recommended alarms and any added via {@link ITableV2Builder.addAlarm}.
+   * No alarm actions are configured.
+   */
+  alarms: Record<string, Alarm>;
 }
 
 /**

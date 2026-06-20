@@ -1,3 +1,24 @@
+## 0.8.5 (2026-06-20)
+
+### 🚀 Features
+
+- **cloudwatch:** add alarm threshold token guard ([#196](https://github.com/laazyj/composureCDK/issues/196))
+- **dynamodb:** add @composurecdk/dynamodb with Table and TableV2 builders ([#221](https://github.com/laazyj/composureCDK/pull/221), [#121](https://github.com/laazyj/composureCDK/issues/121))
+- **ec2:** VPC interface-endpoint builder ([#194](https://github.com/laazyj/composureCDK/pull/194), [#201](https://github.com/laazyj/composureCDK/pull/201))
+
+### 🩹 Fixes
+
+- remove duplicate security entry from issue config ([#218](https://github.com/laazyj/composureCDK/pull/218))
+- **ci:** grant deploy-test role Neptune smoke-test permissions ([#202](https://github.com/laazyj/composureCDK/pull/202))
+- **deps:** raise aws-cdk-lib floor to 2.93.0 for addWarningV2 ([0942766](https://github.com/laazyj/composureCDK/commit/0942766))
+- **dynamodb:** stabilise alarms test lint across Node matrix ([8e991d4](https://github.com/laazyj/composureCDK/commit/8e991d4))
+- **lambda:** guard token-valued alarm thresholds ([#196](https://github.com/laazyj/composureCDK/issues/196))
+
+### ❤️ Thank You
+
+- Claude
+- Jason Duffett
+
 ## 0.8.4 (2026-06-10)
 
 ### 🚀 Features

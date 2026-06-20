@@ -19,10 +19,6 @@ Reach for the classic `createTableBuilder()` when you need an `importSource` (S3
 
 > ⚠️ **`Table` and `TableV2` are different CloudFormation resources** (`AWS::DynamoDB::Table` vs. `AWS::DynamoDB::GlobalTable`). CloudFormation **cannot migrate between them in place** — swapping the construct on an existing table is a resource replacement, which deletes and recreates the table. Choose deliberately up front.
 
-#### Why two builders instead of one?
-
-The library's builders are a thin `Proxy` over `props: Partial<Props>` that mechanically emit one fluent setter per CDK prop key (see [ADR-0001](../../docs/adr/0001-builder-type-emission.md)). `TablePropsV2` is **not** a superset of `TableProps`: most notably both declare a prop named `encryption` with **incompatible types** (`TableEncryption` enum vs. `TableEncryptionV2` class). A single builder typed to `TableProps | TablePropsV2` breaks on that key collision, and the only way to unify them is to abandon the thin CDK-props pass-through for a hand-authored neutral vocabulary — which diverges from every other builder in the repo. Two thin builders sharing alarms and defaults rationale is the honest fit.
-
 ## TableV2 builder (recommended)
 
 ```ts
@@ -70,17 +66,6 @@ The defaults are exported for visibility and testing:
 import { TABLE_DEFAULTS, TABLE_V2_DEFAULTS } from "@composurecdk/dynamodb";
 ```
 
-> **TableV2 per-replica encoding:** in `AWS::DynamoDB::GlobalTable`, `BillingMode`, `SSESpecification`, and `StreamSpecification` are top-level, but `DeletionProtectionEnabled` and `PointInTimeRecoverySpecification` are **per-replica** (under `Replicas[]`). The builder sets them once and CDK applies them to each replica; assert against `Replicas[0]` in synth tests.
-
-### Defaults that yield to a sibling you set (classic builder)
-
-Two classic-builder defaults are mutually exclusive with a sibling property and step aside when you set it ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)):
-
-- Setting `.readCapacity()` / `.writeCapacity()` drops the `PAY_PER_REQUEST` default so CDK uses `PROVISIONED` billing.
-- Setting `.encryptionKey()` infers `TableEncryption.CUSTOMER_MANAGED` (CDK only accepts a key under customer-managed encryption).
-
-The TableV2 builder needs no such logic: `billing` and `encryption` are single helper objects with no flat sibling props, so a plain same-key spread suffices.
-
 ## DynamoDB Streams
 
 Enable a stream with `.dynamoStream(StreamViewType…)` (TableV2) or `.stream(StreamViewType…)` (classic). The build result surfaces the stream ARN so a downstream component can wire a consumer:
@@ -99,7 +84,7 @@ Neither construct exposes a distinct stream construct — the stream is an attri
 
 ## Recommended Alarms
 
-Both builders create the same [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#DynamoDB) by default (the alarm path is shared and typed to `ITable`, which both constructs satisfy). No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.
+Both builders create the same [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#DynamoDB) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.
 
 | Alarm                 | Metric                                      | Default threshold | Rationale                                                        |
 | --------------------- | ------------------------------------------- | ----------------- | ---------------------------------------------------------------- |

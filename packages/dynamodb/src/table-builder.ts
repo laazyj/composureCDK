@@ -135,7 +135,8 @@ function mergeTableDefaults(props: Partial<TableProps>): TableProps {
     merged.encryption = TableEncryption.CUSTOMER_MANAGED;
   }
 
-  return merged;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- `as TableProps` is load-bearing on the supported aws-cdk-lib floor, where `partitionKey` is required and the spread of Partials is not assignable without it; current devDeps make `partitionKey` optional (multi-attribute `partitionKeys` was added), so it only looks redundant against the latest CDK.
+  return merged as TableProps;
 }
 
 /**

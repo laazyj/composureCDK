@@ -113,8 +113,10 @@ Publishing uses [trusted publishers](https://docs.npmjs.com/trusted-publishers/)
 4. Configure a trusted publisher for each package:
 
    ```sh
-   npm trust github @composurecdk/<name> --file release.yml --repo laazyj/composureCDK --env npm
+   npm trust github @composurecdk/<name> --file release.yml --repo laazyj/composureCDK --env npm --allow-publish
    ```
+
+   `--allow-publish` is required by npm 11.6+ (`npm trust` no longer defaults to a permission). Use `--allow-publish` to match the release flow, which publishes immediately-installable versions; `--allow-stage-publish` would only permit staged publishes that need a separate promotion step.
 
 **Adding a new package:**
 

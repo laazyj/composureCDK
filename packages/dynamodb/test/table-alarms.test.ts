@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { type Lifecycle } from "@composurecdk/core";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { AttributeType } from "aws-cdk-lib/aws-dynamodb";
@@ -27,7 +28,16 @@ describe.each(builders)("$name table alarms", ({ create }) => {
     const stack = new Stack(app, "TestStack");
     const builder = create().partitionKey(PK);
     configureFn?.(builder);
-    const result = builder.build(stack, "TestTable");
+    // `builder` is a union of the two builder types, so `.build()` is a union of
+    // two call signatures. typescript-eslint's project service can intermittently
+    // fail to resolve that union (the file is the only test importing both
+    // builders), degrading it to an `error` type and tripping no-unsafe-call —
+    // flaky across the Node CI matrix. Both builders implement Lifecycle and
+    // every result carries `alarms`, so widen to that single signature.
+    const result = (builder as Lifecycle<{ alarms: Record<string, unknown> }>).build(
+      stack,
+      "TestTable",
+    );
     return { result, template: Template.fromStack(stack) };
   }
 

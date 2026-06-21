@@ -1,25 +1,22 @@
 import { App, Duration, Stack } from "aws-cdk-lib";
-import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { AttributeType, StreamViewType } from "aws-cdk-lib/aws-dynamodb";
 import { Code, Runtime, StartingPosition } from "aws-cdk-lib/aws-lambda";
 import { DynamoEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { compose, ref } from "@composurecdk/core";
-import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
 import { createTableV2Builder, type TableV2BuilderResult } from "@composurecdk/dynamodb";
 import { createFunctionBuilder } from "@composurecdk/lambda";
-import { createTopicBuilder } from "@composurecdk/sns";
 
 /**
  * An event-sourcing store built on the recommended `createTableV2Builder`
  * (a `TableV2` / `AWS::DynamoDB::GlobalTable`), feeding a Lambda projector off
- * its change stream, with all alarms routed to an SNS alert topic.
+ * its change stream.
  *
  * The table gets ComposureCDK's secure DynamoDB defaults (on-demand billing,
  * AWS-managed KMS encryption, point-in-time recovery, deletion protection) and
  * the three AWS-recommended alarms (system errors, read/write throttle events);
- * the projector gets the recommended Lambda alarms (errors, throttles).
- * `alarmActionsPolicy` wires every alarm in the stack to publish to the alert
- * topic, so adding more alarms later is automatic.
+ * the projector gets the recommended Lambda alarms (errors, throttles). The
+ * alarms are created but left unrouted — wiring alarm actions to an SNS topic
+ * via `alarmActionsPolicy` is shown in `order-processor-app.ts`.
  *
  * Demonstrates:
  * - `createTableV2Builder` with secure defaults plus a workload key schema
@@ -33,8 +30,6 @@ import { createTopicBuilder } from "@composurecdk/sns";
  *   `IEventSource` (event-source kind `"unknown"`), resolved from the sibling
  *   table `ref` at build time — `addEventSource` then grants the projector's
  *   least-privilege role permission to read the stream.
- * - Composing the table alongside `createTopicBuilder` and routing all alarm
- *   actions through `alarmActionsPolicy`
  * - **Opt-in global-table replicas.** `TableV2`'s headline feature is
  *   cross-region replication. Replicas deploy to additional regions (extra
  *   cost, slower teardown, and each replica region must be CDK-bootstrapped and
@@ -106,10 +101,8 @@ export function createEventStoreApp(app = new App()): { stack: Stack } {
     events = events.replicas(replicaRegions.map((region) => ({ region })));
   }
 
-  const { alerts } = compose(
+  compose(
     {
-      alerts: createTopicBuilder().displayName("Event Store Alerts"),
-
       events,
 
       projector: createFunctionBuilder()
@@ -141,12 +134,8 @@ export function createEventStoreApp(app = new App()): { stack: Stack } {
           ),
         ),
     },
-    { alerts: [], events: [], projector: ["events"] },
+    { events: [], projector: ["events"] },
   ).build(stack, "EventStore");
-
-  alarmActionsPolicy(stack, {
-    defaults: { alarmActions: [new SnsAction(alerts.topic)] },
-  });
 
   return { stack };
 }

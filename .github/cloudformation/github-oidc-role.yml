@@ -319,6 +319,23 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:sqs:*:${AWS::AccountId}:*
 
+          # DynamoDB — smoke tests exercise the table data plane: the
+          # event-store smoke test PutItems to trigger the stream projector,
+          # and the ledger smoke test PutItem/GetItems a round-trip item and
+          # DescribeTables to confirm customer-managed-key encryption. Scoped by
+          # ARN (account tables) like SQSSendMessage above rather than by
+          # aws:ResourceTag, for a robust grant unaffected by tag-propagation
+          # timing; the OIDC trust policy already restricts the role to the
+          # `sandbox` environment, so the blast radius is the sandbox account.
+          - Sid: DynamoDBData
+            Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:GetItem
+              - dynamodb:DescribeTable
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:*:${AWS::AccountId}:table/*
+
           # CDK bootstrap roles — assumed by CDK CLI for asset publishing
           # and CloudFormation execution
           - Sid: CDKAssetRoles

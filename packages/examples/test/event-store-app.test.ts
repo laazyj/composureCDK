@@ -11,8 +11,8 @@ describe("event-store-app", () => {
     template.resourceCountIs("AWS::DynamoDB::GlobalTable", 1);
   });
 
-  it("creates one SNS alert topic", () => {
-    template.resourceCountIs("AWS::SNS::Topic", 1);
+  it("creates no SNS topic — alarm-action wiring is shown in order-processor", () => {
+    template.resourceCountIs("AWS::SNS::Topic", 0);
   });
 
   it("configures the key schema, GSI, TTL and change stream", () => {
@@ -84,13 +84,6 @@ describe("event-store-app", () => {
       Namespace: "AWS/DynamoDB",
       Threshold: 5,
       ComparisonOperator: "GreaterThanThreshold",
-    });
-  });
-
-  it("routes table alarms to the alert topic via alarmActionsPolicy", () => {
-    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
-      MetricName: "WriteThrottleEvents",
-      AlarmActions: Match.arrayWith([Match.objectLike({ Ref: Match.stringLikeRegexp("alerts") })]),
     });
   });
 

@@ -10,6 +10,7 @@ interface FunctionAlarmDefaults {
   concurrentExecutions: PercentageAlarmConfigDefaults;
   eventSourceFailedInvocations: AlarmConfigDefaults;
   eventSourceDroppedEvents: AlarmConfigDefaults;
+  eventSourceIteratorAge: AlarmConfigDefaults;
 }
 
 /**
@@ -71,6 +72,19 @@ export const FUNCTION_ALARM_DEFAULTS: FunctionAlarmDefaults = {
     threshold: 0,
     evaluationPeriods: 1,
     datapointsToAlarm: 1,
+    treatMissingData: TreatMissingData.NOT_BREACHING,
+  },
+
+  /**
+   * The consumer falling behind the stream risks data loss once records age
+   * past the stream's 24h retention. Alarm on sustained lag — 60s of iterator
+   * age for 3 consecutive minutes. Idle functions emit no datapoints and stay
+   * OK (`NOT_BREACHING`).
+   */
+  eventSourceIteratorAge: {
+    threshold: 60_000,
+    evaluationPeriods: 3,
+    datapointsToAlarm: 3,
     treatMissingData: TreatMissingData.NOT_BREACHING,
   },
 };

@@ -15,3 +15,7 @@ export {
   sqsEventSource,
   DEFAULT_SQS_EVENT_SOURCE_PROPS,
 } from "./event-sources/sqs-event-source.js";
+export {
+  dynamoEventSource,
+  DEFAULT_DYNAMO_EVENT_SOURCE_PROPS,
+} from "./event-sources/dynamodb-event-source.js";

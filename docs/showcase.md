@@ -57,6 +57,10 @@ return compose({
 }).withStacks({ zone: dnsStack, cert: certStack, cdn: siteStack /* … */ });
 ```
 
+### [ukehoot.net](https://github.com/laazyj/ukehoot.net)
+
+The website for UkeHoot is a static Eleventy site on S3 + CloudFront with Route 53 DNS, an `us-east-1` ACM certificate, CloudWatch alarms, and a monthly budget guard. The infrastructure follows the same multi-region, multi-stack shape as [jasonduffett.net](#jasonduffettnet). Its distinguishing difference is a CloudFront function that serves 301 redirects for the group's legacy Tumblr URLs (2012–2018) to their archived equivalents.
+
 ## Submitting your project
 
 Open a pull request adding an entry under **Case studies** above, or open an issue if you'd prefer the maintainer to write the entry up. Entries should link to a public repo or homepage so readers can verify the project exists.

@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 15
     environment: npm
     permissions:
-      contents: read
+      contents: write # Create the GitHub Release once the deploy has passed
       id-token: write
 
     steps:
@@ -44,6 +44,34 @@ jobs:
         run: npm run build
         env:
           NX_DAEMON: false
+
+      # Created here, after deploy-test has passed, rather than at tag time —
+      # so a release is only published once its artefacts have deployed cleanly.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          tag="$REF_NAME"
+          version="${tag#v}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; nothing to do."
+            exit 0
+          fi
+          # Notes are extracted from the workspace CHANGELOG.md section for this version.
+          # The section header format is set by nx release: `## VERSION` followed by content
+          # until the next `## ` heading.
+          notes=$(awk -v ver="$version" '
+            $0 ~ "^## "ver"( |$|\\()" { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$notes" ]; then
+            echo "::warning::Could not extract notes for $tag from CHANGELOG.md; using auto-generated notes."
+            gh release create "$tag" --title "$tag" --generate-notes
+          else
+            printf '%s' "$notes" | gh release create "$tag" --title "$tag" --notes-file -
+          fi
 
       - name: Publish to npm
         run: npx nx release publish

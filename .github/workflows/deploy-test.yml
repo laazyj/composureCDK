@@ -23,7 +23,10 @@ permissions:
   id-token: write # Required for AWS OIDC
 
 concurrency:
-  group: deploy-test-${{ github.event.inputs.environment }}
+  # Shared with sandbox-cleanup.yml so a teardown can never run against the
+  # sandbox account while a deploy is in flight (and vice versa). Keep this
+  # group string identical in both workflows.
+  group: sandbox-account-${{ inputs.environment || 'sandbox' }}
   cancel-in-progress: false # Never cancel in-flight deployments
 
 jobs:

@@ -133,7 +133,9 @@ The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.
 | `concurrentExecutions`   | ConcurrentExecutions (Max, 1 min) | >= 80% of reserved limit    | `reservedConcurrentExecutions` is set  |
 | `<key>FailedInvocations` | FailedInvokeEventCount (Sum)      | > 0                         | An SQS or DynamoDB source is attached  |
 | `<key>DroppedEvents`     | DroppedEventCount (Sum)           | > 0                         | An SQS or DynamoDB source is attached  |
-| `iteratorAge`            | IteratorAge (Max, 1 min)          | > 60000 ms for 3 min        | A stream source (DynamoDB) is attached |
+| `iteratorAge`            | IteratorAge (Max, 1 min)          | > 60000 ms for 3 min¹       | A stream source (DynamoDB) is attached |
+
+¹ AWS recommends alarming on `IteratorAge` for stream consumers but prescribes no fixed threshold — it is workload dependent. The 60s/3-minute default is deliberately conservative; tune it per workload via `eventSourceIteratorAge`.
 
 The per-mapping event-source alarms are contextual: one pair is created per event source attached via `addEventSource` (see [Event sources](#event-sources)) whose kind emits per-mapping ESM metrics. Each alarm's key is the event source's key suffixed with `FailedInvocations` / `DroppedEvents` — e.g. an event source added as `"orders"` produces `ordersFailedInvocations` and `ordersDroppedEvents`. The `eventSourceFailedInvocations` / `eventSourceDroppedEvents` fields on `recommendedAlarms` tune every such alarm.
 

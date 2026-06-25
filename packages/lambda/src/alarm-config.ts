@@ -125,18 +125,21 @@ export interface FunctionAlarmConfig {
    *
    * Contextual: a single alarm is created when at least one stream event
    * source (currently DynamoDB streams) is attached via
-   * {@link IFunctionBuilder.addEventSource}. Unlike the per-mapping alarms
-   * above, `IteratorAge` is a function-level metric, so there is one alarm per
-   * function (keyed `iteratorAge`) regardless of how many stream sources are
-   * attached.
+   * {@link IFunctionBuilder.addEventSource}. Unlike the per-mapping
+   * {@link FunctionAlarmConfig.eventSourceFailedInvocations} /
+   * {@link FunctionAlarmConfig.eventSourceDroppedEvents} alarms, `IteratorAge`
+   * is a function-level metric, so there is one alarm per function (keyed
+   * `iteratorAge`) regardless of how many stream sources are attached.
    *
    * The threshold is an absolute age in milliseconds (not a percentage).
    *
    * Metric: `AWS/Lambda IteratorAge`, statistic Maximum, period 1 minute,
-   * dimensioned on `FunctionName`. Default threshold: > 60000 ms (60s) for 3
-   * consecutive minutes.
+   * dimensioned on `FunctionName`. AWS recommends alarming on this metric for
+   * stream consumers but does not prescribe a threshold (it is workload
+   * dependent); the default is a deliberately conservative > 60000 ms (60s) for
+   * 3 consecutive minutes.
    *
-   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda
+   * @see https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics.html
    */
   eventSourceIteratorAge?: AlarmConfig | false;
 }

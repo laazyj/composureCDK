@@ -23,7 +23,10 @@ permissions:
   id-token: write # Required for AWS OIDC
 
 concurrency:
-  group: deploy-test-${{ github.event.inputs.environment }}
+  # Shared with sandbox-cleanup.yml so a teardown can never run against the
+  # sandbox account while a deploy is in flight (and vice versa). Keep this
+  # group string identical in both workflows.
+  group: sandbox-account-${{ inputs.environment || 'sandbox' }}
   cancel-in-progress: false # Never cancel in-flight deployments
 
 jobs:
@@ -35,7 +38,9 @@ jobs:
     name: Deploy and Verify Examples
     needs: ci
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Neptune DB instance provisioning alone is a >15 min long pole; 30 min
+    # left too little slack for a clean deploy of the full example fleet.
+    timeout-minutes: 45
     environment: ${{ inputs.environment }}
 
     steps:

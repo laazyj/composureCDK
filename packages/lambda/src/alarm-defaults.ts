@@ -10,6 +10,7 @@ interface FunctionAlarmDefaults {
   concurrentExecutions: PercentageAlarmConfigDefaults;
   eventSourceFailedInvocations: AlarmConfigDefaults;
   eventSourceDroppedEvents: AlarmConfigDefaults;
+  eventSourceIteratorAge: AlarmConfigDefaults;
 }
 
 /**
@@ -71,6 +72,22 @@ export const FUNCTION_ALARM_DEFAULTS: FunctionAlarmDefaults = {
     threshold: 0,
     evaluationPeriods: 1,
     datapointsToAlarm: 1,
+    treatMissingData: TreatMissingData.NOT_BREACHING,
+  },
+
+  /**
+   * The consumer falling behind the stream risks data loss once records age
+   * past the stream's 24h retention. AWS recommends alarming on `IteratorAge`
+   * for stream consumers but publishes no fixed threshold — the right value is
+   * workload dependent. 60s of sustained lag for 3 consecutive minutes is a
+   * deliberately conservative default; tune via `eventSourceIteratorAge`. Idle
+   * functions emit no datapoints and stay OK (`NOT_BREACHING`).
+   * @see https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics.html
+   */
+  eventSourceIteratorAge: {
+    threshold: 60_000,
+    evaluationPeriods: 3,
+    datapointsToAlarm: 3,
     treatMissingData: TreatMissingData.NOT_BREACHING,
   },
 };

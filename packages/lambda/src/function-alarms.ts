@@ -42,27 +42,41 @@ interface EventSourceAlarmSpec {
  *
  * @see https://aws.amazon.com/blogs/compute/introducing-new-event-source-mapping-esm-metrics-for-aws-lambda/
  */
+/**
+ * Per-mapping ESM alarms shared by every kind that emits the `EventCount`
+ * metrics — both SQS and DynamoDB streams report `FailedInvokeEventCount` and
+ * `DroppedEventCount` when the mapping opts into `MetricType.EVENT_COUNT`.
+ */
+const ESM_EVENT_COUNT_SPECS: EventSourceAlarmSpec[] = [
+  {
+    keySuffix: "FailedInvocations",
+    configKey: "eventSourceFailedInvocations",
+    metricName: "FailedInvokeEventCount",
+    describe: (key, threshold) =>
+      `Lambda event source "${key}" is failing to invoke the function. ` +
+      `Threshold: > ${String(threshold)} failed invocations in ${METRIC_PERIOD_LABEL}.`,
+  },
+  {
+    keySuffix: "DroppedEvents",
+    configKey: "eventSourceDroppedEvents",
+    metricName: "DroppedEventCount",
+    describe: (key, threshold) =>
+      `Lambda event source "${key}" is dropping events after exhausting retries or TTL. ` +
+      `Threshold: > ${String(threshold)} dropped events in ${METRIC_PERIOD_LABEL}.`,
+  },
+];
+
 const EVENT_SOURCE_ALARM_SPECS: Record<AttachedEventSource["kind"], EventSourceAlarmSpec[]> = {
-  sqs: [
-    {
-      keySuffix: "FailedInvocations",
-      configKey: "eventSourceFailedInvocations",
-      metricName: "FailedInvokeEventCount",
-      describe: (key, threshold) =>
-        `Lambda event source "${key}" is failing to invoke the function. ` +
-        `Threshold: > ${String(threshold)} failed invocations in ${METRIC_PERIOD_LABEL}.`,
-    },
-    {
-      keySuffix: "DroppedEvents",
-      configKey: "eventSourceDroppedEvents",
-      metricName: "DroppedEventCount",
-      describe: (key, threshold) =>
-        `Lambda event source "${key}" is dropping events after exhausting retries or TTL. ` +
-        `Threshold: > ${String(threshold)} dropped events in ${METRIC_PERIOD_LABEL}.`,
-    },
-  ],
+  sqs: ESM_EVENT_COUNT_SPECS,
+  dynamodb: ESM_EVENT_COUNT_SPECS,
   unknown: [],
 };
+
+/**
+ * Source kinds backed by a stream, for which the function-level `IteratorAge`
+ * alarm is created. Extensible to `"kinesis"` when that source lands.
+ */
+const STREAM_EVENT_SOURCE_KINDS: ReadonlySet<AttachedEventSource["kind"]> = new Set(["dynamodb"]);
 
 /**
  * Resolves the recommended alarm configuration into fully-resolved
@@ -199,6 +213,38 @@ export function resolveFunctionAlarmDefinitions(
         description: spec.describe(eventSource.key, cfg.threshold),
       });
     }
+  }
+
+  // `IteratorAge` is a function-level metric (dimensioned on `FunctionName`,
+  // not the mapping UUID), so it cannot ride the per-mapping loop above: one
+  // alarm covers the function whenever any stream source is attached.
+  if (
+    config?.eventSourceIteratorAge !== false &&
+    eventSources.some((es) => STREAM_EVENT_SOURCE_KINDS.has(es.kind))
+  ) {
+    const cfg = resolveAlarmConfig(
+      config?.eventSourceIteratorAge,
+      FUNCTION_ALARM_DEFAULTS.eventSourceIteratorAge,
+    );
+    definitions.push({
+      key: "iteratorAge",
+      alarmName: cfg.alarmName,
+      metric: new Metric({
+        namespace: "AWS/Lambda",
+        metricName: "IteratorAge",
+        dimensionsMap: { FunctionName: fn.functionName },
+        statistic: Stats.MAXIMUM,
+        period: METRIC_PERIOD,
+      }),
+      threshold: cfg.threshold,
+      comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: cfg.evaluationPeriods,
+      datapointsToAlarm: cfg.datapointsToAlarm,
+      treatMissingData: cfg.treatMissingData,
+      description:
+        `Lambda function is falling behind its stream event source (IteratorAge). ` +
+        `Threshold: > ${String(cfg.threshold)}ms for ${String(cfg.evaluationPeriods)} consecutive ${METRIC_PERIOD_LABEL} periods.`,
+    });
   }
 
   return definitions;

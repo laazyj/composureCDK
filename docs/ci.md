@@ -27,10 +27,12 @@ ci.yml ──► deploy-test.yml ──► release.yml ◄── tag push (PAT o
 
 ### Who can deploy from a PR
 
-Auto-deploying every example-touching PR to the shared sandbox account would be both costly and a way to let unvetted code run against AWS, so PR deploys are **restricted by default** and only run when the PR is _cleared for deploy_. The `ci` and `deploy-test` jobs in `deploy-test.yml` share one `if` gate:
+Auto-deploying every example-touching PR to the shared sandbox account would be both costly and a way to let unvetted code run against AWS, so PR deploys are **restricted by default** and only run when the PR is _cleared for deploy_. The `deploy-test` job in `deploy-test.yml` runs on a PR only when:
 
-1. **Not a fork.** Fork PRs are skipped — `pull_request` (never `pull_request_target`) gives them a read-only token with no `id-token: write` and no secrets, and the AWS role's OIDC trust is environment-scoped, so they cannot deploy regardless. Skipping them avoids a guaranteed-red run.
+1. **Not a fork.** Fork PRs cannot deploy — `pull_request` (never `pull_request_target`) gives them a read-only token with no `id-token: write` and no secrets, and the AWS role's OIDC trust is environment-scoped, so they cannot deploy regardless.
 2. **Trusted author _or_ a `safe-to-deploy` label.** A PR authored by someone with write access (`author_association` of `OWNER`, `MEMBER`, or `COLLABORATOR`) deploys automatically. For anyone else, a contributor vouches for the change by adding the **`safe-to-deploy`** label — only users with write access can apply labels, and adding it re-triggers the workflow (the trigger lists the `labeled` activity type).
+
+The nested `ci` job (`uses: ./.github/workflows/ci.yml`) is **skipped on PRs** — `ci.yml` already runs standalone on every PR, so nesting it would double each `CI / *` check as a redundant `Deploy Test / CI / *`. It still runs for non-PR events (`workflow_dispatch`, and the `workflow_call` from `release.yml`), where it is the only pre-deploy CI gate; there `deploy-test` requires it to succeed. On a PR the deploy runs in parallel with the standalone `ci.yml` rather than waiting on it — merge readiness is still gated by `ci.yml` via branch protection.
 
 Two pieces of repo configuration back this:
 

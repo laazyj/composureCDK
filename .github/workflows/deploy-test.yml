@@ -44,44 +44,46 @@ concurrency:
   group: sandbox-account-${{ inputs.environment || 'sandbox' }}
   cancel-in-progress: false # Never cancel in-flight deployments
 
-# Sandbox deploys are gated. On a pull_request, the workflow only runs when the
-# PR is "cleared for deploy", which both `ci` and `deploy-test` below check via
-# the same `if`:
+# The nested `ci` job is the pre-deploy quality gate for non-PR runs
+# (workflow_dispatch, and workflow_call from release.yml — where `ci.yml` does
+# not otherwise run). On a `pull_request` it is SKIPPED, because `ci.yml`
+# already runs standalone on the PR; nesting it here too would double every
+# `CI / *` check as a `Deploy Test / CI / *` check.
 #
-#   1. NOT from a fork. A fork PR can never deploy anyway — `pull_request` (not
-#      `pull_request_target`) gives it a read-only token with no `id-token:
-#      write` and no secrets, and the AWS role's OIDC trust is pinned to
-#      `repo:<org>/<repo>:environment:sandbox` (see
-#      .github/cloudformation/github-oidc-role.yml). Skipping forks here avoids
-#      burning a runner on a job that would die at the credentials step; AND
-#   2. Either the author is a trusted contributor (OWNER / MEMBER / COLLABORATOR
-#      — i.e. write access) so their own PRs deploy automatically, OR a
-#      contributor has vouched for the PR by adding the `safe-to-deploy` label
-#      (only users with write access can label). Adding the label re-triggers
-#      via the `labeled` activity type above.
+# `deploy-test` then runs when:
+#   - non-PR event: the nested `ci` succeeded; OR
+#   - pull_request: `ci` was skipped (per above) AND the PR is "cleared for
+#     deploy" —
+#       1. NOT from a fork. A fork PR can never deploy anyway: `pull_request`
+#          (not `pull_request_target`) gives it a read-only token with no
+#          `id-token: write` and no secrets, and the AWS role's OIDC trust is
+#          pinned to `repo:<org>/<repo>:environment:sandbox` (see
+#          .github/cloudformation/github-oidc-role.yml); AND
+#       2. either the author is a trusted contributor (OWNER / MEMBER /
+#          COLLABORATOR — write access) so their own PRs deploy automatically,
+#          OR a contributor vouched for the PR with the `safe-to-deploy` label
+#          (only write access can label). Adding the label re-triggers via the
+#          `labeled` activity type above.
 #
-# Non-PR events (workflow_dispatch, and workflow_call from release.yml) always
-# run. NOTE: the `sandbox` GitHub Environment's deployment-branch policy must
-# also permit the PR head branch, or the job is rejected at the environment gate
-# before any step runs (a ~6s failure with no steps). See docs/ci.md.
+# NOTE: the `sandbox` GitHub Environment's deployment-branch policy must also
+# permit the PR head branch, or the deploy job is rejected at the environment
+# gate before any step runs (a ~6s failure with no steps). See docs/ci.md.
 jobs:
   ci:
     name: CI
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.pull_request.head.repo.full_name == github.repository &&
-       (contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) ||
-        contains(github.event.pull_request.labels.*.name, 'safe-to-deploy')))
+    if: github.event_name != 'pull_request'
     uses: ./.github/workflows/ci.yml
 
   deploy-test:
     name: Deploy and Verify Examples
     needs: ci
     if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.pull_request.head.repo.full_name == github.repository &&
-       (contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) ||
-        contains(github.event.pull_request.labels.*.name, 'safe-to-deploy')))
+      !cancelled() &&
+      ((github.event_name != 'pull_request' && needs.ci.result == 'success') ||
+       (github.event_name == 'pull_request' && needs.ci.result == 'skipped' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        (contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) ||
+         contains(github.event.pull_request.labels.*.name, 'safe-to-deploy'))))
     runs-on: ubuntu-latest
     # Neptune DB instance provisioning alone is a >15 min long pole; 30 min
     # left too little slack for a clean deploy of the full example fleet.

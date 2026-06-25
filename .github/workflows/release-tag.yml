@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   tag:
-    name: Tag and create GitHub Release
+    name: Create and push release tag
     # Cheap workflow-level filter so non-release pushes never spin up a runner.
     # Assumes squash-merge of the release PR — the strict regex parse below is
     # the authoritative validation.
@@ -65,28 +65,6 @@ jobs:
           fi
           git tag -a "$tag" -m "Release $tag"
           git push origin "$tag"
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.parse.outputs.version }}
-        run: |
-          tag="v${VERSION}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; nothing to do."
-            exit 0
-          fi
-          # Notes are extracted from the workspace CHANGELOG.md section for this version.
-          # The section header format is set by nx release: `## VERSION` followed by content
-          # until the next `## ` heading.
-          notes=$(awk -v ver="$VERSION" '
-            $0 ~ "^## "ver"( |$|\\()" { found=1; next }
-            found && /^## / { exit }
-            found { print }
-          ' CHANGELOG.md)
-          if [ -z "$notes" ]; then
-            echo "::warning::Could not extract notes for $tag from CHANGELOG.md; using auto-generated notes."
-            gh release create "$tag" --title "$tag" --generate-notes
-          else
-            printf '%s' "$notes" | gh release create "$tag" --title "$tag" --notes-file -
-          fi
+          # The GitHub Release itself is created by release.yml, gated behind a
+          # successful deploy-test (just before npm publish), so we never
+          # advertise a release whose artefacts failed to deploy.

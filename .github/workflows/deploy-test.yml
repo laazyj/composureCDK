@@ -40,14 +40,28 @@ concurrency:
   group: sandbox-account-${{ inputs.environment || 'sandbox' }}
   cancel-in-progress: false # Never cancel in-flight deployments
 
+# A fork PR can never deploy: it uses `pull_request` (not
+# `pull_request_target`), so GitHub forces a read-only token with no
+# `id-token: write` and no secrets, and the AWS role's OIDC trust is pinned to
+# `repo:<org>/<repo>:environment:sandbox` (see
+# .github/cloudformation/github-oidc-role.yml). This guard is defence in depth
+# plus runner thrift — it skips the whole workflow for fork PRs instead of
+# burning a runner that would die at the credentials step. Non-PR events
+# (workflow_dispatch, and workflow_call from release.yml) always run.
 jobs:
   ci:
     name: CI
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     uses: ./.github/workflows/ci.yml
 
   deploy-test:
     name: Deploy and Verify Examples
     needs: ci
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     # Neptune DB instance provisioning alone is a >15 min long pole; 30 min
     # left too little slack for a clean deploy of the full example fleet.

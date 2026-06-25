@@ -448,7 +448,7 @@ exports[`event-store-app > matches the expected synthesised template 1`] = `
     },
     "EventStoreprojectorDynamoDBEventSourceComposureCDKEventStoreStackEventStoreeventsFEADF0F0E0D5EC3B": {
       "Properties": {
-        "BatchSize": 10,
+        "BatchSize": 100,
         "EventSourceArn": {
           "Fn::GetAtt": [
             "EventStoreevents1552772F",
@@ -458,7 +458,14 @@ exports[`event-store-app > matches the expected synthesised template 1`] = `
         "FunctionName": {
           "Ref": "EventStoreprojectorB3640F96",
         },
-        "MaximumRetryAttempts": 3,
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures",
+        ],
+        "MetricsConfig": {
+          "Metrics": [
+            "EventCount",
+          ],
+        },
         "StartingPosition": "LATEST",
       },
       "Type": "AWS::Lambda::EventSourceMapping",
@@ -479,6 +486,54 @@ exports[`event-store-app > matches the expected synthesised template 1`] = `
         ],
         "EvaluationPeriods": 1,
         "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "EventStoreprojectorEventsDroppedEventsAlarmB105E314": {
+      "Properties": {
+        "AlarmDescription": "Lambda event source "events" is dropping events after exhausting retries or TTL. Threshold: > 0 dropped events in 1 minute.",
+        "AlarmName": "composure-cdk-event-store-stack/event-store/projector/events-dropped-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "EventSourceMappingUUID",
+            "Value": {
+              "Ref": "EventStoreprojectorDynamoDBEventSourceComposureCDKEventStoreStackEventStoreeventsFEADF0F0E0D5EC3B",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "DroppedEventCount",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "EventStoreprojectorEventsFailedInvocationsAlarm4FFAAEC4": {
+      "Properties": {
+        "AlarmDescription": "Lambda event source "events" is failing to invoke the function. Threshold: > 0 failed invocations in 1 minute.",
+        "AlarmName": "composure-cdk-event-store-stack/event-store/projector/events-failed-invocations",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "EventSourceMappingUUID",
+            "Value": {
+              "Ref": "EventStoreprojectorDynamoDBEventSourceComposureCDKEventStoreStackEventStoreeventsFEADF0F0E0D5EC3B",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FailedInvokeEventCount",
         "Namespace": "AWS/Lambda",
         "Period": 60,
         "Statistic": "Sum",
@@ -591,6 +646,30 @@ exports[`event-store-app > matches the expected synthesised template 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "EventStoreprojectorIteratorAgeAlarm3A972432": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is falling behind its stream event source (IteratorAge). Threshold: > 60000ms for 3 consecutive 1 minute periods.",
+        "AlarmName": "composure-cdk-event-store-stack/event-store/projector/iterator-age",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "EventStoreprojectorB3640F96",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "IteratorAge",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 60000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
     "EventStoreprojectorLogGroupC851F201": {
       "DeletionPolicy": "Retain",

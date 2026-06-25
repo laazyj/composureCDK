@@ -1,10 +1,9 @@
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { AttributeType, StreamViewType } from "aws-cdk-lib/aws-dynamodb";
-import { Code, Runtime, StartingPosition } from "aws-cdk-lib/aws-lambda";
-import { DynamoEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, ref } from "@composurecdk/core";
 import { createTableV2Builder, type TableV2BuilderResult } from "@composurecdk/dynamodb";
-import { createFunctionBuilder } from "@composurecdk/lambda";
+import { createFunctionBuilder, dynamoEventSource } from "@composurecdk/lambda";
 
 /**
  * An event-sourcing store built on the recommended `createTableV2Builder`
@@ -24,12 +23,10 @@ import { createFunctionBuilder } from "@composurecdk/lambda";
  * - A DynamoDB stream (`dynamoStream`) exposed for a downstream consumer
  * - Tuning a recommended alarm threshold via `recommendedAlarms` and adding a
  *   workload-specific alarm via `addAlarm`
- * - Wiring the stream to a `createFunctionBuilder` projector. The lambda
- *   package ships no `dynamoEventSource` helper yet, so this uses the
- *   documented raw-CDK escape hatch: `addEventSource` accepts a bare
- *   `IEventSource` (event-source kind `"unknown"`), resolved from the sibling
- *   table `ref` at build time — `addEventSource` then grants the projector's
- *   least-privilege role permission to read the stream.
+ * - Wiring the stream to a `createFunctionBuilder` projector via the
+ *   `dynamoEventSource` helper and a `ref` to the sibling table — resolved at
+ *   build time, granting the projector's least-privilege role stream-read access
+ *   and adding the stream `iteratorAge` + per-mapping event-source alarms.
  * - **Opt-in global-table replicas.** `TableV2`'s headline feature is
  *   cross-region replication. Replicas deploy to additional regions (extra
  *   cost, slower teardown, and each replica region must be CDK-bootstrapped and
@@ -117,21 +114,15 @@ export function createEventStoreApp(app = new App()): { stack: Stack } {
         )
         .memorySize(256)
         .description("Event projector — consumes the change stream and builds read models")
-        // Raw-CDK escape hatch: no `dynamoEventSource` helper exists yet, so a
-        // bare `DynamoEventSource` (kind `"unknown"`) is resolved from the
-        // sibling table `ref` at build time. `addEventSource` calls
-        // `source.bind(fn)`, granting the least-privilege stream-read policy.
+        // `dynamoEventSource` resolves the sibling table `ref` at build time and
+        // applies secure defaults (start at the stream tip, report partial batch
+        // failures, enable the ESM EventCount metrics). `addEventSource` grants
+        // the projector's least-privilege role `grantStreamRead`, and — because
+        // the source is recognised as a stream — adds the `iteratorAge`
+        // stall alarm plus the per-mapping failed/dropped-event alarms.
         .addEventSource(
           "events",
-          ref(
-            "events",
-            (r: TableV2BuilderResult) =>
-              new DynamoEventSource(r.table, {
-                startingPosition: StartingPosition.LATEST,
-                batchSize: 10,
-                retryAttempts: 3,
-              }),
-          ),
+          dynamoEventSource(ref("events", (r: TableV2BuilderResult) => r.table)),
         ),
     },
     { events: [], projector: ["events"] },

@@ -55,9 +55,23 @@ describe("event-store-app", () => {
       Description: "Event projector — consumes the change stream and builds read models",
     });
     template.resourceCountIs("AWS::Lambda::EventSourceMapping", 1);
+    // dynamoEventSource defaults: start at the stream tip and report partial
+    // batch failures.
     template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
       StartingPosition: "LATEST",
-      BatchSize: 10,
+      FunctionResponseTypes: ["ReportBatchItemFailures"],
+    });
+  });
+
+  it("adds the stream IteratorAge stall alarm for the projector", () => {
+    // The dynamoEventSource helper is recognised as a stream source, so the
+    // function builder adds the AWS-recommended IteratorAge alarm — a benefit
+    // the raw-CDK escape hatch (event-source kind "unknown") did not get.
+    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+      MetricName: "IteratorAge",
+      Namespace: "AWS/Lambda",
+      Threshold: 60_000,
+      EvaluationPeriods: 3,
     });
   });
 

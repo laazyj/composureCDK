@@ -26,7 +26,10 @@ permissions:
   id-token: write # AWS OIDC
 
 concurrency:
-  group: sandbox-cleanup
+  # Shared with deploy-test.yml — see the note there. A cleanup queues behind
+  # any in-flight deploy instead of tearing stacks down mid-deployment. Keep
+  # this group string identical in both workflows.
+  group: sandbox-account-${{ inputs.environment || 'sandbox' }}
   cancel-in-progress: false
 
 jobs:

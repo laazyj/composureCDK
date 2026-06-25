@@ -1,5 +1,5 @@
 import type { IEventSource } from "aws-cdk-lib/aws-lambda";
-import type { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import type { DynamoEventSource, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import type { Resolvable } from "@composurecdk/core";
 
 /**
@@ -11,7 +11,7 @@ import type { Resolvable } from "@composurecdk/core";
  * straight to {@link IFunctionBuilder.addEventSource} as an escape hatch —
  * the builder still attaches it, but cannot reason about it.
  */
-export type EventSourceKind = "sqs" | "unknown";
+export type EventSourceKind = "sqs" | "dynamodb" | "unknown";
 
 /** @internal — brands {@link ComposureEventSource} so the guard is unambiguous. */
 const COMPOSURE_EVENT_SOURCE = Symbol.for("composurecdk.lambda.eventSource");
@@ -53,9 +53,9 @@ export function composureEventSource(
 /**
  * Reads the event source mapping UUID off a bound CDK source, keyed by
  * {@link EventSourceKind}. Defined only for kinds whose per-mapping ESM
- * metrics back contextual alarms (currently SQS); `FunctionBuilder` invokes
- * the reader after `addEventSource` so the binding exists. Keying off `kind`
- * — like {@link EVENT_SOURCE_ALARM_SPECS} — keeps the builder from
+ * metrics back contextual alarms (SQS and DynamoDB streams); `FunctionBuilder`
+ * invokes the reader after `addEventSource` so the binding exists. Keying off
+ * `kind` — like {@link EVENT_SOURCE_ALARM_SPECS} — keeps the builder from
  * `instanceof`-ing CDK source classes.
  *
  * @internal
@@ -68,6 +68,10 @@ export const EVENT_SOURCE_MAPPING_ID_READERS: Record<
   // constructs the `SqsEventSource` in the same call — kind and concrete class
   // move in lockstep.
   sqs: (bound) => (bound as SqsEventSource).eventSourceMappingId,
+  // Safe: the `"dynamodb"` kind is only ever assigned by `dynamoEventSource()`,
+  // which constructs the `DynamoEventSource` in the same call — kind and
+  // concrete class move in lockstep.
+  dynamodb: (bound) => (bound as DynamoEventSource).eventSourceMappingId,
   unknown: undefined,
 };
 

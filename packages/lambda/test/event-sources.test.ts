@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { Code, type IEventSource, Runtime } from "aws-cdk-lib/aws-lambda";
-import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import { AttributeType, type ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
+import { Code, type IEventSource, Runtime, StartingPosition } from "aws-cdk-lib/aws-lambda";
+import { DynamoEventSource, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { isRef, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
@@ -11,6 +12,18 @@ import {
   DEFAULT_SQS_EVENT_SOURCE_PROPS,
   sqsEventSource,
 } from "../src/event-sources/sqs-event-source.js";
+import {
+  DEFAULT_DYNAMO_EVENT_SOURCE_PROPS,
+  dynamoEventSource,
+} from "../src/event-sources/dynamodb-event-source.js";
+
+/** A table with a stream enabled, as `DynamoEventSource.bind` requires. */
+function streamTable(stack: Stack, id = "T"): Table {
+  return new Table(stack, id, {
+    partitionKey: { name: "pk", type: AttributeType.STRING },
+    stream: StreamViewType.NEW_AND_OLD_IMAGES,
+  });
+}
 
 function baseBuilder(): ReturnType<typeof createFunctionBuilder> {
   return createFunctionBuilder()
@@ -43,6 +56,94 @@ describe("sqsEventSource", () => {
   it("exposes its secure defaults for visibility", () => {
     expect(DEFAULT_SQS_EVENT_SOURCE_PROPS.reportBatchItemFailures).toBe(true);
     expect(DEFAULT_SQS_EVENT_SOURCE_PROPS.metricsConfig).toEqual({ metrics: ["EventCount"] });
+  });
+});
+
+describe("dynamoEventSource", () => {
+  it("returns a ComposureEventSource of kind 'dynamodb'", () => {
+    const stack = new Stack(new App(), "S");
+    const source = dynamoEventSource(streamTable(stack));
+
+    expect(source.kind).toBe("dynamodb");
+  });
+
+  it("holds a concrete source for a concrete table", () => {
+    const stack = new Stack(new App(), "S");
+    const source = dynamoEventSource(streamTable(stack));
+
+    expect(isRef(source.source)).toBe(false);
+  });
+
+  it("holds a Ref source for a Ref table", () => {
+    const source = dynamoEventSource(ref("orders", (r: { table: ITable }) => r.table));
+
+    expect(isRef(source.source)).toBe(true);
+  });
+
+  it("exposes its secure defaults for visibility", () => {
+    expect(DEFAULT_DYNAMO_EVENT_SOURCE_PROPS.startingPosition).toBe("LATEST");
+    expect(DEFAULT_DYNAMO_EVENT_SOURCE_PROPS.reportBatchItemFailures).toBe(true);
+    expect(DEFAULT_DYNAMO_EVENT_SOURCE_PROPS.metricsConfig).toEqual({ metrics: ["EventCount"] });
+  });
+});
+
+describe("FunctionBuilder.addEventSource (DynamoDB)", () => {
+  it("synthesises an event source mapping and grants stream read", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack)))
+      .build(stack, "Fn");
+
+    const template = Template.fromStack(stack);
+    template.resourceCountIs("AWS::Lambda::EventSourceMapping", 1);
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(["dynamodb:GetRecords", "dynamodb:GetShardIterator"]),
+            Effect: "Allow",
+          }),
+        ]),
+      }),
+    });
+  });
+
+  it("applies the secure DynamoDB defaults to the mapping", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack)))
+      .build(stack, "Fn");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      StartingPosition: "LATEST",
+      FunctionResponseTypes: ["ReportBatchItemFailures"],
+      MetricsConfig: { Metrics: ["EventCount"] },
+    });
+  });
+
+  it("lets props override the secure defaults", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource(
+        "orders",
+        dynamoEventSource(streamTable(stack), { startingPosition: StartingPosition.TRIM_HORIZON }),
+      )
+      .build(stack, "Fn");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      StartingPosition: "TRIM_HORIZON",
+    });
+  });
+
+  it("resolves a Ref table against the build context", () => {
+    const stack = new Stack(new App(), "S");
+    const table = streamTable(stack);
+
+    baseBuilder()
+      .addEventSource("orders", dynamoEventSource(ref("orders", (r: { table: ITable }) => r.table)))
+      .build(stack, "Fn", { orders: { table } });
+
+    Template.fromStack(stack).resourceCountIs("AWS::Lambda::EventSourceMapping", 1);
   });
 });
 
@@ -246,5 +347,99 @@ describe("event-source contextual alarms", () => {
 
     expect(result.alarms).not.toHaveProperty("ordersFailedInvocations");
     expect(result.alarms).toHaveProperty("ordersDroppedEvents");
+  });
+
+  it("creates per-mapping alarms for a DynamoDB stream source too", () => {
+    const stack = new Stack(new App(), "S");
+    const result = baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack)))
+      .build(stack, "Fn");
+
+    expect(result.alarms).toHaveProperty("ordersFailedInvocations");
+    expect(result.alarms).toHaveProperty("ordersDroppedEvents");
+  });
+});
+
+describe("stream IteratorAge contextual alarm", () => {
+  it("creates a single iteratorAge alarm when a DynamoDB stream source is attached", () => {
+    const stack = new Stack(new App(), "S");
+    const result = baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack)))
+      .build(stack, "Fn");
+
+    expect(result.alarms).toHaveProperty("iteratorAge");
+  });
+
+  it("dimensions the iteratorAge metric on the function with Maximum statistic", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack)))
+      .build(stack, "Fn");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::CloudWatch::Alarm", {
+      Namespace: "AWS/Lambda",
+      MetricName: "IteratorAge",
+      Statistic: "Maximum",
+      Dimensions: [{ Name: "FunctionName", Value: Match.anyValue() }],
+      Threshold: 60_000,
+      ComparisonOperator: "GreaterThanThreshold",
+    });
+  });
+
+  it("creates one iteratorAge alarm regardless of how many stream sources are attached", () => {
+    const stack = new Stack(new App(), "S");
+    const result = baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack, "Orders")))
+      .addEventSource("audit", dynamoEventSource(streamTable(stack, "Audit")))
+      .build(stack, "Fn");
+
+    const iteratorAgeKeys = Object.keys(result.alarms).filter((k) => k === "iteratorAge");
+    expect(iteratorAgeKeys).toEqual(["iteratorAge"]);
+  });
+
+  it("does not create an iteratorAge alarm for an SQS-only function", () => {
+    const stack = new Stack(new App(), "S");
+    const result = baseBuilder()
+      .addEventSource("orders", sqsEventSource(new Queue(stack, "Q")))
+      .build(stack, "Fn");
+
+    expect(result.alarms).not.toHaveProperty("iteratorAge");
+  });
+
+  it("does not create an iteratorAge alarm for a bare escape-hatch stream source", () => {
+    const stack = new Stack(new App(), "S");
+    const result = baseBuilder()
+      .addEventSource(
+        "orders",
+        new DynamoEventSource(streamTable(stack), {
+          startingPosition: StartingPosition.LATEST,
+        }),
+      )
+      .build(stack, "Fn");
+
+    expect(result.alarms).not.toHaveProperty("iteratorAge");
+  });
+
+  it("disables the iteratorAge alarm via recommendedAlarms", () => {
+    const stack = new Stack(new App(), "S");
+    const result = baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack)))
+      .recommendedAlarms({ eventSourceIteratorAge: false })
+      .build(stack, "Fn");
+
+    expect(result.alarms).not.toHaveProperty("iteratorAge");
+  });
+
+  it("tunes the iteratorAge threshold via recommendedAlarms", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack)))
+      .recommendedAlarms({ eventSourceIteratorAge: { threshold: 120_000 } })
+      .build(stack, "Fn");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::CloudWatch::Alarm", {
+      MetricName: "IteratorAge",
+      Threshold: 120_000,
+    });
   });
 });

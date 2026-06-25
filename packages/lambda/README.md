@@ -125,16 +125,21 @@ Opt back into CDK's auto-created role attached to `AWSLambdaBasicExecutionRole`.
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.
 
-| Alarm                    | Metric                            | Default threshold           | Created when                          |
-| ------------------------ | --------------------------------- | --------------------------- | ------------------------------------- |
-| `errors`                 | Errors (Sum, 1 min)               | > 0                         | Always                                |
-| `throttles`              | Throttles (Sum, 1 min)            | > 0                         | Always                                |
-| `duration`               | Duration (p99, 1 min)             | > 90% of configured timeout | `timeout` is set                      |
-| `concurrentExecutions`   | ConcurrentExecutions (Max, 1 min) | >= 80% of reserved limit    | `reservedConcurrentExecutions` is set |
-| `<key>FailedInvocations` | FailedInvokeEventCount (Sum)      | > 0                         | An SQS event source is attached       |
-| `<key>DroppedEvents`     | DroppedEventCount (Sum)           | > 0                         | An SQS event source is attached       |
+| Alarm                    | Metric                            | Default threshold           | Created when                           |
+| ------------------------ | --------------------------------- | --------------------------- | -------------------------------------- |
+| `errors`                 | Errors (Sum, 1 min)               | > 0                         | Always                                 |
+| `throttles`              | Throttles (Sum, 1 min)            | > 0                         | Always                                 |
+| `duration`               | Duration (p99, 1 min)             | > 90% of configured timeout | `timeout` is set                       |
+| `concurrentExecutions`   | ConcurrentExecutions (Max, 1 min) | >= 80% of reserved limit    | `reservedConcurrentExecutions` is set  |
+| `<key>FailedInvocations` | FailedInvokeEventCount (Sum)      | > 0                         | An SQS or DynamoDB source is attached  |
+| `<key>DroppedEvents`     | DroppedEventCount (Sum)           | > 0                         | An SQS or DynamoDB source is attached  |
+| `iteratorAge`            | IteratorAge (Max, 1 min)          | > 60000 ms for 3 min¹       | A stream source (DynamoDB) is attached |
 
-The event-source alarms are contextual: one pair is created per event source attached via `addEventSource` (see [Event sources](#event-sources)) whose kind emits per-mapping ESM metrics. Each alarm's key is the event source's key suffixed with `FailedInvocations` / `DroppedEvents` — e.g. an event source added as `"orders"` produces `ordersFailedInvocations` and `ordersDroppedEvents`. The `eventSourceFailedInvocations` / `eventSourceDroppedEvents` fields on `recommendedAlarms` tune every such alarm.
+¹ AWS recommends alarming on `IteratorAge` for stream consumers but prescribes no fixed threshold — it is workload dependent. The 60s/3-minute default is deliberately conservative; tune it per workload via `eventSourceIteratorAge`.
+
+The per-mapping event-source alarms are contextual: one pair is created per event source attached via `addEventSource` (see [Event sources](#event-sources)) whose kind emits per-mapping ESM metrics. Each alarm's key is the event source's key suffixed with `FailedInvocations` / `DroppedEvents` — e.g. an event source added as `"orders"` produces `ordersFailedInvocations` and `ordersDroppedEvents`. The `eventSourceFailedInvocations` / `eventSourceDroppedEvents` fields on `recommendedAlarms` tune every such alarm.
+
+`iteratorAge` is different: `IteratorAge` is a function-level metric, so a single alarm (keyed `iteratorAge`) is created whenever at least one stream source (currently DynamoDB streams) is attached, regardless of how many. It warns when the consumer falls behind its stream. Tune or disable it via the `eventSourceIteratorAge` field on `recommendedAlarms`.
 
 The defaults are exported as `FUNCTION_ALARM_DEFAULTS` for visibility and testing:
 
@@ -226,9 +231,10 @@ for (const alarm of Object.values(result.alarms)) {
 function can have many event sources of mixed types, so the hook is repeatable
 and keyed — the resolved sources are exposed on `result.eventSources`.
 
-Pass a `ComposureEventSource` from a factory (`sqsEventSource`), which carries
-its own `Resolvable` so the source queue can be a `ref()` to a sibling
-component, or a bare CDK `IEventSource` as an escape hatch.
+Pass a `ComposureEventSource` from a factory (`sqsEventSource`,
+`dynamoEventSource`), which carries its own `Resolvable` so the source queue or
+table can be a `ref()` to a sibling component, or a bare CDK `IEventSource` as
+an escape hatch.
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
@@ -250,7 +256,44 @@ const system = compose(
 
 The source is attached _after_ the function and its least-privilege execution
 role exist, so the `source.bind(fn)` that `addEventSource` performs grants the
-queue-consume permission onto the builder's role rather than CDK's auto-role.
+consume permission (SQS `ReceiveMessage`, or DynamoDB `grantStreamRead`) onto
+the builder's role rather than CDK's auto-role.
+
+`dynamoEventSource(table, props?)` mirrors the SQS factory for DynamoDB streams.
+The table must have a stream enabled (via the [DynamoDB builder](../dynamodb)'s
+`.dynamoStream(...)` / `.stream(...)`, or `TableProps.stream`); otherwise CDK
+throws `DynamoDB Streams must be enabled` at build time. `startingPosition`
+defaults to `LATEST` and is overridable via `props`:
+
+```ts
+import { StartingPosition } from "aws-cdk-lib/aws-lambda";
+import { StreamViewType } from "aws-cdk-lib/aws-dynamodb";
+import { compose, ref } from "@composurecdk/core";
+import { createFunctionBuilder, dynamoEventSource } from "@composurecdk/lambda";
+import { createTableV2Builder } from "@composurecdk/dynamodb";
+
+compose(
+  {
+    orders: createTableV2Builder()
+      .partitionKey({ name: "pk", type: AttributeType.STRING })
+      .dynamoStream(StreamViewType.NEW_AND_OLD_IMAGES),
+    processor: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("lambda"))
+      .addEventSource(
+        "orders",
+        dynamoEventSource(
+          ref("orders", (r) => r.table),
+          {
+            startingPosition: StartingPosition.TRIM_HORIZON,
+          },
+        ),
+      ),
+  },
+  { orders: [], processor: ["orders"] },
+);
+```
 
 ### Secure defaults
 
@@ -262,6 +305,15 @@ second `props` argument and exported as `DEFAULT_SQS_EVENT_SOURCE_PROPS`:
 | `reportBatchItemFailures` | `true`                      | A single poison message fails only its own record, not the whole batch. CDK defaults this `false`. |
 | `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                  |
 
+`dynamoEventSource` applies the same defaults plus `startingPosition`, exported
+as `DEFAULT_DYNAMO_EVENT_SOURCE_PROPS`:
+
+| Property                  | Default                     | Rationale                                                                                         |
+| ------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `startingPosition`        | `LATEST`                    | A newly-attached consumer reads from the stream tip, not the table's existing change history.     |
+| `reportBatchItemFailures` | `true`                      | A single poison record fails only its own record, not the whole batch. CDK defaults this `false`. |
+| `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                 |
+
 ### Cross-component invariants
 
 AWS Well-Architected guidance spans the queue and the function — the source
@@ -271,9 +323,8 @@ today (the queue often arrives as an unresolved `ref()`); they are tracked in
 [#123](https://github.com/laazyj/composureCDK/issues/123) and
 [#124](https://github.com/laazyj/composureCDK/issues/124).
 
-`kinesisEventSource` / `dynamoEventSource` and the stream-only `IteratorAge`
-alarm are deferred — see [#120](https://github.com/laazyj/composureCDK/issues/120)
-and [#121](https://github.com/laazyj/composureCDK/issues/121).
+`kinesisEventSource` is still deferred — see
+[#120](https://github.com/laazyj/composureCDK/issues/120).
 
 ## Examples
 

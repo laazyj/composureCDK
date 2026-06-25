@@ -61,6 +61,25 @@ return compose({
 
 The website for UkeHoot is a static Eleventy site on S3 + CloudFront with Route 53 DNS, an `us-east-1` ACM certificate, CloudWatch alarms, and a monthly budget guard. The infrastructure follows the same multi-region, multi-stack shape as [jasonduffett.net](#jasonduffettnet). Its distinguishing difference is a CloudFront function that serves 301 redirects for the group's legacy Tumblr URLs (2012–2018) to their archived equivalents.
 
+### [uke-o-ono.com](https://github.com/laazyj/ukeoono.com)
+
+The single-page flyer for Edinburgh ukulele band Uke O Ono is another static Eleventy site on S3 + CloudFront, sharing the same builder defaults and multi-stack shape as [jasonduffett.net](#jasonduffettnet) — including a CloudFront function for the www→apex 301 and pretty-URL rewrite, CloudWatch alarms, and a monthly budget guard. Its distinguishing difference is **DNS hosted at Cloudflare rather than Route 53**: there is no `@composurecdk/route53` hosted-zone or alias-record builder, so the apex and `www` records are CNAMEs pointed at the distribution by hand in Cloudflare. With no zone to DNS-validate against, the `us-east-1` ACM certificate is validated manually in Cloudflare and imported by ARN, rather than created and validated by the `@composurecdk/acm` builder.
+
+```ts
+// No Route 53 zone, so the cert is validated by hand in Cloudflare and
+// imported by ARN instead of created/DNS-validated by the builder.
+const certificate = Certificate.fromCertificateArn(siteStack, "SiteCert", certArn);
+
+return compose({
+  bucket: createBucketBuilder(), // versioned, RETAIN, access logs by default
+  cdn: createDistributionBuilder()
+    .domainNames([domain, www])
+    .certificate(certificate)
+    .origin(bucket.map((b) => S3BucketOrigin.withOriginAccessControl(b))),
+  // …CloudFront redirect function, budgets, SNS topics, alarms elided
+}).withStacks({ cdn: siteStack /* …alerts, alarms, OIDC stacks */ });
+```
+
 ## Submitting your project
 
 Open a pull request adding an entry under **Case studies** above, or open an issue if you'd prefer the maintainer to write the entry up. Entries should link to a public repo or homepage so readers can verify the project exists.

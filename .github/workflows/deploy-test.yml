@@ -17,6 +17,17 @@ on:
         required: false
         default: sandbox
         type: string
+  # Auto-run on PRs that touch the examples package so we get early
+  # validation that the example apps still deploy and pass smoke tests.
+  # Scoped to packages/examples/** (and this workflow, so trigger edits are
+  # self-testing) to avoid spending a real sandbox deploy on every PR. On a
+  # pull_request event `inputs.environment` is empty, so the job below falls
+  # back to 'sandbox' — see the `environment:` and `concurrency:` keys.
+  pull_request:
+    branches: [main]
+    paths:
+      - packages/examples/**
+      - .github/workflows/deploy-test.yml
 
 permissions:
   contents: read
@@ -41,7 +52,9 @@ jobs:
     # Neptune DB instance provisioning alone is a >15 min long pole; 30 min
     # left too little slack for a clean deploy of the full example fleet.
     timeout-minutes: 45
-    environment: ${{ inputs.environment }}
+    # `inputs.environment` is unset on a pull_request trigger; fall back to
+    # sandbox so the env-scoped AWS_ROLE_ARN/AWS_REGION vars resolve.
+    environment: ${{ inputs.environment || 'sandbox' }}
 
     steps:
       - name: Checkout

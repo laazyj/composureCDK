@@ -10,7 +10,8 @@ Five GitHub Actions workflows chain together:
 ci.yml ──► deploy-test.yml ──► release.yml ◄── tag push (PAT or manual)
    ▲              ▲                              ▲
    │              │                              │
- PRs/push    workflow_dispatch              release-tag.yml ◄── push to main
+ PRs/push    workflow_dispatch /            release-tag.yml ◄── push to main
+             PR (examples)
                                             (filters chore(release): commits,
                                              pushes tag with RELEASE_PR_TOKEN)
                                                   ▲
@@ -19,7 +20,7 @@ ci.yml ──► deploy-test.yml ──► release.yml ◄── tag push (PAT o
 ```
 
 - **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20 + 24 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)).
-- **`deploy-test.yml`** — manual `workflow_dispatch`. Calls CI, then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
+- **`deploy-test.yml`** — manual `workflow_dispatch`, plus automatic on any PR to `main` that touches `packages/examples/**` (or the workflow itself), for early validation that the example apps still deploy. Calls CI, then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. On the `pull_request` trigger `inputs.environment` is unset, so the deploy job falls back to `sandbox`. PR runs share the `sandbox-account-sandbox` concurrency group with `workflow_dispatch` runs and `sandbox-cleanup.yml`, so deploys serialise against the single sandbox account rather than racing. Teardown runs separately in `sandbox-cleanup.yml` (triggered by `workflow_run` on this workflow, so auto-runs are cleaned up too) so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`.
 - **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it tags the commit and creates a GitHub Release from the matching `CHANGELOG.md` section. The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Runs deploy-test, then `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.

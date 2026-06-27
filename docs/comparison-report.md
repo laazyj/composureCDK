@@ -174,18 +174,18 @@ The showcase collapses that into `.recommendedAlarms({ errorRate: { threshold: 2
 Being straight about the trade-offs:
 
 - **It's a dependency, and a new vocabulary.** ComposureCDK is a set of `@composurecdk/*` packages to adopt and track, and `compose` / `ref` / builders are concepts your team has to learn. That cost is real and front-loaded. (Note that B and C's monitoring libraries are dependencies too — the honest question isn't "deps vs. no deps," it's which dependency buys the most.)
-- **For a true throwaway, reach for B.** An internal distribution on the default `*.cloudfront.net` domain, with no custom domain and nothing operational, is three lines of `CloudFrontToS3` and that's the right tool. ComposureCDK starts paying off once the site is real — a custom domain, alarms, a budget — which, as §4 shows, arrives almost immediately.
+- **For a true throwaway, reach for B.** An internal distribution on the default `*.cloudfront.net` domain, with no custom domain and nothing operational, is three lines of `CloudFrontToS3` and that's the right tool. ComposureCDK starts paying off once the site is real — a custom domain, alarms, a budget — which, as [§4](#4-reference-b--cloudfronttos3-aws-solutions-constructs) shows, arrives almost immediately.
 - **On the shared core, the win is ergonomics, not capability.** Where ComposureCDK's output matches B's defaults (private/OAC bucket, logging, SSL, security headers), it isn't doing anything B can't — the difference is that the baseline is a default you can't forget rather than props you maintain, and overrides read as a fluent chain rather than a nested bag.
 
 ## 8. Takeaways
 
 If you're building and _operating_ a real static site on S3 + CloudFront, ComposureCDK is the higher-leverage choice — and the reasons are concrete:
 
-- **The well-architected baseline is free and unforgettable.** Versioned/RETAIN buckets, OAC, SSL enforcement, access logging and the recommended alarm set are defaults, so they can't be omitted by accident and don't cost you a line. At equal functionality the stack is roughly half the code of the canonical AWS example (§3), and the parts that vanish are exactly the parts you'd otherwise copy-paste and have to keep correct.
-- **The operational layer is the real differentiator.** Going from "secure CDN" to "fully-alarmed, budget-guarded, multi-stack site" is a `.recommendedAlarms()` per resource and one `alarmActionsPolicy()` — versus the ~120–180 lines of `new Alarm(...)` and third-party wiring that no off-the-shelf example gives you (§5).
+- **The well-architected baseline is free and unforgettable.** Versioned/RETAIN buckets, OAC, SSL enforcement, access logging and the recommended alarm set are defaults, so they can't be omitted by accident and don't cost you a line. At equal functionality the stack is roughly half the code of the canonical AWS example ([§3](#3-reference-a--aws-cdk-examplesstatic-site)), and the parts that vanish are exactly the parts you'd otherwise copy-paste and have to keep correct.
+- **The operational layer is the real differentiator.** Going from "secure CDN" to "fully-alarmed, budget-guarded, multi-stack site" is a `.recommendedAlarms()` per resource and one `alarmActionsPolicy()` — versus the ~120–180 lines of `new Alarm(...)` and third-party wiring that no off-the-shelf example gives you ([§5](#5-reference-c--assembling-the-operational-layer-yourself)).
 - **The code reads as intent.** Defaults are invisible; only your decisions show. Dependencies are declared as data via `compose`/`ref` instead of implied by statement order, which is what keeps the stack legible as the surface grows.
 
-The honest counterweight: you're taking on a dependency and a small learning curve, and for a genuine throwaway a single-construct option is simpler (§7). For anything you intend to run in production, that trade goes ComposureCDK's way — and the [showcase](showcase.md) consumers are the working proof.
+The honest counterweight: you're taking on a dependency and a small learning curve, and for a genuine throwaway a single-construct option is simpler ([§7](#7-where-composurecdk-isnt-the-right-call)). For anything you intend to run in production, that trade goes ComposureCDK's way — and the [showcase](showcase.md) consumers are the working proof.
 
 ## Sources
 

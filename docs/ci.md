@@ -10,7 +10,8 @@ Five GitHub Actions workflows chain together:
 ci.yml ──► deploy-test.yml ──► release.yml ◄── tag push (PAT or manual)
    ▲              ▲                              ▲
    │              │                              │
- PRs/push    workflow_dispatch              release-tag.yml ◄── push to main
+ PRs/push    workflow_dispatch /            release-tag.yml ◄── push to main
+             PR (examples)
                                             (filters chore(release): commits,
                                              pushes tag with RELEASE_PR_TOKEN)
                                                   ▲
@@ -19,10 +20,24 @@ ci.yml ──► deploy-test.yml ──► release.yml ◄── tag push (PAT o
 ```
 
 - **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20 + 24 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)).
-- **`deploy-test.yml`** — manual `workflow_dispatch`. Calls CI, then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
+- **`deploy-test.yml`** — manual `workflow_dispatch`, plus automatic on PRs to `main` that touch `packages/examples/**` (or the workflow itself), for early validation that the example apps still deploy. Calls CI, then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. On the `pull_request` trigger `inputs.environment` is unset, so the deploy job falls back to `sandbox`. PR runs share the `sandbox-account-sandbox` concurrency group with `workflow_dispatch` runs and `sandbox-cleanup.yml`, so deploys serialise against the single sandbox account rather than racing. Teardown runs separately in `sandbox-cleanup.yml` (triggered by `workflow_run` on this workflow, so auto-runs are cleaned up too) so developer feedback lands in ~10 min instead of waiting on CloudFront propagation. Which PRs actually deploy is gated — see [Who can deploy from a PR](#who-can-deploy-from-a-pr).
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`.
 - **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it tags the commit and creates a GitHub Release from the matching `CHANGELOG.md` section. The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Runs deploy-test, then `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
+
+### Who can deploy from a PR
+
+Auto-deploying every example-touching PR to the shared sandbox account would be both costly and a way to let unvetted code run against AWS, so PR deploys are **restricted by default** and only run when the PR is _cleared for deploy_. The `deploy-test` job in `deploy-test.yml` runs on a PR only when:
+
+1. **Not a fork.** Fork PRs cannot deploy — `pull_request` (never `pull_request_target`) gives them a read-only token with no `id-token: write` and no secrets, and the AWS role's OIDC trust is environment-scoped, so they cannot deploy regardless.
+2. **Trusted author _or_ a `safe-to-deploy` label.** A PR authored by someone with write access (`author_association` of `OWNER`, `MEMBER`, or `COLLABORATOR`) deploys automatically. For anyone else, a contributor vouches for the change by adding the **`safe-to-deploy`** label — only users with write access can apply labels, and adding it re-triggers the workflow (the trigger lists the `labeled` activity type).
+
+The nested `ci` job (`uses: ./.github/workflows/ci.yml`) is **skipped on PRs** — `ci.yml` already runs standalone on every PR, so nesting it would double each `CI / *` check as a redundant `Deploy Test / CI / *`. It still runs for non-PR events (`workflow_dispatch`, and the `workflow_call` from `release.yml`), where it is the only pre-deploy CI gate; there `deploy-test` requires it to succeed. On a PR the deploy runs in parallel with the standalone `ci.yml` rather than waiting on it — merge readiness is still gated by `ci.yml` via branch protection.
+
+Two pieces of repo configuration back this:
+
+- **`sandbox` environment deployment-branch policy** must permit the branches PRs are raised from. With a policy restricted to `main` only, every PR-branch deploy is rejected at the environment gate before any step runs (a ~6 s failure with no steps and no logs). Either widen the policy to allow the PR branch namespace or set it to allow all branches; the `if` gate above is what re-imposes the "who can deploy" restriction at the workflow level, and the OIDC `sub` stays pinned to `environment:sandbox`.
+- **Branch protection on `main`** is where "a deploy test must pass before merge" is enforced — mark the **Deploy and Verify Examples** check required. Note the interaction with the gate: when a PR is _not_ cleared for deploy, the job is skipped, and GitHub reports a skipped required check as passing. So requiring the check enforces a deploy on cleared PRs but does not, on its own, force every PR to be cleared. To make a deploy mandatory for _all_ example-touching PRs, a contributor must label uncleared PRs (or the gate must be tightened) before merge.
 
 ## Versioning
 
@@ -203,7 +218,7 @@ Create a GitHub Environment called `sandbox` with:
 | `AWS_ROLE_ARN` | The `RoleArn` output from the OIDC stack       |
 | `AWS_REGION`   | The region you bootstrapped (e.g. `eu-west-1`) |
 
-Add protection rules (e.g. required reviewers) as desired.
+Add protection rules (e.g. required reviewers) as desired. **Deployment branch policy:** if you restrict which branches may deploy, the policy must include the branches PRs are raised from, or the auto-on-PR `deploy-test` run is rejected at the environment gate before any step runs. See [Who can deploy from a PR](#who-can-deploy-from-a-pr).
 
 ### 4. Trigger the workflow
 
@@ -256,6 +271,7 @@ npx nx cdk examples -- destroy --all
 
 - **OIDC everywhere** — both AWS and npm. No long-lived credentials in GitHub.
 - **Environment-scoped trust** — the AWS role restricts assumption to the `sandbox` environment; npm trusted publishers restrict publishing to `release.yml` in the `npm` environment.
+- **PR deploys are gated** — `deploy-test.yml` auto-runs on PRs touching `packages/examples/**`, but only deploys when the PR is cleared (trusted author or `safe-to-deploy` label, never a fork). Fork PRs are structurally unable to deploy regardless: they trigger on `pull_request` (never `pull_request_target`), so GitHub issues a read-only token with no `id-token: write` and no secrets, and the OIDC `sub` is pinned to `repo:<org>/<repo>:environment:sandbox` so STS would reject a fork's token. The `if` guard on both jobs is defence in depth plus runner thrift. Do not switch this trigger to `pull_request_target` or broaden the role's `sub` condition. See [Who can deploy from a PR](#who-can-deploy-from-a-pr).
 - **Tag-based resource scoping** — Lambda, CloudWatch Logs, and IAM permissions use `aws:cloudformation:stack-name` tag conditions limited to `ComposureCDK-*`. The Neptune smoke test's `ssm:SendCommand` is likewise scoped to bastion instances carrying that tag (the `AWS-RunShellScript` document is granted separately). SQS smoke-test access is ARN-scoped to the sandbox account (CloudFormation system tags don't propagate to SQS in a form IAM evaluates). Read-only describes that AWS does not support resource-level permissions for — EC2 `Describe*`, `rds:DescribeDBClusters`, `ssm:GetCommandInvocation`, `cloudformation:ListStacks` — are granted on `*`.
 - **npm provenance** — published packages include provenance attestations linking them to this repo and workflow run.
 - **Action pinning** — all GitHub Actions are pinned by commit SHA, kept current by Dependabot.

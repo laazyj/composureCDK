@@ -1,6 +1,6 @@
 # ADR 0011: Cross-component relationship guards — builder-registered synth-time Aspects
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-06-27
 
 ## Context
@@ -8,9 +8,8 @@
 Some AWS best practices are not properties of one resource but _relationships
 between two_. The motivating case (laazyj/composureCDK#123): an SQS source
 queue's `visibilityTimeout` should be ≥ 6× the consumer Lambda's `timeout`, so
-Lambda can retry a throttled batch before the message becomes visible again. Its
-sibling #124 (`maxReceiveCount` floor) is the same shape; more will follow as
-builders gain cross-wiring.
+Lambda can retry a throttled batch before the message becomes visible again.
+More relationships of this shape will surface as builders gain cross-wiring.
 
 Three properties make these relationships hard to guard, and none is addressed
 by the single-value constraint catalogue of
@@ -94,12 +93,15 @@ Concretely, for the first instance (`FunctionBuilder` + SQS event source):
 - Cross-component best-practice relationships become real, reliable checks: a
   violation surfaces at `cdk synth`/`deploy` at the authoring site, suppressible
   by id, with no false positive on correct or default configurations. This
-  resolves #123 and unblocks #124.
+  resolves #123.
 - **To add a guard:** register an Aspect in the producing builder's `build()`
   that reads the sibling's resolved scalar off its L1 and warns on violation,
-  dispatched on the wiring's discriminator. In this package that dispatch is the
-  `EventSourceKind` table; #124 (`maxReceiveCount`, via `CfnQueue.redrivePolicy`)
-  is the next entry.
+  dispatched on the wiring's discriminator (in this package, the
+  `EventSourceKind` table). A guard is the right tool _only_ when the check
+  needs a value from the other component. A threshold the owning builder can
+  check on its own — an SQS queue's `maxReceiveCount` floor of 5, which needs
+  nothing from the consumer — stays a local check in that builder
+  (`@composurecdk/sqs`'s `QueueBuilder`), not a guard here.
 - The technique applies only when the sibling's value is recoverable at synth
   (its L1, or similar). A value that never reaches a synth-readable surface needs
   a different channel.
@@ -112,8 +114,9 @@ Concretely, for the first instance (`FunctionBuilder` + SQS event source):
   advisory, warn, at synth.
 - A builder that installs a guard takes on one Aspect per wired pair; the synth
   cost is negligible.
-- Following ADR-0002's precedent, `architecture.md` is not yet amended; this ADR
-  stands alone until the pattern is exercised by more than one instance.
+- `architecture.md` is not yet amended for relationship guards. Following the
+  "> 2 consumers" bar ADR-0002 set for its own promotion, this ADR stands alone
+  until a second cross-component instance exercises the pattern.
 
 ## Alternatives considered
 

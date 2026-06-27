@@ -353,6 +353,36 @@ class MyBuilder implements Lifecycle<MyResult> {
 
 This is the only change required. The builder does not need to know whether it received a concrete value or a `Ref` — `resolve` handles both uniformly.
 
+## Policies
+
+Some concerns are not builder-local: they apply to whatever matching constructs happen to exist under a scope, not to any one component. Examples: attaching CloudWatch alarm actions to every `Alarm` in a stack, overriding `removalPolicy` on every stateful resource for a throwaway environment, or enforcing a tagging convention across services.
+
+A **Policy** is a free function `(scope: IConstruct, config?) => void` that applies a cross-cutting rule to every matching construct in the subtree under `scope`. It returns nothing and is installed once at setup — distinct from a builder (which produces one component) and a `Ref` (which wires two).
+
+### How it works
+
+Policies are backed by CDK `Aspects` or `PropertyInjectors`, never manual `node.findAll()` walks (which miss late-added constructs) or `afterBuild` hooks (which would couple them to `compose`):
+
+- **`Aspects`** for post-construction mutation — e.g. `alarmActionsPolicy` calls `addAlarmAction` on already-built alarms. Aspects fire during synth, after the tree is final, so the policy sees constructs added after it was installed and call ordering does not matter.
+- **`PropertyInjectors`** for props that cannot be changed after construction — e.g. `removalPolicy`, rewritten as the construct is instantiated.
+
+Matching constructs are detected with version-portable jsii guards (`CfnResource.isCfnResource(x) && x.cfnResourceType === Cfn*.CFN_RESOURCE_TYPE_NAME`), not `instanceof` — which fails across the bundled ESM/CJS copies of CDK. A Policy takes no `compose` dependency, so it works in any CDK app; a composed system can still install one from an `afterBuild` hook.
+
+```typescript
+// Install once on any scope — an App, a Stack, or the scope passed to build().
+alarmActionsPolicy(app, {
+  defaults: { alarmActions: [new SnsAction(standardTopic)] },
+  rules: [{ match: "HighSev", alarmActions: [new SnsAction(pagerTopic)] }],
+});
+```
+
+### Design rationale
+
+- **Single-domain policies live in their package** under `src/policies/`, co-located with the detection logic and types they rely on (e.g. `alarmActionsPolicy` in `@composurecdk/cloudwatch`). Pan-domain policies that span services stay in `packages/examples/` until ≥ 2 of them justify a dedicated `@composurecdk/policies` package.
+- **Named with a `<noun>Policy` suffix** to signal a scope-wide side effect applied at setup, distinct from builders and factories.
+
+See [ADR-0002](adr/0002-policies.md).
+
 ## How the pieces fit together
 
 ```

@@ -25,6 +25,7 @@ import {
   EVENT_SOURCE_MAPPING_ID_READERS,
   isComposureEventSource,
 } from "./event-sources/composure-event-source.js";
+import { EVENT_SOURCE_RELATIONSHIP_GUARDS } from "./event-sources/event-source-relationship-guards.js";
 
 const LOGS_WRITER_POLICY_NAME = "LogsWriter";
 
@@ -357,6 +358,13 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
         kind,
         eventSourceMappingId: EVENT_SOURCE_MAPPING_ID_READERS[kind]?.(eventSource),
       });
+
+      // Guard any cross-component relationship that spans this source and the
+      // function (e.g. the SQS visibilityTimeout >= 6x function-timeout rule),
+      // dispatched on kind so no CDK internals are inspected. See ADR-0011.
+      for (const guard of EVENT_SOURCE_RELATIONSHIP_GUARDS[kind]) {
+        guard(fn, id, entry.key, eventSource, mergedProps.timeout);
+      }
     }
 
     const alarms = createFunctionAlarms(

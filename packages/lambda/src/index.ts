@@ -15,6 +15,7 @@ export {
   sqsEventSource,
   DEFAULT_SQS_EVENT_SOURCE_PROPS,
 } from "./event-sources/sqs-event-source.js";
+export { SQS_VISIBILITY_TIMEOUT_WARNING_ID } from "./event-sources/event-source-relationship-guards.js";
 export {
   dynamoEventSource,
   DEFAULT_DYNAMO_EVENT_SOURCE_PROPS,

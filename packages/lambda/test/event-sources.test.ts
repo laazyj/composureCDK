@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
+import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { AttributeType, type ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Code, type IEventSource, Runtime, StartingPosition } from "aws-cdk-lib/aws-lambda";
 import { DynamoEventSource, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
@@ -441,5 +441,175 @@ describe("stream IteratorAge contextual alarm", () => {
       MetricName: "IteratorAge",
       Threshold: 120_000,
     });
+  });
+});
+
+describe("SQS visibility-timeout relationship guard", () => {
+  // The guard's stable ack id; every assertion scopes to it so an unrelated
+  // warning (e.g. the token-timeout duration alarm) can't mask a false pass.
+  const ACK = "sqs-visibility-timeout";
+
+  const expectSilent = (stack: Stack): void => {
+    expect(Annotations.fromStack(stack).findWarning("*", Match.stringLikeRegexp(ACK))).toEqual([]);
+  };
+  const expectWarns = (stack: Stack, message: string): void => {
+    Annotations.fromStack(stack).hasWarning("*", Match.stringLikeRegexp(message));
+  };
+
+  it("warns when the queue visibilityTimeout is below 6x the function timeout", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .timeout(Duration.seconds(30))
+      .addEventSource(
+        "orders",
+        sqsEventSource(new Queue(stack, "Q", { visibilityTimeout: Duration.seconds(90) })),
+      )
+      .build(stack, "Fn");
+
+    expectWarns(
+      stack,
+      `SQS event source "orders".*visibilityTimeout is 90s but should be >= 180s.*\\[ack: @composurecdk/lambda:${ACK}\\]`,
+    );
+  });
+
+  it("stays silent when the queue visibilityTimeout meets the 6x target", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .timeout(Duration.seconds(30))
+      .addEventSource(
+        "orders",
+        sqsEventSource(new Queue(stack, "Q", { visibilityTimeout: Duration.seconds(180) })),
+      )
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("computes the target from a minutes-based timeout", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .timeout(Duration.minutes(1))
+      .addEventSource(
+        "orders",
+        sqsEventSource(new Queue(stack, "Q", { visibilityTimeout: Duration.seconds(90) })),
+      )
+      .build(stack, "Fn");
+
+    expectWarns(stack, "visibilityTimeout is 90s but should be >= 360s");
+  });
+
+  it("stays silent for the default function timeout against the default queue", () => {
+    // No timeout -> 3s (target 18s); a plain queue -> SQS default 30s. 30 >= 18.
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource("orders", sqsEventSource(new Queue(stack, "Q")))
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("warns on the default 3s timeout when the queue is below the 18s target", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource(
+        "orders",
+        sqsEventSource(new Queue(stack, "Q", { visibilityTimeout: Duration.seconds(10) })),
+      )
+      .build(stack, "Fn");
+
+    expectWarns(stack, "visibilityTimeout is 10s but should be >= 18s");
+  });
+
+  it("warns once per attached SQS source, naming each by key", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .timeout(Duration.seconds(30))
+      .addEventSource(
+        "orders",
+        sqsEventSource(new Queue(stack, "Orders", { visibilityTimeout: Duration.seconds(90) })),
+      )
+      .addEventSource(
+        "refunds",
+        sqsEventSource(new Queue(stack, "Refunds", { visibilityTimeout: Duration.seconds(90) })),
+      )
+      .build(stack, "Fn");
+
+    expectWarns(stack, `SQS event source "orders"`);
+    expectWarns(stack, `SQS event source "refunds"`);
+  });
+
+  it("stays silent for an imported queue (no L1 to read)", () => {
+    const stack = new Stack(new App(), "S");
+    const imported = Queue.fromQueueArn(
+      stack,
+      "Imported",
+      "arn:aws:sqs:us-east-1:123456789012:orders",
+    );
+    baseBuilder()
+      .timeout(Duration.seconds(30))
+      .addEventSource("orders", sqsEventSource(imported))
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("stays silent for a bare escape-hatch source even when the queue violates", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .timeout(Duration.seconds(30))
+      .addEventSource(
+        "orders",
+        new SqsEventSource(new Queue(stack, "Q", { visibilityTimeout: Duration.seconds(10) })),
+      )
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("stays silent for a token-valued function timeout", () => {
+    const stack = new Stack(new App(), "S");
+    const param = new CfnParameter(stack, "TimeoutSeconds", { type: "Number", default: 30 });
+    baseBuilder()
+      .timeout(Duration.seconds(param.valueAsNumber))
+      .addEventSource(
+        "orders",
+        sqsEventSource(new Queue(stack, "Q", { visibilityTimeout: Duration.seconds(10) })),
+      )
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("stays silent for a token-valued queue visibilityTimeout", () => {
+    const stack = new Stack(new App(), "S");
+    const param = new CfnParameter(stack, "VisibilitySeconds", { type: "Number", default: 10 });
+    baseBuilder()
+      .timeout(Duration.seconds(30))
+      .addEventSource(
+        "orders",
+        sqsEventSource(
+          new Queue(stack, "Q", { visibilityTimeout: Duration.seconds(param.valueAsNumber) }),
+        ),
+      )
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("stays silent for a DynamoDB stream source", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .timeout(Duration.seconds(30))
+      .addEventSource("orders", dynamoEventSource(streamTable(stack)))
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("stays silent when no event source is attached", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder().timeout(Duration.seconds(30)).build(stack, "Fn");
+
+    expectSilent(stack);
   });
 });

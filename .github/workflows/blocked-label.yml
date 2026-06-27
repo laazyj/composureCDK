@@ -1,0 +1,21 @@
+name: Blocked label
+
+on:
+  pull_request:
+    types: [opened, labeled, unlabeled, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  blocked:
+    name: Not blocked
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if 'blocked' label is present
+        if: contains(github.event.pull_request.labels.*.name, 'blocked')
+        run: |
+          echo "::error::This PR carries the 'blocked' label and cannot be merged. Remove the label to unblock."
+          exit 1

@@ -1,9 +1,8 @@
 # ComposureCDK vs. idiomatic CDK — static-website comparison
 
-> **Status:** draft research report for maintainers. Not yet part of the published docs.
-> Purpose: evaluate how the ComposureCDK static-website showcase reads against the
-> canonical AWS / community CDK examples, and decide what (if anything) to lift into
-> public documentation.
+> A deep-dive companion to the [Showcase](showcase.md). It compares the ComposureCDK
+> static-website pattern against the canonical AWS and community CDK examples for the
+> same architecture — what each builds, and how they read at equal functionality.
 
 ## 1. Why this comparison
 
@@ -147,18 +146,67 @@ that part overlaps the showcase's _defaults_ closely, which is a useful external
 ComposureCDK's baked-in baseline matches AWS's own opinion. **Absent and not its job:** ACM, custom
 domain/DNS, alarms, SNS, health checks, budgets, content deployment, CloudFront functions.
 
-**Code coherence.** Highest of all references — one construct, one identity, nothing to wire. But it's
-coherent because it's _closed_: customisation happens through a wide `...Props` override surface, and
-once you need a custom-domain cert, a second origin, or your own alarm thresholds you're back to passing
-raw L2 props into the construct — the readability gain erodes exactly where the showcase adds value.
+**Is it production-capable for even a trivial site? Not really.** The bare `{}` form serves only the
+generated `*.cloudfront.net` name — no custom domain, no ACM certificate, no DNS. The first thing any
+real site needs is its own domain, and that is exactly where the three-line story ends. To add one you
+pass a `cloudFrontDistributionProps` object and spread raw L2 `DistributionProps` into it:
 
-**Conciseness.** Unbeatable at three lines, but it's three lines for a strictly smaller scope. It's the
-right comparison for "do I even need a builder library for a trivial private bucket + CDN?" and an honest
-report should concede B wins that narrow case. It is _not_ a comparison for the production shape.
+```typescript
+new CloudFrontToS3(this, "site", {
+  cloudFrontDistributionProps: {
+    domainNames: ["example.com"],
+    certificate: siteCert, // you still create + DNS-validate this yourself, in us-east-1
+    defaultRootObject: "index.html",
+    errorResponses: [
+      { httpStatus: 403, responsePagePath: "/error.html", ttl: Duration.minutes(30) },
+    ],
+  },
+});
+```
+
+— and you _still_ hand-write the `acm.Certificate` (in `us-east-1`) and the `route53.ARecord` yourself,
+because the construct creates neither. So for even a trivial _real_ site you are back to A's
+certificate/DNS code plus a nested props bag, with no alarms, health checks or budget. B is genuinely
+concise only for an internal/throwaway distribution on the default CloudFront domain.
+
+**Code coherence.** Highest of all references _while you stay inside its defaults_ — one construct, one
+identity, nothing to wire. But it's coherent because it's _closed_: customisation happens through the
+`cloudFrontDistributionProps` / `bucketProps` override surface, so the readability gain erodes exactly
+where the showcase adds value (custom domain, second origin, alarm thresholds).
+
+**Conciseness.** Three lines — but only for the domainless throwaway above. As soon as a custom domain
+is required the count jumps to A's cert/DNS code plus a nested props bag. The honest concession is narrow:
+B wins _only_ the "internal distribution on the default CloudFront domain" case, not the production shape.
 
 **Readability.** Maximal at first glance, lower under modification — the meaning of a `CloudFrontToS3`
-depends on knowing its (large) default set, and overrides are positional props rather than a fluent,
+depends on knowing its (large) default set, and overrides are nested raw-L2 props rather than a fluent,
 self-documenting chain.
+
+**A minimal, functionally-comparable ComposureCDK version.** Matching B's realistic trivial case — a
+private bucket behind a CDN _on a custom domain, with TLS and DNS_ — is itself only a handful of
+components, and unlike B it actually provisions the certificate and DNS records and ships secure defaults
+(versioned/RETAIN bucket, access logging) without extra lines:
+
+```typescript
+const bucket = ref<BucketBuilderResult>("bucket").get("bucket");
+const distribution = ref<DistributionBuilderResult>("cdn").get("distribution");
+
+compose(
+  {
+    cert: createCertificateBuilder().domainName(domain).validationZone(hostedZone), // us-east-1, DNS-validated
+    bucket: createBucketBuilder(), // private, versioned/RETAIN, access-logged by default
+    cdn: createDistributionBuilder()
+      .domainNames([domain])
+      .certificate(ref("cert", (r: CertificateBuilderResult) => r.certificate))
+      .origin(bucket.map((b) => S3BucketOrigin.withOriginAccessControl(b))),
+    dns: zoneRecords([ALIAS("@", cloudfrontAliasTarget(distribution))]).zone(hostedZone),
+  },
+  { cert: [], bucket: [], cdn: ["cert", "bucket"], dns: ["cdn"] },
+);
+```
+
+Same output surface as B's _customised_ form, fewer moving parts than B-plus-hand-rolled-cert/DNS, and
+the secure baseline is free rather than spread into a props bag.
 
 ## 5. Reference C — the "add monitoring yourself" reality
 
@@ -211,12 +259,16 @@ the AWS-recommended metric set reads as intent; a hand-built `new Alarm(this, 'C
 
 A credible public-doc comparison should pre-empt the obvious rebuttals:
 
-1. **Trivial scope favours B.** For "a private bucket behind a CDN, nothing else," `CloudFrontToS3` in
-   three lines beats anything. Lead with the production shape, not the toy, or the conciseness claim
-   looks cherry-picked.
+1. **The domainless throwaway favours B.** For an internal distribution on the default
+   `*.cloudfront.net` name — no custom domain, cert, DNS or alarms — `CloudFrontToS3` in three lines
+   beats anything (see §4). That's the one case to concede, and it evaporates the moment a real domain
+   is added. Lead with the production shape, not the toy, or the conciseness claim looks cherry-picked.
 2. **A is doing less, so its line count is unfairly flattering.** Always normalise: compare _at equal
-   functionality_. The fair statement is "ComposureCDK reaches A's output in ~20 lines with more secure
-   defaults, and reaches the _full_ showcase in ~110 where A would need ~250+."
+   functionality_. A's resource + output code is ~46 lines (excluding imports and class scaffolding);
+   the ComposureCDK equivalent for byte-identical output is ~20 — **roughly 43% of the code, a ~57%
+   reduction** (≈22% of the full ~90-line file once imports/scaffolding are counted), and that is
+   _before_ crediting the secure defaults A omits. At the _full_ showcase scope ComposureCDK is ~110
+   lines where A-plus-C would need ~250+.
 3. **Learning curve.** A and B use only stock CDK; ComposureCDK adds `compose` / `ref` / builders concepts.
    The payoff is real but non-zero to learn — worth stating plainly rather than hiding.
 4. **Library/version surface.** ComposureCDK is a set of `@composurecdk/*` packages to adopt and track;
@@ -224,21 +276,20 @@ A credible public-doc comparison should pre-empt the obvious rebuttals:
 5. **Don't overclaim on functional difference.** Where ComposureCDK's _output_ matches B's defaults
    (logging, OAC, SSL), the win is authoring ergonomics and override visibility, not capability. Say so.
 
-## 8. Recommendation for public documentation
+## 8. Takeaways
 
-1. **Add a "Compared to idiomatic CDK" section** (in `showcase.md` or a sibling page) built around the
-   **feature matrix in §6** — it's the most defensible, skimmable artefact and makes the "no single
-   example does all this" point immediately.
-2. **Use one head-to-head snippet at equal functionality**: the canonical `aws-cdk-examples/static-site`
-   beside the equivalent ComposureCDK `bucket`/`cdn`/`deploy` components, annotated to show which lines
-   ComposureCDK _removes_ (they become defaults). This is the strongest single image.
-3. **Frame the alarm/health/budget story as the differentiator**, since that's where reference examples
-   genuinely run out — "from secure CDN to fully-alarmed, budget-guarded site is one
-   `.recommendedAlarms()` and one `alarmActionsPolicy()` away, not 150 lines of `new Alarm(...)`."
-4. **Keep the caveats from §7 in the published version.** A comparison that concedes B's three-line win
-   and normalises for scope reads as confident and trustworthy; one that doesn't invites the rebuttal.
-5. **Attribute and link** every reference example, and pin the AWS sample to a commit — it tracks the
-   live `Distribution`/OAC API and will drift.
+- **No reference example covers the showcase's scope in one place.** A and B stop at a secure CDN; the
+  alarms, SNS routing, health checks and budget guard that make a site _operable_ are left to you.
+- **Normalise before comparing lines.** At equal output ComposureCDK is well under half of A's code
+  (§7.2); the larger win is everything A doesn't do.
+- **B's three-line headline is a domainless throwaway.** A custom domain pulls back the raw-L2 props
+  spread plus hand-written cert/DNS (§4) — B is production-capable only on the default CloudFront domain.
+- **The differentiator is the operability layer.** Going from "secure CDN" to "fully-alarmed,
+  budget-guarded, multi-stack site" is a `.recommendedAlarms()` and one `alarmActionsPolicy()` in
+  ComposureCDK, versus ~120–180 lines of `new Alarm(...)` and third-party wiring in idiomatic CDK.
+
+This page is the long-form companion to the [Showcase](showcase.md), which carries the short canonical
+example and the list of real-world consumers.
 
 ## Sources
 

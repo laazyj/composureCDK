@@ -1,3 +1,15 @@
+## 0.8.6 (2026-06-28)
+
+### 🚀 Features
+
+- **lambda:** add dynamoEventSource() and stream IteratorAge alarm ([#231](https://github.com/laazyj/composureCDK/pull/231))
+- **lambda:** guard SQS visibility-timeout against function timeout ([#122](https://github.com/laazyj/composureCDK/issues/122), [#198](https://github.com/laazyj/composureCDK/issues/198), [#195](https://github.com/laazyj/composureCDK/issues/195), [#123](https://github.com/laazyj/composureCDK/issues/123))
+- **route53:** make NsRecordBuilder values Resolvable ([#243](https://github.com/laazyj/composureCDK/pull/243))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.8.5 (2026-06-20)
 
 ### 🚀 Features

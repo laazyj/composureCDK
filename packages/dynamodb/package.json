@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/dynamodb",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "Composable DynamoDB table builder with well-architected defaults",
   "repository": {
     "type": "git",

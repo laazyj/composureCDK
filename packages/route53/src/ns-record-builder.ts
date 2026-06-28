@@ -12,12 +12,17 @@ import { NS_RECORD_DEFAULTS } from "./defaults.js";
 /**
  * Configuration properties for the Route53 NS record builder.
  *
- * Extends the CDK {@link NsRecordProps} but replaces `zone` with a
- * {@link Resolvable} so it can be wired from composed components.
+ * Extends the CDK {@link NsRecordProps} but replaces `zone` and `values` with
+ * {@link Resolvable}s so they can be wired from composed components. Making
+ * `values` resolvable lets a delegation record draw its name servers from a
+ * child hosted zone's `hostedZoneNameServers`, which is only known at build
+ * time.
  */
-export interface NsRecordBuilderProps extends Omit<NsRecordProps, "zone"> {
+export interface NsRecordBuilderProps extends Omit<NsRecordProps, "zone" | "values"> {
   /** The hosted zone in which to create the record. */
   zone?: Resolvable<IHostedZone>;
+  /** The fully-qualified name-server host names for the delegated subdomain. */
+  values?: Resolvable<string[]>;
 }
 
 /**
@@ -52,7 +57,14 @@ class NsRecordBuilder implements Lifecycle<NsRecordBuilderResult> {
           `Call .recordName() with the delegated subdomain — the apex NS set is managed by Route53.`,
       );
     }
-    if (!values || values.length === 0) {
+    if (!values) {
+      throw new Error(
+        `NsRecordBuilder "${id}" requires non-empty values. ` +
+          `Call .values() with one or more fully-qualified name-server host names.`,
+      );
+    }
+    const resolvedValues = resolve(values, context);
+    if (resolvedValues.length === 0) {
       throw new Error(
         `NsRecordBuilder "${id}" requires non-empty values. ` +
           `Call .values() with one or more fully-qualified name-server host names.`,
@@ -63,7 +75,7 @@ class NsRecordBuilder implements Lifecycle<NsRecordBuilderResult> {
       ...NS_RECORD_DEFAULTS,
       ...rest,
       recordName,
-      values,
+      values: resolvedValues,
       zone: resolve(zone, context),
     } as NsRecordProps;
 

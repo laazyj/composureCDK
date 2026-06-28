@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { compose, ref } from "@composurecdk/core";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Distribution } from "aws-cdk-lib/aws-cloudfront";
@@ -18,6 +19,10 @@ import { createMxRecordBuilder } from "../src/mx-record-builder.js";
 import { createSrvRecordBuilder } from "../src/srv-record-builder.js";
 import { createCaaRecordBuilder } from "../src/caa-record-builder.js";
 import { createNsRecordBuilder } from "../src/ns-record-builder.js";
+import {
+  createHostedZoneBuilder,
+  type HostedZoneBuilderResult,
+} from "../src/hosted-zone-builder.js";
 import { createDsRecordBuilder } from "../src/ds-record-builder.js";
 import { createHttpsRecordBuilder } from "../src/https-record-builder.js";
 import { createSvcbRecordBuilder } from "../src/svcb-record-builder.js";
@@ -204,6 +209,32 @@ describe("NsRecordBuilder", () => {
     template.hasResourceProperties("AWS::Route53::RecordSet", {
       Type: "NS",
       Name: "sub.example.com.",
+    });
+  });
+
+  it("resolves Ref-based values from a child zone's name servers", () => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack");
+
+    compose(
+      {
+        parent: createHostedZoneBuilder().zoneName("example.com"),
+        child: createHostedZoneBuilder().zoneName("sub.example.com"),
+        delegation: createNsRecordBuilder()
+          .zone(ref("parent", (r: HostedZoneBuilderResult) => r.hostedZone))
+          .recordName("sub")
+          .values(
+            ref("child", (r: HostedZoneBuilderResult) => r.hostedZone.hostedZoneNameServers ?? []),
+          ),
+      },
+      { parent: [], child: [], delegation: ["parent", "child"] },
+    ).build(stack, "Delegation");
+
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "NS",
+      Name: "sub.example.com.",
+      ResourceRecords: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["NameServers"]) }),
     });
   });
 });

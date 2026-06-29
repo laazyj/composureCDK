@@ -1,6 +1,8 @@
 import { Graph, alg, json } from "@dagrejs/graphlib";
 import { type IConstruct } from "constructs";
+import { buildIdOf } from "./build-id.js";
 import { CyclicDependencyError } from "./cyclic-dependency-error.js";
+import { DuplicateConstructIdError } from "./duplicate-construct-id-error.js";
 import { type Lifecycle } from "./lifecycle.js";
 import { type StackStrategy } from "./stack-strategy.js";
 
@@ -253,6 +255,10 @@ class ComposedLifecycle<
   ): BuildOutcome<Components> {
     const results: Record<string, object> = {};
     const componentScopes: Record<string, IConstruct> = {};
+    // Tracks the construct ids built into each scope so an explicit id from
+    // at() that collides with a sibling fails loudly here, rather than as an
+    // opaque CDK duplicate-construct error deeper in synth.
+    const idsByScope = new Map<IConstruct, Set<string>>();
 
     for (const key of alg.topsort(this.#graph)) {
       const componentScope = stacks?.[key] ?? scope;
@@ -261,7 +267,18 @@ class ComposedLifecycle<
       // Inner deps shadow parent context on key collision.
       const innerContext = Object.fromEntries(deps.map((dep) => [dep, results[dep]]));
       const context = { ...parentContext, ...innerContext };
-      results[key] = this.#components[key].build(componentScope, `${id}/${key}`, context);
+      const component = this.#components[key];
+      // An at()-tagged component pins its own id; otherwise derive it from the key.
+      const componentId = buildIdOf(component) ?? `${id}/${key}`;
+
+      let usedIds = idsByScope.get(componentScope);
+      if (!usedIds) idsByScope.set(componentScope, (usedIds = new Set<string>()));
+      if (usedIds.has(componentId)) {
+        throw new DuplicateConstructIdError(componentId, key);
+      }
+      usedIds.add(componentId);
+
+      results[key] = component.build(componentScope, componentId, context);
     }
 
     return {

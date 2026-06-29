@@ -74,6 +74,21 @@ Cycle detection happens at composition time, not build time. This means structur
 
 `compose` returns a `Lifecycle`. This means a composed system can itself be used as a component in a larger system. Composition is recursive — systems can be nested without special handling. When a composed system is nested, the parent context flows through: components inside the nested system can `ref("outerKey")` to reach siblings of the nested system, provided the outer `compose` declares the corresponding dependency. Inner dependency values shadow the parent context on key collision, matching lexical scoping ([ADR-0003](adr/0003-nested-compose-context-propagation.md)).
 
+### Pinning a component's construct id with `at`
+
+By default a component's construct id is derived from its key as `` `${parentId}/${key}` ``. Nesting an already-deployed system under a new key therefore lengthens every construct path and rotates every CloudFormation logical id — a destructive replacement. `at(id, component)` decouples the construct id from the wiring key: `compose` builds the tagged component under `id` verbatim, so a nested system preserves the logical ids it had standalone.
+
+```typescript
+compose(
+  { existing: at("MySystem", deployedSystem), addition },
+  { existing: [], addition: [] },
+).build(app, "MySystem");
+// deployedSystem's components build at `MySystem/<key>`, not
+// `MySystem/existing/<key>` — logical ids preserved.
+```
+
+The id rides on a `Symbol.for` brand that only `compose` reads; the wiring key (used in the dependency map and in `ref()`) is unaffected. A pinned id shares the sibling namespace of the scope it builds into, so `compose` throws if it collides with another component's id. See [ADR-0012](adr/0012-explicit-build-id-decoupled-from-compose-key.md).
+
 ### Dependency declarations are exhaustive
 
 Every component must appear as a key in the dependencies record, even if it has no dependencies (in which case the value is `[]`). This is enforced by the type system. The alternative — making the dependencies record partial and defaulting missing keys to no dependencies — was rejected because it makes it too easy to forget a component and mask a missing dependency declaration.

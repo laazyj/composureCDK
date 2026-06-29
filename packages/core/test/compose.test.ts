@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { Construct } from "constructs";
 import { compose, type AfterBuildHook } from "../src/compose.js";
+import { at } from "../src/build-id.js";
 import { groupedStacks } from "../src/stack-strategy.js";
 import { CyclicDependencyError } from "../src/cyclic-dependency-error.js";
+import { DuplicateConstructIdError } from "../src/duplicate-construct-id-error.js";
 import { type Lifecycle } from "../src/lifecycle.js";
 import { ref, resolve, type Resolvable } from "../src/ref.js";
 
@@ -230,6 +232,68 @@ describe("compose", () => {
 
       expect(aBuild.mock.calls[0][1]).toBe("myapp/a");
       expect(bBuild.mock.calls[0][1]).toBe("myapp/b");
+    });
+  });
+
+  describe("at (explicit build id)", () => {
+    it("builds an at()-tagged component under its pinned id, leaving untagged siblings on the default derivation", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
+
+      const system = compose(
+        { jduffett: at("jasonduffett.net", a), clara: b },
+        { jduffett: [], clara: [] },
+      );
+      system.build(createScope(), "parent");
+
+      expect(aBuild.mock.calls[0][1]).toBe("jasonduffett.net");
+      expect(bBuild.mock.calls[0][1]).toBe("parent/clara");
+    });
+
+    it("preserves a nested system's internal ids regardless of the outer key", () => {
+      const { lifecycle: zone, build: zoneBuild } = spyComponent({ z: 1 });
+      const apex = compose({ zone }, { zone: [] });
+
+      // Nested under key "jduffett" but pinned to the standalone build id.
+      compose({ jduffett: at("jasonduffett.net", apex) }, { jduffett: [] }).build(
+        createScope(),
+        "parent",
+      );
+
+      // Without at() this would be "parent/jduffett/zone"; pinning re-roots it.
+      expect(zoneBuild.mock.calls[0][1]).toBe("jasonduffett.net/zone");
+    });
+
+    it("still forwards the resolved dependency context to a tagged component", () => {
+      const { lifecycle: a } = spyComponent({ from: "a" });
+      const { lifecycle: b, build: bBuild } = spyComponent({ from: "b" });
+
+      compose({ a, b: at("fixed", b) }, { a: [], b: ["a"] }).build(createScope(), "parent");
+
+      expect(bBuild.mock.calls[0][2]).toEqual({ a: { from: "a" } });
+    });
+
+    it("throws when an explicit id collides with a sibling's id in the same scope", () => {
+      const { lifecycle: a } = spyComponent({ x: 1 });
+      const { lifecycle: b } = spyComponent({ y: 2 });
+
+      const system = compose({ a, b: at("parent/a", b) }, { a: [], b: [] });
+
+      expect(() => system.build(createScope(), "parent")).toThrow(DuplicateConstructIdError);
+    });
+
+    it("allows the same explicit id in different scopes", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
+      const scopeA = new Construct(undefined as never, "scopeA");
+      const scopeB = new Construct(undefined as never, "scopeB");
+
+      compose({ a: at("shared", a), b: at("shared", b) }, { a: [], b: [] })
+        .withStacks({ a: scopeA, b: scopeB })
+        .build(createScope(), "parent");
+
+      expect(aBuild.mock.calls[0][1]).toBe("shared");
+      expect(bBuild.mock.calls[0][1]).toBe("shared");
     });
   });
 

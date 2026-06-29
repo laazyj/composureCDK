@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/module-compat",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "description": "Executable consumption tests asserting every @composurecdk/* package resolves under both ESM import and CommonJS require",
   "private": true,
   "repository": {

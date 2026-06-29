@@ -1,3 +1,13 @@
+## 0.8.7 (2026-06-29)
+
+### 🚀 Features
+
+- **core:** add at() to pin a component's construct id ([#248](https://github.com/laazyj/composureCDK/pull/248), [#245](https://github.com/laazyj/composureCDK/issues/245))
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.8.6 (2026-06-28)
 
 ### 🚀 Features

@@ -47,9 +47,35 @@ return compose({
 
 **How it compares:** [ComposureCDK vs. idiomatic CDK — static-website comparison](comparison-report.md) is a deep dive against the canonical AWS sample, the AWS Solutions Constructs `CloudFrontToS3` pattern, and hand-rolled community monitoring stacks — with a feature matrix, equal-functionality code comparison, and honest caveats.
 
+**Going further — composing systems:** a `compose()` result is itself a `Lifecycle`, so a whole site can nest as a component in a larger graph. [jasonduffett.net](https://github.com/laazyj/jasonduffett.net) uses this to add `clara.jasonduffett.net` as a second, self-contained site — its own bucket, distribution, certificate and hosted zone — beside the apex, with one outer component delegating the subdomain via NS records:
+
+```ts
+compose(
+  {
+    // The already-deployed apex. at() pins its construct id to the already deployed id,
+    // so nesting it under a new key doesn't rotate logical ids and churn it.
+    apexSite: at("mainSiteExistingId", createSystem()),
+    subSite: createSubSite(),
+    // Delegate the subdomain from the apex zone to the subsite's child zone
+    subSiteDelegation: createNsRecordBuilder()
+      .zone(ref("apexSite").get("zone").get("hostedZone"))
+      .recordName("sub.example.com")
+      .values(
+        ref("subSite")
+          .get("zone")
+          .get("hostedZone")
+          .map((z) => z.hostedZoneNameServers ?? []),
+      ),
+  },
+  { apexSite: [], subSite: [], subSiteDelegation: ["apexSite", "subSite"] },
+).build(app, "MyBiggerSite");
+```
+
+The use of [`at(id, component)`](architecture.md#pinning-a-components-construct-id-with-at) demonstrates how to pin the build id of the already-deployed apex, so its resources keep their existing logical ids instead of being replaced when the construct path lengthens to `MyBiggerSite/apexSite/<key>`.
+
 **Built with ComposureCDK:**
 
-- **[jasonduffett.net](https://github.com/laazyj/jasonduffett.net)** — the reference build, exercising most of the surface area: `@composurecdk/cloudfront` + `s3` + `route53` + `acm` + `budgets` + `sns`, plus `@composurecdk/iam` for the GitHub-OIDC deploy role, across a multi-region, multi-stack shape.
+- **[jasonduffett.net](https://github.com/laazyj/jasonduffett.net)** — the reference build, exercising most of the surface area: `@composurecdk/cloudfront` + `s3` + `route53` + `acm` + `budgets` + `sns`, plus `@composurecdk/iam` for the GitHub-OIDC deploy role, across a multi-region, multi-stack shape. It also runs the composition pattern above — the apex and the `clara.` subsite are two nested `compose()` systems joined by an NS delegation, with the apex's construct ids pinned so adding the subsite churned no live resources.
 - **[ukehoot.net](https://github.com/laazyj/ukehoot.net)** — the same shape, distinguished by a CloudFront function serving 301 redirects for the group's legacy Tumblr URLs (2012–2018) to their archived equivalents.
 - **[uke-o-ono.com](https://github.com/laazyj/ukeoono.com)** — DNS hosted at **Cloudflare rather than Route 53**: apex/`www` are CNAMEs pointed at the distribution by hand, and the `us-east-1` ACM certificate is validated manually and imported by ARN rather than created and DNS-validated by the builder.
 

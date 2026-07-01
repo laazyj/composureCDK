@@ -40,7 +40,6 @@
         "push": false
       }
     },
-    "releaseTagPattern": "v{version}",
     "changelog": {
       "automaticFromRef": true,
       "projectChangelogs": false,
@@ -50,6 +49,9 @@
         "tag": false,
         "push": false
       }
+    },
+    "releaseTag": {
+      "pattern": "v{version}"
     }
   },
   "analytics": false

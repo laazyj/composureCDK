@@ -55,9 +55,9 @@ The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.
 | `approximateAgeOfOldestMessage`         | `ApproximateAgeOfOldestMessage` (Max, 1 min)         | > 300s (5 min)    | Primary "consumer falling behind" signal. Conservative starting point — tune to your SLA and `retentionPeriod`.                                                                                               |
 | `approximateNumberOfMessagesNotVisible` | `ApproximateNumberOfMessagesNotVisible` (Max, 1 min) | > 90,000          | 75% of the [120k in-flight messages](https://docs.aws.amazon.com/AmazonSQS/latest/SQSDeveloperGuide/quotas-messages.html#quotas-in-flight) per-queue quota. Proactive guardrail before receives are rejected. |
 
-These defaults target primary queues; dead-letter queues need different thresholds (any message on a DLQ is itself an alert).
+These defaults target primary queues; dead-letter queues need different thresholds (any message on a DLQ is itself an alert) — see [Dead-letter queue role](#dead-letter-queue-role).
 
-The third AWS-recommended SQS alarm, `ApproximateNumberOfMessagesVisible`, is not enabled by default — its useful threshold depends entirely on the application's processing capacity, and any generic value would be either noise or silence. Use `addAlarm` (see [Custom alarms](#custom-alarms)) to add it for workloads where you know the right threshold.
+The third AWS-recommended SQS alarm, `ApproximateNumberOfMessagesVisible`, is not enabled by default on a primary queue — its useful threshold depends entirely on the application's processing capacity, and any generic value would be either noise or silence. Enable it explicitly via `recommendedAlarms` with your own threshold, or use `addAlarm` (see [Custom alarms](#custom-alarms)) for full control over the metric.
 
 The defaults are exported as `QUEUE_ALARM_DEFAULTS` for visibility and testing:
 
@@ -125,6 +125,60 @@ for (const alarm of Object.values(result.alarms)) {
 ```
 
 For composing the alarm-actions wiring across multiple builders in a single `compose` system, see [`alarmActionsPolicy`](../cloudwatch/README.md) in `@composurecdk/cloudwatch`.
+
+## Dead-Letter Queue Role
+
+Call `.asDeadLetterQueue()` to switch the builder into the dead-letter-queue role. It's the same `QueueBuilder` — just a mode flag — so a DLQ still gets every secure default from [Secure Defaults](#secure-defaults), plus a set of adjustments tuned for a queue that exists to be investigated rather than actively consumed:
+
+```ts
+import { createQueueBuilder } from "@composurecdk/sqs";
+
+const ordersDlq = createQueueBuilder()
+  .queueName("orders-dlq")
+  .asDeadLetterQueue()
+  .build(stack, "OrdersDlq");
+
+const orders = createQueueBuilder()
+  .queueName("orders")
+  .deadLetterQueue({ queue: ordersDlq.queue, maxReceiveCount: 5 })
+  .build(stack, "Orders");
+```
+
+### Defaults
+
+| Property          | Default             | Rationale                                                                                                                                                                                               |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `retentionPeriod` | `Duration.days(14)` | The SQS maximum. A DLQ exists to give operators a window to investigate and redrive failed messages — maximizing that window is the point. Exported as `DLQ_QUEUE_DEFAULTS` for visibility and testing. |
+
+`QueueBuilder` warns (via `Annotations`) if a queue built with `.asDeadLetterQueue()` also configures its own `deadLetterQueue` redrive policy — a DLQ is meant to be a terminal destination, and redriving from it to another queue is almost always unintended.
+
+### Alarms
+
+The recommended-alarm set inverts: any message present on a DLQ is itself the alert, whereas the primary-queue signals ("consumer falling behind", "in-flight quota") don't apply to a queue nothing actively consumes from.
+
+| Alarm                                   | Default on a DLQ | Rationale                                                                                                                           |
+| --------------------------------------- | :--------------: | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `approximateNumberOfMessagesVisible`    |     ✅ (> 0)     | Any message on a DLQ indicates a delivery failure that needs investigation.                                                         |
+| `approximateAgeOfOldestMessage`         |        ❌        | Meaningless on a queue nothing consumes from. Opt back in via `recommendedAlarms` to alert on messages sitting unattended too long. |
+| `approximateNumberOfMessagesNotVisible` |        ❌        | Nothing is ever in flight on a DLQ. Opt back in via `recommendedAlarms` if you have a reason to watch it.                           |
+
+Every entry is individually overridable through the same `recommendedAlarms` API used for primary queues:
+
+```ts
+const ordersDlq = createQueueBuilder()
+  .asDeadLetterQueue()
+  .recommendedAlarms({
+    approximateNumberOfMessagesVisible: { threshold: 5 }, // alert only once a small backlog builds up
+    approximateAgeOfOldestMessage: { threshold: 3600 }, // opt back in: alert after an hour unattended
+  })
+  .build(stack, "OrdersDlq");
+```
+
+The default enablement is exported as `DLQ_ALARM_DEFAULTS` for visibility and testing:
+
+```ts
+import { DLQ_ALARM_DEFAULTS } from "@composurecdk/sqs";
+```
 
 ## Examples
 

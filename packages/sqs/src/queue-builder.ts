@@ -8,6 +8,8 @@ import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { QueueAlarmConfig } from "./queue-alarm-config.js";
 import { createQueueAlarms } from "./queue-alarms.js";
 import { QUEUE_DEFAULTS } from "./defaults.js";
+import { DLQ_QUEUE_DEFAULTS } from "./dlq-defaults.js";
+import type { QueueRole } from "./queue-role.js";
 
 /**
  * AWS-recommended minimum for `maxReceiveCount` on an SQS redrive
@@ -81,6 +83,13 @@ export interface QueueBuilderResult {
  * Alarms can be customized or disabled via the `recommendedAlarms` property.
  * Custom alarms can be added via the {@link addAlarm} method.
  *
+ * Calling `.asDeadLetterQueue()` switches the builder into the
+ * dead-letter-queue role: it applies {@link DLQ_QUEUE_DEFAULTS} (14-day
+ * retention) and inverts which recommended alarms are enabled by default
+ * — any message present becomes the alert, rather than a "consumer
+ * falling behind" or "in-flight quota" signal that doesn't apply to a
+ * queue nothing actively consumes from.
+ *
  * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sqs.Queue.html
  *
  * @example
@@ -88,6 +97,10 @@ export interface QueueBuilderResult {
  * const orders = createQueueBuilder()
  *   .queueName("orders")
  *   .visibilityTimeout(Duration.seconds(60));
+ *
+ * const ordersDlq = createQueueBuilder()
+ *   .queueName("orders-dlq")
+ *   .asDeadLetterQueue();
  * ```
  */
 export type IQueueBuilder = ITaggedBuilder<QueueBuilderProps, QueueBuilder>;
@@ -95,6 +108,7 @@ export type IQueueBuilder = ITaggedBuilder<QueueBuilderProps, QueueBuilder>;
 class QueueBuilder implements Lifecycle<QueueBuilderResult> {
   props: Partial<QueueBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IQueue>[] = [];
+  #role: QueueRole = "primary";
 
   addAlarm(
     key: string,
@@ -104,9 +118,23 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
     return this;
   }
 
+  /**
+   * Switches the builder into the dead-letter-queue role: applies
+   * {@link DLQ_QUEUE_DEFAULTS} (14-day retention) and enables the
+   * dead-letter-queue recommended-alarm defaults (see
+   * {@link DLQ_ALARM_DEFAULTS}) in place of the primary-queue ones.
+   * Every default remains individually overridable through the
+   * builder's usual fluent API.
+   */
+  asDeadLetterQueue(): this {
+    this.#role = "dlq";
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: QueueBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
+    target.#role = this.#role;
   }
 
   build(scope: IConstruct, id: string): QueueBuilderResult {
@@ -114,14 +142,16 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
 
     const mergedProps = {
       ...QUEUE_DEFAULTS,
+      ...(this.#role === "dlq" ? DLQ_QUEUE_DEFAULTS : {}),
       ...queueProps,
     } as QueueBuilderProps;
 
     warnIfLowMaxReceiveCount(scope, id, mergedProps);
+    warnIfDlqHasRedrivePolicy(scope, id, this.#role, mergedProps);
 
     const queue = new Queue(scope, id, mergedProps);
 
-    const alarms = createQueueAlarms(scope, id, queue, alarmConfig, this.#customAlarms);
+    const alarms = createQueueAlarms(scope, id, queue, alarmConfig, this.#customAlarms, this.#role);
 
     return { queue, alarms };
   }
@@ -182,5 +212,29 @@ function warnIfLowMaxReceiveCount(
       `AWS recommends >= ${String(RECOMMENDED_MIN_MAX_RECEIVE_COUNT)} so the consumer ` +
       `has room to retry before messages hit the dead-letter queue. ` +
       `See https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html`,
+  );
+}
+
+/**
+ * Annotates `scope` with a non-fatal warning when a queue built via
+ * `.asDeadLetterQueue()` also configures its own redrive policy
+ * (`deadLetterQueue`). A dead-letter queue is meant to be a terminal
+ * destination for failed messages — redriving from it to yet another
+ * queue is almost always unintended.
+ */
+function warnIfDlqHasRedrivePolicy(
+  scope: IConstruct,
+  id: string,
+  role: QueueRole,
+  props: Partial<QueueBuilderProps>,
+): void {
+  if (role !== "dlq") return;
+  if (!props.deadLetterQueue) return;
+  Annotations.of(scope).addWarningV2(
+    "@composurecdk/sqs:dlq-with-redrive-policy",
+    `QueueBuilder "${id}": built via asDeadLetterQueue() but also configures its own ` +
+      `deadLetterQueue redrive policy. A dead-letter queue is meant to be a terminal ` +
+      `destination for failed messages — redriving from it to another queue is unusual ` +
+      `and likely unintended.`,
   );
 }

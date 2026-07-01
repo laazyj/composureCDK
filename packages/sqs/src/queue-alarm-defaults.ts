@@ -5,14 +5,19 @@ interface QueueAlarmDefaults {
   enabled: true;
   approximateAgeOfOldestMessage: AlarmConfigDefaults;
   approximateNumberOfMessagesNotVisible: AlarmConfigDefaults;
+  approximateNumberOfMessagesVisible: AlarmConfigDefaults;
 }
 
 /**
  * AWS-recommended default alarm configuration for SQS queues.
  *
- * Tuned for primary (consumer-fed) queues. Dead-letter queues need
- * different thresholds — any message on a DLQ is itself an alert,
- * whereas a primary queue with messages is normal.
+ * These are threshold baselines only — which alarms are *enabled* by
+ * default (as opposed to requiring an explicit opt-in) depends on the
+ * queue's role and is decided in `resolveQueueAlarmDefinitions`. Tuned
+ * for primary (consumer-fed) queues; dead-letter queues invert which
+ * alarms apply automatically (see {@link DLQ_ALARM_DEFAULTS}) — any
+ * message on a DLQ is itself an alert, whereas a primary queue with
+ * messages is normal.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SQS
  */
@@ -39,6 +44,20 @@ export const QUEUE_ALARM_DEFAULTS: QueueAlarmDefaults = {
    */
   approximateNumberOfMessagesNotVisible: {
     threshold: 90_000,
+    evaluationPeriods: 1,
+    datapointsToAlarm: 1,
+    treatMissingData: TreatMissingData.NOT_BREACHING,
+  },
+
+  /**
+   * 0 — matches the dead-letter-queue semantic of "any message present
+   * is notable" (see {@link DLQ_ALARM_DEFAULTS}, where this alarm is
+   * enabled by default). Only used as a merge baseline when this alarm
+   * is explicitly enabled; on a primary queue, override the threshold
+   * to a value sized to your workload's processing capacity.
+   */
+  approximateNumberOfMessagesVisible: {
+    threshold: 0,
     evaluationPeriods: 1,
     datapointsToAlarm: 1,
     treatMissingData: TreatMissingData.NOT_BREACHING,

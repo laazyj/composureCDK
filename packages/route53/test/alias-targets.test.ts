@@ -59,7 +59,7 @@ describe("apiGatewayAliasTarget", () => {
     api.root.addMethod(
       "GET",
       new LambdaIntegration(
-        new LambdaFn(stack, `Handler${stack.node.children.length}`, {
+        new LambdaFn(stack, "Handler", {
           runtime: Runtime.NODEJS_20_X,
           handler: "index.handler",
           code: Code.fromInline("exports.handler = async () => ({});"),
@@ -87,7 +87,7 @@ describe("apiGatewayAliasTarget", () => {
     api.root.addMethod(
       "GET",
       new LambdaIntegration(
-        new LambdaFn(stack, `Handler${stack.node.children.length}`, {
+        new LambdaFn(stack, "Handler", {
           runtime: Runtime.NODEJS_20_X,
           handler: "index.handler",
           code: Code.fromInline("exports.handler = async () => ({});"),

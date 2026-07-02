@@ -118,13 +118,29 @@ describe("QueueBuilder", () => {
       });
     });
 
-    it("creates a FIFO queue when configured", () => {
-      const template = synthTemplate((b) => b.fifo(true).queueName("orders.fifo"));
+    it("throws when a FIFO-only prop is smuggled past the typed surface", () => {
+      // The standard surface omits the FIFO props at the type level; the
+      // runtime guard catches untyped (JavaScript) callers and points
+      // them at the FIFO-aware entry points.
+      expect(() =>
+        synthTemplate((b) => {
+          // fifo is excluded from the typed surface; cast to mimic an untyped caller
+          (b as unknown as { fifo(value: boolean): unknown }).fifo(true);
+          b.queueName("orders.fifo");
+        }),
+      ).toThrow(/"fifo" is FIFO-specific.*createFifoQueueBuilder\(\)/s);
+    });
 
-      template.hasResourceProperties("AWS::SQS::Queue", {
-        FifoQueue: true,
-        QueueName: "orders.fifo",
-      });
+    it("throws when the redrive target is a FIFO queue", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const fifoDlq = new Queue(stack, "Dlq", { fifo: true });
+
+      expect(() =>
+        createQueueBuilder()
+          .deadLetterQueue({ queue: fifoDlq, maxReceiveCount: 5 })
+          .build(stack, "Orders"),
+      ).toThrow(/standard queue cannot redrive to the FIFO dead-letter queue "Dlq"/);
     });
 
     it("forwards the visibility timeout to the underlying CDK construct", () => {

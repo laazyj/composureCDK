@@ -1,24 +1,33 @@
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
-
-interface QueueAlarmDefaults {
-  enabled: true;
-  approximateAgeOfOldestMessage: AlarmConfigDefaults;
-  approximateNumberOfMessagesNotVisible: AlarmConfigDefaults;
-}
+import type { QueueAlarmKey } from "./queue-alarm-config.js";
 
 /**
- * AWS-recommended default alarm configuration for SQS queues.
+ * Shape of a recommended-alarm default set: an {@link AlarmConfigDefaults}
+ * baseline per recommended SQS alarm. Partial — an alarm with no entry
+ * has no generic default and requires an explicit threshold when
+ * enabled. Implemented by {@link QUEUE_ALARM_DEFAULTS} (primary queues)
+ * and {@link DLQ_ALARM_DEFAULTS} (dead-letter queues).
+ */
+export type QueueAlarmDefaults = Partial<Record<QueueAlarmKey, AlarmConfigDefaults>>;
+
+/**
+ * AWS-recommended default alarm configuration for primary
+ * (consumer-fed) SQS queues, standard and FIFO alike — since November
+ * 2024 FIFO queues share the standard 120,000 in-flight quota, so the
+ * same thresholds apply.
  *
- * Tuned for primary (consumer-fed) queues. Dead-letter queues need
- * different thresholds — any message on a DLQ is itself an alert,
- * whereas a primary queue with messages is normal.
+ * These are threshold baselines only — which alarms are *enabled* by
+ * default differs per builder: dead-letter queues invert the set (see
+ * {@link DLQ_ALARM_DEFAULTS}) because any message on a DLQ is itself an
+ * alert, whereas a primary queue with messages is normal. There is no
+ * entry for `approximateNumberOfMessagesVisible`: no generic threshold
+ * suits a primary queue, so enabling it requires an explicit threshold.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SQS
+ * @see https://aws.amazon.com/about-aws/whats-new/2024/11/amazon-sqs-increases-in-flight-limit-fifo-queues/
  */
-export const QUEUE_ALARM_DEFAULTS: QueueAlarmDefaults = {
-  enabled: true,
-
+export const QUEUE_ALARM_DEFAULTS = {
   /**
    * 5 minutes. Conservative starting point for a "consumer falling
    * behind" alarm. The right value depends on the workload's SLA and
@@ -43,4 +52,4 @@ export const QUEUE_ALARM_DEFAULTS: QueueAlarmDefaults = {
     datapointsToAlarm: 1,
     treatMissingData: TreatMissingData.NOT_BREACHING,
   },
-};
+} satisfies QueueAlarmDefaults;

@@ -1,69 +1,71 @@
-import { Duration } from "aws-cdk-lib";
-import { type Alarm, ComparisonOperator } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, ComparisonOperator, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { IQueue } from "aws-cdk-lib/aws-sqs";
 import type { IConstruct } from "constructs";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
-import type { QueueAlarmConfig } from "./queue-alarm-config.js";
-import { QUEUE_ALARM_DEFAULTS } from "./queue-alarm-defaults.js";
+import type { QueueAlarmConfig, QueueAlarmKey } from "./queue-alarm-config.js";
+import type { QueueAlarmProfile } from "./queue-alarm-profiles.js";
+import { QUEUE_ALARM_METRICS } from "./queue-alarm-profiles.js";
 
-const METRIC_PERIOD = Duration.minutes(1);
-const METRIC_PERIOD_LABEL = `${String(METRIC_PERIOD.toMinutes())} minute`;
+const QUEUE_ALARM_KEYS = Object.keys(QUEUE_ALARM_METRICS) as QueueAlarmKey[];
+
+/**
+ * Non-threshold baseline for alarms enabled without a profile default —
+ * the threshold itself must come from the user's config.
+ */
+const OPT_IN_ALARM_BASELINE = {
+  evaluationPeriods: 1,
+  datapointsToAlarm: 1,
+  treatMissingData: TreatMissingData.NOT_BREACHING,
+};
 
 /**
  * Resolves the recommended alarm configuration into fully-resolved
  * {@link AlarmDefinition}s for an SQS queue.
+ *
+ * @param profile - The builder's alarm profile: which alarms are created
+ *   without explicit opt-in and the defaults they merge against.
  */
 export function resolveQueueAlarmDefinitions(
   queue: IQueue,
   config: QueueAlarmConfig | undefined,
+  profile: QueueAlarmProfile,
 ): AlarmDefinition[] {
   if (config?.enabled === false) return [];
 
-  const definitions: AlarmDefinition[] = [];
+  return QUEUE_ALARM_KEYS.flatMap((key): AlarmDefinition[] => {
+    const userConfig = config?.[key];
+    if (userConfig === false) return [];
+    if (userConfig === undefined && !profile.enablement[key]) return [];
 
-  if (config?.approximateAgeOfOldestMessage !== false) {
+    const baseline = profile.defaults[key];
+    if (baseline === undefined && userConfig?.threshold === undefined) {
+      throw new Error(
+        `Queue "${queue.node.id}": the "${key}" alarm has no generic default threshold for ` +
+          `this queue type — no value fits every workload. Supply one explicitly, e.g. ` +
+          `recommendedAlarms({ ${key}: { threshold: … } }).`,
+      );
+    }
+
     const cfg = resolveAlarmConfig(
-      config?.approximateAgeOfOldestMessage,
-      QUEUE_ALARM_DEFAULTS.approximateAgeOfOldestMessage,
+      userConfig,
+      // userConfig.threshold is present whenever baseline is not — the guard above ensures it.
+      baseline ?? { ...OPT_IN_ALARM_BASELINE, threshold: userConfig?.threshold ?? 0 },
     );
-    definitions.push({
-      key: "approximateAgeOfOldestMessage",
-      alarmName: cfg.alarmName,
-      metric: queue.metricApproximateAgeOfOldestMessage({ period: METRIC_PERIOD }),
-      threshold: cfg.threshold,
-      comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
-      evaluationPeriods: cfg.evaluationPeriods,
-      datapointsToAlarm: cfg.datapointsToAlarm,
-      treatMissingData: cfg.treatMissingData,
-      description:
-        `SQS queue's oldest message has been waiting longer than the threshold, ` +
-        `indicating consumers are falling behind. Threshold: > ${String(cfg.threshold)} seconds in ${METRIC_PERIOD_LABEL}.`,
-    });
-  }
-
-  if (config?.approximateNumberOfMessagesNotVisible !== false) {
-    const cfg = resolveAlarmConfig(
-      config?.approximateNumberOfMessagesNotVisible,
-      QUEUE_ALARM_DEFAULTS.approximateNumberOfMessagesNotVisible,
-    );
-    definitions.push({
-      key: "approximateNumberOfMessagesNotVisible",
-      alarmName: cfg.alarmName,
-      metric: queue.metricApproximateNumberOfMessagesNotVisible({ period: METRIC_PERIOD }),
-      threshold: cfg.threshold,
-      comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
-      evaluationPeriods: cfg.evaluationPeriods,
-      datapointsToAlarm: cfg.datapointsToAlarm,
-      treatMissingData: cfg.treatMissingData,
-      description:
-        `SQS queue's in-flight messages are approaching the 120,000 per-queue quota; ` +
-        `further receives will be rejected once the quota is hit. ` +
-        `Threshold: > ${String(cfg.threshold)} in-flight in ${METRIC_PERIOD_LABEL}.`,
-    });
-  }
-
-  return definitions;
+    return [
+      {
+        key,
+        alarmName: cfg.alarmName,
+        metric: QUEUE_ALARM_METRICS[key](queue),
+        threshold: cfg.threshold,
+        comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
+        evaluationPeriods: cfg.evaluationPeriods,
+        datapointsToAlarm: cfg.datapointsToAlarm,
+        treatMissingData: cfg.treatMissingData,
+        description: profile.descriptions[key](cfg.threshold),
+      },
+    ];
+  });
 }
 
 /**
@@ -75,6 +77,8 @@ export function resolveQueueAlarmDefinitions(
  * @param queue - The SQS queue to create alarms for.
  * @param config - User-provided alarm configuration, or `false` to disable all.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
+ * @param profile - The builder's alarm profile; see
+ *   {@link resolveQueueAlarmDefinitions}.
  * @returns A record mapping alarm keys to their created Alarm constructs.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SQS
@@ -84,14 +88,13 @@ export function createQueueAlarms(
   id: string,
   queue: IQueue,
   config: QueueAlarmConfig | false | undefined,
-  customAlarms: AlarmDefinitionBuilder<IQueue>[] = [],
+  customAlarms: AlarmDefinitionBuilder<IQueue>[],
+  profile: QueueAlarmProfile,
 ): Record<string, Alarm> {
   if (config === false) return {};
+  if (!(config?.enabled ?? true)) return {};
 
-  const enabled = config?.enabled ?? QUEUE_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveQueueAlarmDefinitions(queue, config);
+  const recommended = resolveQueueAlarmDefinitions(queue, config, profile);
   const custom = customAlarms.map((b) => b.resolve(queue));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

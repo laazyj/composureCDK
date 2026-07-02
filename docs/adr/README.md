@@ -42,4 +42,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0011: Cross-component relationship guards — builder-registered synth-time Aspects](0011-cross-component-relationship-guards.md)
 - [ADR-0012: Explicit build id — decouple the construct id from the compose key](0012-explicit-build-id-decoupled-from-compose-key.md)
 - [ADR-0013: Consumer-side IAM grants — declare a grant where the dependency already points](0013-consumer-side-grants.md)
-- [ADR-0013: Role-parameterized queue builder with per-role typed surfaces](0013-role-parameterized-queue-builder.md)
+- [ADR-0013: Role-parameterized builders for mutually-exclusive L2 surfaces](0013-role-parameterized-queue-builder.md)

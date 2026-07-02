@@ -12,6 +12,7 @@ export default defineConfig(
       "**/dist/",
       "**/node_modules/",
       "**/cdk.out/",
+      "**/coverage/",
       // Hand-written ESM/CJS consumption fixtures — each is deliberately a
       // specific module system and is exercised by spawning `node`, not linted.
       "packages/module-compat/test/fixtures/",
@@ -29,6 +30,8 @@ export default defineConfig(
             "scripts/*.mjs",
             "scripts/cdk-floor/*.mjs",
             "packages/examples/test/smoke/*.mjs",
+            "vitest.config.base.ts",
+            "packages/*/vitest.config.ts",
           ],
         },
       },
@@ -48,6 +51,10 @@ export default defineConfig(
         fetch: "readonly",
       },
     },
+  },
+  {
+    files: ["vitest.config.base.ts", "packages/*/vitest.config.ts"],
+    extends: [tseslint.configs.disableTypeChecked],
   },
   {
     files: ["packages/*/src/**/*.ts"],

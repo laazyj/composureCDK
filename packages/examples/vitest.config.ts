@@ -1,7 +1,16 @@
 import { defineConfig } from "vitest/config";
+import { withCoverage } from "../../vitest.config.base.js";
 
-export default defineConfig({
-  test: {
-    setupFiles: ["./vitest.setup.ts"],
+export default withCoverage(
+  defineConfig({
+    test: {
+      setupFiles: ["./vitest.setup.ts"],
+    },
+  }),
+  {
+    statements: 0,
+    branches: 0,
+    functions: 0,
+    lines: 0,
   },
-});
+);

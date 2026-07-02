@@ -8,9 +8,9 @@ export default withCoverage(
     },
   }),
   {
-    statements: 0,
-    branches: 0,
-    functions: 0,
-    lines: 0,
+    statements: 86,
+    branches: 65,
+    functions: 100,
+    lines: 97,
   },
 );

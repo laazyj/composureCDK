@@ -11,9 +11,8 @@ export interface CoverageThresholds {
 // its own, rather than diluting it into a package-wide average — a new
 // builder shipped with no test shows up as 0% and fails immediately.
 export function withCoverage(
-  config: ViteUserConfig,
   thresholds: CoverageThresholds,
-  overrides: Record<string, Partial<CoverageThresholds>> = {},
+  config: ViteUserConfig = {},
 ): ViteUserConfig {
   return mergeConfig(
     defineConfig({
@@ -21,11 +20,10 @@ export function withCoverage(
         coverage: {
           provider: "v8",
           enabled: true,
-          reporter: ["text", "html"],
+          reporter: ["text"],
           thresholds: {
             ...thresholds,
             perFile: true,
-            ...overrides,
           },
         },
       },

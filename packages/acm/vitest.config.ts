@@ -1,7 +1,6 @@
-import { defineConfig } from "vitest/config";
 import { withCoverage } from "../../vitest.config.base.js";
 
-export default withCoverage(defineConfig({}), {
+export default withCoverage({
   statements: 94,
   branches: 90,
   functions: 100,

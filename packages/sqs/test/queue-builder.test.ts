@@ -6,6 +6,7 @@ import { type IQueue, Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createQueueBuilder } from "../src/queue-builder.js";
+import { setUntypedProp } from "./_helpers.js";
 
 function synthTemplate(
   configureFn?: (builder: ReturnType<typeof createQueueBuilder>) => void,
@@ -118,13 +119,30 @@ describe("QueueBuilder", () => {
       });
     });
 
-    it("creates a FIFO queue when configured", () => {
-      const template = synthTemplate((b) => b.fifo(true).queueName("orders.fifo"));
+    it("throws when a FIFO-only prop is smuggled past the typed surface", () => {
+      // The standard role omits the FIFO props at the type level; the
+      // runtime guard catches untyped (JavaScript) callers and points
+      // them at the FIFO roles.
+      expect(() =>
+        synthTemplate((b) => {
+          setUntypedProp(b, "fifo", true);
+          b.queueName("orders.fifo");
+        }),
+      ).toThrow(
+        /"fifo" is FIFO-specific and not supported on role "standard".*createQueueBuilder\("fifo"\)/s,
+      );
+    });
 
-      template.hasResourceProperties("AWS::SQS::Queue", {
-        FifoQueue: true,
-        QueueName: "orders.fifo",
-      });
+    it("throws when the redrive target is a FIFO queue", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const fifoDlq = new Queue(stack, "Dlq", { fifo: true });
+
+      expect(() =>
+        createQueueBuilder()
+          .deadLetterQueue({ queue: fifoDlq, maxReceiveCount: 5 })
+          .build(stack, "Orders"),
+      ).toThrow(/standard queue cannot redrive to the FIFO dead-letter queue "Dlq"/);
     });
 
     it("forwards the visibility timeout to the underlying CDK construct", () => {

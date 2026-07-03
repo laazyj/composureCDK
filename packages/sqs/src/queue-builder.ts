@@ -179,6 +179,11 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
  */
 export function createQueueBuilder(): IQueueBuilder;
 export function createQueueBuilder<R extends QueueRole>(role: R): IQueueBuilder<R>;
+// Callers only ever see the overloads above, which return the exact
+// per-role `IQueueBuilder<R>`. The `unknown` here types the implementation
+// body alone (the internal builder carries the full prop surface, not the
+// narrowed per-role one) and is never observed at a call site — so it does
+// not weaken the type of a builder passed to `compose`.
 export function createQueueBuilder(role: QueueRole = "standard"): unknown {
   const builder = taggedBuilder<InternalQueueBuilderProps, QueueBuilder>(QueueBuilder);
   (builder as unknown as { queueRole(role: QueueRole): unknown }).queueRole(role);

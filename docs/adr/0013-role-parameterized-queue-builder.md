@@ -54,58 +54,40 @@ its own typed prop surface over a single builder implementation. Encode
 per-role behaviour as data keyed by role, not as branching inside the
 builder.**
 
-The factory argument is the type boundary a fluent method cannot be: a factory
-generic can bind a per-role `Props` surface before the chain starts, where a
-mid-chain setter only ever regenerates the full surface. For SQS:
+The pattern has four moving parts. QueueBuilder
+([`packages/sqs/src/queue-builder.ts`](../../packages/sqs/src/queue-builder.ts))
+is the reference implementation; the specifics of its prop surfaces, defaults,
+and alarm profiles live in that package rather than in this ADR.
 
-1. **Role selection lives on the factory.**
-   `createQueueBuilder<R extends QueueRole>(role?: R)` with
-   `QueueRole = "standard" | "fifo" | "dlq" | "fifo-dlq"`. Overloads bind each
-   role to its own props surface (in `queue-props.ts`): the standard surface
-   omits the FIFO-only props, the FIFO surfaces omit `fifo` (always `true`) and
-   retype `queueName` as `` `${string}.fifo` ``, and the dead-letter surfaces
-   omit `deadLetterQueue`. The dead-letter surfaces are _derived_ from their
-   primary counterparts (`Omit<…, "deadLetterQueue">`) so they cannot drift.
-   Untyped callers hit equivalent build-time guards whose messages name the
-   role to use instead.
+1. **Role selection lives on the factory argument — the one type boundary a
+   fluent method cannot be.** A factory generic binds a per-role prop surface
+   _before_ the chain starts; a mid-chain setter only regenerates the full
+   surface (see Context), so it can never narrow what follows. Each role
+   therefore gets an exact API — props invalid for the role are absent from its
+   type, not merely rejected at runtime — from a single factory. Untyped
+   callers reach the same guarantees through build-time validation.
 
-2. **The role is data, not class identity.** It is stored as an internal prop
-   (`queueRole`), set once by the factory and invisible on the public
-   surfaces. Because it rides in `props`, `.copy()` preserves it for free — no
-   special-case state hand-off — and it is inspectable. One flat
-   `QueueBuilder` class backs every role; `build()` derives two booleans
-   (`isFifoRole`, `isDlqRole`) and layers defaults accordingly:
-   `QUEUE_DEFAULTS` → `DLQ_QUEUE_DEFAULTS` (dlq roles) → user props →
-   `fifo: true` (fifo roles, after user props so it cannot be unset).
+2. **The role is data, not class identity.** It is one internal prop, set by
+   the factory and invisible on the public surface. Because it travels in the
+   prop store rather than in a private field, variant authoring (`.copy()`) and
+   inspection get it for free, and a single builder class backs every role. The
+   role only selects which defaults, validation, and alarms apply.
 
-3. **Roles compose where entry points would multiply.** `"fifo-dlq"` is the
-   payoff: the role product is four combinations today, and each is one union
-   member plus one row in the props map — not a new factory or a leaked prop.
-   Composition along independent axes is the strongest signal for this
-   pattern, because the alternatives scale multiplicatively (see below).
+3. **Roles compose as a product where separate entry points would multiply.**
+   Independent role axes — here FIFO × dead-letter — combine into one more
+   union member rather than a new entry point or a prop leaked across roles.
+   This is the pattern's decisive advantage and its clearest applicability
+   signal.
 
-4. **Per-role behaviour is a data profile, not builder branching.**
-   Validation is one `validateQueueProps(scope, id, role, props)` entry point
-   where each guard owns its own applicability, so a new role adds no branch to
-   the builder. Alarms follow the same shape: a `QueueAlarmProfile` couples
-   per-alarm enablement, merge defaults, and descriptions, and
-   `resolveQueueAlarmDefinitions` is a single loop over the alarm keys. Primary
-   roles use `PRIMARY_ALARM_PROFILE`; dead-letter roles use
-   `dlqAlarmProfile(scope, retentionPeriod)`, whose age-alarm default scales to
-   75% of the queue's _resolved_ retention — so the "about to age out" signal
-   stays meaningful when retention is tuned, avoiding the
-   threshold-can-never-fire class of bug. A token-valued retention has no
-   derivable basis, so the age alarm is skipped with the standardized
-   acknowledgeable warning (`resolveAlarmThresholdBasis` from
-   `@composurecdk/cloudwatch`). Profile defaults are partial: an alarm with no
-   generic baseline (`approximateNumberOfMessagesVisible` on a primary queue)
-   throws when enabled without an explicit threshold, rather than inheriting a
-   placeholder value that alarms on noise.
+4. **Per-role behaviour is data keyed by role, not branching in the builder.**
+   Defaults, validation, and recommended-alarm profiles are resolved from the
+   role discriminator through one uniform path, so adding a role adds data, not
+   conditionals. The queue alarms show how far this reaches — a dead-letter
+   role inverts the recommended set and scales its thresholds to the resolved
+   retention — but that depth stays a data profile, not builder logic.
 
-5. **Discovery rides the single entry point.** Autocomplete on the factory
-   argument enumerates every role; there is no sibling factory to fail to
-   find. The validation guards, `QueueRole` JSDoc, and the "Queue roles" table
-   atop the package README carry the rest.
+Discovery follows from the single entry point: autocomplete on the factory
+argument enumerates every role, so there is no sibling factory to fail to find.
 
 ### When this pattern applies
 

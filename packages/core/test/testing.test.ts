@@ -156,6 +156,49 @@ describe("assertCopyPreservesState", () => {
     }).toThrow(/no `\.copy\(\)` method/);
   });
 
+  it("falls back to String() when inspectable state cannot be JSON-serialised", () => {
+    const circular: { self?: unknown } = {};
+    circular.self = circular;
+
+    expect(() => {
+      assertCopyPreservesState({
+        factory: () => Builder<Props, WithAccumulator>(WithAccumulator),
+        configure: (b) => {
+          b.add("first");
+        },
+        mutate: () => {
+          /* no-op — forces the "did not change" failure path */
+        },
+        build: buildResult,
+        inspect: () => circular,
+      });
+    }).toThrow(/\[object Object\]/);
+  });
+
+  it.each<{ name: string; baseline: unknown; mutated: unknown }>([
+    { name: "a primitive vs an object", baseline: {}, mutated: 1 },
+    { name: "null vs an object", baseline: null, mutated: {} },
+    { name: "an array vs a non-array", baseline: [], mutated: {} },
+    { name: "objects with differing key counts", baseline: { p: 1 }, mutated: { p: 1, q: 2 } },
+  ])("treats $name as unequal inspectable state", ({ baseline, mutated }) => {
+    const states = [baseline, mutated, baseline];
+    let call = 0;
+
+    expect(() => {
+      assertCopyPreservesState({
+        factory: () => Builder<Props, WithAccumulator>(WithAccumulator),
+        configure: (b) => {
+          b.add("first");
+        },
+        mutate: (b) => {
+          b.add("after-copy");
+        },
+        build: buildResult,
+        inspect: () => states[call++],
+      });
+    }).not.toThrow();
+  });
+
   it("compares non-trivially structured inspectable state via deep equality", () => {
     interface NestedResult {
       tree: { children: { name: string }[] };

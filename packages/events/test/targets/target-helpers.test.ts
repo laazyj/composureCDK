@@ -107,8 +107,25 @@ describe("target helpers", () => {
       });
     });
 
-    it("returns a Ref for a Ref input", () => {
-      expect(isRef(sqsTarget(ref("q", (r: { q: Queue }) => r.q)))).toBe(true);
+    it("returns a Ref<IRuleTarget> for a Ref<IQueue> and synths the rule", () => {
+      const stack = newStack();
+      const queue = new Queue(stack, "Q");
+
+      createRuleBuilder()
+        .schedule(Schedule.rate(Duration.minutes(15)))
+        .addTarget("queue", sqsTarget(ref("q", (r: { q: Queue }) => r.q)))
+        .build(stack, "TestRule", { q: { q: queue } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SQS::QueuePolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: Match.arrayWith(["sqs:SendMessage"]),
+              Principal: { Service: "events.amazonaws.com" },
+            }),
+          ]),
+        }),
+      });
     });
   });
 
@@ -121,6 +138,27 @@ describe("target helpers", () => {
         .schedule(Schedule.rate(Duration.minutes(15)))
         .addTarget("topic", snsTarget(topic))
         .build(stack, "TestRule");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: "sns:Publish",
+              Principal: { Service: "events.amazonaws.com" },
+            }),
+          ]),
+        }),
+      });
+    });
+
+    it("returns a Ref<IRuleTarget> for a Ref<ITopic> and synths the rule", () => {
+      const stack = newStack();
+      const topic = new Topic(stack, "T");
+
+      createRuleBuilder()
+        .schedule(Schedule.rate(Duration.minutes(15)))
+        .addTarget("topic", snsTarget(ref("t", (r: { t: Topic }) => r.t)))
+        .build(stack, "TestRule", { t: { t: topic } });
 
       Template.fromStack(stack).hasResourceProperties("AWS::SNS::TopicPolicy", {
         PolicyDocument: Match.objectLike({
@@ -153,6 +191,24 @@ describe("target helpers", () => {
         }),
       });
     });
+
+    it("returns a Ref<IRuleTarget> for a Ref<IStateMachine> and synths the rule", () => {
+      const stack = newStack();
+      const sm = new StateMachine(stack, "SM", {
+        definitionBody: DefinitionBody.fromChainable(new Pass(stack, "P")),
+      });
+
+      createRuleBuilder()
+        .schedule(Schedule.rate(Duration.minutes(15)))
+        .addTarget("sm", sfnStateMachineTarget(ref("sm", (r: { sm: StateMachine }) => r.sm)))
+        .build(stack, "TestRule", { sm: { sm } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::IAM::Policy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([Match.objectLike({ Action: "states:StartExecution" })]),
+        }),
+      });
+    });
   });
 
   describe("eventBusTarget", () => {
@@ -164,6 +220,22 @@ describe("target helpers", () => {
         .schedule(Schedule.rate(Duration.minutes(15)))
         .addTarget("forward", eventBusTarget(downstream))
         .build(stack, "TestRule");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::IAM::Policy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([Match.objectLike({ Action: "events:PutEvents" })]),
+        }),
+      });
+    });
+
+    it("returns a Ref<IRuleTarget> for a Ref<IEventBus> and synths the rule", () => {
+      const stack = newStack();
+      const downstream = new EventBus(stack, "Downstream");
+
+      createRuleBuilder()
+        .schedule(Schedule.rate(Duration.minutes(15)))
+        .addTarget("forward", eventBusTarget(ref("bus", (r: { bus: EventBus }) => r.bus)))
+        .build(stack, "TestRule", { bus: { bus: downstream } });
 
       Template.fromStack(stack).hasResourceProperties("AWS::IAM::Policy", {
         PolicyDocument: Match.objectLike({
@@ -183,6 +255,29 @@ describe("target helpers", () => {
         .eventPattern({ source: ["my.app"] })
         .addTarget("audit", cloudWatchLogGroupTarget(lg))
         .build(stack, "TestRule");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Events::Rule", {
+        Targets: Match.arrayWith([
+          Match.objectLike({
+            Arn: Match.objectLike({
+              "Fn::Join": Match.arrayWith([
+                Match.arrayWith([Match.objectLike({ Ref: lgLogicalId })]),
+              ]),
+            }),
+          }),
+        ]),
+      });
+    });
+
+    it("returns a Ref<IRuleTarget> for a Ref<ILogGroup> and synths the rule", () => {
+      const stack = newStack();
+      const lg = new LogGroup(stack, "LG");
+      const lgLogicalId = stack.getLogicalId(lg.node.defaultChild as never);
+
+      createRuleBuilder()
+        .eventPattern({ source: ["my.app"] })
+        .addTarget("audit", cloudWatchLogGroupTarget(ref("lg", (r: { lg: LogGroup }) => r.lg)))
+        .build(stack, "TestRule", { lg: { lg } });
 
       Template.fromStack(stack).hasResourceProperties("AWS::Events::Rule", {
         Targets: Match.arrayWith([

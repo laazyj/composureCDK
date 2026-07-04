@@ -172,6 +172,21 @@ describe("RoleBuilder", () => {
     });
   });
 
+  describe("permissions boundary", () => {
+    it("attaches a permissions boundary resolved from a concrete managed policy", () => {
+      const boundary = ManagedPolicy.fromAwsManagedPolicyName("PowerUserAccess");
+      const template = synth((b) => b.permissionsBoundary(boundary));
+
+      template.hasResourceProperties("AWS::IAM::Role", {
+        PermissionsBoundary: Match.objectLike({
+          "Fn::Join": Match.arrayWith([
+            Match.arrayWith([Match.stringLikeRegexp("PowerUserAccess")]),
+          ]),
+        }),
+      });
+    });
+  });
+
   describe("[COPY_STATE]", () => {
     it("preserves #inlinePolicies across .copy()", () => {
       assertCopyPreservesState({

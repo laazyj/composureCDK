@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import {
   InterfaceVpcEndpointAwsService,
   SecurityGroup,
@@ -283,6 +284,45 @@ describe("InterfaceEndpointBuilder", () => {
 
       expect(result.alarms.packetsDropped).toBeUndefined();
       Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 0);
+    });
+
+    it("suppresses all alarms when enabled is false in recommendedAlarms config", () => {
+      const { stack, vpc } = freshScope();
+      const result = createInterfaceEndpointBuilder()
+        .vpc(vpc)
+        .service(InterfaceVpcEndpointAwsService.SSM)
+        .recommendedAlarms({ enabled: false })
+        .build(stack, "Endpoint");
+
+      expect(Object.keys(result.alarms)).toHaveLength(0);
+      Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 0);
+    });
+
+    it("creates a custom alarm alongside recommended alarms", () => {
+      const { stack, vpc } = freshScope();
+      const result = createInterfaceEndpointBuilder()
+        .vpc(vpc)
+        .service(InterfaceVpcEndpointAwsService.SSM)
+        .addAlarm("customThrottle", (alarm) =>
+          alarm
+            .metric(
+              (endpoint) =>
+                new Metric({
+                  namespace: "AWS/PrivateLinkEndpoints",
+                  metricName: "RstPacketsSent",
+                  dimensionsMap: { "VPC Endpoint Id": endpoint.vpcEndpointId },
+                  statistic: "Sum",
+                }),
+            )
+            .threshold(1)
+            .greaterThanOrEqual()
+            .description("Endpoint is resetting connections"),
+        )
+        .build(stack, "Endpoint");
+
+      expect(result.alarms.packetsDropped).toBeDefined();
+      expect(result.alarms.customThrottle).toBeDefined();
+      Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
     });
   });
 

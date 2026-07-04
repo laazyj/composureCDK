@@ -75,6 +75,19 @@ describe("SecurityGroupBuilder", () => {
 
       expect(() => builder.build(stack, "Sg")).toThrow(/requires a description/);
     });
+
+    it("validates and passes through a securityGroupName", () => {
+      const { stack, vpc } = freshScope();
+      createSecurityGroupBuilder()
+        .vpc(vpc)
+        .description("Test SG")
+        .securityGroupName("bastion-sg")
+        .build(stack, "Sg");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::EC2::SecurityGroup", {
+        GroupName: "bastion-sg",
+      });
+    });
   });
 
   describe("well-architected defaults", () => {
@@ -176,6 +189,29 @@ describe("SecurityGroupBuilder", () => {
       });
     });
 
+    it("adds an egress rule with no description", () => {
+      const { stack, vpc } = freshScope();
+      createSecurityGroupBuilder()
+        .vpc(vpc)
+        .description("Service tier")
+        .addEgressRule(Peer.anyIpv4(), Port.tcp(443))
+        .build(stack, "ServiceSg");
+
+      // No description passed through — CDK falls back to its own
+      // auto-generated "from <peer>:<port>" description.
+      Template.fromStack(stack).hasResourceProperties("AWS::EC2::SecurityGroup", {
+        SecurityGroupEgress: Match.arrayWith([
+          Match.objectLike({
+            CidrIp: "0.0.0.0/0",
+            FromPort: 443,
+            ToPort: 443,
+            IpProtocol: "tcp",
+            Description: "from 0.0.0.0/0:443",
+          }),
+        ]),
+      });
+    });
+
     it("accepts a port range", () => {
       const { stack, vpc } = freshScope();
       createSecurityGroupBuilder()
@@ -233,6 +269,17 @@ describe("SecurityGroupBuilder", () => {
         GroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
         SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
       });
+    });
+
+    it("wires a self-ingress rule with no description", () => {
+      const { stack, vpc } = freshScope();
+      createSecurityGroupBuilder()
+        .vpc(vpc)
+        .description("Intra-cluster traffic")
+        .addSelfIngress(Port.allTcp())
+        .build(stack, "ClusterSg");
+
+      Template.fromStack(stack).resourceCountIs("AWS::EC2::SecurityGroupIngress", 1);
     });
 
     it("resolves a Ref-based peer SG at build time (the canonical two-SG case)", () => {

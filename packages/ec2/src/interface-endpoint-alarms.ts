@@ -29,8 +29,6 @@ function resolveEndpointAlarmDefinitions(
   endpoint: InterfaceVpcEndpoint,
   config: InterfaceEndpointAlarmConfig | undefined,
 ): AlarmDefinition[] {
-  if (config?.enabled === false) return [];
-
   const definitions: AlarmDefinition[] = [];
 
   if (config?.packetsDropped !== false) {

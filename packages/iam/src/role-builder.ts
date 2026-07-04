@@ -1,4 +1,5 @@
 import {
+  type IGrantable,
   type IManagedPolicy,
   PolicyDocument,
   PolicyStatement,
@@ -6,7 +7,14 @@ import {
   type RoleProps,
 } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import {
+  COPY_STATE,
+  type Grant,
+  GrantQueue,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { ROLE_DEFAULTS } from "./role-defaults.js";
 import { StatementBuilder } from "./statement-builder.js";
@@ -96,6 +104,7 @@ interface InlinePolicyEntry {
 class RoleBuilder implements Lifecycle<RoleBuilderResult> {
   props: Partial<RoleBuilderProps> = {};
   readonly #inlinePolicies: InlinePolicyEntry[] = [];
+  readonly #grants = new GrantQueue<IGrantable>();
 
   /**
    * Append an inline policy to the role, embedded in the underlying
@@ -116,9 +125,32 @@ class RoleBuilder implements Lifecycle<RoleBuilderResult> {
     return this;
   }
 
+  /**
+   * Grant this role access to a resource built by a sibling component.
+   *
+   * Grants are declared on the consumer — the role that needs the access —
+   * so the dependency edge points from the role to the resource, matching the
+   * data flow. Each {@link Grant} comes from a resource package's capability
+   * helper (e.g. `tableGrants.readWrite(ref("table", (r) => r.table))`) and is
+   * applied during this builder's {@link build}, once the resource resolves.
+   *
+   * @see ADR-0013
+   *
+   * @example
+   * ```ts
+   * createServiceRoleBuilder("apigateway.amazonaws.com")
+   *   .grant(tableGrants.readWrite(ref("table", (r) => r.table)));
+   * ```
+   */
+  grant(...grants: Grant<IGrantable>[]): this {
+    this.#grants.add(...grants);
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: RoleBuilder): void {
     target.#inlinePolicies.push(...this.#inlinePolicies);
+    this.#grants.copyInto(target.#grants);
   }
 
   build(scope: IConstruct, id: string, context: Record<string, object> = {}): RoleBuilderResult {
@@ -164,6 +196,7 @@ class RoleBuilder implements Lifecycle<RoleBuilderResult> {
     };
 
     const role = new Role(scope, id, mergedProps);
+    this.#grants.applyTo(role, context);
 
     return { role, inlinePolicies: addedInlinePolicies };
   }

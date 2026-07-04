@@ -1,9 +1,18 @@
 import { type Integration, type IResource, type MethodOptions } from "aws-cdk-lib/aws-apigateway";
+import type { IRole } from "aws-cdk-lib/aws-iam";
 import { resolve, type Resolvable } from "@composurecdk/core";
+import { type IAwsServiceIntegration, isAwsServiceIntegration } from "./aws-service-integration.js";
+
+/**
+ * The integration a method can be given: a concrete or `ref`-wrapped CDK
+ * {@link Integration}, or a branded {@link IAwsServiceIntegration} that owns its
+ * credentials role and is built (rather than merely resolved) at apply time.
+ */
+export type MethodIntegration = Resolvable<Integration> | IAwsServiceIntegration;
 
 interface MethodDefinition {
   httpMethod: string;
-  integration?: Resolvable<Integration>;
+  integration?: MethodIntegration;
   options?: MethodOptions;
 }
 
@@ -41,16 +50,13 @@ export class ResourceBuilder {
    * Adds an HTTP method to this resource.
    *
    * @param httpMethod - The HTTP verb (GET, POST, PUT, DELETE, etc.).
-   * @param integration - The backend integration for this method. Accepts a concrete
-   *   {@link Integration} or a {@link Ref} that resolves to one at build time.
+   * @param integration - The backend integration for this method. Accepts a
+   *   concrete {@link Integration}, a {@link Ref} that resolves to one at build
+   *   time, or an {@link awsServiceIntegration} that owns its credentials role.
    * @param options - Additional method configuration such as authorization or method responses.
    * @returns This builder for chaining.
    */
-  addMethod(
-    httpMethod: string,
-    integration?: Resolvable<Integration>,
-    options?: MethodOptions,
-  ): this {
+  addMethod(httpMethod: string, integration?: MethodIntegration, options?: MethodOptions): this {
     this.definition.methods.push({ httpMethod, integration, options });
     return this;
   }
@@ -89,11 +95,29 @@ export class ResourceBuilder {
     }
   }
 
-  /** @internal */
-  applyTo(resource: IResource, context: Record<string, object> = {}): void {
+  /**
+   * Materialises the resource tree onto CDK constructs. Branded AWS-service
+   * integrations are built here (they own a credentials role and need the
+   * `resource` as construct scope) rather than merely resolved; each created
+   * role is recorded in `integrationRoles`, keyed by `"{resource.path} {method}"`,
+   * so `RestApiBuilder.build` can surface it in the result.
+   *
+   * @internal
+   */
+  applyTo(
+    resource: IResource,
+    context: Record<string, object> = {},
+    integrationRoles: Record<string, IRole> = {},
+  ): void {
     for (const method of this.definition.methods) {
-      const integration =
-        method.integration !== undefined ? resolve(method.integration, context) : undefined;
+      let integration: Integration | undefined;
+      if (isAwsServiceIntegration(method.integration)) {
+        const built = method.integration.build(resource, method.httpMethod, context);
+        integration = built.integration;
+        integrationRoles[`${resource.path} ${method.httpMethod}`] = built.role;
+      } else if (method.integration !== undefined) {
+        integration = resolve(method.integration, context);
+      }
       resource.addMethod(method.httpMethod, integration, method.options);
     }
     for (const [pathPart, childDef] of this.definition.children) {
@@ -101,7 +125,7 @@ export class ResourceBuilder {
       const childBuilder = new ResourceBuilder();
       childBuilder.definition.methods = childDef.methods;
       childDef.children.forEach((v, k) => childBuilder.definition.children.set(k, v));
-      childBuilder.applyTo(childResource, context);
+      childBuilder.applyTo(childResource, context, integrationRoles);
     }
   }
 }

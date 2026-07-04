@@ -6,6 +6,7 @@ interface RestApiAlarmDefaults {
   clientError: AlarmConfigDefaults;
   serverError: AlarmConfigDefaults;
   latency: AlarmConfigDefaults;
+  integrationLatency: AlarmConfigDefaults;
 }
 
 /**
@@ -47,6 +48,18 @@ export const REST_API_ALARM_DEFAULTS: RestApiAlarmDefaults = {
    */
   latency: {
     threshold: 2500,
+    evaluationPeriods: 5,
+    datapointsToAlarm: 5,
+    treatMissingData: TreatMissingData.NOT_BREACHING,
+  },
+
+  /**
+   * Elevated p90 integration latency indicates a slow backend — for a direct
+   * AWS-service integration (no Lambda hop) this is the AWS service's own
+   * response time. Default 2000ms threshold per AWS recommendation.
+   */
+  integrationLatency: {
+    threshold: 2000,
     evaluationPeriods: 5,
     datapointsToAlarm: 5,
     treatMissingData: TreatMissingData.NOT_BREACHING,

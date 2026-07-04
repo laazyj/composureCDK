@@ -84,6 +84,24 @@ export function resolveRestApiAlarmDefinitions(
     });
   }
 
+  if (config?.integrationLatency !== false) {
+    const cfg = resolveAlarmConfig(
+      config?.integrationLatency,
+      REST_API_ALARM_DEFAULTS.integrationLatency,
+    );
+    definitions.push({
+      key: "integrationLatency",
+      alarmName: cfg.alarmName,
+      metric: apiMetric(api, "IntegrationLatency", Stats.percentile(90)),
+      threshold: cfg.threshold,
+      comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      evaluationPeriods: cfg.evaluationPeriods,
+      datapointsToAlarm: cfg.datapointsToAlarm,
+      treatMissingData: cfg.treatMissingData,
+      description: `REST API p90 integration (backend) latency is elevated. Threshold: >= ${String(cfg.threshold)}ms in ${METRIC_PERIOD_LABEL}.`,
+    });
+  }
+
   return definitions;
 }
 

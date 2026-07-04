@@ -1,18 +1,18 @@
 import {
-  type Integration,
   type MethodOptions,
   RestApi,
   type RestApiBase,
   type RestApiProps,
 } from "aws-cdk-lib/aws-apigateway";
+import type { IRole } from "aws-cdk-lib/aws-iam";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { REST_API_DEFAULTS } from "./defaults.js";
 import { resolveDeployOptions } from "./deploy-options.js";
-import { ResourceBuilder } from "./resource-builder.js";
+import { type MethodIntegration, ResourceBuilder } from "./resource-builder.js";
 import { createRestApiAlarms } from "./rest-api-alarms.js";
 
 /**
@@ -26,7 +26,16 @@ export interface RestApiBuilderProps extends RestApiProps, RestApiBuilderPropsBa
  * The build output of a {@link IRestApiBuilder}. Contains the CDK constructs
  * created during {@link Lifecycle.build}, keyed by role.
  */
-export type RestApiBuilderResult = RestApiBuilderResultBase<RestApi>;
+export type RestApiBuilderResult = RestApiBuilderResultBase<RestApi> & {
+  /**
+   * Credentials roles owned by AWS-service integrations added via
+   * {@link awsServiceIntegration}, keyed by `"{resourcePath} {httpMethod}"`
+   * (e.g. `"/gadgets GET"`). Each role is the identity API Gateway assumes to
+   * call the AWS service, exposed here so consumers can inspect or extend it.
+   * Empty (`{}`) when no AWS-service integrations were added.
+   */
+  integrationRoles: Record<string, IRole>;
+};
 
 /**
  * A fluent builder for configuring and creating an API Gateway REST API.
@@ -73,16 +82,13 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
    * Adds an HTTP method to the API root resource (`/`).
    *
    * @param httpMethod - The HTTP verb (GET, POST, PUT, DELETE, etc.).
-   * @param integration - The backend integration for this method. Accepts a concrete
-   *   {@link Integration} or a {@link Ref} that resolves to one at build time.
+   * @param integration - The backend integration for this method. Accepts a
+   *   concrete `Integration`, a {@link Ref} that resolves to one at build time,
+   *   or an {@link awsServiceIntegration} that owns its credentials role.
    * @param options - Additional method configuration such as authorization or method responses.
    * @returns This builder for chaining.
    */
-  addMethod(
-    httpMethod: string,
-    integration?: Resolvable<Integration>,
-    options?: MethodOptions,
-  ): this {
+  addMethod(httpMethod: string, integration?: MethodIntegration, options?: MethodOptions): this {
     this.#root.addMethod(httpMethod, integration, options);
     return this;
   }
@@ -127,11 +133,12 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
       ...restApiProps,
       deployOptions,
     });
-    this.#root.applyTo(api.root, context ?? {});
+    const integrationRoles: Record<string, IRole> = {};
+    this.#root.applyTo(api.root, context ?? {}, integrationRoles);
 
     const alarms = createRestApiAlarms(scope, id, api, alarmConfig, this.#customAlarms);
 
-    return { api, accessLogGroup, alarms };
+    return { api, accessLogGroup, alarms, integrationRoles };
   }
 }
 

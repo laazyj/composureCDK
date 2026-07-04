@@ -47,4 +47,16 @@ export interface RestApiAlarmConfig {
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#ApiGateway
    */
   latency?: AlarmConfig | false;
+
+  /**
+   * Alarm when backend integration latency is elevated. For a direct
+   * AWS-service integration this measures the AWS service's response time,
+   * distinct from total {@link latency}.
+   *
+   * Metric: `AWS/ApiGateway IntegrationLatency`, statistic p90, period 1 minute.
+   * Default threshold: >= 2000ms.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#ApiGateway
+   */
+  integrationLatency?: AlarmConfig | false;
 }

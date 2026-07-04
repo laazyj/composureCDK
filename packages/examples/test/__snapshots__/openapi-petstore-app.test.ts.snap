@@ -306,6 +306,34 @@ exports[`openapi-petstore-app > matches the expected synthesised template 1`] = 
       },
       "Type": "AWS::ApiGateway::Stage",
     },
+    "OpenApiPetstoreAppapiIntegrationLatencyAlarm0155B602": {
+      "Properties": {
+        "AlarmDescription": "REST API p90 integration (backend) latency is elevated. Threshold: >= 2000ms in 1 minute.",
+        "AlarmName": "composure-cdk-open-api-petstore-stack/open-api-petstore-app/api/integration-latency",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "PetStore",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "OpenApiPetstoreAppapiDeploymentStageprod0B59E801",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "IntegrationLatency",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Threshold": 2000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "OpenApiPetstoreAppapiLatencyAlarm28B7B0BF": {
       "Properties": {
         "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",

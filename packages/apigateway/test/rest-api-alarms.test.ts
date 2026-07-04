@@ -27,7 +27,7 @@ function mockIntegration() {
 
 const methodResponse200 = { methodResponses: [{ statusCode: "200" }] };
 
-const ALARM_KEYS = ["clientError", "serverError", "latency"] as const;
+const ALARM_KEYS = ["clientError", "serverError", "latency", "integrationLatency"] as const;
 
 function buildResult(configureFn: (builder: ReturnType<typeof createRestApiBuilder>) => void) {
   const app = new App();
@@ -44,13 +44,30 @@ function withStubMethod(builder: ReturnType<typeof createRestApiBuilder>) {
 
 describe("recommended alarms", () => {
   describe("defaults", () => {
-    it("creates clientError, serverError, and latency alarms by default", () => {
+    it("creates clientError, serverError, latency, and integrationLatency alarms by default", () => {
       const { result, template } = buildResult(withStubMethod);
 
       expect(result.alarms.clientError).toBeDefined();
       expect(result.alarms.serverError).toBeDefined();
       expect(result.alarms.latency).toBeDefined();
-      template.resourceCountIs("AWS::CloudWatch::Alarm", 3);
+      expect(result.alarms.integrationLatency).toBeDefined();
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 4);
+    });
+
+    it("creates integrationLatency alarm with threshold >= 2000ms", () => {
+      const { template } = buildResult(withStubMethod);
+
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        MetricName: "IntegrationLatency",
+        Namespace: "AWS/ApiGateway",
+        Threshold: 2000,
+        ComparisonOperator: "GreaterThanOrEqualToThreshold",
+        EvaluationPeriods: 5,
+        DatapointsToAlarm: 5,
+        TreatMissingData: "notBreaching",
+        ExtendedStatistic: "p90",
+        Period: 60,
+      });
     });
 
     it("creates clientError alarm with threshold > 0.05", () => {
@@ -211,17 +228,18 @@ describe("recommended alarms", () => {
       for (const other of others) {
         expect(result.alarms[other]).toBeDefined();
       }
-      template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", ALARM_KEYS.length - 1);
     });
 
     it("disables multiple individual alarms", () => {
       const { result, template } = buildResult((b) => {
         withStubMethod(b);
-        b.recommendedAlarms({ clientError: false, serverError: false });
+        b.recommendedAlarms({ clientError: false, serverError: false, integrationLatency: false });
       });
 
       expect(result.alarms.clientError).toBeUndefined();
       expect(result.alarms.serverError).toBeUndefined();
+      expect(result.alarms.integrationLatency).toBeUndefined();
       expect(result.alarms.latency).toBeDefined();
       template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
     });
@@ -252,24 +270,24 @@ describe("addAlarm", () => {
   it("creates a custom alarm alongside recommended alarms", () => {
     const { result, template } = buildResult((b) => {
       withStubMethod(b);
-      b.addAlarm("integrationLatency", (alarm) =>
+      b.addAlarm("count", (alarm) =>
         alarm
           .metric(
             (api) =>
               new Metric({
                 namespace: "AWS/ApiGateway",
-                metricName: "IntegrationLatency",
+                metricName: "Count",
                 dimensionsMap: {
                   ApiName: api.restApiName,
                   Stage: api.deploymentStage.stageName,
                 },
-                statistic: "p90",
+                statistic: "SampleCount",
                 period: Duration.minutes(1),
               }),
           )
-          .threshold(2000)
-          .greaterThanOrEqual()
-          .description("Integration latency is elevated"),
+          .threshold(1)
+          .lessThanOrEqual()
+          .description("Request volume has dropped"),
       );
     });
 
@@ -277,7 +295,8 @@ describe("addAlarm", () => {
     expect(result.alarms.serverError).toBeDefined();
     expect(result.alarms.latency).toBeDefined();
     expect(result.alarms.integrationLatency).toBeDefined();
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 4);
+    expect(result.alarms.count).toBeDefined();
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 5);
   });
 
   it("throws on duplicate key with recommended alarm", () => {
@@ -338,6 +357,7 @@ describe("SpecRestApiBuilder alarms", () => {
     expect(result.alarms.clientError).toBeDefined();
     expect(result.alarms.serverError).toBeDefined();
     expect(result.alarms.latency).toBeDefined();
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 3);
+    expect(result.alarms.integrationLatency).toBeDefined();
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 4);
   });
 });

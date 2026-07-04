@@ -222,6 +222,34 @@ exports[`mock-api-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::ApiGateway::Method",
     },
+    "MockApiAppapiIntegrationLatencyAlarm05539D37": {
+      "Properties": {
+        "AlarmDescription": "REST API p90 integration (backend) latency is elevated. Threshold: >= 2000ms in 1 minute.",
+        "AlarmName": "composure-cdk-mock-api-stack/mock-api-app/api/integration-latency",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "MockApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "MockApiAppapiDeploymentStageprod294E2332",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "IntegrationLatency",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Threshold": 2000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "MockApiAppapiLatencyAlarmBB38671F": {
       "Properties": {
         "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",

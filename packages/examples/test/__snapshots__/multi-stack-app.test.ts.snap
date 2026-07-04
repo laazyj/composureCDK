@@ -321,6 +321,40 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
       },
       "Type": "AWS::Lambda::Permission",
     },
+    "MultiStackAppapiIntegrationLatencyAlarm943EFC32": {
+      "Properties": {
+        "AlarmDescription": "REST API p90 integration (backend) latency is elevated. Threshold: >= 2000ms in 1 minute.",
+        "AlarmName": "composure-cdk-multi-stack-api-stack/multi-stack-app/api/integration-latency",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "MultiStackApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "MultiStackAppapiDeploymentStageprod995AB209",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "IntegrationLatency",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
+        "Threshold": 2000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
     "MultiStackAppapiLatencyAlarm8D8FBA0C": {
       "Properties": {
         "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",

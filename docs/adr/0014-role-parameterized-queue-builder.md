@@ -1,4 +1,4 @@
-# ADR 0013: Role-parameterized builders for mutually-exclusive L2 surfaces
+# ADR 0014: Role-parameterized builders for mutually-exclusive L2 surfaces
 
 - **Status:** Proposed
 - **Date:** 2026-07-02

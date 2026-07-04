@@ -27,6 +27,8 @@ function mockIntegration() {
 
 const methodResponse200 = { methodResponses: [{ statusCode: "200" }] };
 
+const ALARM_KEYS = ["clientError", "serverError", "latency"] as const;
+
 function buildResult(configureFn: (builder: ReturnType<typeof createRestApiBuilder>) => void) {
   const app = new App();
   const stack = new Stack(app, "TestStack");
@@ -197,10 +199,9 @@ describe("recommended alarms", () => {
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
-    it.each([
-      { key: "clientError", others: ["serverError", "latency"] },
-      { key: "latency", others: ["clientError", "serverError"] },
-    ])("disables only the $key alarm when set to false", ({ key, others }) => {
+    it.each(
+      ALARM_KEYS.map((key) => ({ key, others: ALARM_KEYS.filter((other) => other !== key) })),
+    )("disables only the $key alarm when set to false", ({ key, others }) => {
       const { result, template } = buildResult((b) => {
         withStubMethod(b);
         b.recommendedAlarms({ [key]: false });

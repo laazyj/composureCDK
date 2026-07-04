@@ -4,6 +4,7 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
 import { createHealthCheckBuilder } from "../src/health-check-builder.js";
+import { resolveHealthCheckAlarmDefinitions } from "../src/health-check-alarms.js";
 
 const ENV_US_EAST_1 = { account: "123456789012", region: "us-east-1" };
 
@@ -164,6 +165,20 @@ describe("recommended alarms", () => {
           );
         }),
       ).toThrow(/Duplicate alarm key/);
+    });
+  });
+
+  describe("resolveHealthCheckAlarmDefinitions", () => {
+    const fakeHealthCheck = { healthCheckId: "hc-123" } as IHealthCheck;
+
+    it("returns no definitions when config is disabled", () => {
+      expect(resolveHealthCheckAlarmDefinitions(fakeHealthCheck, { enabled: false })).toEqual([]);
+    });
+
+    it("returns the healthCheckStatus definition when config is undefined", () => {
+      const definitions = resolveHealthCheckAlarmDefinitions(fakeHealthCheck, undefined);
+      expect(definitions).toHaveLength(1);
+      expect(definitions[0]?.key).toBe("healthCheckStatus");
     });
   });
 

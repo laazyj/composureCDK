@@ -34,6 +34,25 @@ function setup(): { stack: Stack; zone: PublicHostedZone } {
   return { stack, zone };
 }
 
+describe("zone requirement", () => {
+  const builders: [string, () => { build: (s: Stack, id: string) => unknown }][] = [
+    ["Aaaa", createAaaaRecordBuilder],
+    ["Cname", createCnameRecordBuilder],
+    ["Txt", createTxtRecordBuilder],
+    ["Mx", createMxRecordBuilder],
+    ["Srv", createSrvRecordBuilder],
+    ["Caa", createCaaRecordBuilder],
+    ["Ns", createNsRecordBuilder],
+    ["Ds", createDsRecordBuilder],
+    ["Svcb", createSvcbRecordBuilder],
+  ];
+
+  it.each(builders)("%s requires a zone", (id, create) => {
+    const { stack } = setup();
+    expect(() => create().build(stack, id)).toThrow(/requires a zone/);
+  });
+});
+
 describe("AaaaRecordBuilder", () => {
   it("synthesises an AAAA record", () => {
     const { stack, zone } = setup();
@@ -47,6 +66,34 @@ describe("AaaaRecordBuilder", () => {
     template.hasResourceProperties("AWS::Route53::RecordSet", {
       Type: "AAAA",
       Name: "v6.example.com.",
+    });
+  });
+
+  it("requires a target", () => {
+    const { stack, zone } = setup();
+    expect(() => createAaaaRecordBuilder().zone(zone).build(stack, "Aaaa")).toThrow(
+      /requires a target/,
+    );
+  });
+
+  it("synthesises an AAAA alias record without a default TTL", () => {
+    const { stack, zone } = setup();
+    const distribution = new Distribution(stack, "Dist", {
+      defaultBehavior: { origin: new HttpOrigin("origin.example.net") },
+    });
+
+    createAaaaRecordBuilder()
+      .zone(zone)
+      .target(cloudfrontAliasTarget(distribution))
+      .build(stack, "AaaaAlias");
+
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "AAAA",
+      AliasTarget: Match.objectLike({
+        DNSName: Match.objectLike({ "Fn::GetAtt": ["DistB3B78991", "DomainName"] }),
+      }),
+      TTL: Match.absent(),
     });
   });
 });
@@ -188,6 +235,13 @@ describe("NsRecordBuilder", () => {
     expect(() =>
       createNsRecordBuilder().zone(zone).values(["ns-1.awsdns-01.com"]).build(stack, "Ns"),
     ).toThrow(/requires a recordName/);
+  });
+
+  it("requires values to be set", () => {
+    const { stack, zone } = setup();
+    expect(() => createNsRecordBuilder().zone(zone).recordName("sub").build(stack, "Ns")).toThrow(
+      /requires .*values/,
+    );
   });
 
   it("requires non-empty values", () => {

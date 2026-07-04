@@ -1,12 +1,14 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type ITable, TableV2, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
+import type { IGrantable } from "aws-cdk-lib/aws-iam";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TableAlarmConfig } from "./table-alarm-config.js";
 import { createTableAlarms } from "./table-alarms.js";
 import { TABLE_V2_DEFAULTS } from "./defaults.js";
+import { TableGrants } from "./table-grants.js";
 
 /**
  * Configuration properties for the DynamoDB {@link TableV2} builder.
@@ -81,6 +83,14 @@ export interface TableV2BuilderResult {
  * can be customized or disabled via the `recommendedAlarms` property. Custom
  * alarms can be added via the {@link addAlarm} method.
  *
+ * Cross-component IAM grants — e.g. an API Gateway role that needs
+ * `dynamodb:GetItem`/`PutItem` on this table — are declared with
+ * {@link ITableV2Builder.grantReadData}, {@link ITableV2Builder.grantWriteData},
+ * or {@link ITableV2Builder.grantReadWriteData}, each accepting a `Resolvable`
+ * so the grantee can be a sibling component's `ref()`. The grant is applied
+ * during this builder's own `build()`, once both constructs exist — no
+ * `afterBuild` hook required.
+ *
  * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_dynamodb.TableV2.html
  *
  * @example
@@ -98,6 +108,7 @@ export type ITableV2Builder = ITaggedBuilder<TableV2BuilderProps, TableV2Builder
 class TableV2Builder implements Lifecycle<TableV2BuilderResult> {
   props: Partial<TableV2BuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ITable>[] = [];
+  readonly #grants = new TableGrants();
 
   addAlarm(
     key: string,
@@ -107,12 +118,43 @@ class TableV2Builder implements Lifecycle<TableV2BuilderResult> {
     return this;
   }
 
+  /**
+   * Grants a principal `dynamodb:GetItem`/`Query`/`Scan`/etc. read access to
+   * this table. Accepts a concrete {@link IGrantable} or a {@link Resolvable}
+   * (e.g. `ref("apiRole", r => r.role)`) so the grantee can be a sibling
+   * component built later in the same {@link compose | composed system}.
+   */
+  grantReadData(principal: Resolvable<IGrantable>): this {
+    this.#grants.add(principal, (table, grantee) => table.grantReadData(grantee));
+    return this;
+  }
+
+  /**
+   * Grants a principal `dynamodb:PutItem`/`UpdateItem`/`DeleteItem`/etc.
+   * write access to this table. Accepts a concrete {@link IGrantable} or a
+   * {@link Resolvable}.
+   */
+  grantWriteData(principal: Resolvable<IGrantable>): this {
+    this.#grants.add(principal, (table, grantee) => table.grantWriteData(grantee));
+    return this;
+  }
+
+  /**
+   * Grants a principal full read/write access to this table. Accepts a
+   * concrete {@link IGrantable} or a {@link Resolvable}.
+   */
+  grantReadWriteData(principal: Resolvable<IGrantable>): this {
+    this.#grants.add(principal, (table, grantee) => table.grantReadWriteData(grantee));
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: TableV2Builder): void {
     target.#customAlarms.push(...this.#customAlarms);
+    this.#grants.copyInto(target.#grants);
   }
 
-  build(scope: IConstruct, id: string): TableV2BuilderResult {
+  build(scope: IConstruct, id: string, context?: Record<string, object>): TableV2BuilderResult {
     const { recommendedAlarms: alarmConfig, ...tableProps } = this.props;
 
     // TableV2's billing and encryption defaults are single helper objects with
@@ -122,6 +164,8 @@ class TableV2Builder implements Lifecycle<TableV2BuilderResult> {
     const mergedProps = { ...TABLE_V2_DEFAULTS, ...tableProps } as TablePropsV2;
 
     const table = new TableV2(scope, id, mergedProps);
+
+    this.#grants.applyTo(table, context);
 
     const alarms = createTableAlarms(scope, id, table, alarmConfig, this.#customAlarms);
 

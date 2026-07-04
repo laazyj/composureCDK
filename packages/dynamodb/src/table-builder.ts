@@ -1,12 +1,14 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type ITable, Table, TableEncryption, type TableProps } from "aws-cdk-lib/aws-dynamodb";
+import type { IGrantable } from "aws-cdk-lib/aws-iam";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TableAlarmConfig } from "./table-alarm-config.js";
 import { createTableAlarms } from "./table-alarms.js";
 import { TABLE_DEFAULTS } from "./defaults.js";
+import { TableGrants } from "./table-grants.js";
 
 /**
  * Configuration properties for the DynamoDB table builder.
@@ -76,6 +78,14 @@ export interface TableBuilderResult {
  * can be customized or disabled via the `recommendedAlarms` property. Custom
  * alarms can be added via the {@link addAlarm} method.
  *
+ * Cross-component IAM grants — e.g. an API Gateway role that needs
+ * `dynamodb:GetItem`/`PutItem` on this table — are declared with
+ * {@link ITableBuilder.grantReadData}, {@link ITableBuilder.grantWriteData},
+ * or {@link ITableBuilder.grantReadWriteData}, each accepting a `Resolvable`
+ * so the grantee can be a sibling component's `ref()`. The grant is applied
+ * during this builder's own `build()`, once both constructs exist — no
+ * `afterBuild` hook required.
+ *
  * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_dynamodb.Table.html
  *
  * @example
@@ -93,6 +103,7 @@ export type ITableBuilder = ITaggedBuilder<TableBuilderProps, TableBuilder>;
 class TableBuilder implements Lifecycle<TableBuilderResult> {
   props: Partial<TableBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ITable>[] = [];
+  readonly #grants = new TableGrants();
 
   addAlarm(
     key: string,
@@ -102,17 +113,50 @@ class TableBuilder implements Lifecycle<TableBuilderResult> {
     return this;
   }
 
+  /**
+   * Grants a principal `dynamodb:GetItem`/`Query`/`Scan`/etc. read access to
+   * this table. Accepts a concrete {@link IGrantable} or a {@link Resolvable}
+   * (e.g. `ref("apiRole", r => r.role)`) so the grantee can be a sibling
+   * component built later in the same {@link compose | composed system}.
+   */
+  grantReadData(principal: Resolvable<IGrantable>): this {
+    this.#grants.add(principal, (table, grantee) => table.grantReadData(grantee));
+    return this;
+  }
+
+  /**
+   * Grants a principal `dynamodb:PutItem`/`UpdateItem`/`DeleteItem`/etc.
+   * write access to this table. Accepts a concrete {@link IGrantable} or a
+   * {@link Resolvable}.
+   */
+  grantWriteData(principal: Resolvable<IGrantable>): this {
+    this.#grants.add(principal, (table, grantee) => table.grantWriteData(grantee));
+    return this;
+  }
+
+  /**
+   * Grants a principal full read/write access to this table. Accepts a
+   * concrete {@link IGrantable} or a {@link Resolvable}.
+   */
+  grantReadWriteData(principal: Resolvable<IGrantable>): this {
+    this.#grants.add(principal, (table, grantee) => table.grantReadWriteData(grantee));
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: TableBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
+    this.#grants.copyInto(target.#grants);
   }
 
-  build(scope: IConstruct, id: string): TableBuilderResult {
+  build(scope: IConstruct, id: string, context?: Record<string, object>): TableBuilderResult {
     const { recommendedAlarms: alarmConfig, ...tableProps } = this.props;
 
     const mergedProps = mergeTableDefaults(tableProps);
 
     const table = new Table(scope, id, mergedProps);
+
+    this.#grants.applyTo(table, context);
 
     const alarms = createTableAlarms(scope, id, table, alarmConfig, this.#customAlarms);
 

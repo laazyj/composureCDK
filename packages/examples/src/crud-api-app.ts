@@ -15,104 +15,62 @@ const OK: MethodOptions = { methodResponses: [{ statusCode: "200" }] };
 
 type DynamoAction = "GetItem" | "PutItem" | "DeleteItem" | "Scan";
 
-interface GadgetIntegrationsResult {
-  list: Integration;
-  create: Integration;
-  read: Integration;
-  update: Integration;
-  remove: Integration;
+/** The two sibling outputs every `AwsIntegration` below needs: the table to
+ * call and the role to call it as. */
+interface TableAndRole {
+  tableName: string;
+  role: RoleBuilderResult["role"];
 }
 
 /**
- * A plain {@link Lifecycle} — not a builder — that turns its two
- * dependencies' build outputs (the table and the role) into the five
- * `AwsIntegration`s the resource tree below wires up. Keeping this as its
- * own component lets `compose` resolve `table` and `apiRole` before it
- * runs, so the VTL mapping templates below can embed the table's physical
- * name directly instead of threading two separate `ref()`s through every
- * `addMethod` call.
+ * A plain {@link Lifecycle} — not a builder — that does nothing but merge
+ * the `table` and `apiRole` components' outputs into one object. `ref()`
+ * only reaches a single named component, and each method below needs both,
+ * so this is the one piece of glue standing between the two `Resolvable`s
+ * and the resource tree; the DynamoDB action and VTL mapping for each verb
+ * stays declared inline at its `addMethod` call, in `createCrudApiApp` below.
  */
-function createGadgetIntegrations(): Lifecycle<GadgetIntegrationsResult> {
+function createTableAndRole(): Lifecycle<TableAndRole> {
   return {
     build(_scope: IConstruct, _id: string, context: Record<string, object> = {}) {
       const { table } = context.table as TableV2BuilderResult;
       const { role } = context.apiRole as RoleBuilderResult;
-      const tableName = table.tableName;
-
-      const integration = (
-        action: DynamoAction,
-        requestTemplate: object,
-        responseTemplate: string,
-      ): Integration =>
-        new AwsIntegration({
-          service: "dynamodb",
-          action,
-          options: {
-            credentialsRole: role,
-            requestTemplates: { "application/json": JSON.stringify(requestTemplate) },
-            integrationResponses: [
-              { statusCode: "200", responseTemplates: { "application/json": responseTemplate } },
-            ],
-          },
-        });
-
-      return {
-        list: integration(
-          "Scan",
-          { TableName: tableName },
-          `{
-  "gadgets": [
-    #foreach($item in $input.path('$.Items'))
-    { "id": "$item.id.S", "name": "$item.name.S", "description": "$item.description.S" }#if($foreach.hasNext),#end
-    #end
-  ]
-}`,
-        ),
-
-        create: integration(
-          "PutItem",
-          {
-            TableName: tableName,
-            Item: {
-              id: { S: "$context.requestId" },
-              name: { S: "$input.path('$.name')" },
-              description: { S: "$input.path('$.description')" },
-            },
-          },
-          `{ "id": "$context.requestId" }`,
-        ),
-
-        read: integration(
-          "GetItem",
-          { TableName: tableName, Key: { id: { S: "$input.params('id')" } } },
-          `{
-  "id": "$input.path('$.Item.id.S')",
-  "name": "$input.path('$.Item.name.S')",
-  "description": "$input.path('$.Item.description.S')"
-}`,
-        ),
-
-        update: integration(
-          "PutItem",
-          {
-            TableName: tableName,
-            Item: {
-              id: { S: "$input.params('id')" },
-              name: { S: "$input.path('$.name')" },
-              description: { S: "$input.path('$.description')" },
-            },
-          },
-          `{ "id": "$input.params('id')", "updated": true }`,
-        ),
-
-        remove: integration(
-          "DeleteItem",
-          { TableName: tableName, Key: { id: { S: "$input.params('id')" } } },
-          `{ "id": "$input.params('id')", "deleted": true }`,
-        ),
-      };
+      return { tableName: table.tableName, role };
     },
   };
+}
+
+/** Builds the `AwsIntegration` for one DynamoDB action against the resolved
+ * table + role, given the request/response VTL for that action. */
+function dynamoIntegration(
+  { role }: TableAndRole,
+  action: DynamoAction,
+  requestTemplate: object,
+  responseTemplate: string,
+): Integration {
+  return new AwsIntegration({
+    service: "dynamodb",
+    action,
+    options: {
+      credentialsRole: role,
+      requestTemplates: { "application/json": JSON.stringify(requestTemplate) },
+      integrationResponses: [
+        { statusCode: "200", responseTemplates: { "application/json": responseTemplate } },
+      ],
+    },
+  });
+}
+
+/** A `ref` to the `tableAndRole` component, resolving straight to the
+ * `AwsIntegration` for one DynamoDB action. */
+function gadgetIntegration(
+  action: DynamoAction,
+  requestTemplate: (tableName: string) => object,
+  responseTemplate: string,
+) {
+  return ref("tableAndRole", (tr: TableAndRole) =>
+    dynamoIntegration(tr, action, requestTemplate(tr.tableName), responseTemplate),
+  );
 }
 
 /**
@@ -123,14 +81,17 @@ function createGadgetIntegrations(): Lifecycle<GadgetIntegrationsResult> {
  * Demonstrates:
  * - `createTableV2Builder`, keyed on `id`, as the item store.
  * - `createServiceRoleBuilder("apigateway.amazonaws.com")` for the role API
- *   Gateway assumes when calling DynamoDB, granted access via
- *   `table.grantReadWriteData(role)` in an `afterBuild` hook — the grant
- *   runs once both constructs exist, producing a policy scoped to this
- *   table's ARN rather than a hand-written wildcard statement.
+ *   Gateway assumes when calling DynamoDB, granted access via the table's own
+ *   `.grantReadWriteData(ref("apiRole", ...))` — declared as data alongside
+ *   the table's other configuration, and applied during the table's own
+ *   `build()` once the role exists, rather than pushed out to an imperative
+ *   post-build hook.
  * - `createRestApiBuilder` wiring each HTTP verb straight to a DynamoDB
- *   action (`Scan`, `PutItem`, `GetItem`, `DeleteItem`) via the
- *   `gadgetIntegrations` component, referenced with `ref` so the resource
- *   tree only depends on the *result* of the table + role composition.
+ *   action (`Scan`, `PutItem`, `GetItem`, `DeleteItem`) via `gadgetIntegration`
+ *   — the resource tree below is the full, literal description of the API:
+ *   every path, verb, DynamoDB action, and mapping template is declared at
+ *   its `addMethod` call, not hidden behind a helper that builds the API
+ *   shape off-stage.
  *
  * Resource tree (a "gadget" catalog — the business domain is arbitrary):
  * ```
@@ -143,52 +104,113 @@ function createGadgetIntegrations(): Lifecycle<GadgetIntegrationsResult> {
  *     └── DELETE → DeleteItem
  * ```
  */
-/** A `ref` to one named integration built by the `gadgetIntegrations` component. */
-function gadgetIntegration(key: keyof GadgetIntegrationsResult) {
-  return ref("gadgetIntegrations", (r: GadgetIntegrationsResult) => r[key]);
-}
-
 export function createCrudApiApp(app = new App()) {
   const stack = new Stack(app, "ComposureCDK-CrudApiStack");
 
   compose(
     {
-      table: createTableV2Builder().partitionKey({ name: "id", type: AttributeType.STRING }),
+      table: createTableV2Builder()
+        .partitionKey({ name: "id", type: AttributeType.STRING })
+        .grantReadWriteData(ref("apiRole", (r: RoleBuilderResult) => r.role)),
 
       apiRole: createServiceRoleBuilder("apigateway.amazonaws.com").description(
         "Assumed by API Gateway to call DynamoDB directly for the gadgets table",
       ),
 
-      gadgetIntegrations: createGadgetIntegrations(),
+      tableAndRole: createTableAndRole(),
 
       api: createRestApiBuilder()
         .restApiName("CrudApi")
         .description("Minimal REST API backed directly by DynamoDB — no Lambda in the request path")
         .addResource("gadgets", (gadgets) =>
           gadgets
-            .addMethod("GET", gadgetIntegration("list"), OK)
-            .addMethod("POST", gadgetIntegration("create"), OK)
+            .addMethod(
+              "GET",
+              gadgetIntegration(
+                "Scan",
+                (tableName) => ({ TableName: tableName }),
+                `{
+  "gadgets": [
+    #foreach($item in $input.path('$.Items'))
+    { "id": "$item.id.S", "name": "$item.name.S", "description": "$item.description.S" }#if($foreach.hasNext),#end
+    #end
+  ]
+}`,
+              ),
+              OK,
+            )
+            .addMethod(
+              "POST",
+              gadgetIntegration(
+                "PutItem",
+                (tableName) => ({
+                  TableName: tableName,
+                  Item: {
+                    id: { S: "$context.requestId" },
+                    name: { S: "$input.path('$.name')" },
+                    description: { S: "$input.path('$.description')" },
+                  },
+                }),
+                `{ "id": "$context.requestId" }`,
+              ),
+              OK,
+            )
             .addResource("{id}", (gadget) =>
               gadget
-                .addMethod("GET", gadgetIntegration("read"), OK)
-                .addMethod("PUT", gadgetIntegration("update"), OK)
-                .addMethod("DELETE", gadgetIntegration("remove"), OK),
+                .addMethod(
+                  "GET",
+                  gadgetIntegration(
+                    "GetItem",
+                    (tableName) => ({
+                      TableName: tableName,
+                      Key: { id: { S: "$input.params('id')" } },
+                    }),
+                    `{
+  "id": "$input.path('$.Item.id.S')",
+  "name": "$input.path('$.Item.name.S')",
+  "description": "$input.path('$.Item.description.S')"
+}`,
+                  ),
+                  OK,
+                )
+                .addMethod(
+                  "PUT",
+                  gadgetIntegration(
+                    "PutItem",
+                    (tableName) => ({
+                      TableName: tableName,
+                      Item: {
+                        id: { S: "$input.params('id')" },
+                        name: { S: "$input.path('$.name')" },
+                        description: { S: "$input.path('$.description')" },
+                      },
+                    }),
+                    `{ "id": "$input.params('id')", "updated": true }`,
+                  ),
+                  OK,
+                )
+                .addMethod(
+                  "DELETE",
+                  gadgetIntegration(
+                    "DeleteItem",
+                    (tableName) => ({
+                      TableName: tableName,
+                      Key: { id: { S: "$input.params('id')" } },
+                    }),
+                    `{ "id": "$input.params('id')", "deleted": true }`,
+                  ),
+                  OK,
+                ),
             ),
         ),
     },
     {
-      table: [],
+      table: ["apiRole"],
       apiRole: [],
-      gadgetIntegrations: ["table", "apiRole"],
-      api: ["gadgetIntegrations"],
+      tableAndRole: ["table", "apiRole"],
+      api: ["tableAndRole"],
     },
-  )
-    .afterBuild((_scope, _id, results) => {
-      // Least-privilege grant scoped to this table's ARN, computed after
-      // both constructs exist rather than authored as a hand-written policy.
-      results.table.table.grantReadWriteData(results.apiRole.role);
-    })
-    .build(stack, "CrudApiApp");
+  ).build(stack, "CrudApiApp");
 
   return { stack };
 }

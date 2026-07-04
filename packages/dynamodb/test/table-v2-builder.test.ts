@@ -10,7 +10,9 @@ import {
   StreamViewType,
   TableEncryptionV2,
 } from "aws-cdk-lib/aws-dynamodb";
+import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
+import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createTableV2Builder } from "../src/table-v2-builder.js";
 
@@ -191,6 +193,59 @@ describe("TableV2Builder", () => {
 
       template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
         StreamSpecification: { StreamViewType: "NEW_IMAGE" },
+      });
+    });
+  });
+
+  describe("grants", () => {
+    it("grants a concrete principal read/write access, scoped to the table's ARN", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const grantee = new Role(stack, "Grantee", {
+        assumedBy: new ServicePrincipal("ec2.amazonaws.com"),
+      });
+
+      createTableV2Builder().partitionKey(PK).grantReadWriteData(grantee).build(stack, "TestTable");
+
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::IAM::Policy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: Match.arrayWith(["dynamodb:GetItem", "dynamodb:PutItem"]),
+              Effect: "Allow",
+            }),
+          ]),
+        }),
+        Roles: [{ Ref: Match.stringLikeRegexp("^Grantee") }],
+      });
+    });
+
+    it("resolves a Ref principal from a sibling component before granting", () => {
+      const stack = new Stack(new App(), "TestStack");
+
+      const { table } = compose(
+        {
+          role: {
+            build: (scope: Stack, id: string) => ({
+              role: new Role(scope, id, { assumedBy: new ServicePrincipal("ec2.amazonaws.com") }),
+            }),
+          },
+          table: createTableV2Builder()
+            .partitionKey(PK)
+            .grantReadData(ref<{ role: Role }, Role>("role", (r) => r.role)),
+        },
+        { role: [], table: ["role"] },
+      ).build(stack, "System");
+
+      expect(table.table).toBeDefined();
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties("AWS::IAM::Policy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([
+            Match.objectLike({ Action: Match.arrayWith(["dynamodb:GetItem"]) }),
+          ]),
+        }),
       });
     });
   });

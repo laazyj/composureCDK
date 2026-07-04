@@ -13,6 +13,12 @@ import {
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { createInstanceBuilder } from "../src/instance-builder.js";
 
+const ALWAYS_ON_ALARM_KEYS = [
+  "cpuUtilization",
+  "statusCheckFailed",
+  "attachedEbsStatusCheckFailed",
+] as const;
+
 function buildInstance(
   configureFn?: (builder: ReturnType<typeof createInstanceBuilder>) => void,
   instanceType: InstanceType = InstanceType.of(InstanceClass.T3, InstanceSize.MICRO),
@@ -216,15 +222,20 @@ describe("recommended alarms", () => {
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
-    it("disables individual alarms when set to false", () => {
+    it.each(
+      ALWAYS_ON_ALARM_KEYS.map((key) => ({
+        key,
+        others: [...ALWAYS_ON_ALARM_KEYS.filter((other) => other !== key), "cpuCreditBalance"],
+      })),
+    )("disables only the $key alarm when set to false", ({ key, others }) => {
       const { result, template } = buildInstance((b) => {
-        b.recommendedAlarms({ cpuUtilization: false });
+        b.recommendedAlarms({ [key]: false });
       });
 
-      expect(result.alarms.cpuUtilization).toBeUndefined();
-      expect(result.alarms.statusCheckFailed).toBeDefined();
-      expect(result.alarms.attachedEbsStatusCheckFailed).toBeDefined();
-      expect(result.alarms.cpuCreditBalance).toBeDefined();
+      expect(result.alarms[key]).toBeUndefined();
+      for (const other of others) {
+        expect(result.alarms[other]).toBeDefined();
+      }
       template.resourceCountIs("AWS::CloudWatch::Alarm", 3);
     });
 

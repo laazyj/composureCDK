@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, CfnParameter, Stack } from "aws-cdk-lib";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
 import {
   validateSecurityGroupDescription,
@@ -25,6 +25,15 @@ describe("validateSecurityGroupDescription", () => {
       validateSecurityGroupDescription("a".repeat(256));
     }).toThrow(/exceeds the 255-character limit/);
   });
+
+  it("skips validation for an unresolved token", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const param = new CfnParameter(stack, "Description", { type: "String", default: "x" });
+
+    expect(() => {
+      validateSecurityGroupDescription(param.valueAsString);
+    }).not.toThrow();
+  });
 });
 
 describe("validateSecurityGroupName", () => {
@@ -38,6 +47,15 @@ describe("validateSecurityGroupName", () => {
     expect(() => {
       validateSecurityGroupName("sg-1234");
     }).toThrow(/reserved "sg-" prefix/);
+  });
+
+  it("skips validation for an unresolved token", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const param = new CfnParameter(stack, "Name", { type: "String", default: "x" });
+
+    expect(() => {
+      validateSecurityGroupName(param.valueAsString);
+    }).not.toThrow();
   });
 });
 

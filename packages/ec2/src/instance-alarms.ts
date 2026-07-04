@@ -59,8 +59,6 @@ export function resolveInstanceAlarmDefinitions(
   config: InstanceAlarmConfig | undefined,
   props: Pick<InstanceProps, "instanceType">,
 ): AlarmDefinition[] {
-  if (config?.enabled === false) return [];
-
   const definitions: AlarmDefinition[] = [];
 
   if (config?.cpuUtilization !== false) {

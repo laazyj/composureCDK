@@ -108,6 +108,26 @@ describe("recommended alarms", () => {
       expect(Object.keys(result.alarms)).toHaveLength(0);
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
+
+    it("creates approximateNumberOfMessagesVisible when opted in with an explicit threshold", () => {
+      const { result, template } = buildResult((b) =>
+        b.recommendedAlarms({ approximateNumberOfMessagesVisible: { threshold: 1000 } }),
+      );
+
+      expect(result.alarms.approximateNumberOfMessagesVisible).toBeDefined();
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        MetricName: "ApproximateNumberOfMessagesVisible",
+        Threshold: 1000,
+      });
+    });
+
+    it("throws when approximateNumberOfMessagesVisible is opted in without a threshold", () => {
+      // No generic visible-messages threshold fits a primary queue, so the
+      // opt-in must bring its own instead of silently inheriting a noisy 0.
+      expect(() =>
+        buildResult((b) => b.recommendedAlarms({ approximateNumberOfMessagesVisible: {} })),
+      ).toThrow(/"approximateNumberOfMessagesVisible" alarm has no generic default threshold/);
+    });
   });
 
   describe("no default actions", () => {

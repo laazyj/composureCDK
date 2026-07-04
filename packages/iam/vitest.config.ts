@@ -1,8 +1,8 @@
 import { withCoverage } from "../../vitest.config.base.js";
 
 export default withCoverage({
-  statements: 75,
-  branches: 70,
-  functions: 68,
-  lines: 75,
+  statements: 90,
+  branches: 90,
+  functions: 100,
+  lines: 90,
 });

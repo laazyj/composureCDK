@@ -13,6 +13,15 @@ updates:
     schedule:
       interval: weekly
     groups:
+      aws-cdk:
+        patterns:
+          - "aws-cdk"
+          - "aws-cdk*"
+          - "@aws-cdk/*"
       npm-dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "aws-cdk"
+          - "aws-cdk*"
+          - "@aws-cdk/*"

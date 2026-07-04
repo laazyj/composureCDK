@@ -197,27 +197,19 @@ describe("recommended alarms", () => {
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
-    it("disables individual alarms when set to false", () => {
+    it.each([
+      { key: "clientError", others: ["serverError", "latency"] },
+      { key: "latency", others: ["clientError", "serverError"] },
+    ])("disables only the $key alarm when set to false", ({ key, others }) => {
       const { result, template } = buildResult((b) => {
         withStubMethod(b);
-        b.recommendedAlarms({ clientError: false });
+        b.recommendedAlarms({ [key]: false });
       });
 
-      expect(result.alarms.clientError).toBeUndefined();
-      expect(result.alarms.serverError).toBeDefined();
-      expect(result.alarms.latency).toBeDefined();
-      template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
-    });
-
-    it("disables only the latency alarm when set to false", () => {
-      const { result, template } = buildResult((b) => {
-        withStubMethod(b);
-        b.recommendedAlarms({ latency: false });
-      });
-
-      expect(result.alarms.clientError).toBeDefined();
-      expect(result.alarms.serverError).toBeDefined();
-      expect(result.alarms.latency).toBeUndefined();
+      expect(result.alarms[key]).toBeUndefined();
+      for (const other of others) {
+        expect(result.alarms[other]).toBeDefined();
+      }
       template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
     });
 

@@ -13,6 +13,12 @@ import {
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { createInstanceBuilder } from "../src/instance-builder.js";
 
+const ALWAYS_ON_ALARM_KEYS = [
+  "cpuUtilization",
+  "statusCheckFailed",
+  "attachedEbsStatusCheckFailed",
+] as const;
+
 function buildInstance(
   configureFn?: (builder: ReturnType<typeof createInstanceBuilder>) => void,
   instanceType: InstanceType = InstanceType.of(InstanceClass.T3, InstanceSize.MICRO),
@@ -216,20 +222,12 @@ describe("recommended alarms", () => {
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
-    it.each([
-      {
-        key: "cpuUtilization",
-        others: ["statusCheckFailed", "attachedEbsStatusCheckFailed", "cpuCreditBalance"],
-      },
-      {
-        key: "statusCheckFailed",
-        others: ["cpuUtilization", "attachedEbsStatusCheckFailed", "cpuCreditBalance"],
-      },
-      {
-        key: "attachedEbsStatusCheckFailed",
-        others: ["cpuUtilization", "statusCheckFailed", "cpuCreditBalance"],
-      },
-    ])("disables only the $key alarm when set to false", ({ key, others }) => {
+    it.each(
+      ALWAYS_ON_ALARM_KEYS.map((key) => ({
+        key,
+        others: [...ALWAYS_ON_ALARM_KEYS.filter((other) => other !== key), "cpuCreditBalance"],
+      })),
+    )("disables only the $key alarm when set to false", ({ key, others }) => {
       const { result, template } = buildInstance((b) => {
         b.recommendedAlarms({ [key]: false });
       });

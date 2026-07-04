@@ -4,6 +4,7 @@ import { Bucket, CfnBucket, type BucketProps } from "aws-cdk-lib/aws-s3";
 import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
 import { RestApi, type RestApiProps } from "aws-cdk-lib/aws-apigateway";
+import { TableV2, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { DatabaseCluster, type DatabaseClusterProps } from "@aws-cdk/aws-neptune-alpha";
 import {
   AwsCustomResource,
@@ -74,6 +75,21 @@ class NeptuneClusterRemovalPolicyInjector implements IPropertyInjector {
   readonly constructUniqueId = DatabaseCluster.PROPERTY_INJECTION_ID;
 
   inject(originalProps: DatabaseClusterProps): DatabaseClusterProps {
+    return { ...originalProps, removalPolicy: RemovalPolicy.DESTROY, deletionProtection: false };
+  }
+}
+
+/**
+ * A {@link IPropertyInjector} for DynamoDB {@link TableV2} tables that sets
+ * `removalPolicy` to `DESTROY` and `deletionProtection` to `false`. The
+ * builder's secure defaults retain the table and block deletion; teardown
+ * of an ephemeral example stack needs both flipped, same as the Neptune
+ * cluster injector above.
+ */
+class TableV2RemovalPolicyInjector implements IPropertyInjector {
+  readonly constructUniqueId = TableV2.PROPERTY_INJECTION_ID;
+
+  inject(originalProps: TablePropsV2): TablePropsV2 {
     return { ...originalProps, removalPolicy: RemovalPolicy.DESTROY, deletionProtection: false };
   }
 }
@@ -197,10 +213,11 @@ function resolveLogsBucketInStack(
  * - `aws-cdk-lib/aws-logs.LogGroup`
  * - `aws-cdk-lib/aws-ec2.Volume`
  * - `aws-cdk-lib/aws-apigateway.RestApi` (Account + CloudWatch Role)
+ * - `aws-cdk-lib/aws-dynamodb.TableV2` (also clears `deletionProtection`)
  * - `@aws-cdk/aws-neptune-alpha.DatabaseCluster` (also clears `deletionProtection`)
  *
  * If new stateful construct types are added to example stacks (e.g.
- * DynamoDB tables, SQS queues), add a corresponding injector here.
+ * SQS queues), add a corresponding injector here.
  *
  * @param scope - The scope to apply the policy to (typically an `App`).
  */
@@ -211,6 +228,7 @@ export function cleanDeskPolicy(scope: IConstruct): void {
   injectors.add(new RemovalPolicyInjector<VolumeProps>(Volume.PROPERTY_INJECTION_ID));
   injectors.add(new RestApiRemovalPolicyInjector());
   injectors.add(new NeptuneClusterRemovalPolicyInjector());
+  injectors.add(new TableV2RemovalPolicyInjector());
 
   Aspects.of(scope).add(new DisableSourceLoggingOnDeleteAspect());
 }

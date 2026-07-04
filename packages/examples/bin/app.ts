@@ -2,6 +2,7 @@
 import { App } from "aws-cdk-lib";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
 import { createAgentVolumeApp } from "../src/agent-volume-app.js";
+import { createCrudApiApp } from "../src/crud-api-app.js";
 import { createDnsZoneApp } from "../src/dns-zone-app.js";
 import { createDualFunctionApp } from "../src/dual-function-app.js";
 import { createEc2App } from "../src/ec2-app.js";
@@ -17,6 +18,7 @@ const app = new App();
 cleanDeskPolicy(app);
 
 createAgentVolumeApp(app);
+createCrudApiApp(app);
 createDnsZoneApp(app);
 createDualFunctionApp(app);
 createEc2App(app);

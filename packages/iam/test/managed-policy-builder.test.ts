@@ -93,8 +93,7 @@ describe("ManagedPolicyBuilder", () => {
           const stack = Stack.of(r.policy);
           const policies = Template.fromStack(stack).findResources("AWS::IAM::ManagedPolicy");
           const entry = Object.values(policies)[0] as
-            | { Properties: { PolicyDocument: { Statement: { Action: string }[] } } }
-            | undefined;
+            { Properties: { PolicyDocument: { Statement: { Action: string }[] } } } | undefined;
           return (entry?.Properties.PolicyDocument.Statement ?? []).map((s) => s.Action).sort();
         },
       });

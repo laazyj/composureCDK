@@ -357,8 +357,7 @@ describe("BucketDeploymentBuilder", () => {
             "Custom::CDKBucketDeployment",
           );
           const entry = Object.values(deployments)[0] as
-            | { Properties: { DestinationBucketName: unknown } }
-            | undefined;
+            { Properties: { DestinationBucketName: unknown } } | undefined;
           return JSON.stringify(entry?.Properties.DestinationBucketName);
         },
       });

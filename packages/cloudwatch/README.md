@@ -190,12 +190,7 @@ All three action states are supported: `alarmActions`, `okActions`, and `insuffi
 Rules route by _alarm identity_ (id, path, predicate). When you instead need to route by _scope_ — e.g. one SNS topic for everything in `us-east-1` and another for the primary region — call `alarmActionsPolicy` multiple times, once per target scope. If the topics are themselves built by the composed system, this is the case where wrapping in [`afterBuild`](../core/README.md) is load-bearing: the closure captures the build `results` so each call can reference its topic.
 
 ```ts
-compose(
-  { usEast1Alerts: createTopicBuilder(), siteAlerts: createTopicBuilder() },
-  {
-    /* … */
-  },
-)
+compose({ usEast1Alerts: createTopicBuilder(), siteAlerts: createTopicBuilder() }, {/* … */})
   .withStacks({ usEast1Alerts: usEast1AlertsStack, siteAlerts: siteStack })
   .afterBuild((_scope, _id, results) => {
     alarmActionsPolicy(usEast1AlertsStack, {

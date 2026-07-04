@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Effect } from "aws-cdk-lib/aws-iam";
+import { ArnPrincipal, Effect, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { createStatementBuilder, WildcardResourceError } from "../src/statement-builder.js";
 
 describe("StatementBuilder", () => {
@@ -31,6 +31,16 @@ describe("StatementBuilder", () => {
         .build();
 
       expect(stmt.effect).toBe(Effect.ALLOW);
+    });
+
+    it("sets the effect explicitly via effect()", () => {
+      const stmt = createStatementBuilder()
+        .effect(Effect.DENY)
+        .actions(["s3:DeleteObject"])
+        .resources(["*"])
+        .build();
+
+      expect(stmt.effect).toBe(Effect.DENY);
     });
 
     it("supports Deny statements", () => {
@@ -70,6 +80,37 @@ describe("StatementBuilder", () => {
       expect(() =>
         createStatementBuilder().deny().actions(["s3:*"]).resources(["*"]).build(),
       ).not.toThrow();
+    });
+  });
+
+  describe("negated fields and principals", () => {
+    it("passes notActions, notResources and notPrincipals through", () => {
+      const stmt = createStatementBuilder()
+        .deny()
+        .notActions(["s3:DeleteObject", "s3:PutObject"])
+        .notResources(["arn:aws:s3:::locked/*"])
+        .notPrincipals([new ArnPrincipal("arn:aws:iam::111122223333:role/Admin")])
+        .build();
+
+      const rendered = stmt.toJSON() as {
+        NotAction: string[];
+        NotResource: string;
+        NotPrincipal: unknown;
+      };
+      expect(rendered.NotAction).toEqual(["s3:DeleteObject", "s3:PutObject"]);
+      expect(rendered.NotResource).toBe("arn:aws:s3:::locked/*");
+      expect(rendered.NotPrincipal).toBeDefined();
+    });
+
+    it("passes principals through", () => {
+      const principal = new ServicePrincipal("lambda.amazonaws.com");
+      const stmt = createStatementBuilder()
+        .allow()
+        .actions(["sts:AssumeRole"])
+        .principals([principal])
+        .build();
+
+      expect(stmt.principals).toContain(principal);
     });
   });
 

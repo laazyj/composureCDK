@@ -1,5 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { type IRole, ManagedPolicy } from "aws-cdk-lib/aws-iam";
+import { type IGrantable, type IRole, ManagedPolicy } from "aws-cdk-lib/aws-iam";
 import {
   Function as LambdaFunction,
   type FunctionProps,
@@ -7,7 +7,14 @@ import {
 } from "aws-cdk-lib/aws-lambda";
 import type { ILogGroup, LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import {
+  COPY_STATE,
+  type Grant,
+  GrantQueue,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import {
@@ -202,6 +209,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   props: Partial<FunctionBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<LambdaFunction>[] = [];
   readonly #eventSources: EventSourceEntry[] = [];
+  readonly #grants = new GrantQueue<IGrantable>();
   #configureRole?: (rb: IRoleBuilder) => unknown;
   #useCdkAutoRole = false;
 
@@ -279,10 +287,35 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     return this;
   }
 
+  /**
+   * Grant this function's execution role access to a resource built by a
+   * sibling component.
+   *
+   * A Lambda `Function` is an `IGrantable`, so the grant routes onto whichever
+   * execution role the function ends up with (the default least-privilege role,
+   * a {@link configureRole} extension, an external {@link role}, or the CDK
+   * auto-role). Declaring it here keeps the dependency edge pointing from the
+   * function to the resource. Each {@link Grant} comes from a resource
+   * package's capability helper and is applied during {@link build}.
+   *
+   * @see ADR-0013
+   *
+   * @example
+   * ```ts
+   * createFunctionBuilder()
+   *   .grant(bucketGrants.write(ref("bucket", (r) => r.bucket)));
+   * ```
+   */
+  grant(...grants: Grant<IGrantable>[]): this {
+    this.#grants.add(...grants);
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: FunctionBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
     target.#eventSources.push(...this.#eventSources);
+    this.#grants.copyInto(target.#grants);
     target.#configureRole = this.#configureRole;
     target.#useCdkAutoRole = this.#useCdkAutoRole;
   }
@@ -332,6 +365,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     } as FunctionProps;
 
     const fn = new LambdaFunction(scope, id, mergedProps);
+    this.#grants.applyTo(fn, context);
 
     const eventSources: Record<string, IEventSource> = {};
     const attachedEventSources: AttachedEventSource[] = [];

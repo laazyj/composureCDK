@@ -119,7 +119,7 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
       scope,
       id,
       accessLogging,
-      REST_API_DEFAULTS.deployOptions ?? {},
+      REST_API_DEFAULTS.deployOptions,
       restApiProps.deployOptions ?? {},
     );
 

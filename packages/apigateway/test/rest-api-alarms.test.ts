@@ -1,10 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { ApiDefinition, MockIntegration, PassthroughBehavior } from "aws-cdk-lib/aws-apigateway";
+import {
+  ApiDefinition,
+  MockIntegration,
+  PassthroughBehavior,
+  RestApi,
+} from "aws-cdk-lib/aws-apigateway";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { createRestApiBuilder } from "../src/rest-api-builder.js";
 import { createSpecRestApiBuilder } from "../src/spec-rest-api-builder.js";
+import { resolveRestApiAlarmDefinitions } from "../src/rest-api-alarms.js";
 
 function mockIntegration() {
   return new MockIntegration({
@@ -203,6 +209,18 @@ describe("recommended alarms", () => {
       template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
     });
 
+    it("disables only the latency alarm when set to false", () => {
+      const { result, template } = buildResult((b) => {
+        withStubMethod(b);
+        b.recommendedAlarms({ latency: false });
+      });
+
+      expect(result.alarms.clientError).toBeDefined();
+      expect(result.alarms.serverError).toBeDefined();
+      expect(result.alarms.latency).toBeUndefined();
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+    });
+
     it("disables multiple individual alarms", () => {
       const { result, template } = buildResult((b) => {
         withStubMethod(b);
@@ -225,6 +243,15 @@ describe("recommended alarms", () => {
         AlarmActions: Match.absent(),
       });
     });
+  });
+});
+
+describe("resolveRestApiAlarmDefinitions", () => {
+  it("returns no definitions when explicitly disabled", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const api = new RestApi(stack, "TestApi");
+
+    expect(resolveRestApiAlarmDefinitions(api, { enabled: false })).toEqual([]);
   });
 });
 

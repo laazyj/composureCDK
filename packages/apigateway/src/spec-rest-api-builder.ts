@@ -68,7 +68,7 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
       scope,
       id,
       accessLogging,
-      SPEC_REST_API_DEFAULTS.deployOptions ?? {},
+      SPEC_REST_API_DEFAULTS.deployOptions,
       specRestApiProps.deployOptions ?? {},
     );
 

@@ -71,8 +71,9 @@ Concretely, the seam has three layers:
    `IGrantable`: `tableGrants` (`read`/`write`/`readWrite`/`fullAccess`),
    `queueGrants` (`consume`/`send`/`purge`), `bucketGrants`
    (`read`/`write`/`readWrite`/`put`/`delete`), `topicGrants`
-   (`publish`/`subscribe`). One `tableGrants` serves both DynamoDB builders
-   because `Table` and `TableV2` share `ITable`.
+   (`publish`/`subscribe`), `functionGrants` (`invoke`/`invokeUrl`). One
+   `tableGrants` serves both DynamoDB builders because `Table` and `TableV2`
+   share `ITable`.
 3. **Grantee builders** expose `grant(...)`, backed by a `GrantQueue<IGrantable>`
    applied in `build()`.
 
@@ -85,6 +86,13 @@ aws-cdk-lib's `IGrantable`. `RoleBuilder`'s `Role` implements it directly;
 `IGrantable` is thus the test for a grantee builder. A resource is never
 `IGrantable`, so the mutation always lands on the grantee's principal, never on
 the resource.
+
+Grantee and resource are roles a construct plays, not fixed identities: the same
+construct can be both. A Lambda `Function` is a grantee via
+`createFunctionBuilder().grant(...)` (it reaches out to a table or bucket) and,
+in the opposite direction, an invokable resource via `functionGrants.invoke(...)`
+(some other grantee is allowed to call it). The two are distinct edges pointing
+opposite ways, so each is declared on its own consumer.
 
 ```ts
 compose(

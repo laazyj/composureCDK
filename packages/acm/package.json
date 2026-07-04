@@ -56,7 +56,7 @@
     "constructs": "^10.0.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.1.0",
     "aws-cdk-lib": "^2.258.1",
     "constructs": "^10.6.0",
     "typescript": "^6.0.3",

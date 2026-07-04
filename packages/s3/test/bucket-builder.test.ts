@@ -397,8 +397,7 @@ describe("BucketBuilder", () => {
 
       const logBucket = findLogBucket(template);
       const lifecycle = logBucket.Properties.LifecycleConfiguration as
-        | { Rules: Record<string, unknown>[] }
-        | undefined;
+        { Rules: Record<string, unknown>[] } | undefined;
       const rules = lifecycle?.Rules ?? [];
       expect(rules).toHaveLength(1);
       expect(rules[0]).toMatchObject({ Id: "ShortLogs", ExpirationInDays: 30 });

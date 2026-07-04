@@ -83,9 +83,7 @@ import { createServiceRoleBuilder } from "@composurecdk/iam";
 
 const lambdaRole = createServiceRoleBuilder("lambda.amazonaws.com")
   .description("Execution role for StopEC2 Lambda")
-  .addInlinePolicyStatements("StopEC2", [
-    /* statements */
-  ]);
+  .addInlinePolicyStatements("StopEC2", [/* statements */]);
 ```
 
 Thin sugar over `createRoleBuilder().assumedBy(new ServicePrincipal(...))`.

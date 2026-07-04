@@ -47,9 +47,7 @@ The `recommended` preset also bans the TypeScript `private` modifier via `no-res
        messages: { someId: "..." },
      },
      create(ctx) {
-       return {
-         /* visitor */
-       };
+       return {/* visitor */};
      },
    };
    ```

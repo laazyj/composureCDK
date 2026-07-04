@@ -99,8 +99,7 @@ export function tags<T extends object = object>(defs: TagDefinitions<T>): AfterB
     validateTagRecord(defs.system);
   }
   const byComponent = defs.byComponent as
-    | Record<string, Record<string, string> | undefined>
-    | undefined;
+    Record<string, Record<string, string> | undefined> | undefined;
   if (byComponent) {
     for (const componentTags of Object.values(byComponent)) {
       if (componentTags === undefined) continue;

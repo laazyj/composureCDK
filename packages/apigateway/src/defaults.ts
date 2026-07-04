@@ -33,7 +33,7 @@ export const DEPLOY_OPTIONS_DEFAULTS: StageOptions = {
  * {@link createRestApiBuilder}. Each property can be individually overridden
  * via the builder's fluent API.
  */
-export const REST_API_DEFAULTS: Partial<RestApiBuilderProps> = {
+export const REST_API_DEFAULTS = {
   /**
    * Automatically create an access log group with structured JSON output.
    * Access logging provides an audit trail of all API calls for security
@@ -43,14 +43,14 @@ export const REST_API_DEFAULTS: Partial<RestApiBuilderProps> = {
   accessLogging: true,
 
   deployOptions: DEPLOY_OPTIONS_DEFAULTS,
-};
+} satisfies Partial<RestApiBuilderProps>;
 
 /**
  * Secure, AWS-recommended defaults applied to every spec-driven REST API
  * built with {@link createSpecRestApiBuilder}. Each property can be
  * individually overridden via the builder's fluent API.
  */
-export const SPEC_REST_API_DEFAULTS: Partial<SpecRestApiBuilderProps> = {
+export const SPEC_REST_API_DEFAULTS = {
   /**
    * Automatically create an access log group with structured JSON output.
    * @see https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/opex-logging.html
@@ -58,4 +58,4 @@ export const SPEC_REST_API_DEFAULTS: Partial<SpecRestApiBuilderProps> = {
   accessLogging: true,
 
   deployOptions: DEPLOY_OPTIONS_DEFAULTS,
-};
+} satisfies Partial<SpecRestApiBuilderProps>;

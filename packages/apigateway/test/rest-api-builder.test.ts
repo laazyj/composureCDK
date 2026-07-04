@@ -149,6 +149,14 @@ describe("RestApiBuilder", () => {
       });
     });
 
+    it("creates a method with no explicit integration", () => {
+      const template = synthTemplate((b) => b.restApiName("My Service").addMethod("GET"));
+
+      template.hasResourceProperties("AWS::ApiGateway::Method", {
+        HttpMethod: "GET",
+      });
+    });
+
     it("creates nested resources", () => {
       const template = synthTemplate((b) =>
         withStubMethod(b.restApiName("My Service")).addResource("users", (users) =>

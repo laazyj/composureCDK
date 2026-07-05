@@ -22,6 +22,20 @@ describe("sanitizeConstructId", () => {
   it("handles the empty string", () => {
     expect(sanitizeConstructId("")).toBe("");
   });
+
+  it("throws on braces and brackets", () => {
+    for (const raw of ["a{b", "a}b", "a[b", "a]b", "${Token[TOKEN.7]}"]) {
+      expect(() => sanitizeConstructId(raw)).toThrow(/not allowed/);
+    }
+  });
+
+  it("names the leaked token in the error", () => {
+    expect(() => sanitizeConstructId("${Token[TOKEN.7]}")).toThrow(/unresolved CDK token/);
+  });
+
+  it("does not reject a lone dollar sign", () => {
+    expect(sanitizeConstructId("cost$center")).toBe("cost$center");
+  });
 });
 
 describe("constructId", () => {
@@ -42,5 +56,9 @@ describe("constructId", () => {
 
   it("returns an empty string when every part is falsy", () => {
     expect(constructId(undefined, null, false, "")).toBe("");
+  });
+
+  it("throws when any part contains a leaked token", () => {
+    expect(() => constructId("records", "${Token[TOKEN.7]}")).toThrow(/not allowed/);
   });
 });

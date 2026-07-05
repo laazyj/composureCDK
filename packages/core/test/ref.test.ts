@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ref, resolve, isRef, REF_BRAND, type Resolvable } from "../src/ref.js";
+import { ref, combine, resolve, isRef, REF_BRAND, type Resolvable } from "../src/ref.js";
 
 interface FakeResult {
   value: string;
@@ -88,6 +88,81 @@ describe("Ref", () => {
 
       expect(r.resolve(fakeContext)).toEqual({ label: "hello-42" });
     });
+  });
+});
+
+describe("combine", () => {
+  it("merges several refs into a record keyed the same as the input", () => {
+    const c = combine({
+      first: ref<FakeResult>("component"),
+      second: ref<{ name: string }>("other"),
+    });
+
+    expect(c.resolve(fakeContext)).toEqual({
+      first: { value: "hello", nested: { id: 42 } },
+      second: { name: "world" },
+    });
+  });
+
+  it("resolves each entry independently against the context", () => {
+    const c = combine({
+      value: ref<FakeResult>("component").get("value"),
+      name: ref<{ name: string }>("other").get("name"),
+    });
+
+    expect(c.resolve(fakeContext)).toEqual({ value: "hello", name: "world" });
+  });
+
+  it("applies a transform over the merged record", () => {
+    const c = combine(
+      {
+        value: ref<FakeResult>("component").get("value"),
+        name: ref<{ name: string }>("other").get("name"),
+      },
+      ({ value, name }) => `${value} ${name}`,
+    );
+
+    expect(c.resolve(fakeContext)).toBe("hello world");
+  });
+
+  it("mixes concrete values and refs", () => {
+    const c = combine({
+      table: ref<FakeResult>("component"),
+      literal: "concrete",
+    });
+
+    expect(c.resolve(fakeContext)).toEqual({
+      table: { value: "hello", nested: { id: 42 } },
+      literal: "concrete",
+    });
+  });
+
+  it("propagates the component-not-found error from a missing ref", () => {
+    const c = combine({
+      present: ref<FakeResult>("component"),
+      absent: ref<FakeResult>("missing"),
+    });
+
+    expect(() => c.resolve(fakeContext)).toThrow('Ref to "missing" cannot be resolved');
+  });
+
+  it("returns a real Ref that composes with map and get", () => {
+    const c = combine({
+      value: ref<FakeResult>("component").get("value"),
+      name: ref<{ name: string }>("other").get("name"),
+    });
+
+    expect(isRef(c)).toBe(true);
+    expect(c.get("value").resolve(fakeContext)).toBe("hello");
+    expect(c.map((r) => r.name.toUpperCase()).resolve(fakeContext)).toBe("WORLD");
+  });
+
+  it("is interchangeable with a concrete value at a Resolvable seam", () => {
+    const c: Resolvable<{ value: string }> = combine({
+      value: ref<FakeResult>("component").get("value"),
+    });
+
+    expect(resolve(c, fakeContext)).toEqual({ value: "hello" });
   });
 });
 

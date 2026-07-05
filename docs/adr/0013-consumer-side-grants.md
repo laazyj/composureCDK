@@ -124,7 +124,10 @@ compose(
   package and a grantee, as it already does.
 - **Out of scope.** API Gateway AWS-service integrations, whose `credentialsRole`
   has no owner in the current builder surface and so cannot yet be a grantee
-  (tracked in laazyj/composureCDK#270); and Neptune's `allowAccessFrom`, which
+  (tracked in laazyj/composureCDK#270; resolved by keeping the role an explicit
+  sibling and merging it with the integration target via `combine`, see
+  [ADR-0015](0015-combine-multi-ref-combinator.md)); and Neptune's
+  `allowAccessFrom`, which
   couples an IAM grant with a security-group rule and will migrate its IAM half to
   a consumer-side `clusterGrants.connect(...)` in a separate breaking change.
 

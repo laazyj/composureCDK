@@ -43,3 +43,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0012: Explicit build id — decouple the construct id from the compose key](0012-explicit-build-id-decoupled-from-compose-key.md)
 - [ADR-0013: Consumer-side IAM grants — declare a grant where the dependency already points](0013-consumer-side-grants.md)
 - [ADR-0014: Role-parameterized builders for mutually-exclusive L2 surfaces](0014-role-parameterized-queue-builder.md)
+- [ADR-0015: Combining multiple refs into one — the `combine()` Ref combinator](0015-combine-multi-ref-combinator.md)

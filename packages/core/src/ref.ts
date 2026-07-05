@@ -64,6 +64,30 @@ export class Ref<T> {
   }
 
   /**
+   * Creates a `Ref` that resolves a record of {@link Resolvable} values into a
+   * record of their resolved results.
+   *
+   * Backs the {@link combine} factory. Each entry is resolved against the build
+   * context independently, so a single consumer can gather values from several
+   * siblings at once — the gap {@link Ref.to} leaves, since it reaches only one
+   * component.
+   *
+   * @param refs - A record whose values are concrete values or `Ref`s.
+   * @returns A `Ref` to the record of resolved values.
+   */
+  static combine<R extends Record<string, unknown>>(
+    refs: R,
+  ): Ref<{ [K in keyof R]: Resolved<R[K]> }> {
+    return new Ref((context) => {
+      const resolved = {} as { [K in keyof R]: Resolved<R[K]> };
+      for (const key of Object.keys(refs) as (keyof R)[]) {
+        resolved[key] = resolve(refs[key] as Resolvable<Resolved<R[typeof key]>>, context);
+      }
+      return resolved;
+    });
+  }
+
+  /**
    * Narrows this reference to a specific property of the resolved value.
    *
    * @param key - The property key to select.
@@ -134,6 +158,61 @@ export function ref<T extends object, U>(
   transform?: (value: T) => U,
 ): Ref<T> | Ref<U> {
   const base = Ref.to<T>(component);
+  return transform ? base.map(transform) : base;
+}
+
+/**
+ * The concrete type a {@link Resolvable} resolves to: the inner type of a
+ * {@link Ref}, or the value itself when it is already concrete. Mirrors what
+ * {@link resolve} returns at runtime.
+ */
+export type Resolved<R> = R extends Ref<infer T> ? T : R;
+
+/**
+ * Combines several {@link Resolvable} values into a single {@link Ref} of their
+ * resolved results, keyed the same way as the input record.
+ *
+ * `ref()` reaches exactly one component, so a consumer that must assemble a
+ * construct from **more than one** sibling has no single reference to hand to a
+ * `Resolvable<T>` seam. `combine` closes that gap: it resolves each entry
+ * against the build context and returns one `Ref`, which drops into any place a
+ * `Ref`/`Resolvable` is already accepted — no change to the consuming builder.
+ *
+ * Entries may mix concrete values and refs. Pass a `transform` to adapt the
+ * merged record into the shape the consumer needs (a shorthand for
+ * `combine(refs).map(transform)`).
+ *
+ * @param refs - A record whose values are concrete values or `Ref`s.
+ * @param transform - Optional function mapping the merged record to a new value.
+ * @returns A `Ref` to the merged record, optionally transformed.
+ *
+ * @example
+ * ```ts
+ * // One integration assembled from two siblings — a table and a credentials role
+ * addMethod("GET", combine(
+ *   { table: ref<TableV2BuilderResult>("table"), role: ref<RoleBuilderResult>("apiRole") },
+ *   ({ table, role }) => new AwsIntegration({
+ *     service: "dynamodb", action: "Scan",
+ *     options: {
+ *       credentialsRole: role.role,
+ *       requestTemplates: { "application/json": scanTemplate(table.table.tableName) },
+ *     },
+ *   }),
+ * ))
+ * ```
+ */
+export function combine<R extends Record<string, unknown>>(
+  refs: R,
+): Ref<{ [K in keyof R]: Resolved<R[K]> }>;
+export function combine<R extends Record<string, unknown>, U>(
+  refs: R,
+  transform: (values: { [K in keyof R]: Resolved<R[K]> }) => U,
+): Ref<U>;
+export function combine<R extends Record<string, unknown>, U>(
+  refs: R,
+  transform?: (values: { [K in keyof R]: Resolved<R[K]> }) => U,
+): Ref<{ [K in keyof R]: Resolved<R[K]> }> | Ref<U> {
+  const base = Ref.combine(refs);
   return transform ? base.map(transform) : base;
 }
 

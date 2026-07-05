@@ -15,6 +15,18 @@
 const UNSAFE = /[/\x00-\x1f\x7f]/g;
 
 /**
+ * Characters that are never legitimate in a construct ID. Braces and brackets
+ * signal a leaked CDK token — a string token always encodes as
+ * `${Token[TOKEN.n]}`, which contains all four — but no valid DNS name, ARN, or
+ * path contains them either, so rejecting them is safe for real inputs.
+ *
+ * `$` is deliberately excluded: on its own it is borderline (it can appear in
+ * odd-but-legal names), and the brace/bracket set already catches the token
+ * encoding.
+ */
+const REJECTED = /[{}[\]]/;
+
+/**
  * Return a construct-ID-safe copy of `raw` by replacing unsafe characters
  * (`/` and control characters) with a single `-`.
  *
@@ -22,13 +34,30 @@ const UNSAFE = /[/\x00-\x1f\x7f]/g;
  * permissive, and collapsing further (e.g., to PascalCase) would destroy
  * information a reader expects to see in the synthesised tree.
  *
+ * Throws on `{`, `}`, `[`, or `]`. These never appear in a well-formed ID; in
+ * practice they mean an unresolved CDK token (`${Token[TOKEN.n]}`) has leaked
+ * into an ID, which yields an unstable logical ID whose hash churns with the
+ * token counter. Failing here surfaces the mistake at its source rather than
+ * silently stripping it to a stable-looking but still-broken ID. Core stays
+ * `aws-cdk-lib`-free, so this is a character check, not a `Token.isUnresolved`
+ * check — callers that need token-aware handling must guard before calling.
+ *
  * @example
  * ```ts
  * sanitizeConstructId("a/b")       // "a-b"
  * sanitizeConstructId("_sip._tcp") // "_sip._tcp" (unchanged)
+ * sanitizeConstructId("${Token[TOKEN.7]}") // throws
  * ```
  */
 export function sanitizeConstructId(raw: string): string {
+  if (REJECTED.test(raw)) {
+    throw new Error(
+      `Invalid construct ID ${JSON.stringify(raw)}: ` +
+        `the characters { } [ ] are not allowed. ` +
+        `This usually means an unresolved CDK token has leaked into a construct ID — ` +
+        `supply a stable, static ID instead.`,
+    );
+  }
   return raw.replace(UNSAFE, "-");
 }
 
@@ -39,7 +68,9 @@ export function sanitizeConstructId(raw: string): string {
  *
  * Intended for composing IDs from a mix of static prefixes and user-supplied
  * fragments — the sanitization step means callers don't have to reason about
- * what characters their inputs might contain.
+ * most characters their inputs might contain. Throws if any part contains
+ * `{ } [ ]` (see {@link sanitizeConstructId}), which signals a leaked CDK
+ * token.
  *
  * @example
  * ```ts

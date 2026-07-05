@@ -340,6 +340,50 @@ Internally, the builder stores the `Resolvable<T>` as-is. At build time, it call
 
 `resolve` distinguishes a `Ref` from a concrete value via the `isRef` guard. `isRef` recognises a `Ref` by a `Symbol.for("composurecdk.ref")` brand rather than `instanceof` — because packages are published dual ESM/CJS ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)), the ESM and CommonJS copies of `@composurecdk/core` can both load in one process, and `instanceof` is realm-bound. The `Symbol.for(...)` brand is shared across realms, so a `Ref` minted by either copy is still recognised.
 
+### Combining refs — one consumer, many dependencies
+
+A `ref` reaches exactly one component. Most wiring needs only that: a consumer adapts one dependency's output into the shape it needs. But some constructs are assembled from **more than one** sibling at once. A direct API Gateway → AWS-service `AwsIntegration`, for example, needs both the target's identifier (a table's `tableName`, for the VTL request template) **and** a credentials role — two separate siblings, and a single `ref` cannot carry both.
+
+`combine` closes that gap. It takes a record of `Resolvable` values, resolves each against the build context, and returns a **single `Ref`** to the merged record — optionally transformed:
+
+```typescript
+compose(
+  {
+    table: createTableBuilder(),
+    apiRole: createServiceRoleBuilder("apigateway.amazonaws.com").grant(
+      tableGrants.read(ref("table", (r) => r.table)),
+    ),
+    api: createRestApiBuilder().addResource("gadgets", (g) =>
+      g.addMethod(
+        "GET",
+        combine(
+          { table: ref<TableV2BuilderResult>("table"), role: ref<RoleBuilderResult>("apiRole") },
+          ({ table, role }) =>
+            new AwsIntegration({
+              service: "dynamodb",
+              action: "Scan",
+              options: {
+                credentialsRole: role.role,
+                requestTemplates: { "application/json": scanTemplate(table.table.tableName) },
+              },
+            }),
+        ),
+      ),
+    ),
+  },
+  { table: [], apiRole: ["table"], api: ["table", "apiRole"] },
+);
+```
+
+Because `combine` returns a `Ref`, it drops into any place a `Resolvable<T>` is already accepted — here `addMethod` — with **no change to the consuming builder**. The merged record's keys and types are inferred from the input, so `({ table, role })` is fully typed. Entries may mix concrete values and refs, and the result composes with `.get()`/`.map()` like any other `Ref`.
+
+`combine` is for **assembling one construct from several siblings** — nothing more. It is deliberately not an ownership mechanism: the credentials role above is an ordinary sibling the system declares and grants against with [consumer-side grants](adr/0013-consumer-side-grants.md), visible in the `compose` graph, exactly as CDK would have you write it. Reach for it only when a single `ref` genuinely cannot express the dependency:
+
+- **One sibling, reshaped?** Use `ref(component, transform)` or `.get()`/`.map()`. `combine` of a single entry adds a needless wrapper.
+- **Wiring a permission?** Use a consumer-side grant on the grantee, not a `combine` that hand-rolls a role into a construct.
+
+See [ADR-0015](adr/0015-combine-multi-ref-combinator.md) for the full rationale, including the fake-`Lifecycle` merge anti-pattern it replaces.
+
 ### Implementing Ref support in a builder
 
 A builder that accepts cross-component references follows this pattern:

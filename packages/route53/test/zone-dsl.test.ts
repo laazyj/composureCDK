@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { App, Duration, Lazy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
@@ -469,5 +469,117 @@ describe("zoneRecords", () => {
         .zone(zone)
         .build(stack, "DNS"),
     ).toThrow(/only one alias record/);
+  });
+});
+
+describe("zoneRecords — absolute and token names", () => {
+  it("emits a concrete absolute name verbatim instead of appending the zone", () => {
+    const { stack, zone } = setup();
+    zoneRecords([
+      CNAME("sel._domainkey.other.net", "t.dkim.amazonses.com.", { absoluteName: true }),
+    ])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "CNAME",
+      Name: "sel._domainkey.other.net.",
+    });
+  });
+
+  it("appends the zone to the same name when absoluteName is not set (baseline)", () => {
+    const { stack, zone } = setup();
+    zoneRecords([CNAME("sel._domainkey.other.net", "t.example.com.")])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Name: "sel._domainkey.other.net.example.com.",
+    });
+  });
+
+  it("normalises an already-dotted absolute name to a single trailing dot", () => {
+    const { stack, zone } = setup();
+    zoneRecords([CNAME("x.other.net.", "t.example.com.", { absoluteName: true })])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Name: "x.other.net.",
+    });
+  });
+
+  it("supports absoluteName for non-CNAME record types too", () => {
+    const { stack, zone } = setup();
+    zoneRecords([TXT("_verify.other.net", "token", { absoluteName: true })])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "TXT",
+      Name: "_verify.other.net.",
+    });
+  });
+
+  it("rejects a token record name with no explicit id", () => {
+    const { stack, zone } = setup();
+    const tokenName = Lazy.string({ produce: () => "sel._domainkey.ask.example.com" });
+
+    expect(() =>
+      zoneRecords([CNAME(tokenName, "t.dkim.amazonses.com.", { absoluteName: true })])
+        .zone(zone)
+        .build(stack, "DNS"),
+    ).toThrow(/unresolved token[\s\S]*explicit id/);
+  });
+
+  it("accepts a token name with an explicit id, keying the result and Name correctly", () => {
+    const { stack, zone } = setup();
+    const tokenName = Lazy.string({ produce: () => "sel._domainkey.ask.example.com" });
+
+    const built = zoneRecords([
+      CNAME(tokenName, "t.dkim.amazonses.com.", { id: "dkim1", absoluteName: true }),
+    ])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    // Result-map key is the stable id, not the token.
+    expect(Object.keys(built.cname)).toEqual(["dkim1"]);
+    // Name is the token verbatim — no zone appended, no trailing dot added.
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "CNAME",
+      Name: "sel._domainkey.ask.example.com",
+    });
+  });
+
+  it("keeps id and absoluteName orthogonal: a token with id but no absoluteName is still qualified", () => {
+    const { stack, zone } = setup();
+    const label = Lazy.string({ produce: () => "generated" });
+
+    zoneRecords([CNAME(label, "t.example.com.", { id: "gen" })])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Name: "generated.example.com.",
+    });
+  });
+
+  it("gives token-named records stable construct ids from their explicit id", () => {
+    const { stack, zone } = setup();
+    const t1 = Lazy.string({ produce: () => "a._domainkey.ask.example.com" });
+    const t2 = Lazy.string({ produce: () => "b._domainkey.ask.example.com" });
+
+    const built = zoneRecords([
+      CNAME(t1, "a.dkim.amazonses.com.", { id: "dkim1", absoluteName: true }),
+      CNAME(t2, "b.dkim.amazonses.com.", { id: "dkim2", absoluteName: true }),
+    ])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    expect(Object.keys(built.cname).sort()).toEqual(["dkim1", "dkim2"]);
+    Template.fromStack(stack).resourceCountIs("AWS::Route53::RecordSet", 2);
+    const ids = stack.node.findAll().map((c) => c.node.id);
+    expect(ids).toContain("dkim1");
+    expect(ids).toContain("dkim2");
   });
 });

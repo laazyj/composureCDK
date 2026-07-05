@@ -26,6 +26,7 @@ import {
   CAA_ISSUE,
   CAA_ISSUEWILD,
   CNAME,
+  DKIM,
   DS,
   HTTPS,
   MX,
@@ -581,5 +582,76 @@ describe("zoneRecords — absolute and token names", () => {
     const ids = stack.node.findAll().map((c) => c.node.id);
     expect(ids).toContain("dkim1");
     expect(ids).toContain("dkim2");
+  });
+});
+
+describe("DKIM", () => {
+  it("maps pairs to absolute CNAME specs with stable ids", () => {
+    const specs = DKIM([
+      { name: "n1", value: "v1" },
+      { name: "n2", value: "v2" },
+      { name: "n3", value: "v3" },
+    ]);
+
+    expect(specs).toEqual([
+      { type: "CNAME", name: "n1", target: "v1", id: "dkim1", absoluteName: true },
+      { type: "CNAME", name: "n2", target: "v2", id: "dkim2", absoluteName: true },
+      { type: "CNAME", name: "n3", target: "v3", id: "dkim3", absoluteName: true },
+    ]);
+  });
+
+  it("applies a custom id prefix and common options", () => {
+    const ttl = Duration.minutes(30);
+    const specs = DKIM([{ name: "n1", value: "v1" }], { idPrefix: "mail", ttl, comment: "SES" });
+
+    expect(specs[0]).toEqual({
+      type: "CNAME",
+      name: "n1",
+      target: "v1",
+      id: "mail1",
+      absoluteName: true,
+      ttl,
+      comment: "SES",
+    });
+  });
+
+  it("returns an empty list for no records", () => {
+    expect(DKIM([])).toEqual([]);
+  });
+
+  it("publishes token-named DKIM CNAMEs verbatim through zoneRecords", () => {
+    const { stack, zone } = setup();
+    // Mirrors SES EmailIdentity.dkimDnsTokenName1 — a token already carrying
+    // the full domain, which the plain CNAME builder would double-append.
+    const tokenName = Lazy.string({ produce: () => "abc._domainkey.ask.example.com" });
+
+    const built = zoneRecords([...DKIM([{ name: tokenName, value: "abc.dkim.amazonses.com" }])])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    expect(Object.keys(built.cname)).toEqual(["dkim1"]);
+    const template = Template.fromStack(stack);
+    template.resourceCountIs("AWS::Route53::RecordSet", 1);
+    template.hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "CNAME",
+      Name: "abc._domainkey.ask.example.com",
+      ResourceRecords: ["abc.dkim.amazonses.com"],
+    });
+  });
+
+  it("avoids construct-id collisions across identities via idPrefix", () => {
+    const { stack, zone } = setup();
+
+    const built = zoneRecords([
+      ...DKIM([{ name: "a._domainkey.example.com", value: "a.dkim.amazonses.com" }]),
+      ...DKIM([{ name: "b._domainkey.other.net", value: "b.dkim.amazonses.com" }], {
+        idPrefix: "other",
+      }),
+    ])
+      .zone(zone)
+      .build(stack, "DNS");
+
+    expect(Object.keys(built.cname).sort()).toEqual(["dkim1", "other1"]);
+    Template.fromStack(stack).resourceCountIs("AWS::Route53::RecordSet", 2);
   });
 });

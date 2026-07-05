@@ -446,3 +446,65 @@ export function ALIAS(
   const { ipv6 = false, ...rest } = options;
   return { type: "ALIAS", name, target, ipv6, ...rest };
 }
+
+/** A single DKIM CNAME to publish: a record `name` and the `value` it points at. */
+export interface DkimRecord {
+  readonly name: string;
+  readonly value: string;
+}
+
+/** Options for {@link DKIM}. */
+export interface DkimOptions {
+  /** TTL for the DKIM record sets. Falls back to the CNAME builder's default. */
+  readonly ttl?: Duration;
+  /** Optional comment applied to every emitted record. */
+  readonly comment?: string;
+  /**
+   * Prefix for the stable per-record ids (`<prefix>1`, `<prefix>2`, …).
+   * Defaults to `"dkim"`. Set a distinct prefix when publishing DKIM for more
+   * than one identity into the same zone, so their construct ids don't collide.
+   */
+  readonly idPrefix?: string;
+}
+
+/**
+ * Publish CNAME-delegation DKIM records — the shape SES Easy DKIM (three
+ * CNAMEs) and other ESPs that hand you CNAMEs produce. Spread the result into
+ * {@link zoneRecords}.
+ *
+ * Each record is emitted with {@link RecordOptions.absoluteName} set, so a
+ * token name that already carries the full domain (SES `dkimDnsTokenName*`) is
+ * published verbatim rather than double-appended against the zone, and with a
+ * stable {@link RecordOptions.id} (`dkim1`, `dkim2`, …) so the token name never
+ * reaches the construct id.
+ *
+ * Takes structural `{ name, value }` pairs rather than an SES `EmailIdentity`,
+ * keeping this package provider-agnostic — adapt an identity's
+ * `dkimDnsTokenName*` / `dkimDnsTokenValue*` into pairs at the call site (or via
+ * a future SES `.publishDkim()`). For TXT-style BYODKIM (a single
+ * `selector._domainkey` TXT with the public key) use {@link TXT} directly — it
+ * has no token-name gotcha.
+ *
+ * @example
+ * ```ts
+ * zoneRecords([
+ *   ...DKIM([
+ *     { name: identity.dkimDnsTokenName1, value: identity.dkimDnsTokenValue1 },
+ *     { name: identity.dkimDnsTokenName2, value: identity.dkimDnsTokenValue2 },
+ *     { name: identity.dkimDnsTokenName3, value: identity.dkimDnsTokenValue3 },
+ *   ]),
+ * ]).zone(zone);
+ * ```
+ */
+export function DKIM(records: readonly DkimRecord[], options: DkimOptions = {}): CnameRecordSpec[] {
+  const { idPrefix = "dkim", ...common } = options;
+  return records.map((record, i) => ({
+    type: "CNAME",
+    name: record.name,
+    target: record.value,
+    ...common,
+    // Forced last so they can never be shadowed by a caller option.
+    id: `${idPrefix}${String(i + 1)}`,
+    absoluteName: true,
+  }));
+}

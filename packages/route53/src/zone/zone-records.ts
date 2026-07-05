@@ -1,4 +1,10 @@
-import { type IHostedZone, RecordTarget } from "aws-cdk-lib/aws-route53";
+import { Token } from "aws-cdk-lib";
+import {
+  type CfnRecordSet,
+  type IHostedZone,
+  type RecordSet,
+  RecordTarget,
+} from "aws-cdk-lib/aws-route53";
 import { Construct, type IConstruct } from "constructs";
 import { constructId, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type AaaaRecordBuilderResult, createAaaaRecordBuilder } from "../aaaa-record-builder.js";
@@ -150,87 +156,85 @@ class ZoneRecordsBuilder implements IZoneRecordsBuilder {
     };
     for (const group of groupRecords(this.#specs)) {
       const head = group[0];
+      // Identity (construct id + result-map key) is decoupled from the DNS
+      // name: `id` overrides `name` when supplied. This is what lets a
+      // token-named record (SES DKIM) keep a stable, readable id.
+      const key = head.id ?? head.name;
+      if (Token.isUnresolved(key)) {
+        throw new Error(
+          `zoneRecords: the ${head.type} record has an unresolved token as its name ` +
+            `and no explicit id. A token cannot be a stable construct id — pass ` +
+            `{ id: "..." } in the record options.`,
+        );
+      }
       // Use the APEX sentinel ("@") as the result-map key, but a readable
       // "Apex" as the construct id so the synthesised logical ID keeps a
       // human-visible marker. ("@" sanitises to empty and produces opaque
       // logical IDs like `DNSrecordsa85669662`.) CDK's duplicate-id check
       // catches the rare case of a user-supplied label also spelled "Apex".
-      const key = head.name;
       const childId = key === APEX ? "Apex" : constructId(key);
+      // `absoluteName` emits the DNS name verbatim. CDK's L2 always qualifies
+      // `recordName`, so the only faithful path is to override the built
+      // record set's `Name` after the fact — see overrideAbsoluteName.
+      const absolute = pickOption(group, "absoluteName");
+      const abs = <T extends { record: RecordSet }>(built: T): T => {
+        if (absolute) overrideAbsoluteName(built.record, head.name);
+        return built;
+      };
       switch (head.type) {
         case "A":
-          result.a[key] = buildA(subScope("a"), childId, group as ARecordSpec[], zone, context);
+          result.a[key] = abs(
+            buildA(subScope("a"), childId, group as ARecordSpec[], zone, context),
+          );
           break;
         case "AAAA":
-          result.aaaa[key] = buildAaaa(
-            subScope("aaaa"),
-            childId,
-            group as AaaaRecordSpec[],
-            zone,
-            context,
+          result.aaaa[key] = abs(
+            buildAaaa(subScope("aaaa"), childId, group as AaaaRecordSpec[], zone, context),
           );
           break;
         case "CNAME":
-          result.cname[key] = buildCname(
-            subScope("cname"),
-            childId,
-            group as CnameRecordSpec[],
-            zone,
-            context,
+          result.cname[key] = abs(
+            buildCname(subScope("cname"), childId, group as CnameRecordSpec[], zone, context),
           );
           break;
         case "TXT":
-          result.txt[key] = buildTxt(
-            subScope("txt"),
-            childId,
-            group as TxtRecordSpec[],
-            zone,
-            context,
+          result.txt[key] = abs(
+            buildTxt(subScope("txt"), childId, group as TxtRecordSpec[], zone, context),
           );
           break;
         case "MX":
-          result.mx[key] = buildMx(subScope("mx"), childId, group as MxRecordSpec[], zone, context);
+          result.mx[key] = abs(
+            buildMx(subScope("mx"), childId, group as MxRecordSpec[], zone, context),
+          );
           break;
         case "SRV":
-          result.srv[key] = buildSrv(
-            subScope("srv"),
-            childId,
-            group as SrvRecordSpec[],
-            zone,
-            context,
+          result.srv[key] = abs(
+            buildSrv(subScope("srv"), childId, group as SrvRecordSpec[], zone, context),
           );
           break;
         case "CAA":
-          result.caa[key] = buildCaa(
-            subScope("caa"),
-            childId,
-            group as CaaRecordSpec[],
-            zone,
-            context,
+          result.caa[key] = abs(
+            buildCaa(subScope("caa"), childId, group as CaaRecordSpec[], zone, context),
           );
           break;
         case "NS":
-          result.ns[key] = buildNs(subScope("ns"), childId, group as NsRecordSpec[], zone, context);
+          result.ns[key] = abs(
+            buildNs(subScope("ns"), childId, group as NsRecordSpec[], zone, context),
+          );
           break;
         case "DS":
-          result.ds[key] = buildDs(subScope("ds"), childId, group as DsRecordSpec[], zone, context);
+          result.ds[key] = abs(
+            buildDs(subScope("ds"), childId, group as DsRecordSpec[], zone, context),
+          );
           break;
         case "HTTPS":
-          result.https[key] = buildHttps(
-            subScope("https"),
-            childId,
-            group as HttpsRecordSpec[],
-            zone,
-            context,
+          result.https[key] = abs(
+            buildHttps(subScope("https"), childId, group as HttpsRecordSpec[], zone, context),
           );
           break;
         case "SVCB":
-          result.svcb[key] = buildSvcb(
-            subScope("svcb"),
-            childId,
-            group as SvcbRecordSpec[],
-            zone,
-            context,
+          result.svcb[key] = abs(
+            buildSvcb(subScope("svcb"), childId, group as SvcbRecordSpec[], zone, context),
           );
           break;
         case "ALIAS": {
@@ -244,9 +248,9 @@ class ZoneRecordsBuilder implements IZoneRecordsBuilder {
           }
           const spec = aliasGroup[0];
           if (spec.ipv6) {
-            result.aaaa[key] = buildAliasAaaa(subScope("aaaa"), childId, spec, zone, context);
+            result.aaaa[key] = abs(buildAliasAaaa(subScope("aaaa"), childId, spec, zone, context));
           } else {
-            result.a[key] = buildAliasA(subScope("a"), childId, spec, zone, context);
+            result.a[key] = abs(buildAliasA(subScope("a"), childId, spec, zone, context));
           }
           break;
         }
@@ -264,6 +268,29 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /** CDK-style record-name convention: apex is `undefined`. */
 const sub = (name: string) => (name === APEX ? undefined : name);
+
+/**
+ * The verbatim, absolute form of a record name. A concrete name is normalised
+ * to exactly one trailing dot (idempotent, so an already-dotted name is safe).
+ * A token is returned as-is: CFN treats a record-set `Name` as an absolute
+ * FQDN and never appends the hosted zone, so a token already carrying the full
+ * domain (SES DKIM) resolves correctly — and no dot is appended to a token,
+ * side-stepping the `..` hazard of a naive `` `${token}.` ``.
+ */
+function absoluteNameValue(name: string): string {
+  return Token.isUnresolved(name) ? name : `${name.replace(/\.+$/, "")}.`;
+}
+
+/**
+ * Replace a built record set's `Name` with its absolute form. CDK's L2 always
+ * runs `recordName` through its fully-qualify step, which double-appends the
+ * zone to an already-qualified token; overriding the property on the
+ * underlying {@link CfnRecordSet} is the only way to keep the name intact.
+ */
+function overrideAbsoluteName(record: RecordSet, name: string): void {
+  const cfn = record.node.defaultChild as CfnRecordSet;
+  cfn.addPropertyOverride("Name", absoluteNameValue(name));
+}
 
 /** Preserve insertion order while dropping duplicates. */
 const dedupe = <T>(xs: readonly T[]): T[] => [...new Set(xs)];

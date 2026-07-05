@@ -25,6 +25,29 @@ export interface RecordOptions {
   readonly ttl?: Duration;
   /** Optional comment passed through to the CDK construct. */
   readonly comment?: string;
+  /**
+   * Stable construct id and result-map key for this record, decoupled from its
+   * DNS `name`. Defaults to the name, which is right for almost every record.
+   *
+   * Supply it when the name is an unresolved CDK token (e.g. an SES DKIM CNAME
+   * name): a token stringifies to an unstable encoding and cannot serve as a
+   * construct id, so the zone DSL rejects a token name unless an explicit `id`
+   * is set. Orthogonal to {@link absoluteName} — this fixes the construct id,
+   * that fixes the emitted DNS name.
+   */
+  readonly id?: string;
+  /**
+   * Treat `name` as already fully-qualified and emit it verbatim, instead of
+   * letting CDK append the zone apex.
+   *
+   * Needed for names that already carry the full domain — notably token names
+   * (SES Easy DKIM), where CDK's static `endsWith` check runs against the token
+   * encoding, fails to match the zone suffix, and double-appends the apex. A
+   * concrete name is normalised to a single trailing dot; a token is emitted
+   * as-is (CFN treats a record-set name as absolute, so no dot is appended and
+   * the `..` hazard is avoided). Orthogonal to {@link id}.
+   */
+  readonly absoluteName?: boolean;
 }
 
 export interface ARecordSpec extends RecordOptions {

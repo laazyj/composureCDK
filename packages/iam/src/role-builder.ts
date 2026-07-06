@@ -1,6 +1,7 @@
 import {
   type IGrantable,
   type IManagedPolicy,
+  type IPrincipal,
   PolicyDocument,
   PolicyStatement,
   Role,
@@ -23,11 +24,23 @@ import { StatementBuilder } from "./statement-builder.js";
  * Configuration properties for the IAM role builder.
  *
  * Extends the CDK {@link RoleProps} with builder-specific options for
- * cross-component wiring: `permissionsBoundary` accepts a {@link Resolvable}
- * so boundary policies built by sibling components can be referenced at
- * configuration time.
+ * cross-component wiring: `assumedBy` and `permissionsBoundary` each accept a
+ * {@link Resolvable} so principals and boundary policies built by sibling
+ * components can be referenced at configuration time.
  */
-export interface RoleBuilderProps extends Omit<RoleProps, "permissionsBoundary"> {
+export interface RoleBuilderProps extends Omit<RoleProps, "assumedBy" | "permissionsBoundary"> {
+  /**
+   * The principal the role trusts to assume it — the role's trust policy.
+   *
+   * Accepts a concrete {@link IPrincipal} or a {@link Resolvable} for
+   * cross-component wiring, so a principal derived from a provider built by a
+   * sibling component (e.g. `ref("oidc", r => r.provider)`) can be supplied at
+   * configuration time and resolved during {@link build}.
+   *
+   * @see https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_terms-and-concepts.html
+   */
+  assumedBy?: Resolvable<IPrincipal>;
+
   /**
    * A permissions boundary that caps the maximum permissions this role
    * can ever grant, regardless of inline or managed policies attached.
@@ -168,6 +181,7 @@ class RoleBuilder implements Lifecycle<RoleBuilderResult> {
       );
     }
 
+    const resolvedAssumedBy = resolve(assumedBy, context);
     const resolvedBoundary = permissionsBoundary
       ? resolve(permissionsBoundary, context)
       : undefined;
@@ -188,7 +202,7 @@ class RoleBuilder implements Lifecycle<RoleBuilderResult> {
     const mergedProps: RoleProps = {
       ...ROLE_DEFAULTS,
       ...rest,
-      assumedBy,
+      assumedBy: resolvedAssumedBy,
       ...(Object.keys(mergedInlinePolicies).length > 0
         ? { inlinePolicies: mergedInlinePolicies }
         : {}),

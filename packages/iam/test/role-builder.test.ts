@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { ManagedPolicy, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import {
+  type IPrincipal,
+  ManagedPolicy,
+  PolicyStatement,
+  ServicePrincipal,
+} from "aws-cdk-lib/aws-iam";
+import { compose, type Lifecycle, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createRoleBuilder } from "../src/role-builder.js";
 import { createStatementBuilder, WildcardResourceError } from "../src/statement-builder.js";
@@ -168,6 +174,41 @@ describe("RoleBuilder", () => {
             ]),
           }),
         ]),
+      });
+    });
+  });
+
+  describe("assumedBy", () => {
+    it("resolves a principal supplied as a ref through compose context", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+
+      // lambda.amazonaws.com renders as a flat `Service` string across all
+      // supported aws-cdk-lib floors; region-scoped principals (e.g. ec2) render
+      // as a URLSuffix Fn::Join before the standardizedServicePrincipals flag.
+      const provider: Lifecycle<{ principal: IPrincipal }> = {
+        build: () => ({ principal: new ServicePrincipal("lambda.amazonaws.com") }),
+      };
+      const role = createRoleBuilder().assumedBy(
+        ref<{ principal: IPrincipal }, IPrincipal>("provider", (r) => r.principal),
+      );
+
+      // role depends on provider — the principal follows the data-flow edge and
+      // composes without a cycle.
+      expect(() =>
+        compose({ provider, role }, { provider: [], role: ["provider"] }).build(stack, "Sys"),
+      ).not.toThrow();
+
+      Template.fromStack(stack).hasResourceProperties("AWS::IAM::Role", {
+        AssumeRolePolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Effect: "Allow",
+              Principal: { Service: "lambda.amazonaws.com" },
+              Action: "sts:AssumeRole",
+            }),
+          ]),
+        }),
       });
     });
   });

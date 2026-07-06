@@ -8,6 +8,7 @@
     "format:check": "prettier --check .",
     "typecheck": "npx nx run-many -t typecheck",
     "test": "npx nx run-many -t test",
+    "coverage:summary": "node scripts/coverage-summary.mjs",
     "cdk-floors:apply": "node scripts/cdk-floors.mjs apply",
     "cdk-floors:check": "node scripts/cdk-floors.mjs check",
     "cdk-floors:enforce": "node scripts/cdk-floors.mjs enforce",

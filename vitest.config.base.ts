@@ -20,7 +20,10 @@ export function withCoverage(
         coverage: {
           provider: "v8",
           enabled: true,
-          reporter: ["text"],
+          // text: local console. json-summary: machine-readable per-package
+          // totals at coverage/coverage-summary.json, merged by
+          // scripts/coverage-summary.mjs into the CI PR comment + job summary.
+          reporter: ["text", "json-summary"],
           thresholds: {
             ...thresholds,
             perFile: true,

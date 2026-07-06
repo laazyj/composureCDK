@@ -18,11 +18,26 @@ ci.yml ──► deploy-test.yml ──► release.yml ◄── tag push (PAT o
                                           release-prepare.yml (workflow_dispatch → opens PR)
 ```
 
-- **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20 + 24 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)).
+- **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20/22/24/26 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). A sibling `coverage` job reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)).
 - **`deploy-test.yml`** — manual `workflow_dispatch`. Calls CI, then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`.
 - **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it tags the commit and creates a GitHub Release from the matching `CHANGELOG.md` section. The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Runs deploy-test, then `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
+
+## Coverage reporting
+
+Coverage is reported on PRs without any external service (no Codecov/Coveralls account, no secrets, no data leaving GitHub). It is a reporting layer only — the actual gate is each package's `perFile` thresholds in `vitest.config.ts`, enforced by `npm run test`.
+
+How it fits together:
+
+- **`vitest.config.base.ts`** emits the `json-summary` reporter alongside `text`, so every `npm run test` writes `packages/<pkg>/coverage/coverage-summary.json`. `nx.json` lists `{projectRoot}/coverage` in the `test` target's `outputs`, so a cached test run still restores the summary files.
+- **[`scripts/coverage-summary.mjs`](../scripts/coverage-summary.mjs)** (`npm run coverage:summary`) merges every package's summary into one markdown table — per-package and an overall total computed as summed-covered / summed-total, not an average of percentages. It writes `coverage/coverage-summary.md`, prints to stdout, and appends to `$GITHUB_STEP_SUMMARY` when set.
+- **The `coverage` job in `ci.yml`** runs the suite once on Node 24, builds the summary (so it lands on the Actions run page), and posts it as a sticky PR comment via `marocchino/sticky-pull-request-comment` (keyed `header: coverage`, so it updates in place instead of adding a comment per push).
+
+Notes:
+
+- The comment step is `continue-on-error` and gated to `pull_request` events. **Fork PRs** get a read-only `GITHUB_TOKEN`, so the comment is skipped there — the numbers still appear on the job summary page. Promoting fork-PR comments would need the `pull_request_target` / `workflow_run` two-workflow pattern, deliberately avoided here for simplicity.
+- The summary and comment run with `if: always()`, so when a package dips below its threshold and fails `npm run test`, reviewers still see the table (with the offending package flagged) instead of an empty comment. The job status still reflects the failure — the gate is unchanged.
 
 ## Versioning
 

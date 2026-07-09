@@ -17,3 +17,13 @@ export {
   StatementBuilder,
   WildcardResourceError,
 } from "./statement-builder.js";
+export {
+  createOpenIdConnectProviderBuilder,
+  type IOpenIdConnectProviderBuilder,
+  type OpenIdConnectProviderBuilderProps,
+  type OpenIdConnectProviderBuilderResult,
+} from "./open-id-connect-provider-builder.js";
+export {
+  openIdConnectPrincipal,
+  type OpenIdConnectPrincipalOptions,
+} from "./open-id-connect-principal.js";

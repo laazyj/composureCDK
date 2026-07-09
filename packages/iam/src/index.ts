@@ -27,3 +27,4 @@ export {
   openIdConnectPrincipal,
   type OpenIdConnectPrincipalOptions,
 } from "./open-id-connect-principal.js";
+export * as githubActions from "./github-actions.js";

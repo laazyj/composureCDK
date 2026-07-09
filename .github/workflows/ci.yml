@@ -40,6 +40,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
+      # Pin npm across the whole matrix. Node 20/22 ship npm 10 while 24/26 ship
+      # npm 11, and the two disagree on how optional peer deps are pinned in the
+      # lockfile (npm 11 prunes entries like vitest's optional `yaml` peer that
+      # npm 10 still expects). Our lockfile is generated under npm 11 (release
+      # tooling runs on Node 24), so `npm ci` on the npm 10 legs would otherwise
+      # fail with "Missing: yaml@2.9.0 from lock file". Install under one npm.
+      - name: Pin npm
+        run: npm install -g npm@11
+
       - name: Install dependencies
         run: npm ci
 

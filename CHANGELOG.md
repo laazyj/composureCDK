@@ -1,3 +1,40 @@
+## 0.9.0 (2026-07-09)
+
+### 🚀 Features
+
+- **core:** add consumer-side grant primitives ([#269](https://github.com/laazyj/composureCDK/issues/269))
+- **core:** add combine() multi-ref combinator ([#270](https://github.com/laazyj/composureCDK/issues/270), [#276](https://github.com/laazyj/composureCDK/issues/276))
+- **dynamodb:** add tableGrants capability helpers ([#269](https://github.com/laazyj/composureCDK/issues/269))
+- **iam:** add consumer-side role.grant() ([#269](https://github.com/laazyj/composureCDK/issues/269))
+- **iam:** accept a Resolvable principal in RoleBuilder.assumedBy ([e619485](https://github.com/laazyj/composureCDK/commit/e619485))
+- **iam:** add general-purpose OIDC provider builder and principal helper ([#278](https://github.com/laazyj/composureCDK/issues/278))
+- **iam:** add GitHub Actions OIDC convenience layer ([#278](https://github.com/laazyj/composureCDK/issues/278))
+- **lambda:** add consumer-side function.grant() ([#269](https://github.com/laazyj/composureCDK/issues/269))
+- **lambda:** add functionGrants invoke helpers ([#269](https://github.com/laazyj/composureCDK/issues/269))
+- **route53:** support absolute and token record names in the zone DSL ([#281](https://github.com/laazyj/composureCDK/issues/281), [#279](https://github.com/laazyj/composureCDK/issues/279))
+- **s3:** add bucketGrants capability helpers ([#269](https://github.com/laazyj/composureCDK/issues/269))
+- **sns:** add topicGrants capability helpers ([#269](https://github.com/laazyj/composureCDK/issues/269))
+- **sqs:** add queueGrants capability helpers ([#269](https://github.com/laazyj/composureCDK/issues/269))
+- **sqs:** add queue roles for FIFO and dead-letter queues ([#255](https://github.com/laazyj/composureCDK/pull/255))
+
+### 🩹 Fixes
+
+- ⚠️ **core:** reject leaked tokens in construct IDs ([#283](https://github.com/laazyj/composureCDK/pull/283))
+
+### ⚠️ Breaking Changes
+
+- **core:** reject leaked tokens in construct IDs ([#283](https://github.com/laazyj/composureCDK/pull/283))
+  sanitizeConstructId and constructId now throw on inputs
+  containing { } [ ] instead of passing them through. Callers that relied
+  on those characters surviving into a construct ID must supply a stable,
+  static ID instead."
+  M packages/core/src/construct-id.ts
+  M packages/core/test/construct-id.test.ts
+
+### ❤️ Thank You
+
+- Jason Duffett
+
 ## 0.8.7 (2026-06-29)
 
 ### 🚀 Features

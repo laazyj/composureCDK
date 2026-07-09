@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/apigateway",
-  "version": "0.8.7",
+  "version": "0.9.0",
   "description": "Composable API Gateway REST API builder with well-architected defaults",
   "repository": {
     "type": "git",
@@ -47,10 +47,10 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.8.0",
-    "@composurecdk/cloudwatch": "^0.8.0",
-    "@composurecdk/core": "^0.8.0",
-    "@composurecdk/logs": "^0.8.0",
+    "@composurecdk/cloudformation": "^0.9.0",
+    "@composurecdk/cloudwatch": "^0.9.0",
+    "@composurecdk/core": "^0.9.0",
+    "@composurecdk/logs": "^0.9.0",
     "aws-cdk-lib": "^2.93.0",
     "constructs": "^10.0.0"
   },

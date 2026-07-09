@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/iam",
-  "version": "0.8.7",
+  "version": "0.9.0",
   "description": "Composable IAM role, policy, and statement builders with well-architected defaults",
   "repository": {
     "type": "git",
@@ -49,8 +49,8 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.8.0",
-    "@composurecdk/core": "^0.8.0",
+    "@composurecdk/cloudformation": "^0.9.0",
+    "@composurecdk/core": "^0.9.0",
     "aws-cdk-lib": "^2.26.0",
     "constructs": "^10.0.0"
   },

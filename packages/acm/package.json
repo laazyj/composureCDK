@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/acm",
-  "version": "0.8.7",
+  "version": "0.9.0",
   "description": "Composable AWS Certificate Manager builder with well-architected defaults",
   "repository": {
     "type": "git",
@@ -49,9 +49,9 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.8.0",
-    "@composurecdk/cloudwatch": "^0.8.0",
-    "@composurecdk/core": "^0.8.0",
+    "@composurecdk/cloudformation": "^0.9.0",
+    "@composurecdk/cloudwatch": "^0.9.0",
+    "@composurecdk/core": "^0.9.0",
     "aws-cdk-lib": "^2.119.0",
     "constructs": "^10.0.0"
   },

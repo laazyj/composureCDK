@@ -28,6 +28,7 @@ export default defineConfig(
           allowDefaultProject: [
             "eslint.config.mjs",
             "scripts/*.mjs",
+            "scripts/*.cjs",
             "scripts/cdk-floor/*.mjs",
             "packages/examples/test/smoke/*.mjs",
             "vitest.config.base.ts",
@@ -50,6 +51,23 @@ export default defineConfig(
         process: "readonly",
         fetch: "readonly",
       },
+    },
+  },
+  {
+    files: ["scripts/*.cjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: {
+        require: "readonly",
+        module: "writable",
+        console: "readonly",
+      },
+    },
+    // CommonJS is required here: nx loads non-".ts" changelog renderers with
+    // require(), which cannot import an ESM module in this "type": "module" repo.
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
   {

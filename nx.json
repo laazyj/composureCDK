@@ -44,7 +44,9 @@
     "changelog": {
       "automaticFromRef": true,
       "projectChangelogs": false,
-      "workspaceChangelog": true,
+      "workspaceChangelog": {
+        "renderer": "{workspaceRoot}/scripts/changelog-renderer.cjs"
+      },
       "git": {
         "commit": false,
         "tag": false,

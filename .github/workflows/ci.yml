@@ -77,17 +77,21 @@ jobs:
 
   # Self-contained coverage reporting (no external service): run the suite once
   # on a single Node version, merge every package's json-summary output into one
-  # markdown table (scripts/coverage-summary.mjs), publish it to the Actions run
-  # summary, and mirror it into a sticky PR comment. The per-file thresholds in
-  # each vitest.config.ts already gate coverage during `npm run test`; this job
-  # only surfaces the numbers to reviewers. See docs/ci.md#coverage-reporting.
+  # markdown table (scripts/coverage-summary.mjs) and publish it to the Actions
+  # run summary. The per-file thresholds in each vitest.config.ts already gate
+  # coverage during `npm run test`; this job only surfaces the numbers to
+  # reviewers. See docs/ci.md#coverage-reporting.
+  #
+  # The sticky PR comment is posted by coverage-comment.yml, not here: this
+  # workflow is workflow_call-able from release.yml, and a job requesting
+  # `pull-requests: write` fails validation under that caller's narrower
+  # permission ceiling — even when the posting step could never run.
   coverage:
     name: Coverage report
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-      pull-requests: write
     env:
       NX_DAEMON: false
     steps:
@@ -116,16 +120,26 @@ jobs:
         if: always()
         run: npm run coverage:summary
 
-      - name: Post coverage comment
-        # Skipped for fork PRs (read-only GITHUB_TOKEN); the job summary still
-        # carries the numbers. continue-on-error keeps a comment failure from
-        # masking the real test result.
+      # The workflow_run listener has no access to this run's PR context, so the
+      # number travels with the artifact.
+      - name: Record PR number
         if: always() && github.event_name == 'pull_request'
-        continue-on-error: true
-        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          mkdir -p coverage
+          printf '%s' "$PR_NUMBER" > coverage/pr-number.txt
+
+      - name: Upload coverage summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          header: coverage
-          path: coverage/coverage-summary.md
+          name: coverage-summary
+          path: |
+            coverage/coverage-summary.md
+            coverage/pr-number.txt
+          if-no-files-found: error
+          retention-days: 1
 
   # Derive the distinct floors from cdk-floors.json so the enforce matrix
   # stays in sync without duplicating values in YAML.

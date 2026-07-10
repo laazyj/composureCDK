@@ -4,21 +4,22 @@ CI/CD pipeline for ComposureCDK: how the workflows chain, how to bootstrap AWS a
 
 ## Pipeline overview
 
-Five GitHub Actions workflows chain together:
+Five GitHub Actions workflows chain together, with `coverage-comment.yml` hanging off CI as a listener rather than a link in the chain:
 
 ```
 ci.yml ──► deploy-test.yml ──► release.yml ◄── tag push (PAT or manual)
    ▲              ▲                              ▲
    │              │                              │
  PRs/push    workflow_dispatch              release-tag.yml ◄── push to main
-                                            (filters chore(release): commits,
-                                             pushes tag with RELEASE_PR_TOKEN)
-                                                  ▲
-                                                  │
+   │                                        (filters chore(release): commits,
+   │ workflow_run                            pushes tag with RELEASE_PR_TOKEN)
+   ▼                                              ▲
+coverage-comment.yml                              │
                                           release-prepare.yml (workflow_dispatch → opens PR)
 ```
 
-- **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20/22/24/26 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). A sibling `coverage` job reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)).
+- **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20/22/24/26 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). A sibling `coverage` job reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)). It holds no write scopes, so it stays callable from `release.yml`.
+- **`coverage-comment.yml`** — `workflow_run` listener on CI. Posts the coverage table as a sticky PR comment (see [Coverage reporting](#coverage-reporting)).
 - **`deploy-test.yml`** — manual `workflow_dispatch`. Calls CI, then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`.
 - **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it tags the commit and creates a GitHub Release from the matching `CHANGELOG.md` section. The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
@@ -32,12 +33,15 @@ How it fits together:
 
 - **`vitest.config.base.ts`** emits the `json-summary` reporter alongside `text`, so every `npm run test` writes `packages/<pkg>/coverage/coverage-summary.json`. `nx.json` lists `{projectRoot}/coverage` in the `test` target's `outputs`, so a cached test run still restores the summary files.
 - **[`scripts/coverage-summary.mjs`](../scripts/coverage-summary.mjs)** (`npm run coverage:summary`) merges every package's summary into one markdown table — per-package and an overall total computed as summed-covered / summed-total, not an average of percentages. It writes `coverage/coverage-summary.md`, prints to stdout, and appends to `$GITHUB_STEP_SUMMARY` when set.
-- **The `coverage` job in `ci.yml`** runs the suite once on Node 24, builds the summary (so it lands on the Actions run page), and posts it as a sticky PR comment via `marocchino/sticky-pull-request-comment` (keyed `header: coverage`, so it updates in place instead of adding a comment per push).
+- **The `coverage` job in `ci.yml`** runs the suite once on Node 24, builds the summary (so it lands on the Actions run page), and — on `pull_request` events — uploads `coverage-summary.md` plus the PR number as a `coverage-summary` artifact.
+- **[`coverage-comment.yml`](../.github/workflows/coverage-comment.yml)** listens for CI's `workflow_run` completion, downloads that artifact, and posts it as a sticky PR comment via `marocchino/sticky-pull-request-comment` (keyed `header: coverage`, so it updates in place instead of adding a comment per push).
 
 Notes:
 
-- The comment step is `continue-on-error` and gated to `pull_request` events. **Fork PRs** get a read-only `GITHUB_TOKEN`, so the comment is skipped there — the numbers still appear on the job summary page. Promoting fork-PR comments would need the `pull_request_target` / `workflow_run` two-workflow pattern, deliberately avoided here for simplicity.
-- The summary and comment run with `if: always()`, so when a package dips below its threshold and fails `npm run test`, reviewers still see the table (with the offending package flagged) instead of an empty comment. The job status still reflects the failure — the gate is unchanged.
+- **Why two workflows.** `ci.yml` is `workflow_call`-able from `release.yml`, and GitHub only ever _narrows_ permissions down a reusable-workflow chain. A job inside `ci.yml` declaring `pull-requests: write` therefore fails validation for any caller that lacks that scope — statically, at parse time, regardless of whether the posting step's `if:` would ever let it run. Keeping `ci.yml` at `contents: read` makes it callable from anywhere; the write scope lives only in `coverage-comment.yml`.
+- **Fork PRs** now get a comment too. `workflow_run` executes in the base-repo context with a writable `GITHUB_TOKEN`, which the old in-line comment step could not obtain. The listener never checks out or executes PR code — it only reads the uploaded markdown and the PR number, which it validates is numeric before use.
+- `coverage-comment.yml` must exist on the **default branch** to fire; `workflow_run` always dispatches the default-branch copy. Changes to it are not exercised by the PR that introduces them.
+- The summary and upload steps run with `if: always()`, so when a package dips below its threshold and fails `npm run test`, reviewers still see the table (with the offending package flagged). The job status still reflects the failure — the gate is unchanged.
 
 ## Versioning
 

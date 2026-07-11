@@ -4,10 +4,6 @@ import { type AwsCustomResourceProps } from "aws-cdk-lib/custom-resources";
  * Defaults applied to every custom resource built with
  * {@link createAwsCustomResourceBuilder}. Each property can be individually
  * overridden via the builder's fluent API.
- *
- * This is an escape-hatch builder, not a resource abstraction — it deliberately
- * ships only the one default that is unambiguously safe. It does **not** invent
- * recommended alarms, log groups, or other resource-style defaults.
  */
 export const AWS_CUSTOM_RESOURCE_DEFAULTS: Partial<AwsCustomResourceProps> = {
   /**

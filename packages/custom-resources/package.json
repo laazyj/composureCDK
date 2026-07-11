@@ -1,7 +1,7 @@
 {
   "name": "@composurecdk/custom-resources",
   "version": "0.9.0",
-  "description": "Compose-native AwsCustomResource escape hatch for AWS operations with no CloudFormation resource",
+  "description": "Compose-native AwsCustomResource builder for AWS operations with no CloudFormation resource",
   "repository": {
     "type": "git",
     "url": "https://github.com/laazyj/composureCDK",
@@ -28,8 +28,7 @@
     "iac",
     "composurecdk",
     "custom-resource",
-    "aws-custom-resource",
-    "escape-hatch"
+    "aws-custom-resource"
   ],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",

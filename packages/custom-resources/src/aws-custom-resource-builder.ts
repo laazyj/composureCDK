@@ -19,11 +19,6 @@ import { addDependenciesFromRefs } from "./dependencies.js";
  * {@link IAwsCustomResourceBuilder.policy | policy} /
  * {@link IAwsCustomResourceBuilder.dependsOn | dependsOn}).
  *
- * Deriving from `AwsCustomResourceProps` means the fluent surface tracks the
- * consumer's installed aws-cdk-lib: props added in later releases (e.g.
- * `serviceTimeout`, `logGroup`, `memorySize`) are available automatically with
- * no floor bump, and are simply absent on older versions.
- *
  * `installLatestAwsSdk` defaults to `false` (see {@link AWS_CUSTOM_RESOURCE_DEFAULTS});
  * set `role` to make the IAM policy optional.
  */
@@ -45,17 +40,17 @@ export interface AwsCustomResourceBuilderResult {
 }
 
 /**
- * A fluent builder wrapping the CDK {@link AwsCustomResource} construct — the
- * blessed, compose-native escape hatch for AWS operations that have **no
- * CloudFormation resource** (account-level SDK calls such as
- * `ses:SetActiveReceiptRuleSet`).
+ * A fluent, compose-native builder wrapping the CDK {@link AwsCustomResource}
+ * construct for AWS operations that have **no CloudFormation resource** —
+ * account-level SDK calls such as `ses:SetActiveReceiptRuleSet`, reachable only
+ * through the SDK.
  *
- * This is an escape hatch, not a resource abstraction. **When a domain builder
- * exists for the call you need, prefer it** — it scopes IAM automatically and
- * reads as intent rather than plumbing. Reach for this builder only for the
- * long tail of one-off SDK calls that don't justify a domain builder.
+ * **When a domain builder already covers the call you need, prefer it** — it
+ * scopes IAM automatically and reads as intent rather than plumbing. This
+ * builder is for the long tail of one-off SDK calls that don't justify a domain
+ * builder.
  *
- * What it genuinely buys over raw `AwsCustomResource`:
+ * Benefits over raw `AwsCustomResource`:
  *
  * - **{@link dependsOn}** — a precise, declarative ordering seam. Tokens buried
  *   in `AwsCustomResource`'s JSON-stringified `parameters` frequently don't

@@ -1,12 +1,12 @@
 # @composurecdk/custom-resources
 
-Compose-native `AwsCustomResource` escape hatch for [ComposureCDK](../../README.md).
+Compose-native `AwsCustomResource` builder for [ComposureCDK](../../README.md).
 
 Some AWS operations have **no CloudFormation resource** — they are account-level SDK calls only reachable through CDK's [`AwsCustomResource`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.custom_resources.AwsCustomResource.html). The canonical example is `ses:SetActiveReceiptRuleSet`: the one call that makes an SES receipt rule set actually receive mail. There is no CFN property for "active rule set".
 
 This package wraps `AwsCustomResource` as a builder so those calls become first-class `compose()` citizens — with a precise dependency-ordering seam, `Resolvable` parameters, and IAM sugar.
 
-> **This is an escape hatch, not a resource abstraction.** When a domain builder exists for the call you need, prefer it — it scopes IAM automatically and reads as intent rather than plumbing (e.g. a future SES `.activate()`). Reach for this builder only for the long tail of one-off SDK calls that don't justify a domain builder.
+> **When a domain builder already covers the call you need, prefer it** — it scopes IAM automatically and reads as intent rather than plumbing (e.g. a future SES `.activate()`). This builder is for the long tail of one-off SDK calls that don't justify a domain builder.
 
 ## Usage
 
@@ -55,7 +55,7 @@ On stack _delete_ with multiple custom resources, CloudFormation can remove a pr
 
 ## Defaults
 
-`createAwsCustomResourceBuilder` sets a single, unambiguously safe default (overridable via the fluent API). It deliberately does **not** invent recommended alarms or resource-style defaults — it is an escape hatch.
+`createAwsCustomResourceBuilder` sets a single, unambiguously safe default (overridable via the fluent API), and deliberately does **not** invent recommended alarms or other resource-style defaults.
 
 | Property              | Default | Rationale                                                                                                         |
 | --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |

@@ -13,6 +13,7 @@ import { resolve, type Ref } from "@composurecdk/core";
  * @param value - The value to search (typically a component's build result).
  * @param out - Accumulates the constructs found.
  * @param seen - Guards against cycles in plain-object graphs.
+ * @internal — exported for unit testing; not part of the public API.
  */
 export function collectConstructs(
   value: unknown,
@@ -38,6 +39,8 @@ export function collectConstructs(
  * it wires a CloudFormation `DependsOn` even when the SDK call's parameters are
  * hardcoded strings (no token → no native CFN edge), and only for the
  * component(s) actually named — nothing incidental.
+ *
+ * @internal — not part of the public API.
  */
 export function addDependenciesFromRefs(
   customResource: AwsCustomResource,

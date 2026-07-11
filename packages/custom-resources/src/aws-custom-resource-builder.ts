@@ -1,6 +1,4 @@
-import { type Duration, type RemovalPolicy } from "aws-cdk-lib";
-import { Effect, PolicyStatement, type IRole } from "aws-cdk-lib/aws-iam";
-import { type ILogGroup } from "aws-cdk-lib/aws-logs";
+import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import {
   AwsCustomResource,
   AwsCustomResourcePolicy,
@@ -14,48 +12,25 @@ import { addDependenciesFromRefs } from "./dependencies.js";
 
 /**
  * Passthrough configuration for the custom resource's provider Lambda and
- * CloudFormation resource. The lifecycle SDK calls, IAM policy, and dependency
- * ordering are configured through the builder's dedicated methods
- * ({@link IAwsCustomResourceBuilder.onCreate | onCreate} /
+ * CloudFormation resource — every {@link AwsCustomResourceProps} field **except**
+ * the lifecycle calls and policy, which the builder configures through its
+ * dedicated methods ({@link IAwsCustomResourceBuilder.onCreate | onCreate} /
  * {@link IAwsCustomResourceBuilder.allow | allow} /
- * {@link IAwsCustomResourceBuilder.dependsOn | dependsOn}) rather than as props.
+ * {@link IAwsCustomResourceBuilder.policy | policy} /
+ * {@link IAwsCustomResourceBuilder.dependsOn | dependsOn}).
+ *
+ * Deriving from `AwsCustomResourceProps` means the fluent surface tracks the
+ * consumer's installed aws-cdk-lib: props added in later releases (e.g.
+ * `serviceTimeout`, `logGroup`, `memorySize`) are available automatically with
+ * no floor bump, and are simply absent on older versions.
+ *
+ * `installLatestAwsSdk` defaults to `false` (see {@link AWS_CUSTOM_RESOURCE_DEFAULTS});
+ * set `role` to make the IAM policy optional.
  */
-export interface AwsCustomResourceBuilderProps {
-  /** CloudFormation resource type, e.g. `"Custom::SesActivateRuleSet"`. */
-  resourceType?: string;
-
-  /**
-   * An existing role for the provider Lambda. When set, an IAM policy is
-   * optional — otherwise {@link IAwsCustomResourceBuilder.allow} or
-   * {@link IAwsCustomResourceBuilder.policy} is required.
-   */
-  role?: IRole;
-
-  /** Timeout for the provider Lambda's execution. */
-  timeout?: Duration;
-
-  /** Memory, in MB, for the provider Lambda. */
-  memorySize?: number;
-
-  /** Physical name for the provider Lambda. */
-  functionName?: string;
-
-  /** Removal policy for the custom resource. */
-  removalPolicy?: RemovalPolicy;
-
-  /**
-   * Whether to install the latest AWS SDK at deploy time.
-   * @default false — use the SDK bundled with the Lambda runtime (see
-   *   {@link AWS_CUSTOM_RESOURCE_DEFAULTS}).
-   */
-  installLatestAwsSdk?: boolean;
-
-  /** Log group for the provider Lambda (prefer this over deprecated retention). */
-  logGroup?: ILogGroup;
-
-  /** Timeout applied to the underlying CloudFormation custom-resource wait. */
-  serviceTimeout?: Duration;
-}
+export type AwsCustomResourceBuilderProps = Omit<
+  AwsCustomResourceProps,
+  "onCreate" | "onUpdate" | "onDelete" | "policy"
+>;
 
 /**
  * The build output of an {@link IAwsCustomResourceBuilder}.

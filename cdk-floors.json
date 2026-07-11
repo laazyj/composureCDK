@@ -67,8 +67,8 @@
     },
     "route53": { "floor": "2.216.0", "gatedBy": "aws-route53.HttpsRecord (introduced 2.216.0)" },
     "custom-resources": {
-      "floor": "2.93.0",
-      "gatedBy": "The builder's props type is Omit<AwsCustomResourceProps, ...>, so the surface tracks the consumer's installed aws-cdk-lib. The floor is where the build()-assembled AwsCustomResourceProps object first typechecks as assignable — enforce fails at 2.26.0 (a passthrough prop's type differs on older releases) and passes at the 2.93.0 rung (the common builder floor). Also covers the installLatestAwsSdk: false default (2.14.0) and the aws-cdk-lib/custom-resources + aws-cdk-lib/assertions ESM subpath exports the suite needs."
+      "floor": "2.37.0",
+      "gatedBy": "AwsCustomResourceProps.policy became optional in 2.37.0 (required in 2.36.0). The builder omits policy when a role is supplied, so its build()-assembled AwsCustomResourceProps object only typechecks once policy is optional — the sole compile gate (bisected via the aws-custom-resource .d.ts and validated with `cdk-floors enforce 2.37.0`). Everything else is lower: the Omit<AwsCustomResourceProps> props surface tracks the consumer's aws-cdk-lib, the installLatestAwsSdk: false default is 2.14.0, and the aws-cdk-lib/custom-resources + aws-cdk-lib/assertions ESM subpath exports the suite needs are 2.1.0."
     }
   }
 }

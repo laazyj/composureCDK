@@ -65,6 +65,10 @@
         "@aws-cdk/aws-neptune-alpha": "2.190.0-alpha.0"
       }
     },
-    "route53": { "floor": "2.216.0", "gatedBy": "aws-route53.HttpsRecord (introduced 2.216.0)" }
+    "route53": { "floor": "2.216.0", "gatedBy": "aws-route53.HttpsRecord (introduced 2.216.0)" },
+    "custom-resources": {
+      "floor": "2.37.0",
+      "gatedBy": "AwsCustomResourceProps.policy became optional in 2.37.0 (required in 2.36.0). The builder omits policy when a role is supplied, so its build()-assembled AwsCustomResourceProps object only typechecks once policy is optional — the sole compile gate (bisected via the aws-custom-resource .d.ts and validated with `cdk-floors enforce 2.37.0`). Everything else is lower: the Omit<AwsCustomResourceProps> props surface tracks the consumer's aws-cdk-lib, the installLatestAwsSdk: false default is 2.14.0, and the aws-cdk-lib/custom-resources + aws-cdk-lib/assertions ESM subpath exports the suite needs are 2.1.0."
+    }
   }
 }

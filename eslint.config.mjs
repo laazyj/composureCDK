@@ -4,6 +4,7 @@ import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier/flat";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
+import nx from "@nx/eslint-plugin";
 import composurecdk from "@composurecdk/eslint-plugin";
 
 export default defineConfig(
@@ -108,6 +109,52 @@ export default defineConfig(
               group: ["@composurecdk/*", "@composurecdk/**"],
               message:
                 "@composurecdk/core is the root of the dependency graph and must not import from any other @composurecdk package.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Graph-wide package boundaries via the Nx project graph. Tags live in
+    // each package's package.json (`nx.tags`). This catches what a
+    // specifier-level rule cannot: cross-package cycles, deep imports past a
+    // package's public entry points, and reliance on undeclared (transitive)
+    // dependencies — i.e. phantom deps. Siblings may depend on siblings by
+    // design (e.g. cloudfront -> s3), so `scope:lib` may depend on itself.
+    files: ["packages/*/src/**/*.ts"],
+    plugins: { "@nx": nx },
+    rules: {
+      "@nx/enforce-module-boundaries": [
+        "error",
+        {
+          // Also bans imports that don't resolve to a package's public entry
+          // point — i.e. deep imports into another package's internals and
+          // reliance on undeclared (transitive) dependencies.
+          banTransitiveDependencies: true,
+          // `estree` is a types-only module supplied by `@types/estree`, which
+          // the eslint-plugin package declares as a devDependency. Nx keys the
+          // transitive check on the import specifier, and `estree` has no
+          // matching package name (the package is `@types/estree`), so the rule
+          // cannot resolve it. The import is compile-time-only; allow it.
+          allow: ["estree"],
+          depConstraints: [
+            {
+              sourceTag: "scope:core",
+              onlyDependOnLibsWithTags: [],
+              bannedExternalImports: ["aws-cdk-lib", "@aws-cdk/*"],
+            },
+            {
+              sourceTag: "scope:lib",
+              onlyDependOnLibsWithTags: ["scope:core", "scope:lib"],
+            },
+            {
+              sourceTag: "scope:aggregate",
+              onlyDependOnLibsWithTags: ["scope:core", "scope:lib", "scope:aggregate"],
+            },
+            {
+              sourceTag: "scope:tooling",
+              onlyDependOnLibsWithTags: [],
             },
           ],
         },

@@ -35,10 +35,16 @@
     "eslint": "^10.0.0"
   },
   "devDependencies": {
+    "@types/estree": "^1.0.6",
     "@types/node": "^25.9.3",
     "@typescript-eslint/parser": "^8.58.0",
     "eslint": "^10.4.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"
+  },
+  "nx": {
+    "tags": [
+      "scope:tooling"
+    ]
   }
 }

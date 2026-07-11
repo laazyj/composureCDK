@@ -1,3 +1,13 @@
+## 0.9.1 (2026-07-11)
+
+### 🚀 Features
+
+- **custom-resources:** add AwsCustomResource builder ([#294](https://github.com/laazyj/composureCDK/pull/294), [#280](https://github.com/laazyj/composureCDK/issues/280))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.9.0 (2026-07-09)
 
 ### 🚀 Features

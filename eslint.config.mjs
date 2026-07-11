@@ -80,6 +80,41 @@ export default defineConfig(
     rules: composurecdk.configs.recommended.rules,
   },
   {
+    // @composurecdk/core is the root of the dependency graph. It stays
+    // CDK-version-agnostic — depending only on `constructs` (peer) and
+    // `@dagrejs/graphlib` — and must never import a sibling @composurecdk
+    // package or a CDK construct library. See docs/architecture.md. This
+    // encodes as lint what was previously an unwritten convention; the
+    // graph-wide version (phantom deps, cycles, deep imports) is a planned
+    // follow-up via @nx/enforce-module-boundaries.
+    files: ["packages/core/src/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "aws-cdk-lib",
+                "aws-cdk-lib/*",
+                "aws-cdk-lib/**",
+                "@aws-cdk/*",
+                "@aws-cdk/**",
+              ],
+              message:
+                "@composurecdk/core must not depend on aws-cdk-lib or any @aws-cdk/* construct library — it stays CDK-version-agnostic and depends only on `constructs`. See docs/architecture.md.",
+            },
+            {
+              group: ["@composurecdk/*", "@composurecdk/**"],
+              message:
+                "@composurecdk/core is the root of the dependency graph and must not import from any other @composurecdk package.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // The tagged-builder wrapper IS the implementation of the tagged-builder
     // surface — by definition it must reach for `Builder` / `IBuilder` from
     // `@composurecdk/core`. Disable the rule at the file level rather than

@@ -24,6 +24,7 @@ export const DUAL_PACKAGES = [
   { name: "@composurecdk/neptune", probe: "createClusterBuilder" },
   { name: "@composurecdk/route53", probe: "createHostedZoneBuilder" },
   { name: "@composurecdk/s3", probe: "createBucketBuilder" },
+  { name: "@composurecdk/ses", probe: "createEmailIdentityBuilder" },
   { name: "@composurecdk/sns", probe: "createTopicBuilder" },
   { name: "@composurecdk/sqs", probe: "createQueueBuilder" },
 ] as const;

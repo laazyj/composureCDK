@@ -39,6 +39,7 @@
     "@composurecdk/neptune": "^0.9.0",
     "@composurecdk/route53": "^0.9.0",
     "@composurecdk/s3": "^0.9.0",
+    "@composurecdk/ses": "^0.9.0",
     "@composurecdk/sns": "^0.9.0",
     "@composurecdk/sqs": "^0.9.0"
   },

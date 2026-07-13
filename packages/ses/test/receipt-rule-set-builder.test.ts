@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { s3Action } from "../src/actions.js";
+import { s3Action } from "../src/actions/index.js";
 import { createReceiptRuleSetBuilder } from "../src/receipt-rule-set-builder.js";
 
 function newStack(region = "us-east-1"): Stack {

@@ -23,7 +23,8 @@ describe("EmailIdentityBuilder", () => {
       .build(stack, "MailIdentity");
 
     expect(emailIdentity).toBeDefined();
-    expect(dkim.tokenName1).toBeDefined();
+    expect(dkim).toHaveLength(3);
+    expect(dkim[0].name).toBeDefined();
     Template.fromStack(stack).hasResourceProperties("AWS::SES::EmailIdentity", {
       EmailIdentity: "ask.example.com",
     });

@@ -2,7 +2,6 @@ export {
   createEmailIdentityBuilder,
   type EmailIdentityBuilderProps,
   type EmailIdentityBuilderResult,
-  type DkimTokens,
   type IEmailIdentityBuilder,
 } from "./email-identity-builder.js";
 export {
@@ -33,10 +32,6 @@ export {
   type BounceActionOptions,
   stopAction,
   addHeaderAction,
-} from "./actions.js";
+} from "./actions/index.js";
 export { DEFAULT_RECEIPT_RULE, DEFAULT_MAIL_FROM_BEHAVIOR_ON_MX_FAILURE } from "./defaults.js";
-export {
-  SES_RECEIVING_REGIONS,
-  RECEIVING_REGION_WARNING,
-  warnIfNotReceivingRegion,
-} from "./region-support.js";
+export { SES_RECEIVING_REGIONS, RECEIVING_REGION_WARNING } from "./region-support.js";

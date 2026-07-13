@@ -25,7 +25,7 @@ import {
   s3Action,
   snsAction,
   stopAction,
-} from "../src/actions.js";
+} from "../src/actions/index.js";
 
 function newStack(): Stack {
   return new Stack(new App(), "TestStack");

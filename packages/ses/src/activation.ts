@@ -1,37 +1,40 @@
 import { CustomResource, Duration } from "aws-cdk-lib";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
-import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Code, Function as LambdaFunction, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
 import { type IReceiptRuleSet } from "aws-cdk-lib/aws-ses";
 import { Provider } from "aws-cdk-lib/custom-resources";
 import { type IConstruct } from "constructs";
+import { runActivation } from "./activation-handler.js";
 
 /**
- * Provider handler for the rule-set activation custom resource.
- *
- * A rule set is inert until it is the account's single **active** rule set —
- * `ses:SetActiveReceiptRuleSet`, which has no CloudFormation resource. On
- * create/update it activates the named rule set. On delete it **conditionally
- * deactivates**: it clears the active slot only when the currently-active set
- * is the one being deleted, so tearing down this stack never disables another
- * stack's rule set. (A single-call `AwsCustomResource` cannot express this
- * describe-then-act logic, which is why activation uses a purpose-built
- * provider.) `@aws-sdk/client-ses` is provided by the Lambda runtime.
+ * Node runtime for the provider Lambda. Constructed as a magic-string runtime
+ * rather than the `Runtime.NODEJS_24_X` enum so adopting the latest LTS doesn't
+ * pull the package's aws-cdk-lib floor up to whatever release introduced the
+ * enum member (see cdk-floors.json).
+ */
+const NODE_RUNTIME = new Runtime("nodejs24.x", RuntimeFamily.NODEJS, { supportsInlineCode: true });
+
+/**
+ * The provider Lambda source. A rule set is inert until it is the account's
+ * single **active** rule set — `ses:SetActiveReceiptRuleSet`, which has no
+ * CloudFormation resource. The conditional-deactivate decision lives in the
+ * type-checked, unit-tested {@link runActivation} (serialised here via
+ * `.toString()`); only the SDK adapter is inline. `@aws-sdk/client-ses` is
+ * provided by the Lambda runtime.
  */
 const HANDLER = `
 const { SESClient, SetActiveReceiptRuleSetCommand, DescribeActiveReceiptRuleSetCommand } = require("@aws-sdk/client-ses");
+${runActivation.toString()}
 exports.handler = async (event) => {
   const ses = new SESClient({});
-  const name = event.ResourceProperties.RuleSetName;
-  const PhysicalResourceId = "ses-active-rule-set-" + name;
-  if (event.RequestType === "Delete") {
-    const active = await ses.send(new DescribeActiveReceiptRuleSetCommand({}));
-    if (active && active.Metadata && active.Metadata.Name === name) {
-      await ses.send(new SetActiveReceiptRuleSetCommand({}));
-    }
-    return { PhysicalResourceId };
-  }
-  await ses.send(new SetActiveReceiptRuleSetCommand({ RuleSetName: name }));
-  return { PhysicalResourceId };
+  const api = {
+    getActiveRuleSetName: async () =>
+      (await ses.send(new DescribeActiveReceiptRuleSetCommand({}))).Metadata?.Name,
+    setActive: async (name) => {
+      await ses.send(new SetActiveReceiptRuleSetCommand(name ? { RuleSetName: name } : {}));
+    },
+  };
+  return runActivation(event, api);
 };
 `;
 
@@ -47,7 +50,7 @@ export function activateReceiptRuleSet(
   ruleSet: IReceiptRuleSet,
 ): CustomResource {
   const onEvent = new LambdaFunction(scope, `${id}Fn`, {
-    runtime: Runtime.NODEJS_20_X,
+    runtime: NODE_RUNTIME,
     handler: "index.handler",
     code: Code.fromInline(HANDLER),
     timeout: Duration.minutes(1),

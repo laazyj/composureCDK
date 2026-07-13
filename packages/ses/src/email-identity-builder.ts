@@ -1,6 +1,7 @@
 import { type IHostedZone, type IPublicHostedZone } from "aws-cdk-lib/aws-route53";
 import {
   type ByoDkimOptions,
+  type DkimRecord,
   DkimIdentity,
   type EasyDkimSigningKeyLength,
   EmailIdentity,
@@ -28,25 +29,16 @@ import { type PublishDkimSpec, publishDkimRecords } from "./publish-dkim.js";
  */
 export type EmailIdentityBuilderProps = Omit<EmailIdentityProps, "identity" | "dkimIdentity">;
 
-/** DKIM token names and values exposed on the build result. */
-export interface DkimTokens {
-  readonly tokenName1: string;
-  readonly tokenName2: string;
-  readonly tokenName3: string;
-  readonly tokenValue1: string;
-  readonly tokenValue2: string;
-  readonly tokenValue3: string;
-}
-
 /** The build output of an {@link IEmailIdentityBuilder}. */
 export interface EmailIdentityBuilderResult {
   /** The SES email identity construct. */
   emailIdentity: EmailIdentity;
   /**
-   * The identity's DKIM DNS tokens. For manual publication when a Route 53 zone
-   * is not available to {@link IEmailIdentityBuilder.publishDkim | `.publishDkim()`}.
+   * The identity's DKIM DNS records ({@link DkimRecord | `{ name, value }`}), as
+   * exposed by CDK. For manual publication when a Route 53 zone is not available
+   * to {@link IEmailIdentityBuilder.publishDkim | `.publishDkim()`}.
    */
-  dkim: DkimTokens;
+  dkim: readonly DkimRecord[];
   /**
    * DNS records emitted by {@link IEmailIdentityBuilder.publishDkim}. Present
    * only when `.publishDkim(zone)` was called.
@@ -191,14 +183,7 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
 
     return {
       emailIdentity,
-      dkim: {
-        tokenName1: emailIdentity.dkimDnsTokenName1,
-        tokenName2: emailIdentity.dkimDnsTokenName2,
-        tokenName3: emailIdentity.dkimDnsTokenName3,
-        tokenValue1: emailIdentity.dkimDnsTokenValue1,
-        tokenValue2: emailIdentity.dkimDnsTokenValue2,
-        tokenValue3: emailIdentity.dkimDnsTokenValue3,
-      },
+      dkim: emailIdentity.dkimRecords,
       ...(dkimRecords && { dkimRecords }),
     };
   }

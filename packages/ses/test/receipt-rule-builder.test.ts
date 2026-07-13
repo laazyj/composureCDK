@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TlsPolicy } from "aws-cdk-lib/aws-ses";
-import { addHeaderAction } from "../src/actions.js";
+import { addHeaderAction } from "../src/actions/index.js";
 import { createReceiptRuleBuilder } from "../src/receipt-rule-builder.js";
 
 describe("ReceiptRuleBuilder", () => {

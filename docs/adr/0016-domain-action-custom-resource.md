@@ -1,34 +1,30 @@
-# ADR 0016: Domain-action custom resources — purpose-built providers for stateful SDK-only operations
+# ADR 0016: Encapsulate SDK-only operations as domain actions on the owning builder
 
 - **Status:** Proposed
 - **Date:** 2026-07-12
 
 ## Context
 
-Some AWS operations have **no CloudFormation resource** — they are SDK calls only. [`@composurecdk/custom-resources`](../../packages/custom-resources) wraps CDK's `AwsCustomResource` for these, and for a **stateless** operation (one fixed SDK call per lifecycle event) it is the right tool.
+Some AWS operations have **no CloudFormation resource** — they are SDK calls only (e.g. `ses:SetActiveReceiptRuleSet`, the call that makes a receipt rule set actually receive mail). In a raw CDK system the consumer models these themselves as a standalone `AwsCustomResource`, or a `Provider` + handler Lambda, wired up alongside — but disconnected from — the resource they concern.
 
-A subset are **stateful**: the correct action on a lifecycle event depends on current remote state. The delete handler in particular may need to _read_ state, _decide_, then _maybe act_ — a read-modify-write. `AwsCustomResource` runs one fixed call per event with parameters frozen at synth time and no hook to branch on a call's response, so it structurally cannot express this. Forcing such an operation through it means falling back to an unconditional call, which is often unsafe — e.g. clobbering account-level state another stack owns.
-
-Conditional/multi-step logic needs a **provider with a custom handler** (`Provider` + a handler Lambda) — a different construct from the declarative `AwsCustomResource`, not a gap to patch into it. Where a domain builder owns such an operation, this shape recurs, which is the bar for an ADR (per the [#280 / PR #294 review](https://github.com/laazyj/composureCDK/issues/279#issuecomment-4946384322)).
+That plumbing sits outside the domain. The consumer has to know the SDK call, its IAM, its ordering, and its teardown semantics — none of which read as the intent ("make this rule set active"). Where a builder already owns the domain the operation belongs to, that knowledge belongs with it.
 
 ## Decision
 
-Model an SDK-only operation a domain builder owns as a **domain action** (a `<verb>()` method), and pick the backing by the operation's shape:
+**Encapsulate an SDK-only operation as a domain action — a `<verb>()` method — on the builder that owns its domain.** The builder expresses the operation in the language of its domain (`.activate()`, not "call `SetActiveReceiptRuleSet` with these parameters"), owns its IAM scoping and lifecycle, and exposes the resulting custom resource on its build result ([architecture.md — build results must be complete](../architecture.md#build-results-must-be-complete)). The consumer declares intent; the builder owns the plumbing.
 
-1. **Stateless single call** → reuse `@composurecdk/custom-resources` (`createAwsCustomResourceBuilder`). Prefer this; it scopes IAM and reads as intent.
-2. **Stateful / conditional** (describe-then-act, delete-ordering, idempotency that depends on remote state) → a **purpose-built provider**: a `Provider` fronting a handler Lambda that branches on `event.RequestType` and remote state.
+This is the primary decision, and it is **independent of how the operation is backed**. That backing is a secondary, per-operation implementation choice:
 
-Rules for the provider case:
+1. **Stateless single call** (one fixed SDK call per lifecycle event) → reuse `@composurecdk/custom-resources` (`createAwsCustomResourceBuilder`). Prefer it; it scopes IAM and reads as intent.
+2. **Stateful / conditional** (the correct action depends on current remote state — describe-then-act, delete-ordering, idempotency) → a purpose-built `Provider` fronting a handler Lambda. `AwsCustomResource` runs one fixed call per event with no hook to branch on a response, so it cannot express this; forcing it means an unconditional call, often unsafe (clobbering account-level state another stack owns). For the handler, extract the decision logic into a typed, unit-tested function and serialise it into the Lambda via `.toString()`, keeping only a thin SDK adapter inline; scope IAM to exactly the actions it calls.
 
-- **Extract the decision logic into a typed function and unit-test it**, then serialise it into the handler via `.toString()`; keep only the SDK adapter inline. The behaviour that matters is type-checked and tested; only trivial call-wiring is unverified.
-- **Expose the custom resource on the build result** ([architecture.md — build results must be complete](../architecture.md#build-results-must-be-complete)).
-- **Default the action on when its absence is a silent footgun**, and make the on-by-default path safe (e.g. conditional teardown that touches only state this resource owns).
-- **Scope IAM to exactly the actions the handler calls.**
+When the operation's absence is a silent footgun, default the action on and make the on-by-default path safe.
 
-The first application is `@composurecdk/ses` `.activate()`: a receipt rule set is inert until it is the account's active set (`ses:SetActiveReceiptRuleSet`, no CFN resource), so `.activate()` is on by default, and on delete it clears the active slot only when the active set is ours.
+The first application is `@composurecdk/ses` `.activate()`: a receipt rule set is inert until it is the account's active set, so activation is encapsulated as `.activate()` on the rule-set builder (on by default). Its backing happens to be case 2 — because activation must not clobber another stack's active set on teardown, it uses a provider that conditionally deactivates — but the encapsulation decision would stand regardless of that choice.
 
 ## Consequences
 
-- Stateful SDK-only operations get a provider + typed handler rather than an unsafe unconditional `AwsCustomResource` call; the decision logic is tested, and the inline residue is a thin SDK adapter.
-- **Proposed** until a second stateful domain-action lands. That second case prices whether to extract a shared `domainActionProvider(scope, id, { handler, actions })` — or grow a handler-based capability inside `@composurecdk/custom-resources` — rather than each builder rolling its own `Provider`.
-- Consumers running multiple instances of an account-global operation (e.g. several SES rule sets across stacks) must understand the shared-state arbitration; document it on the builder and keep `createAwsCustomResourceBuilder` as the escape hatch for bespoke behaviour.
+- SDK-only operations a domain builder owns are expressed as domain actions, not consumer-assembled plumbing — encapsulated, in-domain, IAM-scoped, and surfaced on the build result.
+- The stateless-vs-stateful backing is implementation guidance, not part of the core decision: the same `.activate()` encapsulation would hold even if activation used an unconditional stateless `AwsCustomResource`.
+- **Proposed** until a second SDK-only operation is encapsulated this way. The second instance prices whether to extract shared scaffolding — a `domainActionProvider(scope, id, { handler, actions })` for the stateful case, and/or handler-serialisation helpers — rather than each builder rolling its own.
+- Consumers running multiple instances of an account-global operation (e.g. several SES rule sets across stacks) must understand the shared-state arbitration; document it on the builder, and keep `createAwsCustomResourceBuilder` as the escape hatch for bespoke behaviour.

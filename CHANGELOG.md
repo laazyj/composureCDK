@@ -1,3 +1,16 @@
+## 0.9.1 (2026-07-14)
+
+### 🚀 Features
+
+- **custom-resources:** add AwsCustomResource builder ([#294](https://github.com/laazyj/composureCDK/pull/294), [#280](https://github.com/laazyj/composureCDK/issues/280))
+- **eslint:** forbid aws-cdk-lib and sibling imports in core ([#297](https://github.com/laazyj/composureCDK/pull/297))
+- **eslint:** enforce package boundaries via nx project graph ([00f4d8b](https://github.com/laazyj/composureCDK/commit/00f4d8b))
+- **ses:** receiving-side builders (new @composurecdk/ses) ([#301](https://github.com/laazyj/composureCDK/pull/301), [#279](https://github.com/laazyj/composureCDK/issues/279))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.9.0 (2026-07-09)
 
 ### 🚀 Features

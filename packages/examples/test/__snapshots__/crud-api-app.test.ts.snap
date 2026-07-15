@@ -130,7 +130,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
       "Type": "AWS::IAM::Role",
       "UpdateReplacePolicy": "Retain",
     },
-    "CrudApiAppapiDeploymentBBBA8FB49f66cb8815eef643c10052df2bce8ae7": {
+    "CrudApiAppapiDeploymentBBBA8FB4296656823acbce46a065d30dfd7c2214": {
       "DependsOn": [
         "CrudApiAppapigadgetsidDELETE7DABC736",
         "CrudApiAppapigadgetsidGETD2E65655",
@@ -166,7 +166,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
           "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
         },
         "DeploymentId": {
-          "Ref": "CrudApiAppapiDeploymentBBBA8FB49f66cb8815eef643c10052df2bce8ae7",
+          "Ref": "CrudApiAppapiDeploymentBBBA8FB4296656823acbce46a065d30dfd7c2214",
         },
         "MethodSettings": [
           {
@@ -350,6 +350,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
               "StatusCode": "200",
             },
           ],
+          "PassthroughBehavior": "NEVER",
           "RequestTemplates": {
             "application/json": {
               "Fn::Join": [
@@ -416,6 +417,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
               "StatusCode": "200",
             },
           ],
+          "PassthroughBehavior": "NEVER",
           "RequestTemplates": {
             "application/json": {
               "Fn::Join": [
@@ -494,6 +496,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
               "StatusCode": "200",
             },
           ],
+          "PassthroughBehavior": "NEVER",
           "RequestTemplates": {
             "application/json": {
               "Fn::Join": [
@@ -564,6 +567,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
               "StatusCode": "200",
             },
           ],
+          "PassthroughBehavior": "NEVER",
           "RequestTemplates": {
             "application/json": {
               "Fn::Join": [
@@ -573,7 +577,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
                   {
                     "Ref": "CrudApiApptableE9F135F3",
                   },
-                  "","Key":{"id":{"S":"$input.params('id')"}}}",
+                  "","Key":{"id":{"S":"$input.params('id')"}},"ConsistentRead":true}",
                 ],
               ],
             },
@@ -630,6 +634,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
               "StatusCode": "200",
             },
           ],
+          "PassthroughBehavior": "NEVER",
           "RequestTemplates": {
             "application/json": {
               "Fn::Join": [

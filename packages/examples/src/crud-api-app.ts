@@ -1,5 +1,9 @@
 import { App, Stack } from "aws-cdk-lib";
-import { AwsIntegration, type Integration, type MethodOptions } from "aws-cdk-lib/aws-apigateway";
+import {
+  AwsIntegration,
+  PassthroughBehavior,
+  type MethodOptions,
+} from "aws-cdk-lib/aws-apigateway";
 import { AttributeType } from "aws-cdk-lib/aws-dynamodb";
 import { compose, combine, ref } from "@composurecdk/core";
 import { createRestApiBuilder } from "@composurecdk/apigateway";
@@ -17,29 +21,6 @@ import { createServiceRoleBuilder, type RoleBuilderResult } from "@composurecdk/
 const OK: MethodOptions = { methodResponses: [{ statusCode: "200" }] };
 
 type DynamoAction = "GetItem" | "PutItem" | "DeleteItem" | "Scan";
-
-type ApiRole = RoleBuilderResult["role"];
-
-/** Builds the `AwsIntegration` for one DynamoDB action, given the resolved
- * credentials role and the request/response VTL for that action. */
-function dynamoIntegration(
-  role: ApiRole,
-  action: DynamoAction,
-  requestTemplate: object,
-  responseTemplate: string,
-): Integration {
-  return new AwsIntegration({
-    service: "dynamodb",
-    action,
-    options: {
-      credentialsRole: role,
-      requestTemplates: { "application/json": JSON.stringify(requestTemplate) },
-      integrationResponses: [
-        { statusCode: "200", responseTemplates: { "application/json": responseTemplate } },
-      ],
-    },
-  });
-}
 
 /**
  * A single `Ref` to the `AwsIntegration` for one DynamoDB action, assembled
@@ -61,9 +42,85 @@ function gadgetIntegration(
       role: ref("apiRole", (r: RoleBuilderResult) => r.role),
     },
     ({ tableName, role }) =>
-      dynamoIntegration(role, action, requestTemplate(tableName), responseTemplate),
+      new AwsIntegration({
+        service: "dynamodb",
+        action,
+        options: {
+          credentialsRole: role,
+          requestTemplates: { "application/json": JSON.stringify(requestTemplate(tableName)) },
+          // Reject a request whose Content-Type has no matching request
+          // template with a 415, rather than passing its unmapped body straight
+          // to DynamoDB (the WHEN_NO_MATCH default) and masking the failure as
+          // a 200 via the response template below.
+          passthroughBehavior: PassthroughBehavior.NEVER,
+          integrationResponses: [
+            { statusCode: "200", responseTemplates: { "application/json": responseTemplate } },
+          ],
+        },
+      }),
   );
 }
+
+const LIST_OPERATION = gadgetIntegration(
+  "Scan",
+  (tableName) => ({ TableName: tableName }),
+  `{
+  "gadgets": [
+    #foreach($item in $input.path('$.Items'))
+    { "id": "$item.id.S", "name": "$item.name.S", "description": "$item.description.S" }#if($foreach.hasNext),#end
+    #end
+  ]
+}`,
+);
+
+const CREATE_OPERATION = gadgetIntegration(
+  "PutItem",
+  (tableName) => ({
+    TableName: tableName,
+    Item: {
+      id: { S: "$context.requestId" },
+      name: { S: "$input.path('$.name')" },
+      description: { S: "$input.path('$.description')" },
+    },
+  }),
+  `{ "id": "$context.requestId" }`,
+);
+
+const READ_OPERATION = gadgetIntegration(
+  "GetItem",
+  (tableName) => ({
+    TableName: tableName,
+    Key: { id: { S: "$input.params('id')" } },
+    ConsistentRead: true,
+  }),
+  `{
+  "id": "$input.path('$.Item.id.S')",
+  "name": "$input.path('$.Item.name.S')",
+  "description": "$input.path('$.Item.description.S')"
+}`,
+);
+
+const UPDATE_OPERATION = gadgetIntegration(
+  "PutItem",
+  (tableName) => ({
+    TableName: tableName,
+    Item: {
+      id: { S: "$input.params('id')" },
+      name: { S: "$input.path('$.name')" },
+      description: { S: "$input.path('$.description')" },
+    },
+  }),
+  `{ "id": "$input.params('id')", "updated": true }`,
+);
+
+const DELETE_OPERATION = gadgetIntegration(
+  "DeleteItem",
+  (tableName) => ({
+    TableName: tableName,
+    Key: { id: { S: "$input.params('id')" } },
+  }),
+  `{ "id": "$input.params('id')", "deleted": true }`,
+);
 
 /**
  * A minimal CRUD REST API backed directly by DynamoDB — no Lambda in the
@@ -99,83 +156,13 @@ export function createCrudApiApp(app = new App()) {
         .description("Minimal REST API backed directly by DynamoDB — no Lambda in the request path")
         .addResource("gadgets", (gadgets) =>
           gadgets
-            .addMethod(
-              "GET",
-              gadgetIntegration(
-                "Scan",
-                (tableName) => ({ TableName: tableName }),
-                `{
-  "gadgets": [
-    #foreach($item in $input.path('$.Items'))
-    { "id": "$item.id.S", "name": "$item.name.S", "description": "$item.description.S" }#if($foreach.hasNext),#end
-    #end
-  ]
-}`,
-              ),
-              OK,
-            )
-            .addMethod(
-              "POST",
-              gadgetIntegration(
-                "PutItem",
-                (tableName) => ({
-                  TableName: tableName,
-                  Item: {
-                    id: { S: "$context.requestId" },
-                    name: { S: "$input.path('$.name')" },
-                    description: { S: "$input.path('$.description')" },
-                  },
-                }),
-                `{ "id": "$context.requestId" }`,
-              ),
-              OK,
-            )
+            .addMethod("GET", LIST_OPERATION, OK)
+            .addMethod("POST", CREATE_OPERATION, OK)
             .addResource("{id}", (gadget) =>
               gadget
-                .addMethod(
-                  "GET",
-                  gadgetIntegration(
-                    "GetItem",
-                    (tableName) => ({
-                      TableName: tableName,
-                      Key: { id: { S: "$input.params('id')" } },
-                    }),
-                    `{
-  "id": "$input.path('$.Item.id.S')",
-  "name": "$input.path('$.Item.name.S')",
-  "description": "$input.path('$.Item.description.S')"
-}`,
-                  ),
-                  OK,
-                )
-                .addMethod(
-                  "PUT",
-                  gadgetIntegration(
-                    "PutItem",
-                    (tableName) => ({
-                      TableName: tableName,
-                      Item: {
-                        id: { S: "$input.params('id')" },
-                        name: { S: "$input.path('$.name')" },
-                        description: { S: "$input.path('$.description')" },
-                      },
-                    }),
-                    `{ "id": "$input.params('id')", "updated": true }`,
-                  ),
-                  OK,
-                )
-                .addMethod(
-                  "DELETE",
-                  gadgetIntegration(
-                    "DeleteItem",
-                    (tableName) => ({
-                      TableName: tableName,
-                      Key: { id: { S: "$input.params('id')" } },
-                    }),
-                    `{ "id": "$input.params('id')", "deleted": true }`,
-                  ),
-                  OK,
-                ),
+                .addMethod("GET", READ_OPERATION, OK)
+                .addMethod("PUT", UPDATE_OPERATION, OK)
+                .addMethod("DELETE", DELETE_OPERATION, OK),
             ),
         ),
     },

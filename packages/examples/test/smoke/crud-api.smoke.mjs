@@ -58,6 +58,10 @@ export default {
 };
 
 async function jsonRequest(url, method, body) {
-  const res = await fetch(url, { method, body: body ? JSON.stringify(body) : undefined });
+  const res = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
   return res.json();
 }

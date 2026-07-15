@@ -2,7 +2,7 @@
 
 Compose-native builders for [AWS SES](https://docs.aws.amazon.com/ses/latest/dg/Welcome.html), part of [ComposureCDK](../../README.md).
 
-SES is Amazon's email service for **sending** and **receiving** mail. This package currently covers the **receiving** path — email identities, receipt rule sets, receipt filters, and rule actions. Sending-side builders (configuration sets, dedicated IP pools, VDM, reputation alarms) will follow.
+SES is Amazon's email service for **sending** and **receiving** mail. This package covers both: the **sending** path — configuration sets, event routing, send grants, and account reputation alarms — and the **receiving** path — email identities, receipt rule sets, receipt filters, and rule actions. (Dedicated IP pools, account-level VDM, and SES templates will follow.)
 
 ## Install
 
@@ -10,7 +10,7 @@ SES is Amazon's email service for **sending** and **receiving** mail. This packa
 npm install @composurecdk/ses
 ```
 
-Peer dependencies: `@composurecdk/core`, `@composurecdk/route53` (for `.publishDkim()`), `aws-cdk-lib`, `constructs`.
+Peer dependencies: `@composurecdk/core`, `@composurecdk/cloudformation`, `@composurecdk/cloudwatch` (for reputation alarms), `@composurecdk/route53` (for `.publishDkim()`), `aws-cdk-lib`, `constructs`.
 
 ## Email identity
 
@@ -31,6 +31,113 @@ const { emailIdentity, dkim } = createEmailIdentityBuilder()
 - **`.publishDkim(zone)`** — for the `.domain()` case (e.g. a subdomain whose apex lives elsewhere), publishes the DKIM DNS records into `zone`: three CNAMEs for Easy DKIM, one TXT for BYODKIM. Mutually exclusive with `.publicHostedZone()` (which already publishes); not valid for an email identity.
 - **`.mailFromDomain(...)`** — a [custom MAIL FROM domain](https://docs.aws.amazon.com/ses/latest/dg/mail-from.html); defaults to `REJECT_MESSAGE` on MX failure (no insecure fallback to `amazonses.com`, preserving SPF/DMARC alignment).
 - The result exposes `dkim` — the identity's DKIM DNS records as `{ name, value }[]` (CDK's `dkimRecords`), for manual publication when a zone isn't available — and `dkimRecords` (the Route 53 records) when `.publishDkim()` was used.
+
+## Sending
+
+The sending path centres on a **configuration set** (the unit that tracks and
+controls a stream of outbound mail), a **send grant** to whatever role sends, and
+an account-level **reputation safety net**.
+
+```ts
+import {
+  createConfigurationSetBuilder,
+  createEmailIdentityBuilder,
+  createReputationAlarmBuilder,
+  identityGrants,
+  snsDestination,
+} from "@composurecdk/ses";
+import { EmailSendingEvent } from "aws-cdk-lib/aws-ses";
+import { compose, ref } from "@composurecdk/core";
+
+compose(
+  {
+    feedback: createTopicBuilder(),
+
+    // TLS required + reputation metrics on by default; route bounces/complaints out.
+    mailConfig: createConfigurationSetBuilder().addEventDestination("feedback", {
+      destination: snsDestination(ref<TopicBuilderResult>("feedback").get("topic")),
+      events: [EmailSendingEvent.BOUNCE, EmailSendingEvent.COMPLAINT, EmailSendingEvent.REJECT],
+    }),
+
+    // Associate the identity with the config set so every send is tracked.
+    identity: createEmailIdentityBuilder()
+      .domain("mail.example.com")
+      .configurationSet(ref<ConfigurationSetBuilderResult>("mailConfig").get("configurationSet")),
+
+    // Least-privilege ses:SendEmail on the identity, scoped to one From address.
+    sender: createFunctionBuilder().grant(
+      identityGrants.sendFrom(ref<EmailIdentityBuilderResult>("identity").get("emailIdentity"), [
+        "alerts@mail.example.com",
+      ]),
+    ),
+
+    // Account-level bounce/complaint alarms (create once per account/Region).
+    reputation: createReputationAlarmBuilder(),
+  },
+  {
+    feedback: [],
+    mailConfig: ["feedback"],
+    identity: ["mailConfig"],
+    sender: ["identity"],
+    reputation: [],
+  },
+);
+```
+
+### Configuration set
+
+A [configuration set](https://docs.aws.amazon.com/ses/latest/dg/using-configuration-sets.html)
+applies to every message sent with it — enforcing TLS, publishing reputation
+metrics, and routing send events.
+
+- **`.addEventDestination(key, { destination, events?, enabled? })`** — routes send
+  events to a destination. The `snsDestination` / `eventBusDestination` /
+  `cloudWatchDestination` helpers accept `Resolvable`s so a destination can `ref()`
+  a sibling topic or bus. Routing `BOUNCE`/`COMPLAINT` to a suppression workflow is
+  how a production sender protects its reputation — AWS **requires** you to track
+  them. (EventBridge destinations can only target the account's **default** bus.)
+- Every other [`ConfigurationSetProps`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ses.ConfigurationSetProps.html)
+  field passes through — `dedicatedIpPool`, `suppressionReasons`, `vdmOptions`,
+  `sendingEnabled`, etc.
+
+#### Secure defaults
+
+| Default             | Value     | Why                                                                                                           |
+| ------------------- | --------- | ------------------------------------------------------------------------------------------------------------- |
+| `tlsPolicy`         | `REQUIRE` | Encrypt in transit. Override with `.tlsPolicy(ConfigurationSetTlsPolicy.OPTIONAL)` for receivers without TLS. |
+| `reputationMetrics` | `true`    | Publish per-config-set bounce/complaint metrics (CloudFormation defaults this off).                           |
+
+> **Migrating from raw `aws-cdk-lib`?** `tlsPolicy` defaults to `REQUIRE` here vs.
+> CloudFormation's `OPTIONAL` — a more secure posture, but a behaviour change on
+> migration.
+
+### Send grants
+
+Sending is authorised on the **identity** resource (a configuration set has no ARN),
+so grants live on `identityGrants` and are declared on the **consumer** (the role or
+function that sends), per [ADR-0013](../../docs/adr/0013-consumer-side-grants.md).
+
+- **`identityGrants.send(identity)`** — `ses:SendEmail` + `ses:SendRawEmail` on the
+  identity ARN (delegates to CDK's native `grantSendEmail`).
+- **`identityGrants.sendFrom(identity, fromAddresses)`** — the same, scoped with a
+  `ses:FromAddress` condition (StringLike, so `alerts+*@example.com` works) — the
+  least-privilege posture so a leaked credential can't send as arbitrary addresses.
+
+### Reputation alarms
+
+`createReputationAlarmBuilder()` creates the AWS-recommended account-level alarms:
+
+| Alarm           | Metric (`AWS/SES`)         | Default threshold | SES action at threshold            |
+| --------------- | -------------------------- | ----------------- | ---------------------------------- |
+| `bounceRate`    | `Reputation.BounceRate`    | `>= 0.05` (5%)    | Account under review (pause ≥10%)  |
+| `complaintRate` | `Reputation.ComplaintRate` | `>= 0.001` (0.1%) | Account under review (pause ≥0.5%) |
+
+Both use `Average` over a 1-hour period with `treatMissingData: IGNORE`, per the
+[SES reputation-alarm guidance](https://docs.aws.amazon.com/ses/latest/dg/reputationdashboard-cloudwatch-alarm.html).
+These metrics are **account/Region-scoped and dimensionless**, so build this once per
+account/Region — not per configuration set. Tune or disable via `recommendedAlarms`,
+add custom alarms with `.addAlarm()`, and apply alarm actions from the result (no
+actions are configured by default). Set `.recommendedAlarms(false)` to disable.
 
 ## Receipt rule set
 

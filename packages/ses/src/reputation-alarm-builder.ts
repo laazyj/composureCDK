@@ -15,7 +15,9 @@ export interface ReputationAlarmBuilderProps {
    *
    * By default the builder creates both recommended alarms (bounce rate and
    * complaint rate) with AWS-recommended thresholds. Individual alarms can be
-   * customized or disabled. Set to `false` to disable all alarms.
+   * customized or disabled. Set to `false` to disable the recommended alarms;
+   * custom alarms added via {@link IReputationAlarmBuilder.addAlarm} are an
+   * explicit opt-in and are still created.
    *
    * No alarm actions are configured by default since notification methods are
    * user-specific. Access alarms from the build result or use an `afterBuild`
@@ -30,8 +32,8 @@ export interface ReputationAlarmBuilderProps {
 export interface ReputationAlarmBuilderResult {
   /**
    * The reputation alarms created, keyed by alarm name (`bounceRate`,
-   * `complaintRate`, plus any custom alarm keys). Always present — `{}` when
-   * alarms were disabled.
+   * `complaintRate`, plus any custom alarm keys). Always present — `{}` when no
+   * alarms were created (recommended disabled and no custom alarms added).
    */
   alarms: Record<string, Alarm>;
 }

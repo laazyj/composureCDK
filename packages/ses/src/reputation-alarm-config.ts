@@ -14,7 +14,9 @@ import type { AlarmConfig } from "@composurecdk/cloudwatch";
  */
 export interface ReputationAlarmConfig {
   /**
-   * Master switch: set to `false` to disable both recommended alarms.
+   * Master switch for the recommended alarms: set to `false` to disable both
+   * the bounce-rate and complaint-rate alarms. Custom alarms added via
+   * `addAlarm()` are an explicit opt-in and are unaffected by this switch.
    * @default true
    */
   enabled?: boolean;

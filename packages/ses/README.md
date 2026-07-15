@@ -137,7 +137,9 @@ Both use `Average` over a 1-hour period with `treatMissingData: IGNORE`, per the
 These metrics are **account/Region-scoped and dimensionless**, so build this once per
 account/Region — not per configuration set. Tune or disable via `recommendedAlarms`,
 add custom alarms with `.addAlarm()`, and apply alarm actions from the result (no
-actions are configured by default). Set `.recommendedAlarms(false)` to disable.
+actions are configured by default). `.recommendedAlarms(false)` disables the
+**recommended** alarms only — custom alarms added via `.addAlarm()` are an explicit
+opt-in and are always created.
 
 ## Receipt rule set
 

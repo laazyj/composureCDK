@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createReputationAlarmBuilder } from "../src/reputation-alarm-builder.js";
 import { resolveReputationAlarmDefinitions } from "../src/reputation-alarms.js";
 
@@ -9,6 +10,23 @@ function newStack(): Stack {
   return new Stack(new App(), "TestStack", {
     env: { account: "111111111111", region: "us-east-1" },
   });
+}
+
+/** A target-less custom alarm on the SES `Reject` count, for reuse in tests. */
+function rejectAlarm(a: AlarmDefinitionBuilder<void>): AlarmDefinitionBuilder<void> {
+  return a
+    .metric(
+      () =>
+        new Metric({
+          namespace: "AWS/SES",
+          metricName: "Reject",
+          statistic: "Sum",
+          period: Duration.minutes(5),
+        }),
+    )
+    .threshold(1)
+    .greaterThan()
+    .description("SES rejected a message.");
 }
 
 describe("ReputationAlarmBuilder", () => {
@@ -43,13 +61,35 @@ describe("ReputationAlarmBuilder", () => {
     });
   });
 
-  it("disables all alarms when recommendedAlarms is false", () => {
+  it("disables the recommended alarms when recommendedAlarms is false", () => {
     const stack = newStack();
     const { alarms } = createReputationAlarmBuilder()
       .recommendedAlarms(false)
       .build(stack, "SesReputation");
     expect(alarms).toEqual({});
     Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 0);
+  });
+
+  it("keeps custom alarms when the recommended alarms are disabled with false", () => {
+    const stack = newStack();
+    const { alarms } = createReputationAlarmBuilder()
+      .recommendedAlarms(false)
+      .addAlarm("rejects", rejectAlarm)
+      .build(stack, "SesReputation");
+    // recommendedAlarms(false) suppresses only the recommended set — the
+    // explicitly-added custom alarm must survive.
+    expect(Object.keys(alarms)).toEqual(["rejects"]);
+    Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps custom alarms when the recommended alarms are disabled with enabled:false", () => {
+    const stack = newStack();
+    const { alarms } = createReputationAlarmBuilder()
+      .recommendedAlarms({ enabled: false })
+      .addAlarm("rejects", rejectAlarm)
+      .build(stack, "SesReputation");
+    expect(Object.keys(alarms)).toEqual(["rejects"]);
+    Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 1);
   });
 
   it("disables only the bounce-rate alarm", () => {
@@ -85,21 +125,7 @@ describe("ReputationAlarmBuilder", () => {
 
   it("copies accumulated custom alarms on .copy()", () => {
     const stack = newStack();
-    const base = createReputationAlarmBuilder().addAlarm("rejects", (a) =>
-      a
-        .metric(
-          () =>
-            new Metric({
-              namespace: "AWS/SES",
-              metricName: "Reject",
-              statistic: "Sum",
-              period: Duration.minutes(5),
-            }),
-        )
-        .threshold(1)
-        .greaterThan()
-        .description("SES rejected a message."),
-    );
+    const base = createReputationAlarmBuilder().addAlarm("rejects", rejectAlarm);
     const { alarms } = base.copy().build(stack, "SesReputation");
     expect(alarms.rejects).toBeDefined();
   });
@@ -107,21 +133,7 @@ describe("ReputationAlarmBuilder", () => {
   it("adds a custom alarm alongside the recommended ones", () => {
     const stack = newStack();
     const { alarms } = createReputationAlarmBuilder()
-      .addAlarm("rejects", (a) =>
-        a
-          .metric(
-            () =>
-              new Metric({
-                namespace: "AWS/SES",
-                metricName: "Reject",
-                statistic: "Sum",
-                period: Duration.minutes(5),
-              }),
-          )
-          .threshold(1)
-          .greaterThan()
-          .description("SES rejected a message (virus/content)."),
-      )
+      .addAlarm("rejects", rejectAlarm)
       .build(stack, "SesReputation");
 
     expect(alarms.rejects).toBeDefined();

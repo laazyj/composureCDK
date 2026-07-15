@@ -77,9 +77,13 @@ export function resolveReputationAlarmDefinitions(
  * Creates AWS-recommended account-level SES reputation alarms, merging the
  * recommended definitions with any custom alarm builders.
  *
+ * Disabling the recommended alarms (`config === false` or `config.enabled ===
+ * false`) suppresses only the recommended definitions — custom alarms added via
+ * `addAlarm()` are always created, since they are an explicit, separate opt-in.
+ *
  * @param scope - CDK construct scope for creating alarm constructs.
  * @param id - Base identifier for alarm construct ids.
- * @param config - User-provided alarm configuration, or `false` to disable all.
+ * @param config - Recommended-alarm configuration, or `false` to disable the recommended alarms.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
  * @returns A record mapping alarm keys to their created Alarm constructs.
  *
@@ -91,12 +95,8 @@ export function createReputationAlarms(
   config: ReputationAlarmConfig | false | undefined,
   customAlarms: AlarmDefinitionBuilder<void>[] = [],
 ): Record<string, Alarm> {
-  if (config === false) return {};
-
-  const enabled = config?.enabled ?? REPUTATION_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveReputationAlarmDefinitions(config);
+  const recommended =
+    config === false || config?.enabled === false ? [] : resolveReputationAlarmDefinitions(config);
   const custom = customAlarms.map((b) => b.resolve(undefined));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

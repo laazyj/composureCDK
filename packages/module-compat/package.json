@@ -47,7 +47,7 @@
   "devDependencies": {
     "@aws-cdk/aws-neptune-alpha": "2.257.0-alpha.0",
     "@types/node": "^25.9.3",
-    "aws-cdk-lib": "^2.258.1",
+    "aws-cdk-lib": "^2.261.0",
     "constructs": "^10.6.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"

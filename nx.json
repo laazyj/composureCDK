@@ -20,6 +20,17 @@
       "inputs": ["{projectRoot}/dist/**/*", "{projectRoot}/package.json"],
       "cache": true
     },
+    "lint": {
+      "dependsOn": [{ "projects": ["@composurecdk/eslint-plugin"], "target": "build" }],
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/eslint.config.mjs",
+        "{workspaceRoot}/packages/eslint-plugin/src/**/*",
+        { "externalDependencies": ["eslint"] }
+      ]
+    },
     "test:update": {
       "dependsOn": ["^build", "typecheck"],
       "cache": false

@@ -1,0 +1,15 @@
+{
+  "name": "workspace-root",
+  "$schema": "node_modules/nx/schemas/project-schema.json",
+  "targets": {
+    "lint": {
+      "command": "eslint eslint.config.mjs scripts vitest.config.base.ts",
+      "inputs": [
+        "{workspaceRoot}/eslint.config.mjs",
+        "{workspaceRoot}/scripts/**/*",
+        "{workspaceRoot}/vitest.config.base.ts",
+        { "externalDependencies": ["eslint"] }
+      ]
+    }
+  }
+}

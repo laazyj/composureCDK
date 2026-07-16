@@ -1,9 +1,12 @@
 {
   "name": "composurecdk",
   "description": "Composable, lifecycle-managed AWS infrastructure built on AWS CDK — monorepo for the @composurecdk/* packages.",
+  "nx": {
+    "includedScripts": []
+  },
   "scripts": {
-    "lint": "nx show projects > /dev/null 2>&1 && eslint .",
-    "lint:fix": "nx show projects > /dev/null 2>&1 && eslint --fix .",
+    "lint": "npx nx run-many -t lint",
+    "lint:fix": "npx nx run-many -t lint -- --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npx nx run-many -t typecheck",

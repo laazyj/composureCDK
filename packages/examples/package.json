@@ -4,6 +4,7 @@
   "description": "Example applications exercising the ComposureCDK public API",
   "private": true,
   "scripts": {
+    "lint": "eslint .",
     "clean": "rm -rf dist cdk.out",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",

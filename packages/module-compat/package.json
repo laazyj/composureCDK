@@ -9,6 +9,7 @@
     "directory": "packages/module-compat"
   },
   "scripts": {
+    "lint": "eslint .",
     "clean": "rm -rf node_modules/.vite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

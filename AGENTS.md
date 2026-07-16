@@ -19,6 +19,11 @@ Fix any issues before moving on. Use npm run lint:fix and npm run format to auto
 
 Use npx nx to run build/test scripts — this is an nx monorepo.
 
+Lint is an nx target too: `npm run lint` runs `nx run-many -t lint`, which caches per project so unchanged packages fast-succeed. Two things make this correct rather than merely fast:
+
+- **Loose top-level files** (`eslint.config.mjs`, `scripts/**`, `vitest.config.base.ts`) belong to no package, so they are linted by the `workspace-root` project defined in the root [`project.json`](project.json). If you add a source file outside `packages/` and outside those globs, extend that project's `lint` target so it stays covered — the goal is that every file the old `eslint .` linted is still linted.
+- **The custom rules** in `@composurecdk/eslint-plugin` drive every package's lint result, so `targetDefaults.lint` in [`nx.json`](nx.json) both depends on that package's `build` (the config imports its compiled output) and lists its `src/**` as a lint input, so a rule change busts the dependent lint caches.
+
 ## Publishing & module format
 
 Every publishable package ships dual ESM/CJS, built by `tshy` — see [ADR-0007](docs/adr/0007-dual-esm-cjs-publishing.md). When touching a builder package:

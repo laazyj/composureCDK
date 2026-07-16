@@ -2,8 +2,8 @@
   "name": "composurecdk",
   "description": "Composable, lifecycle-managed AWS infrastructure built on AWS CDK — monorepo for the @composurecdk/* packages.",
   "scripts": {
-    "lint": "nx show projects > /dev/null 2>&1 && eslint .",
-    "lint:fix": "nx show projects > /dev/null 2>&1 && eslint --fix .",
+    "lint": "npx nx run-many -t lint",
+    "lint:fix": "npx nx run-many -t lint -- --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npx nx run-many -t typecheck",
@@ -54,6 +54,7 @@
     "@composurecdk/eslint-plugin": "*",
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
     "@eslint/js": "^10.0.1",
+    "@nx/eslint": "23.0.1",
     "@nx/eslint-plugin": "23.0.1",
     "@nx/js": "23.0.1",
     "@vitest/coverage-v8": "^4.1.8",

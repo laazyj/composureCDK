@@ -13,6 +13,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "lint": "eslint .",
     "clean": "rm -rf dist .tshy .tshy-build",
     "build": "tshy",
     "typecheck": "tsc --noEmit",

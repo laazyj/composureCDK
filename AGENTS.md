@@ -19,10 +19,11 @@ Fix any issues before moving on. Use npm run lint:fix and npm run format to auto
 
 Use npx nx to run build/test scripts — this is an nx monorepo.
 
-Lint is an nx target too: `npm run lint` runs `nx run-many -t lint`, which caches per project so unchanged packages fast-succeed. Two things make this correct rather than merely fast:
+Lint is an nx target too: `npm run lint` runs `nx run-many -t lint`, which caches per project so unchanged packages fast-succeed. Each package carries a `"lint": "eslint ."` script, so nx infers a `lint` target the same way it infers `build`/`test`/`typecheck` from package.json scripts — add that line when you create a package. Three things make this correct rather than merely fast:
 
-- **Loose top-level files** (`eslint.config.mjs`, `scripts/**`, `vitest.config.base.ts`) belong to no package, so they are linted by the `workspace-root` project defined in the root [`project.json`](project.json). If you add a source file outside `packages/` and outside those globs, extend that project's `lint` target so it stays covered — the goal is that every file the old `eslint .` linted is still linted.
-- **The custom rules** in `@composurecdk/eslint-plugin` drive every package's lint result, so `targetDefaults.lint` in [`nx.json`](nx.json) both depends on that package's `build` (the config imports its compiled output) and lists its `src/**` as a lint input, so a rule change busts the dependent lint caches.
+- **Loose top-level files** (`eslint.config.mjs`, `scripts/**`, `vitest.config.base.ts`) belong to no package, so they are linted by the `workspace-root` project defined in the root [`project.json`](project.json). If you add a source file outside `packages/` and outside those globs, extend that project's `lint` target so it stays covered.
+- **The custom rules** in `@composurecdk/eslint-plugin` drive every package's lint result, so `targetDefaults.lint` in [`nx.json`](nx.json) both depends on that package's `build` (the flat config imports its compiled output) and lists its `src/**` as a lint input, so a rule change busts the dependent lint caches.
+- **Not the `@nx/eslint` inference plugin.** It would auto-create the `lint` targets, but it evaluates the root flat config during graph construction (to skip projects with no lintable files). That imports `@composurecdk/eslint-plugin` before it is built, so every nx command fails on a fresh checkout. Per-package scripts avoid loading the config until lint actually runs — by which point `dependsOn` has built the plugin.
 
 ## Publishing & module format
 

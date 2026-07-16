@@ -247,9 +247,9 @@ it first. The only check `verify` cannot reproduce is CI's Node 20 + 24 matrix.
 
 `npm run lint` is `nx run-many -t lint` — a cached nx target like build and
 test, so re-running it after an unrelated change fast-succeeds from cache
-instead of re-linting the whole tree. Coverage is unchanged from the old
-`eslint .`: every package is linted in place, and loose top-level files are
-linted by the `workspace-root` project (see [AGENTS.md](../AGENTS.md#build-system)).
+instead of re-linting the whole tree. Every package is linted in place, and
+loose top-level files are linted by the `workspace-root` project (see
+[AGENTS.md](../AGENTS.md#build-system)).
 
 `check:exports` runs `attw` + `publint` per package against the built `dist/`,
 catching broken or masquerading `exports` maps and dual-package issues. The

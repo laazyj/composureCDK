@@ -18,6 +18,10 @@ updates:
           - "aws-cdk"
           - "aws-cdk*"
           - "@aws-cdk/*"
+      nx:
+        patterns:
+          - "nx"
+          - "@nx/*"
       npm-dependencies:
         patterns:
           - "*"
@@ -25,3 +29,5 @@ updates:
           - "aws-cdk"
           - "aws-cdk*"
           - "@aws-cdk/*"
+          - "nx"
+          - "@nx/*"

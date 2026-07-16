@@ -20,7 +20,7 @@
   "type": "module",
   "dependencies": {
     "@aws-cdk/aws-neptune-alpha": "2.257.0-alpha.0",
-    "aws-cdk-lib": "^2.258.1",
+    "aws-cdk-lib": "^2.261.0",
     "constructs": "^10.6.0"
   },
   "peerDependencies": {
@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
-    "aws-cdk": "^2.1126.0",
+    "aws-cdk": "^2.1131.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"
   },

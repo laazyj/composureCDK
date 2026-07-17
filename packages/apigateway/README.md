@@ -22,6 +22,12 @@ const api = createRestApiBuilder()
 
 Every [RestApiProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.RestApiProps.html) property is available as a fluent setter on the builder.
 
+### Integrations
+
+`addMethod` accepts any CDK [Integration](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.Integration.html) — `LambdaIntegration`, `MockIntegration`, `HttpIntegration`, or `AwsIntegration` to call an AWS service directly with no Lambda in the request path. To wire an integration to a sibling builder (e.g. a DynamoDB table's name and an IAM role for API Gateway to assume), assemble it with `ref`/`combine` so the integration resolves once its dependencies are built:
+
+- [**CrudApiStack**](../examples/src/crud-api-app.ts) — a complete CRUD REST API wired straight to DynamoDB via `AwsIntegration` and VTL mapping templates (`Scan`/`PutItem`/`GetItem`/`DeleteItem`), with the credentials role assembled from sibling builders using `combine` and granted via consumer-side `tableGrants`. Start here for the `AwsIntegration` → DynamoDB pattern.
+
 ## Secure Defaults
 
 `createRestApiBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
@@ -164,5 +170,6 @@ for (const alarm of Object.values(result.alarms)) {
 
 ## Examples
 
+- [CrudApiStack](../examples/src/crud-api-app.ts) — CRUD REST API backed directly by DynamoDB via `AwsIntegration`, with no Lambda in the request path
 - [MockApiStack](../examples/src/mock-api-app.ts) — CRUD REST API with mock integrations and recommended alarms with custom thresholds
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`, wired with `ref`

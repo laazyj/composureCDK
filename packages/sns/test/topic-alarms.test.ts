@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { Topic } from "aws-cdk-lib/aws-sns";
 import { createTopicBuilder } from "../src/topic-builder.js";
+import { resolveTopicAlarmDefinitions } from "../src/topic-alarms.js";
 
 function buildResult(configureFn?: (builder: ReturnType<typeof createTopicBuilder>) => void) {
   const app = new App();
@@ -248,5 +250,55 @@ describe("addAlarm", () => {
         );
       }),
     ).toThrow(/Duplicate alarm key "numberOfNotificationsFailed"/);
+  });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  function customAlarm(builder: ReturnType<typeof createTopicBuilder>) {
+    return builder.addAlarm("numberOfMessagesPublished", (alarm) =>
+      alarm
+        .metric(
+          (topic) =>
+            new Metric({
+              namespace: "AWS/SNS",
+              metricName: "NumberOfMessagesPublished",
+              dimensionsMap: { TopicName: topic.topicName },
+              statistic: "Sum",
+              period: Duration.minutes(1),
+            }),
+        )
+        .threshold(10000)
+        .greaterThanOrEqual()
+        .description("Topic receiving unusually high message volume"),
+    );
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    const { result, template } = buildResult((b) => {
+      customAlarm(b.recommendedAlarms(false));
+    });
+
+    expect(result.alarms.numberOfMessagesPublished).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["numberOfMessagesPublished"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildResult((b) => {
+      customAlarm(b.recommendedAlarms({ enabled: false }));
+    });
+
+    expect(result.alarms.numberOfMessagesPublished).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["numberOfMessagesPublished"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+});
+
+describe("resolveTopicAlarmDefinitions", () => {
+  it("returns no definitions when explicitly disabled", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const topic = new Topic(stack, "Topic");
+
+    expect(resolveTopicAlarmDefinitions(topic, { enabled: false })).toEqual([]);
   });
 });

@@ -112,7 +112,8 @@ export function resolveTopicAlarmDefinitions(
  * @param scope - CDK construct scope for creating alarm constructs.
  * @param id - Base identifier for alarm construct ids.
  * @param topic - The SNS topic to create alarms for.
- * @param config - User-provided alarm configuration, or `false` to disable all.
+ * @param config - User-provided alarm configuration, or `false` to disable the
+ *   recommended alarms.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
  * @returns A record mapping alarm keys to their created Alarm constructs.
  *
@@ -125,12 +126,10 @@ export function createTopicAlarms(
   config: TopicAlarmConfig | false | undefined,
   customAlarms: AlarmDefinitionBuilder<ITopic>[] = [],
 ): Record<string, Alarm> {
-  if (config === false) return {};
-
-  const enabled = config?.enabled ?? TOPIC_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveTopicAlarmDefinitions(topic, config);
+  const recommended =
+    config === false || config?.enabled === false
+      ? []
+      : resolveTopicAlarmDefinitions(topic, config);
   const custom = customAlarms.map((b) => b.resolve(topic));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

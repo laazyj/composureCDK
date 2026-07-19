@@ -300,6 +300,53 @@ describe("addAlarm", () => {
       }),
     ).toThrow(/Duplicate alarm key "serverError"/);
   });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  function withCustomAlarm(builder: ReturnType<typeof createRestApiBuilder>) {
+    withStubMethod(builder);
+    builder.addAlarm("integrationLatency", (alarm) =>
+      alarm
+        .metric(
+          (api) =>
+            new Metric({
+              namespace: "AWS/ApiGateway",
+              metricName: "IntegrationLatency",
+              dimensionsMap: {
+                ApiName: api.restApiName,
+                Stage: api.deploymentStage.stageName,
+              },
+              statistic: "p90",
+              period: Duration.minutes(1),
+            }),
+        )
+        .threshold(2000)
+        .greaterThanOrEqual()
+        .description("Integration latency is elevated"),
+    );
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    const { result, template } = buildResult((b) => {
+      b.recommendedAlarms(false);
+      withCustomAlarm(b);
+    });
+
+    expect(result.alarms.integrationLatency).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["integrationLatency"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildResult((b) => {
+      b.recommendedAlarms({ enabled: false });
+      withCustomAlarm(b);
+    });
+
+    expect(result.alarms.integrationLatency).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["integrationLatency"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
 });
 
 describe("SpecRestApiBuilder alarms", () => {

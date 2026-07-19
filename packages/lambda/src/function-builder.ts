@@ -63,7 +63,8 @@ export interface FunctionBuilderProps extends Omit<FunctionProps, "role"> {
    *
    * By default, the builder creates recommended alarms with sensible
    * thresholds for every applicable metric. Individual alarms can be
-   * customized or disabled. Set to `false` to disable all alarms.
+   * customized or disabled. Set to `false` to disable the recommended
+   * alarms; custom alarms added via `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification
    * methods are user-specific. Access alarms from the build result

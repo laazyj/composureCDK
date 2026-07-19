@@ -501,4 +501,39 @@ describe("addAlarm", () => {
       }),
     ).toThrow(/Duplicate alarm key "errors"/);
   });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  function customAlarm(builder: ReturnType<typeof createFunctionBuilder>) {
+    minimalFunction(builder);
+    builder.addAlarm("invocations", (alarm) =>
+      alarm
+        .metric((fn) => fn.metricInvocations({ period: Duration.minutes(1) }))
+        .threshold(1000)
+        .greaterThanOrEqual()
+        .description("High invocation count"),
+    );
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    const { result, template } = buildResult((b) => {
+      b.recommendedAlarms(false);
+      customAlarm(b);
+    });
+
+    expect(result.alarms.invocations).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["invocations"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildResult((b) => {
+      b.recommendedAlarms({ enabled: false });
+      customAlarm(b);
+    });
+
+    expect(result.alarms.invocations).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["invocations"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
 });

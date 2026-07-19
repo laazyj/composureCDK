@@ -75,7 +75,8 @@ export function resolveQueueAlarmDefinitions(
  * @param scope - CDK construct scope for creating alarm constructs.
  * @param id - Base identifier for alarm construct ids.
  * @param queue - The SQS queue to create alarms for.
- * @param config - User-provided alarm configuration, or `false` to disable all.
+ * @param config - User-provided alarm configuration, or `false` to disable the
+ *   recommended alarms.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
  * @param profile - The builder's alarm profile; see
  *   {@link resolveQueueAlarmDefinitions}.
@@ -91,10 +92,10 @@ export function createQueueAlarms(
   customAlarms: AlarmDefinitionBuilder<IQueue>[],
   profile: QueueAlarmProfile,
 ): Record<string, Alarm> {
-  if (config === false) return {};
-  if (!(config?.enabled ?? true)) return {};
-
-  const recommended = resolveQueueAlarmDefinitions(queue, config, profile);
+  const recommended =
+    config === false || config?.enabled === false
+      ? []
+      : resolveQueueAlarmDefinitions(queue, config, profile);
   const custom = customAlarms.map((b) => b.resolve(queue));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { type Lifecycle } from "@composurecdk/core";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { AttributeType } from "aws-cdk-lib/aws-dynamodb";
+import { AttributeType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { createTableBuilder, type ITableBuilder } from "../src/table-builder.js";
 import { createTableV2Builder, type ITableV2Builder } from "../src/table-v2-builder.js";
+import { resolveTableAlarmDefinitions } from "../src/table-alarms.js";
 
 const PK = { name: "pk", type: AttributeType.STRING };
 
@@ -139,5 +140,50 @@ describe.each(builders)("$name table alarms", ({ create }) => {
         ComparisonOperator: "GreaterThanThreshold",
       });
     });
+
+    // Regression: disabling the recommended alarms must not drop custom alarms
+    // added via addAlarm() — see issue #305.
+    it("keeps a custom alarm when recommendedAlarms is false", () => {
+      const { result, template } = build((b) => {
+        b.recommendedAlarms(false);
+        b.addAlarm("userErrors", (a) =>
+          a
+            .metric((table) => table.metricUserErrors({ period: Duration.minutes(5) }))
+            .threshold(5)
+            .greaterThan()
+            .description("Table is returning client-side (HTTP 400) errors."),
+        );
+      });
+
+      expect(result.alarms.userErrors).toBeDefined();
+      expect(Object.keys(result.alarms)).toEqual(["userErrors"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+
+    it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+      const { result, template } = build((b) => {
+        b.recommendedAlarms({ enabled: false });
+        b.addAlarm("userErrors", (a) =>
+          a
+            .metric((table) => table.metricUserErrors({ period: Duration.minutes(5) }))
+            .threshold(5)
+            .greaterThan()
+            .description("Table is returning client-side (HTTP 400) errors."),
+        );
+      });
+
+      expect(result.alarms.userErrors).toBeDefined();
+      expect(Object.keys(result.alarms)).toEqual(["userErrors"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+  });
+});
+
+describe("resolveTableAlarmDefinitions", () => {
+  it("returns no definitions when explicitly disabled", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const table = new Table(stack, "Table", { partitionKey: PK });
+
+    expect(resolveTableAlarmDefinitions(table, { enabled: false })).toEqual([]);
   });
 });

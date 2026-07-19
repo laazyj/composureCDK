@@ -55,6 +55,29 @@
   "nx": {
     "tags": [
       "scope:aggregate"
-    ]
+    ],
+    "targets": {
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "tsc --noEmit",
+          "cwd": "{projectRoot}"
+        }
+      },
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "vitest run",
+          "cwd": "{projectRoot}"
+        }
+      },
+      "lint": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "eslint .",
+          "cwd": "{projectRoot}"
+        }
+      }
+    }
   }
 }

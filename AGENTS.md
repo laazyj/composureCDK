@@ -25,6 +25,12 @@ Lint is an nx target too: `npm run lint` runs `nx run-many -t lint`, which cache
 - **The custom rules** in `@composurecdk/eslint-plugin` drive every package's lint result, so `targetDefaults.lint` in [`nx.json`](nx.json) both depends on that package's `build` (the flat config imports its compiled output) and lists its `src/**` as a lint input, so a rule change busts the dependent lint caches.
 - **Not the `@nx/eslint` inference plugin.** It would auto-create the `lint` targets, but it evaluates the root flat config during graph construction (to skip projects with no lintable files). That imports `@composurecdk/eslint-plugin` before it is built, so every nx command fails on a fresh checkout. Per-package scripts avoid loading the config until lint actually runs — by which point `dependsOn` has built the plugin.
 
+### Targets run the tool directly, not `npm run`
+
+Each package's `package.json` maps its hot targets (`build`, `typecheck`, `test`, `check:exports`, `lint`) to `nx:run-commands` under an `"nx": { "targets": … }` block, each running the tool directly (`tsc --noEmit`, `eslint .`, …) with `"cwd": "{projectRoot}"`. The `scripts` entries stay — they remain the source of truth for each command and keep `npm run <script>` working for humans — and the `nx.targets` block mirrors them.
+
+Without this block, nx _infers_ those targets from the scripts and runs them through the package manager (`npm run <script>`), spawning one `npm` process per task. Under CI's parallelism those concurrent `npm` startups intermittently crash inside npm's own config loader (`Exit prior to config file resolving` / `call config.load() before reading values`), failing the task _before_ the underlying tool runs — a flake unrelated to the code. Running the tool directly removes the `npm` subprocess entirely. `targetDefaults` in [`nx.json`](nx.json) still supply each target's `dependsOn`/`cache`/`inputs`/`outputs`; the override only changes the executor. When you add a package, copy the `nx.targets` block (adjusting `build` — `tshy` for publishable packages, `tsc -p tsconfig.build.json` otherwise).
+
 ## Publishing & module format
 
 Every publishable package ships dual ESM/CJS, built by `tshy` — see [ADR-0007](docs/adr/0007-dual-esm-cjs-publishing.md). When touching a builder package:

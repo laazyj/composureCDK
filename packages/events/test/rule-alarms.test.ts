@@ -178,4 +178,49 @@ describe("RuleBuilder recommended alarms", () => {
       Threshold: 10,
     });
   });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  function buildWithCustomAlarm(disable: false | { enabled: false }) {
+    const stack = newStack();
+    const fn = makeFn(stack);
+
+    const result = createRuleBuilder()
+      .schedule(Schedule.rate(Duration.minutes(15)))
+      .addTarget("h", new LambdaFunction(fn))
+      .recommendedAlarms(disable)
+      .addAlarm("retryAttempts", (alarm) =>
+        alarm
+          .metric(
+            (rule) =>
+              new Metric({
+                namespace: "AWS/Events",
+                metricName: "RetryInvocationAttempts",
+                dimensionsMap: { RuleName: rule.ruleName },
+                statistic: "Sum",
+                period: Duration.minutes(1),
+              }),
+          )
+          .threshold(10)
+          .greaterThan()
+          .description("Targets are being undersized; retries are climbing."),
+      )
+      .build(stack, "TestRule");
+
+    return { result, template: Template.fromStack(stack) };
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    const { result, template } = buildWithCustomAlarm(false);
+
+    expect(Object.keys(result.alarms)).toEqual(["retryAttempts"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildWithCustomAlarm({ enabled: false });
+
+    expect(Object.keys(result.alarms)).toEqual(["retryAttempts"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
 });

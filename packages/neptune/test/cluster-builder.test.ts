@@ -234,6 +234,36 @@ describe("ClusterBuilder", () => {
 
       expect(result.alarms.gremlinErrors).toBeDefined();
     });
+
+    // Regression: disabling the recommended alarms must not drop custom alarms
+    // added via addAlarm() — see issue #305.
+    it("keeps a custom alarm when recommendedAlarms is false", () => {
+      const { result, template } = buildCluster((b) =>
+        b.recommendedAlarms(false).addAlarm("gremlinErrors", (a) =>
+          a
+            .metric((cluster) => cluster.metric("NumGremlinErrorsPerSec"))
+            .threshold(0)
+            .greaterThan(),
+        ),
+      );
+
+      expect(Object.keys(result.alarms)).toEqual(["gremlinErrors"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+
+    it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+      const { result, template } = buildCluster((b) =>
+        b.recommendedAlarms({ enabled: false }).addAlarm("gremlinErrors", (a) =>
+          a
+            .metric((cluster) => cluster.metric("NumGremlinErrorsPerSec"))
+            .threshold(0)
+            .greaterThan(),
+        ),
+      );
+
+      expect(Object.keys(result.alarms)).toEqual(["gremlinErrors"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
   });
 
   describe("allowAccessFrom", () => {

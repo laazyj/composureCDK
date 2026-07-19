@@ -142,7 +142,8 @@ export function resolveClusterAlarmDefinitions(
  * @param scope - CDK construct scope for creating alarm constructs.
  * @param id - Base identifier for alarm construct ids.
  * @param cluster - The Neptune cluster to create alarms for.
- * @param config - User-provided alarm configuration, or `false` to disable all.
+ * @param config - User-provided alarm configuration, or `false` to disable the
+ *   recommended alarms.
  * @param serverlessScaling - The cluster's serverless scaling config, if any.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
  * @returns A record mapping alarm keys to their created Alarm constructs.
@@ -155,12 +156,10 @@ export function createClusterAlarms(
   serverlessScaling: ServerlessScalingConfiguration | undefined,
   customAlarms: AlarmDefinitionBuilder<IDatabaseCluster>[] = [],
 ): Record<string, Alarm> {
-  if (config === false) return {};
-
-  const enabled = config?.enabled ?? CLUSTER_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveClusterAlarmDefinitions(cluster, config, serverlessScaling);
+  const recommended =
+    config === false || config?.enabled === false
+      ? []
+      : resolveClusterAlarmDefinitions(cluster, config, serverlessScaling);
   const custom = customAlarms.map((b) => b.resolve(cluster));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

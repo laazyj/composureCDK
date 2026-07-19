@@ -87,7 +87,8 @@ export function resolveVolumeAlarmDefinitions(
  * @param scope - CDK construct scope for creating alarm constructs.
  * @param id - Base identifier for alarm construct ids.
  * @param volume - The EBS volume to create alarms for.
- * @param config - User-provided alarm configuration, or `false` to disable all.
+ * @param config - User-provided alarm configuration, or `false` to disable the
+ *   recommended alarms.
  * @param volumeType - Resolved volume type, used to gate the contextual
  *   burst-balance alarm.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
@@ -103,12 +104,10 @@ export function createVolumeAlarms(
   volumeType: EbsDeviceVolumeType | undefined,
   customAlarms: AlarmDefinitionBuilder<Volume>[] = [],
 ): Record<string, Alarm> {
-  if (config === false) return {};
-
-  const enabled = config?.enabled ?? VOLUME_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveVolumeAlarmDefinitions(volume, config, volumeType);
+  const recommended =
+    config === false || config?.enabled === false
+      ? []
+      : resolveVolumeAlarmDefinitions(volume, config, volumeType);
   const custom = customAlarms.map((b) => b.resolve(volume));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

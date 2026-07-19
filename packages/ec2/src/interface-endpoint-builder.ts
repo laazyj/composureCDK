@@ -37,7 +37,8 @@ export interface InterfaceEndpointBuilderProps extends Omit<
    *
    * By default, the builder creates recommended alarms with sensible
    * thresholds. Individual alarms can be customized or disabled. Set to
-   * `false` to disable all alarms.
+   * `false` to disable the recommended alarms; custom alarms added via
+   * `addAlarm()` are still created.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#PrivateLinkEndpoints
    */

@@ -324,6 +324,47 @@ describe("InterfaceEndpointBuilder", () => {
       expect(result.alarms.customThrottle).toBeDefined();
       Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
     });
+
+    // Regression: disabling the recommended alarms must not drop custom alarms
+    // added via addAlarm() — see issue #305.
+    function buildWithCustomAlarm(disable: false | { enabled: false }) {
+      const { stack, vpc } = freshScope();
+      const result = createInterfaceEndpointBuilder()
+        .vpc(vpc)
+        .service(InterfaceVpcEndpointAwsService.SSM)
+        .recommendedAlarms(disable)
+        .addAlarm("customThrottle", (alarm) =>
+          alarm
+            .metric(
+              (endpoint) =>
+                new Metric({
+                  namespace: "AWS/PrivateLinkEndpoints",
+                  metricName: "RstPacketsSent",
+                  dimensionsMap: { "VPC Endpoint Id": endpoint.vpcEndpointId },
+                  statistic: "Sum",
+                }),
+            )
+            .threshold(1)
+            .greaterThanOrEqual()
+            .description("Endpoint is resetting connections"),
+        )
+        .build(stack, "Endpoint");
+      return { result, template: Template.fromStack(stack) };
+    }
+
+    it("keeps a custom alarm when recommendedAlarms is false", () => {
+      const { result, template } = buildWithCustomAlarm(false);
+
+      expect(Object.keys(result.alarms)).toEqual(["customThrottle"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+
+    it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+      const { result, template } = buildWithCustomAlarm({ enabled: false });
+
+      expect(Object.keys(result.alarms)).toEqual(["customThrottle"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
   });
 
   describe("compose integration", () => {

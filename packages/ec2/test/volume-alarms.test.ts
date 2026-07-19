@@ -181,4 +181,47 @@ describe("volume addAlarm", () => {
       AlarmDescription: "EBS volume queue length is high",
     });
   });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  function customAlarm(builder: ReturnType<typeof createVolumeBuilder>) {
+    return builder.addAlarm("volumeQueueLength", (alarm) =>
+      alarm
+        .metric(
+          (volume: Volume) =>
+            new Metric({
+              namespace: "AWS/EBS",
+              metricName: "VolumeQueueLength",
+              dimensionsMap: { VolumeId: volume.volumeId },
+              statistic: Stats.AVERAGE,
+              period: Duration.minutes(5),
+            }),
+        )
+        .threshold(10)
+        .greaterThan()
+        .description("EBS volume queue length is high"),
+    );
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    // GP2 is burstable, so burstBalance would normally be created — proving the
+    // recommended set is fully suppressed while the custom alarm survives.
+    const { result, template } = buildVolume(
+      (b) => customAlarm(b.recommendedAlarms(false)),
+      EbsDeviceVolumeType.GP2,
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["volumeQueueLength"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildVolume(
+      (b) => customAlarm(b.recommendedAlarms({ enabled: false })),
+      EbsDeviceVolumeType.GP2,
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["volumeQueueLength"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
 });

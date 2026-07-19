@@ -69,12 +69,10 @@ export function createInterfaceEndpointAlarms(
   config: InterfaceEndpointAlarmConfig | false | undefined,
   customAlarms: AlarmDefinitionBuilder<InterfaceVpcEndpoint>[] = [],
 ): Record<string, Alarm> {
-  if (config === false) return {};
-
-  const enabled = config?.enabled ?? INTERFACE_ENDPOINT_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveEndpointAlarmDefinitions(endpoint, config);
+  const recommended =
+    config === false || config?.enabled === false
+      ? []
+      : resolveEndpointAlarmDefinitions(endpoint, config);
   const custom = customAlarms.map((b) => b.resolve(endpoint));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

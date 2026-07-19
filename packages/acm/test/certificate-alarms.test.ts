@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import type { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
+import { Certificate, type ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
 import { createCertificateBuilder } from "../src/certificate-builder.js";
+import { resolveCertificateAlarmDefinitions } from "../src/certificate-alarms.js";
 
 function buildResult(configureFn?: (builder: ReturnType<typeof createCertificateBuilder>) => void) {
   const app = new App();
@@ -164,5 +165,57 @@ describe("recommended alarms", () => {
       // Sanity: the public enum value we rely on resolves to 'notBreaching'.
       expect(TreatMissingData.NOT_BREACHING).toBe("notBreaching");
     });
+  });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  describe("custom alarms survive disabled recommended alarms", () => {
+    function customAlarm(builder: ReturnType<typeof createCertificateBuilder>) {
+      return builder.addAlarm("custom", (alarm) =>
+        alarm
+          .metric(
+            (cert: ICertificate) =>
+              new Metric({
+                namespace: "AWS/CertificateManager",
+                metricName: "DaysToExpiry",
+                dimensionsMap: { CertificateArn: cert.certificateArn },
+                statistic: "Minimum",
+                period: Duration.days(1),
+              }),
+          )
+          .threshold(10)
+          .lessThanOrEqual()
+          .description("Certificate very close to expiry"),
+      );
+    }
+
+    it("keeps a custom alarm when recommendedAlarms is false", () => {
+      const { result, template } = buildResult((b) => {
+        customAlarm(b.recommendedAlarms(false));
+      });
+
+      expect(result.alarms.custom).toBeDefined();
+      expect(Object.keys(result.alarms)).toEqual(["custom"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+
+    it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+      const { result, template } = buildResult((b) => {
+        customAlarm(b.recommendedAlarms({ enabled: false }));
+      });
+
+      expect(result.alarms.custom).toBeDefined();
+      expect(Object.keys(result.alarms)).toEqual(["custom"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+  });
+});
+
+describe("resolveCertificateAlarmDefinitions", () => {
+  it("returns no definitions when explicitly disabled", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const certificate = new Certificate(stack, "Certificate", { domainName: "example.com" });
+
+    expect(resolveCertificateAlarmDefinitions(certificate, { enabled: false })).toEqual([]);
   });
 });

@@ -53,7 +53,8 @@ export interface CertificateBuilderProps extends CertificateProps {
    *
    * By default, the builder creates a recommended `daysToExpiry` alarm
    * at 45 days. The alarm can be customized or disabled. Set to `false`
-   * to disable all alarms.
+   * to disable the recommended alarms; custom alarms added via
+   * `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification
    * methods are user-specific. Access alarms from the build result

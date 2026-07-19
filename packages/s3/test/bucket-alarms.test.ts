@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { Bucket } from "aws-cdk-lib/aws-s3";
 import { createBucketBuilder } from "../src/bucket-builder.js";
+import { resolveBucketAlarmDefinitions } from "../src/bucket-alarms.js";
 
 function buildResult(configureFn: (builder: ReturnType<typeof createBucketBuilder>) => void) {
   const app = new App();
@@ -272,5 +274,56 @@ describe("addAlarm", () => {
           );
       }),
     ).toThrow(/Duplicate alarm key "serverErrors:EntireBucket"/);
+  });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  function customAlarm(builder: ReturnType<typeof createBucketBuilder>) {
+    return builder.serverAccessLogs(false).addAlarm("totalRequests", (alarm) =>
+      alarm
+        .metric(
+          (bucket) =>
+            new Metric({
+              namespace: "AWS/S3",
+              metricName: "GetRequests",
+              dimensionsMap: { BucketName: bucket.bucketName, FilterId: "EntireBucket" },
+              period: Duration.minutes(5),
+            }),
+        )
+        .threshold(100)
+        .lessThan()
+        .description("Bucket traffic has dropped below expected level"),
+    );
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    const { result, template } = buildResult((b) => {
+      customAlarm(b.recommendedAlarms(false).metrics([{ id: "EntireBucket" }]));
+    });
+
+    expect(result.alarms.totalRequests).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["totalRequests"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildResult((b) => {
+      customAlarm(b.recommendedAlarms({ enabled: false }).metrics([{ id: "EntireBucket" }]));
+    });
+
+    expect(result.alarms.totalRequests).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["totalRequests"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+});
+
+describe("resolveBucketAlarmDefinitions", () => {
+  it("returns no definitions when explicitly disabled", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const bucket = new Bucket(stack, "Bucket");
+
+    expect(
+      resolveBucketAlarmDefinitions(bucket, { enabled: false }, [{ id: "EntireBucket" }]),
+    ).toEqual([]);
   });
 });

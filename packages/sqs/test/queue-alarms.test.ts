@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { Queue } from "aws-cdk-lib/aws-sqs";
 import { createQueueBuilder } from "../src/queue-builder.js";
+import { resolveQueueAlarmDefinitions } from "../src/queue-alarms.js";
+import { PRIMARY_ALARM_PROFILE } from "../src/queue-alarm-profiles.js";
 
 function buildResult(configureFn?: (builder: ReturnType<typeof createQueueBuilder>) => void) {
   const app = new App();
@@ -159,5 +162,50 @@ describe("addAlarm duplicate-key safety", () => {
         );
       }),
     ).toThrow(/Duplicate alarm key "approximateAgeOfOldestMessage"/);
+  });
+});
+
+// Regression: disabling the recommended alarms must not drop custom alarms
+// added via addAlarm() — see issue #305.
+describe("custom alarms survive disabled recommended alarms", () => {
+  function customAlarm(builder: ReturnType<typeof createQueueBuilder>) {
+    return builder.addAlarm("backlogDepth", (alarm) =>
+      alarm
+        .metric((queue) => queue.metricApproximateNumberOfMessagesVisible())
+        .threshold(1000)
+        .greaterThan()
+        .description("Queue backlog is deep"),
+    );
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    const { result, template } = buildResult((b) => {
+      customAlarm(b.recommendedAlarms(false));
+    });
+
+    expect(result.alarms.backlogDepth).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["backlogDepth"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildResult((b) => {
+      customAlarm(b.recommendedAlarms({ enabled: false }));
+    });
+
+    expect(result.alarms.backlogDepth).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["backlogDepth"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+});
+
+describe("resolveQueueAlarmDefinitions", () => {
+  it("returns no definitions when explicitly disabled", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const queue = new Queue(stack, "Queue");
+
+    expect(resolveQueueAlarmDefinitions(queue, { enabled: false }, PRIMARY_ALARM_PROFILE)).toEqual(
+      [],
+    );
   });
 });

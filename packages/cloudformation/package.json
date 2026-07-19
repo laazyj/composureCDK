@@ -77,6 +77,43 @@
   "nx": {
     "tags": [
       "scope:lib"
-    ]
+    ],
+    "targets": {
+      "build": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "tshy",
+          "cwd": "{projectRoot}"
+        }
+      },
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "tsc --noEmit",
+          "cwd": "{projectRoot}"
+        }
+      },
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "vitest run --passWithNoTests",
+          "cwd": "{projectRoot}"
+        }
+      },
+      "check:exports": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "attw --pack . --profile node16 && publint",
+          "cwd": "{projectRoot}"
+        }
+      },
+      "lint": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "eslint .",
+          "cwd": "{projectRoot}"
+        }
+      }
+    }
   }
 }

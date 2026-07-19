@@ -140,7 +140,8 @@ export function resolveInstanceAlarmDefinitions(
  * @param scope - CDK construct scope for creating alarm constructs.
  * @param id - Base identifier for alarm construct ids.
  * @param instance - The EC2 instance to create alarms for.
- * @param config - User-provided alarm configuration, or `false` to disable all.
+ * @param config - User-provided alarm configuration, or `false` to disable the
+ *   recommended alarms.
  * @param props - The merged instance props, used for contextual alarm thresholds.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
  * @returns A record mapping alarm keys to their created Alarm constructs.
@@ -155,12 +156,10 @@ export function createInstanceAlarms(
   props: Pick<InstanceProps, "instanceType">,
   customAlarms: AlarmDefinitionBuilder<Instance>[] = [],
 ): Record<string, Alarm> {
-  if (config === false) return {};
-
-  const enabled = config?.enabled ?? INSTANCE_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveInstanceAlarmDefinitions(instance, config, props);
+  const recommended =
+    config === false || config?.enabled === false
+      ? []
+      : resolveInstanceAlarmDefinitions(instance, config, props);
   const custom = customAlarms.map((b) => b.resolve(instance));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

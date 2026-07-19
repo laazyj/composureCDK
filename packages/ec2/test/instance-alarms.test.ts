@@ -295,4 +295,43 @@ describe("addAlarm", () => {
       AlarmDescription: "High inbound network traffic",
     });
   });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  function customAlarm(builder: ReturnType<typeof createInstanceBuilder>) {
+    return builder.addAlarm("networkIn", (alarm) =>
+      alarm
+        .metric(
+          (instance: Instance) =>
+            new Metric({
+              namespace: "AWS/EC2",
+              metricName: "NetworkIn",
+              dimensionsMap: { InstanceId: instance.instanceId },
+              statistic: Stats.AVERAGE,
+              period: Duration.minutes(1),
+            }),
+        )
+        .threshold(1_000_000_000)
+        .greaterThanOrEqual()
+        .description("High inbound network traffic"),
+    );
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    const { result, template } = buildInstance((b) => {
+      customAlarm(b.recommendedAlarms(false));
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["networkIn"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildInstance((b) => {
+      customAlarm(b.recommendedAlarms({ enabled: false }));
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["networkIn"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
 });

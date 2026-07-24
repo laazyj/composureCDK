@@ -1,5 +1,9 @@
 import { Annotations, Aspects, CfnResource, type Duration, Token } from "aws-cdk-lib";
-import type { Function as LambdaFunction, IEventSource } from "aws-cdk-lib/aws-lambda";
+import {
+  CfnEventSourceMapping,
+  type Function as LambdaFunction,
+  type IEventSource,
+} from "aws-cdk-lib/aws-lambda";
 import type { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { CfnQueue, type IQueue } from "aws-cdk-lib/aws-sqs";
 import type { IConstruct } from "constructs";
@@ -29,6 +33,14 @@ const SQS_DEFAULT_VISIBILITY_TIMEOUT_SECONDS = 30;
 export const SQS_VISIBILITY_TIMEOUT_WARNING_ID = "@composurecdk/lambda:sqs-visibility-timeout";
 
 /**
+ * Suppression id for the stream dead-letter relationship guard. Stable and part
+ * of the public surface — silence the warning with
+ * `Annotations.of(scope).acknowledgeWarning(STREAM_DLQ_WARNING_ID)`, so it must
+ * not be renamed casually.
+ */
+export const STREAM_DLQ_WARNING_ID = "@composurecdk/lambda:stream-dlq-missing";
+
+/**
  * Guards a cross-component relationship that spans an attached event source and
  * its consumer function. `FunctionBuilder` dispatches on {@link EventSourceKind}
  * so it never has to `instanceof` CDK internals — see ADR-0011.
@@ -56,7 +68,9 @@ export const EVENT_SOURCE_RELATIONSHIP_GUARDS: Record<
   EventSourceRelationshipGuard[]
 > = {
   sqs: [guardSqsVisibilityTimeout],
-  dynamodb: [],
+  // `guardStreamFailureDestination` is source-agnostic — it reads only the
+  // mapping's own failure config — so a future `kinesis` kind reuses it as-is.
+  dynamodb: [guardStreamFailureDestination],
   unknown: [],
 };
 
@@ -140,4 +154,54 @@ function readVisibilityTimeoutSeconds(queue: IQueue): number | undefined {
   const value = (child as CfnQueue).visibilityTimeout;
   if (value === undefined) return SQS_DEFAULT_VISIBILITY_TIMEOUT_SECONDS;
   return Token.isUnresolved(value) ? undefined : value;
+}
+
+/** A resolved, non-negative bound (a finite `maximumRetry*`/`maximumRecordAge*`). `-1` means "infinite". */
+function isFiniteBound(value: number | undefined): boolean {
+  return value !== undefined && !Token.isUnresolved(value) && value >= 0;
+}
+
+/**
+ * Warns when a stream event source mapping bounds `maximumRetryAttempts` or
+ * `maximumRecordAgeInSeconds` but has no `onFailure` destination — records that
+ * exhaust the bound are then dropped silently. Registers a synth-time Aspect
+ * that reads the *final* values off the L1 `CfnEventSourceMapping` (the L2
+ * source does not re-expose them), regardless of build order (ADR-0011).
+ *
+ * Source-agnostic: it inspects only the mapping's own failure config, so it
+ * applies unchanged to any polling stream kind (DynamoDB now, Kinesis later).
+ * SQS mappings never set these stream-only properties, so the guard stays
+ * silent even though the Aspect visits them.
+ */
+function guardStreamFailureDestination(fn: LambdaFunction, id: string): void {
+  // One Aspect is registered per attached stream source, so with N sources each
+  // mapping is visited N times. The warning message is a pure function of the
+  // mapping node, so every visit produces a byte-identical message on the same
+  // node — which CDK's `Annotations.addMessage` dedupes — leaving one warning
+  // per offending mapping without any bookkeeping here.
+  Aspects.of(fn).add({
+    visit(node: IConstruct): void {
+      if (
+        !CfnResource.isCfnResource(node) ||
+        node.cfnResourceType !== CfnEventSourceMapping.CFN_RESOURCE_TYPE_NAME
+      ) {
+        return;
+      }
+
+      const mapping = node as CfnEventSourceMapping;
+      const bounded =
+        isFiniteBound(mapping.maximumRetryAttempts) ||
+        isFiniteBound(mapping.maximumRecordAgeInSeconds);
+      if (!bounded || mapping.destinationConfig !== undefined) return; // unbounded or has a DLQ — stay quiet
+
+      Annotations.of(node).addWarningV2(
+        STREAM_DLQ_WARNING_ID,
+        `FunctionBuilder "${id}": stream event source mapping "${node.node.path}" bounds ` +
+          `retries/record-age but has no onFailure destination — records that exhaust the bound ` +
+          `are dropped silently. Set onFailure to a dead-letter queue (e.g. the sqs "dlq" queue ` +
+          `builder) or acknowledge "${STREAM_DLQ_WARNING_ID}". ` +
+          `See https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html#services-ddb-errors`,
+      );
+    },
+  });
 }

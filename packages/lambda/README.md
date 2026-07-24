@@ -305,14 +305,45 @@ second `props` argument and exported as `DEFAULT_SQS_EVENT_SOURCE_PROPS`:
 | `reportBatchItemFailures` | `true`                      | A single poison message fails only its own record, not the whole batch. CDK defaults this `false`. |
 | `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                  |
 
-`dynamoEventSource` applies the same defaults plus `startingPosition`, exported
-as `DEFAULT_DYNAMO_EVENT_SOURCE_PROPS`:
+`dynamoEventSource` applies the same defaults plus `startingPosition` and
+`bisectBatchOnError`, exported as `DEFAULT_DYNAMO_EVENT_SOURCE_PROPS` (the shared
+`DEFAULT_STREAM_EVENT_SOURCE_PROPS`, which a future `kinesisEventSource` reuses):
 
-| Property                  | Default                     | Rationale                                                                                         |
-| ------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------- |
-| `startingPosition`        | `LATEST`                    | A newly-attached consumer reads from the stream tip, not the table's existing change history.     |
-| `reportBatchItemFailures` | `true`                      | A single poison record fails only its own record, not the whole batch. CDK defaults this `false`. |
-| `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                 |
+| Property                  | Default                     | Rationale                                                                                                            |
+| ------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `startingPosition`        | `LATEST`                    | A newly-attached consumer reads from the stream tip, not the source's existing change history.                       |
+| `reportBatchItemFailures` | `true`                      | A single poison record fails only its own record, not the whole batch. CDK defaults this `false`.                    |
+| `bisectBatchOnError`      | `true`                      | Split and retry a failing batch, isolating a poison record instead of blocking the shard. CDK defaults this `false`. |
+| `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                                    |
+
+`startingPosition` is optional on `dynamoEventSource` (the default supplies it) —
+unlike CDK's `DynamoEventSourceProps`, which requires it.
+
+### Failure handling (dead-letter queue)
+
+Bisecting isolates a poison record, but a record that never succeeds is still
+retried until the stream's 24 h retention window expires unless you bound
+`retryAttempts` / `maxRecordAge`. Bounding retries **without** a dead-letter
+destination drops those records silently — so for durable failure handling, set
+`onFailure` too. `dynamoEventSource` widens `onFailure` to accept a queue (or a
+`ref()` to a sibling [`createQueueBuilder("dlq")`](../sqs) result) and wraps it
+in an `SqsDlq` for you, resolving it alongside the table `ref` via `combine`:
+
+```ts
+.addEventSource(
+  "orders",
+  dynamoEventSource(ref("orders", (r) => r.table), {
+    retryAttempts: 3,
+    onFailure: ref("dlq", (r) => r.queue),
+  }),
+)
+```
+
+If retries or record-age are bounded but no `onFailure` destination is set, a
+suppressible synth-time warning (`STREAM_DLQ_WARNING_ID`) fires. Silence it —
+when dropping is intended — with
+`Annotations.of(scope).acknowledgeWarning(STREAM_DLQ_WARNING_ID)`. See
+[ADR-0017](../../docs/adr/0017-stream-event-source-failure-handling.md).
 
 ### Cross-component invariants
 
@@ -331,3 +362,4 @@ today (the queue often arrives as an unresolved `ref()`); they are tracked in
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with recommended alarms, custom alarms, and SNS alarm actions
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — Lambda split across stacks via `.withStacks()`, wired with `ref`
 - [OrderProcessorStack](../examples/src/order-processor-app.ts) — SQS queue wired to a Lambda consumer via `sqsEventSource`
+- [DynamoStreamProcessorStack](../examples/src/dynamo-stream-processor-app.ts) — DynamoDB stream wired to a Lambda consumer via `dynamoEventSource`, with bisect-on-error, bounded retries, and an `onFailure` SQS DLQ

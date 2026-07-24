@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
+import { Annotations as CdkAnnotations, App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { AttributeType, type ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Code, type IEventSource, Runtime, StartingPosition } from "aws-cdk-lib/aws-lambda";
-import { DynamoEventSource, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import { DynamoEventSource, SqsDlq, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { isRef, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
@@ -83,6 +83,7 @@ describe("dynamoEventSource", () => {
   it("exposes its secure defaults for visibility", () => {
     expect(DEFAULT_DYNAMO_EVENT_SOURCE_PROPS.startingPosition).toBe("LATEST");
     expect(DEFAULT_DYNAMO_EVENT_SOURCE_PROPS.reportBatchItemFailures).toBe(true);
+    expect(DEFAULT_DYNAMO_EVENT_SOURCE_PROPS.bisectBatchOnError).toBe(true);
     expect(DEFAULT_DYNAMO_EVENT_SOURCE_PROPS.metricsConfig).toEqual({ metrics: ["EventCount"] });
   });
 });
@@ -117,6 +118,7 @@ describe("FunctionBuilder.addEventSource (DynamoDB)", () => {
     Template.fromStack(stack).hasResourceProperties("AWS::Lambda::EventSourceMapping", {
       StartingPosition: "LATEST",
       FunctionResponseTypes: ["ReportBatchItemFailures"],
+      BisectBatchOnFunctionError: true,
       MetricsConfig: { Metrics: ["EventCount"] },
     });
   });
@@ -611,5 +613,161 @@ describe("SQS visibility-timeout relationship guard", () => {
     baseBuilder().timeout(Duration.seconds(30)).build(stack, "Fn");
 
     expectSilent(stack);
+  });
+});
+
+describe("dynamoEventSource onFailure DLQ", () => {
+  it("wraps a bare queue as an SqsDlq destination on the mapping", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource(
+        "orders",
+        dynamoEventSource(streamTable(stack), {
+          retryAttempts: 3,
+          onFailure: new Queue(stack, "Dlq"),
+        }),
+      )
+      .build(stack, "Fn");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      MaximumRetryAttempts: 3,
+      DestinationConfig: { OnFailure: { Destination: Match.anyValue() } },
+    });
+  });
+
+  it("passes an explicit IEventSourceDlq through unwrapped", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource(
+        "orders",
+        dynamoEventSource(streamTable(stack), {
+          maxRecordAge: Duration.hours(1),
+          onFailure: new SqsDlq(new Queue(stack, "Dlq")),
+        }),
+      )
+      .build(stack, "Fn");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      DestinationConfig: { OnFailure: { Destination: Match.anyValue() } },
+    });
+  });
+
+  it("makes the source lazy (a Ref) so a Ref table and Ref DLQ resolve together via combine", () => {
+    const stack = new Stack(new App(), "S");
+    const table = streamTable(stack);
+    const queue = new Queue(stack, "Dlq");
+
+    const source = dynamoEventSource(
+      ref("orders", (r: { table: ITable }) => r.table),
+      {
+        retryAttempts: 3,
+        onFailure: ref("dlq", (r: { queue: Queue }) => r.queue),
+      },
+    );
+    expect(isRef(source.source)).toBe(true);
+
+    baseBuilder()
+      .addEventSource("orders", source)
+      .build(stack, "Fn", { orders: { table }, dlq: { queue } });
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      MaximumRetryAttempts: 3,
+      DestinationConfig: { OnFailure: { Destination: Match.anyValue() } },
+    });
+  });
+});
+
+describe("stream dead-letter relationship guard", () => {
+  // The guard's stable ack id; assertions scope to it so an unrelated warning
+  // can't mask a false pass.
+  const ACK = "stream-dlq-missing";
+
+  const expectSilent = (stack: Stack): void => {
+    expect(Annotations.fromStack(stack).findWarning("*", Match.stringLikeRegexp(ACK))).toEqual([]);
+  };
+  const expectWarns = (stack: Stack, message: string): void => {
+    Annotations.fromStack(stack).hasWarning("*", Match.stringLikeRegexp(message));
+  };
+
+  it("warns when retryAttempts is bounded but no onFailure destination is set", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack), { retryAttempts: 3 }))
+      .build(stack, "Fn");
+
+    expectWarns(
+      stack,
+      `bounds retries/record-age but has no onFailure destination.*\\[ack: @composurecdk/lambda:${ACK}\\]`,
+    );
+  });
+
+  it("warns when maxRecordAge is bounded but no onFailure destination is set", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource(
+        "orders",
+        dynamoEventSource(streamTable(stack), { maxRecordAge: Duration.hours(1) }),
+      )
+      .build(stack, "Fn");
+
+    expectWarns(stack, "no onFailure destination");
+  });
+
+  it("stays silent when a bounded retry has an onFailure DLQ", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource(
+        "orders",
+        dynamoEventSource(streamTable(stack), {
+          retryAttempts: 3,
+          onFailure: new Queue(stack, "Dlq"),
+        }),
+      )
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("stays silent for the default source (retries left unbounded)", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack)))
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("stays silent for an SQS source (no stream failure config)", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource("orders", sqsEventSource(new Queue(stack, "Q")))
+      .build(stack, "Fn");
+
+    expectSilent(stack);
+  });
+
+  it("warns once per offending mapping when two bounded stream sources lack DLQs", () => {
+    const stack = new Stack(new App(), "S");
+    baseBuilder()
+      .addEventSource(
+        "orders",
+        dynamoEventSource(streamTable(stack, "Orders"), { retryAttempts: 3 }),
+      )
+      .addEventSource("audit", dynamoEventSource(streamTable(stack, "Audit"), { retryAttempts: 3 }))
+      .build(stack, "Fn");
+
+    expect(Annotations.fromStack(stack).findWarning("*", Match.stringLikeRegexp(ACK))).toHaveLength(
+      2,
+    );
+  });
+
+  it("is suppressed by acknowledging the warning id", () => {
+    const stack = new Stack(new App(), "S");
+    CdkAnnotations.of(stack).acknowledgeWarning(`@composurecdk/lambda:${ACK}`);
+    baseBuilder()
+      .addEventSource("orders", dynamoEventSource(streamTable(stack), { retryAttempts: 3 }))
+      .build(stack, "Fn");
+
+    expect(Annotations.fromStack(stack).findWarning("*", Match.stringLikeRegexp(ACK))).toEqual([]);
   });
 });

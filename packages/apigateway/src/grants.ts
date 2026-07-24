@@ -24,12 +24,7 @@ export interface RestApiInvokeScope {
  * `role.grant(restApiGrants.invoke(ref("api", (r) => r.api)))`.
  *
  * `IRestApi` is implemented by both `RestApi` and `SpecRestApi`, so this serves
- * either builder's result. Unlike most resources, `IRestApi` has no native
- * `grant*` method, so the grant is assembled from the single well-known
- * `execute-api:Invoke` action and the construct's own `arnForExecuteApi(...)`
- * for the resource ARN — no library-owned policy beyond that action. See
- * ADR-0013 (consumer-side grants) and ADR-0017 (assembling a grant when a
- * resource has no native `grant*` method).
+ * either builder's result. See ADR-0013.
  */
 export const restApiGrants = {
   /**

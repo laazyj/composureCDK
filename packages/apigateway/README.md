@@ -54,7 +54,7 @@ compose(
 
 `restApiGrants.invoke(api)` adds `execute-api:Invoke` on the API's `arnForExecuteApi()` (all methods, paths, and stages). `IRestApi` is implemented by both `RestApi` and `SpecRestApi`, so the same helper serves either builder's result.
 
-Unlike most resources, `IRestApi` exposes no native `grant*` method to delegate to — the grant is assembled from the single `execute-api:Invoke` action plus the construct's own ARN builder ([ADR-0017](../../docs/adr/0017-assemble-grants-when-no-native-method.md)).
+Unlike most resources, `IRestApi` exposes no native `grant*` method to delegate to — the grant is assembled from the single `execute-api:Invoke` action plus the construct's own ARN builder ([ADR-0013 addendum](../../docs/adr/0013-consumer-side-grants.md#addendum-2026-07-24-resources-with-no-native-grant-method)).
 
 ### Scoping the grant
 
@@ -71,6 +71,8 @@ restApiGrants.invoke(
   },
 );
 ```
+
+Each field is independent, so any subset yields a partial wildcard — `{ method: "GET" }` allows `GET` on any path and stage, `{ path: "/items" }` allows any method on `/items`. Paths themselves accept `*` (e.g. `{ path: "/items/*" }`), matching the `arn:…:execute-api:…:<api>/<stage>/<method>/<path>` structure.
 
 ## Secure Defaults
 

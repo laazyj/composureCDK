@@ -1,0 +1,1013 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`dynamo-stream-processor-app > matches the expected synthesised template 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "DynamoStreamProcessoralerts1D9E3894": {
+      "Properties": {
+        "DisplayName": "Dynamo Stream Processor Alerts",
+      },
+      "Type": "AWS::SNS::Topic",
+    },
+    "DynamoStreamProcessoralertsNumberOfNotificationsFailedAlarmCA404BED": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "SNS topic is failing to deliver notifications. Threshold: > 0 failures in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/alerts/number-of-notifications-failed",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "DynamoStreamProcessoralerts1D9E3894",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFailed",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessoralertsNumberOfNotificationsFailedToRedriveToDlqAlarm9CE6EE05": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/alerts/number-of-notifications-failed-to-redrive-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "DynamoStreamProcessoralerts1D9E3894",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFailedToRedriveToDlq",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessoralertsNumberOfNotificationsFilteredOutInvalidAttributesAlarm3351604D": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "SNS topic messages are being filtered out due to invalid subscription filter policy attributes. Threshold: > 0 filtered messages in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/alerts/number-of-notifications-filtered-out-invalid-attributes",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "DynamoStreamProcessoralerts1D9E3894",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessoralertsNumberOfNotificationsRedrivenToDlqAlarmBC5B5BDB": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/alerts/number-of-notifications-redriven-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TopicName",
+            "Value": {
+              "Fn::GetAtt": [
+                "DynamoStreamProcessoralerts1D9E3894",
+                "TopicName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "NumberOfNotificationsRedrivenToDlq",
+        "Namespace": "AWS/SNS",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessoralertsPolicy2EA0C31F": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sns:Publish",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": {
+                "Ref": "DynamoStreamProcessoralerts1D9E3894",
+              },
+              "Sid": "AllowPublishThroughSSLOnly",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Topics": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+      },
+      "Type": "AWS::SNS::TopicPolicy",
+    },
+    "DynamoStreamProcessororders58299B29": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "pk",
+            "AttributeType": "S",
+          },
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [
+          {
+            "AttributeName": "pk",
+            "KeyType": "HASH",
+          },
+        ],
+        "Replicas": [
+          {
+            "DeletionProtectionEnabled": true,
+            "PointInTimeRecoverySpecification": {
+              "PointInTimeRecoveryEnabled": true,
+            },
+            "Region": {
+              "Ref": "AWS::Region",
+            },
+          },
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+        },
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES",
+        },
+      },
+      "Type": "AWS::DynamoDB::GlobalTable",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "DynamoStreamProcessorordersDlq76545271": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "QueueName": "orders-stream-dlq",
+        "ReceiveMessageWaitTimeSeconds": 20,
+        "SqsManagedSseEnabled": true,
+      },
+      "Type": "AWS::SQS::Queue",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "DynamoStreamProcessorordersDlqApproximateAgeOfOldestMessageAlarm58C1F628": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "Dead-letter queue's oldest message is approaching the queue's retentionPeriod — investigate and redrive it before SQS deletes it. Threshold: > 907200 seconds in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/orders-dlq/approximate-age-of-oldest-message",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "DynamoStreamProcessorordersDlq76545271",
+                "QueueName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ApproximateAgeOfOldestMessage",
+        "Namespace": "AWS/SQS",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 907200,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessorordersDlqApproximateNumberOfMessagesVisibleAlarm71A3ABD9": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "Dead-letter queue has messages present — any message here indicates a delivery failure that needs investigation. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/orders-dlq/approximate-number-of-messages-visible",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "DynamoStreamProcessorordersDlq76545271",
+                "QueueName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Namespace": "AWS/SQS",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessorordersDlqPolicyCD55BB1B": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DynamoStreamProcessorordersDlq76545271",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Queues": [
+          {
+            "Ref": "DynamoStreamProcessorordersDlq76545271",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::QueuePolicy",
+    },
+    "DynamoStreamProcessorordersReadThrottleEventsAlarm0C924E55": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "DynamoDB table read requests are being throttled, indicating a hot partition or insufficient read capacity. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/orders/read-throttle-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": {
+              "Ref": "DynamoStreamProcessororders58299B29",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ReadThrottleEvents",
+        "Namespace": "AWS/DynamoDB",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessorordersSystemErrorsAlarm318B2B72": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "DynamoDB table is returning server-side (HTTP 500) errors, summed across the core data-plane operations. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/orders/system-errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "EvaluationPeriods": 1,
+        "Metrics": [
+          {
+            "Expression": "getitem + batchgetitem + query + scan + putitem + updateitem + deleteitem + batchwriteitem + transactgetitems + transactwriteitems",
+            "Id": "expr_1",
+            "Label": "Sum of errors across all operations",
+            "ReturnData": true,
+          },
+          {
+            "Id": "getitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "GetItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "batchgetitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "BatchGetItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "query",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "Query",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "scan",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "Scan",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "putitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "PutItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "updateitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "UpdateItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "deleteitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "DeleteItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "batchwriteitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "BatchWriteItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "transactgetitems",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "TransactGetItems",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "transactwriteitems",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "TransactWriteItems",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "DynamoStreamProcessororders58299B29",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+        ],
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessorordersWriteThrottleEventsAlarmA5BC4B3D": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "DynamoDB table write requests are being throttled, indicating a hot partition or insufficient write capacity. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/orders/write-throttle-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": {
+              "Ref": "DynamoStreamProcessororders58299B29",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "WriteThrottleEvents",
+        "Namespace": "AWS/DynamoDB",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessorprocessorB2403F32": {
+      "DependsOn": [
+        "DynamoStreamProcessorprocessorExecutionRoleDefaultPolicyA08A80C5",
+        "DynamoStreamProcessorprocessorExecutionRole9954F432",
+      ],
+      "Properties": {
+        "Code": {
+          "ZipFile": "exports.handler = async (event) => { for (const r of event.Records) console.log('processed change', r.eventName, JSON.stringify(r.dynamodb?.Keys)); };",
+        },
+        "Description": "DynamoDB stream processor — consumes table change events",
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "DynamoStreamProcessorprocessorLogGroup0A593903",
+          },
+        },
+        "MemorySize": 256,
+        "Role": {
+          "Fn::GetAtt": [
+            "DynamoStreamProcessorprocessorExecutionRole9954F432",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "DynamoStreamProcessorprocessorDynamoDBEventSourceComposureCDKDynamoStreamProcessorStackDynamoStreamProcessororders2A8CC5F34FA18BA5": {
+      "Properties": {
+        "BatchSize": 100,
+        "BisectBatchOnFunctionError": true,
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "DynamoStreamProcessorordersDlq76545271",
+                "Arn",
+              ],
+            },
+          },
+        },
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "DynamoStreamProcessororders58299B29",
+            "StreamArn",
+          ],
+        },
+        "FunctionName": {
+          "Ref": "DynamoStreamProcessorprocessorB2403F32",
+        },
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures",
+        ],
+        "MaximumRetryAttempts": 3,
+        "MetricsConfig": {
+          "Metrics": [
+            "EventCount",
+          ],
+        },
+        "StartingPosition": "LATEST",
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
+    },
+    "DynamoStreamProcessorprocessorErrorsAlarmA0652296": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/processor/errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DynamoStreamProcessorprocessorB2403F32",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessorprocessorExecutionRole9954F432": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "DynamoStreamProcessorprocessorLogGroup0A593903",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "DynamoStreamProcessorprocessorLogGroup0A593903",
+                              "Arn",
+                            ],
+                          },
+                          ":log-stream:*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "LogsWriter",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "DynamoStreamProcessorprocessorExecutionRoleDefaultPolicyA08A80C5": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DynamoStreamProcessorordersDlq76545271",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "dynamodb:ListStreams",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DynamoStreamProcessororders58299B29",
+                  "StreamArn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "dynamodb:DescribeStream",
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "DynamoStreamProcessororders58299B29",
+                  "StreamArn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "DynamoStreamProcessorprocessorExecutionRoleDefaultPolicyA08A80C5",
+        "Roles": [
+          {
+            "Ref": "DynamoStreamProcessorprocessorExecutionRole9954F432",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "DynamoStreamProcessorprocessorIteratorAgeAlarmD88040F3": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "Lambda function is falling behind its stream event source (IteratorAge). Threshold: > 60000ms for 3 consecutive 1 minute periods.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/processor/iterator-age",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DynamoStreamProcessorprocessorB2403F32",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "IteratorAge",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 60000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessorprocessorLogGroup0A593903": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "DynamoStreamProcessorprocessorOrdersDroppedEventsAlarm41EFADD6": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "Lambda event source "orders" is dropping events after exhausting retries or TTL. Threshold: > 0 dropped events in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/processor/orders-dropped-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "EventSourceMappingUUID",
+            "Value": {
+              "Ref": "DynamoStreamProcessorprocessorDynamoDBEventSourceComposureCDKDynamoStreamProcessorStackDynamoStreamProcessororders2A8CC5F34FA18BA5",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "DroppedEventCount",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessorprocessorOrdersFailedInvocationsAlarmBA198DAE": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "Lambda event source "orders" is failing to invoke the function. Threshold: > 0 failed invocations in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/processor/orders-failed-invocations",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "EventSourceMappingUUID",
+            "Value": {
+              "Ref": "DynamoStreamProcessorprocessorDynamoDBEventSourceComposureCDKDynamoStreamProcessorStackDynamoStreamProcessororders2A8CC5F34FA18BA5",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FailedInvokeEventCount",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "DynamoStreamProcessorprocessorThrottlesAlarm84B78886": {
+      "Properties": {
+        "AlarmActions": [
+          {
+            "Ref": "DynamoStreamProcessoralerts1D9E3894",
+          },
+        ],
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/processor/throttles",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "DynamoStreamProcessorprocessorB2403F32",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

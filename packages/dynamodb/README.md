@@ -82,6 +82,8 @@ result.table; // the table itself, which a DynamoEventSource consumes
 
 Neither construct exposes a distinct stream construct — the stream is an attribute of the table — so the result exposes `tableStreamArn` directly. It is `undefined` when no stream is configured, on both builders, so a `ref()` consumer can branch on its presence.
 
+To consume the stream from a Lambda, pass a `ref()` to the table into the [`@composurecdk/lambda`](../lambda#event-sources) `dynamoEventSource` factory — it applies secure stream defaults (bisect-on-error, partial-batch reporting), grants least-privilege `grantStreamRead`, and wires an `onFailure` dead-letter queue ergonomically. The [`DynamoStreamProcessor`](../examples/src/dynamo-stream-processor-app.ts) example shows the end-to-end table → stream → Lambda → DLQ wiring.
+
 ## Recommended Alarms
 
 Both builders create the same [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#DynamoDB) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

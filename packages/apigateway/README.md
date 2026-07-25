@@ -28,6 +28,52 @@ Every [RestApiProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws
 
 - [**CrudApiStack**](../examples/src/crud-api-app.ts) — a complete CRUD REST API wired straight to DynamoDB via `AwsIntegration` and VTL mapping templates (`Scan`/`PutItem`/`GetItem`/`DeleteItem`), with the credentials role assembled from sibling builders using `combine` and granted via consumer-side `tableGrants`. Start here for the `AwsIntegration` → DynamoDB pattern.
 
+## Invoke grants
+
+To let a principal call an IAM-authorized API (`authorizationType: AuthorizationType.IAM`), `restApiGrants` provides a consumer-side grant helper — the mirror of DynamoDB's `tableGrants`. Declare it on the **grantee** (the caller), pointing at the API via a `ref`, exactly as you would any other grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)):
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createRestApiBuilder,
+  restApiGrants,
+  type RestApiBuilderResult,
+} from "@composurecdk/apigateway";
+import { createRoleBuilder } from "@composurecdk/iam";
+
+compose(
+  {
+    api: createRestApiBuilder().restApiName("Internal"),
+    caller: createRoleBuilder()
+      .assumedBy(principal)
+      .grant(restApiGrants.invoke(ref("api", (r: RestApiBuilderResult) => r.api))),
+  },
+  { api: [], caller: ["api"] }, // caller → api; the grant edge follows the data flow
+);
+```
+
+`restApiGrants.invoke(api)` adds `execute-api:Invoke` on the API's `arnForExecuteApi()` (all methods, paths, and stages). `IRestApi` is implemented by both `RestApi` and `SpecRestApi`, so the same helper serves either builder's result.
+
+Unlike most resources, `IRestApi` exposes no native `grant*` method to delegate to — the grant is assembled from the single `execute-api:Invoke` action plus the construct's own ARN builder ([ADR-0013 addendum](../../docs/adr/0013-consumer-side-grants.md#addendum-2026-07-24-resources-with-no-native-grant-method)).
+
+### Scoping the grant
+
+Pass a `RestApiInvokeScope` to narrow the ARN to a specific method, path, and/or stage; each field defaults to `*`:
+
+```ts
+// Only GET /items on the prod stage
+restApiGrants.invoke(
+  ref("api", (r: RestApiBuilderResult) => r.api),
+  {
+    method: "GET",
+    path: "/items",
+    stage: "prod",
+  },
+);
+```
+
+Each field is independent, so any subset yields a partial wildcard — `{ method: "GET" }` allows `GET` on any path and stage, `{ path: "/items" }` allows any method on `/items`. Paths themselves accept `*` (e.g. `{ path: "/items/*" }`), matching the `arn:…:execute-api:…:<api>/<stage>/<method>/<path>` structure.
+
 ## Secure Defaults
 
 `createRestApiBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.

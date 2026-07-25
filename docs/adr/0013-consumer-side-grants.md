@@ -143,3 +143,19 @@ compose(
 - **Put the shared contract in `@composurecdk/iam`.** Rejected: every grantable
   resource package would then depend on `@composurecdk/iam` (today only `lambda`
   does). A generic `Grant<G>` in `core` needs no such edges.
+
+## Addendum (2026-07-24): resources with no native `grant*` method
+
+The second principle — _defer to the construct's own authority_ — assumes the
+resource exposes a `grant*` method to delegate to. A few do not. `apigateway`'s
+`restApiGrants.invoke` is the first: `IRestApi`/`RestApiBase` has no API-wide
+invoke grant (aws-cdk-lib's only native `execute-api:Invoke` helper is
+`Method.grantExecute`, on the individual `Method` construct, which the REST API
+builders do not surface in their result). Where no delegate exists, a helper may
+assemble the grant directly, kept minimal so the library owns no real policy: a
+single well-known action (`execute-api:Invoke`) on the construct's own ARN
+builder (`arnForExecuteApi(method, path, stage)`), never a hand-curated action
+set or a hand-formatted ARN. That ARN builder also gives the helper its
+method/path/stage scoping for free, so per-method granularity needs no separate
+helper. This is a narrow exception, not a reversal — prefer a native `grant*`
+method whenever one exists.

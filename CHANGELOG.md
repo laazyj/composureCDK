@@ -1,3 +1,31 @@
+## 0.9.1 (2026-07-25)
+
+### 🚀 Features
+
+- **apigateway:** add restApiGrants.invoke consumer-side grant helper ([#327](https://github.com/laazyj/composureCDK/pull/327), [#326](https://github.com/laazyj/composureCDK/issues/326))
+- **custom-resources:** add AwsCustomResource builder ([#294](https://github.com/laazyj/composureCDK/pull/294), [#280](https://github.com/laazyj/composureCDK/issues/280))
+- **eslint:** forbid aws-cdk-lib and sibling imports in core ([#297](https://github.com/laazyj/composureCDK/pull/297))
+- **eslint:** enforce package boundaries via nx project graph ([00f4d8b](https://github.com/laazyj/composureCDK/commit/00f4d8b))
+- **examples:** add Dynamo backed CRUD API example with combine + consumer-side grants ([#302](https://github.com/laazyj/composureCDK/pull/302))
+- **ses:** receiving-side builders (new @composurecdk/ses) ([#301](https://github.com/laazyj/composureCDK/pull/301), [#279](https://github.com/laazyj/composureCDK/issues/279))
+
+### 🩹 Fixes
+
+- **acm:** keep custom alarms when recommended alarms are disabled ([#319](https://github.com/laazyj/composureCDK/pull/319))
+- **apigateway:** keep custom alarms when recommended alarms are disabled ([#320](https://github.com/laazyj/composureCDK/pull/320))
+- **dynamodb:** keep custom alarms when recommended alarms are disabled ([#316](https://github.com/laazyj/composureCDK/pull/316))
+- **ec2:** keep custom alarms when recommended alarms are disabled ([#322](https://github.com/laazyj/composureCDK/pull/322))
+- **events:** keep custom alarms when recommended alarms are disabled ([#318](https://github.com/laazyj/composureCDK/pull/318))
+- **lambda:** keep custom alarms when recommended alarms are disabled ([#317](https://github.com/laazyj/composureCDK/pull/317))
+- **neptune:** keep custom alarms when recommended alarms are disabled ([#321](https://github.com/laazyj/composureCDK/pull/321))
+- **s3:** keep custom alarms when recommended alarms are disabled ([#315](https://github.com/laazyj/composureCDK/pull/315))
+- **sns:** keep custom alarms when recommended alarms are disabled ([#313](https://github.com/laazyj/composureCDK/pull/313))
+- **sqs:** keep custom alarms when recommended alarms are disabled ([#314](https://github.com/laazyj/composureCDK/pull/314))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.9.0 (2026-07-09)
 
 ### 🚀 Features

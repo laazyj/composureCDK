@@ -72,6 +72,12 @@ jobs:
       - name: Check CDK floor ranges in sync
         run: npm run cdk-floors:check
 
+      # Synthesises the example stacks once and fails on any CloudFormation
+      # Validate finding. Same step `npm run verify` runs locally, so this
+      # should only ever fire for something that skipped the pre-push hook.
+      - name: Validate example stacks
+        run: npm run validate
+
       # id: test — the coverage steps below key off whether this actually ran.
       - name: Test
         id: test

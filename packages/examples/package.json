@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "cdk": "cdk",
     "deploy": "cdk deploy",
-    "synth": "cdk synth"
+    "synth": "cdk synth",
+    "validate": "cdk synth --quiet && node ../../scripts/check-validation-report.mjs cdk.out/validation-report.json"
   },
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",

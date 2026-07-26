@@ -72,58 +72,42 @@ jobs:
       - name: Check CDK floor ranges in sync
         run: npm run cdk-floors:check
 
+      # id: test — the coverage steps below key off whether this actually ran.
       - name: Test
+        id: test
         run: npm run test
 
-  # Self-contained coverage reporting (no external service): run the suite once
-  # on a single Node version, merge every package's json-summary output into one
-  # markdown table (scripts/coverage-summary.mjs) and publish it to the Actions
-  # run summary. The per-file thresholds in each vitest.config.ts already gate
-  # coverage during `npm run test`; this job only surfaces the numbers to
-  # reviewers. See docs/ci.md#coverage-reporting.
-  #
-  # The sticky PR comment is posted by coverage-comment.yml, not here: this
-  # workflow is workflow_call-able from release.yml, and a job requesting
-  # `pull-requests: write` fails validation under that caller's narrower
-  # permission ceiling — even when the posting step could never run.
-  coverage:
-    name: Coverage report
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    env:
-      NX_DAEMON: false
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      # nx test depends on ^build + typecheck, so the graph builds what it needs.
-      # Coverage (v8, json-summary reporter) is always on via vitest.config.base.
-      - name: Test with coverage
-        run: npm run test
-
-      # if: always() — a threshold miss fails the step above but reviewers still
-      # want the table showing which package dipped.
+      # Self-contained coverage reporting (no external service): merge every
+      # package's json-summary output into one markdown table
+      # (scripts/coverage-summary.mjs) and publish it to the Actions run summary.
+      # The per-file thresholds in each vitest.config.ts already gate coverage
+      # during the Test step above; these steps only surface the numbers to
+      # reviewers. See docs/ci.md#coverage-reporting.
+      #
+      # This rides along on the Node 24 leg rather than a sibling job. A separate
+      # job had to re-run the whole build -> typecheck -> test chain this leg has
+      # already run, for identical output — ~3.5 min of duplicated wall-clock per
+      # CI run. Coverage (v8, json-summary reporter) is always on via
+      # vitest.config.base, so the table is a by-product of the Test step.
+      #
+      # The sticky PR comment is posted by coverage-comment.yml, not here: this
+      # workflow is workflow_call-able from release.yml, and a job requesting
+      # `pull-requests: write` fails validation under that caller's narrower
+      # permission ceiling — even when the posting step could never run.
+      #
+      # if: always() — a threshold miss fails Test but reviewers still want the
+      # table showing which package dipped. The `conclusion != 'skipped'` guard
+      # is what always() costs us here: an earlier failure (typecheck, lint)
+      # skips Test, leaving no coverage-summary.json to merge, and these steps
+      # must stay quiet rather than fail a second time on the same root cause.
       - name: Build coverage summary
-        if: always()
+        if: always() && matrix.node-version == 24 && steps.test.conclusion != 'skipped'
         run: npm run coverage:summary
 
       # The workflow_run listener has no access to this run's PR context, so the
       # number travels with the artifact.
       - name: Record PR number
-        if: always() && github.event_name == 'pull_request'
+        if: always() && matrix.node-version == 24 && steps.test.conclusion != 'skipped' && github.event_name == 'pull_request'
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
@@ -131,7 +115,7 @@ jobs:
           printf '%s' "$PR_NUMBER" > coverage/pr-number.txt
 
       - name: Upload coverage summary
-        if: always() && github.event_name == 'pull_request'
+        if: always() && matrix.node-version == 24 && steps.test.conclusion != 'skipped' && github.event_name == 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-summary

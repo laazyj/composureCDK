@@ -37,17 +37,34 @@ jobs:
     steps:
       # The summary artifact is only uploaded when the Node 24 leg got far enough
       # to run its tests and build a table. A cancelled run, an infra failure, or
-      # a failure in an earlier gate (typecheck, lint) leaves none, and
-      # download-artifact fails closed rather than posting a stale comment.
+      # a failure in an earlier gate (lint, format, typecheck, cdk-floors) skips
+      # Test and leaves none.
+      #
+      # That is a normal outcome, not a fault of this workflow: CI has already
+      # reported the failure, and a hard failure here would report the same root
+      # cause a second time as a separate red run. So the download is tolerated
+      # and the posting steps are gated on it — no artifact, no comment, green.
+      #
+      # Deliberately not gated on workflow_run.conclusion == 'success': a
+      # coverage threshold miss fails Test but still uploads the table, and that
+      # is exactly the run a reviewer wants the comment on.
       - name: Download coverage summary
+        id: download
+        continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: coverage-summary
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Report missing coverage summary
+        if: steps.download.outcome != 'success'
+        run: |
+          echo "::notice::No coverage-summary artifact on run ${{ github.event.workflow_run.id }} (${{ github.event.workflow_run.conclusion }}) — CI was cancelled or failed before the Node 24 Test step. Nothing to comment."
+
       - name: Read PR number
         id: pr
+        if: steps.download.outcome == 'success'
         run: |
           number=$(cat pr-number.txt)
           case "$number" in
@@ -61,6 +78,7 @@ jobs:
       # header: coverage keys the comment so pushes update it in place rather
       # than appending one comment per push.
       - name: Post coverage comment
+        if: steps.download.outcome == 'success'
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: coverage

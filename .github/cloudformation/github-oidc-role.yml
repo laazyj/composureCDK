@@ -319,6 +319,17 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:sqs:*:${AWS::AccountId}:*
 
+          # DynamoDB — smoke test writes one item to the stream-processor
+          # table to verify the consumer Lambda. DynamoDB does not support
+          # tag-based authorization for data-plane actions, so — as with SQS
+          # above — this is ARN-scoped to the sandbox account.
+          - Sid: DynamoDBPutItem
+            Effect: Allow
+            Action:
+              - dynamodb:PutItem
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:*:${AWS::AccountId}:table/*
+
           # CDK bootstrap roles — assumed by CDK CLI for asset publishing
           # and CloudFormation execution
           - Sid: CDKAssetRoles

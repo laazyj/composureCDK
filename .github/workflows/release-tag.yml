@@ -4,22 +4,29 @@ on:
   push:
     branches: [main]
 
+# The ceiling for every job below, narrowed per job: a reusable-workflow call
+# cannot be granted a scope the calling workflow does not hold.
 permissions:
-  contents: write
+  contents: write # tag push
+  id-token: write # AWS OIDC, for the deploy-test call
 
 concurrency:
   group: release-tag
   cancel-in-progress: false
 
 jobs:
-  tag:
-    name: Create and push release tag
-    # Cheap workflow-level filter so non-release pushes never spin up a runner.
-    # Assumes squash-merge of the release PR — the strict regex parse below is
-    # the authoritative validation.
+  # Validate before committing 45 minutes of sandbox deploy to the commit. This
+  # is also the only place the release-commit filter is written — `needs`
+  # propagates the skip to both jobs below.
+  parse:
+    name: Parse release version
+    # Cheap prefix filter so non-release pushes never spin up a runner; the
+    # strict regex below is the authoritative validation. Assumes squash-merge
+    # of the release PR.
     if: "${{ startsWith(github.event.head_commit.message, 'chore(release): v') }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions: {} # reads the event payload only
     outputs:
       version: ${{ steps.parse.outputs.version }}
     steps:
@@ -40,6 +47,25 @@ jobs:
             exit 1
           fi
 
+  # The tag is the release gate: it exists only once the example fleet has
+  # deployed and smoke-tested cleanly, so a failed deploy leaves main untagged
+  # with nothing to unpick.
+  deploy-test:
+    name: Deploy Test
+    needs: parse
+    uses: ./.github/workflows/deploy-test.yml
+    permissions:
+      contents: read
+      id-token: write
+
+  tag:
+    name: Create and push release tag
+    needs: [parse, deploy-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
       - name: Checkout
         # Authenticate with RELEASE_PR_TOKEN (a PAT) so the tag push below triggers
         # release.yml's `push: tags` workflow. Pushes authenticated with the default
@@ -56,7 +82,7 @@ jobs:
 
       - name: Create and push tag
         env:
-          VERSION: ${{ steps.parse.outputs.version }}
+          VERSION: ${{ needs.parse.outputs.version }}
         run: |
           tag="v${VERSION}"
           if git ls-remote --exit-code --tags origin "$tag" >/dev/null 2>&1; then
@@ -65,6 +91,5 @@ jobs:
           fi
           git tag -a "$tag" -m "Release $tag"
           git push origin "$tag"
-          # The GitHub Release itself is created by release.yml, gated behind a
-          # successful deploy-test (just before npm publish), so we never
-          # advertise a release whose artefacts failed to deploy.
+          # The push triggers release.yml, which creates the GitHub Release and
+          # publishes to npm.

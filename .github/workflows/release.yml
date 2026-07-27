@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    # deploy-test gates the tag, in release-tag.yml — so a tag pushed by hand
+    # skips it. See docs/ci.md#manual-fallback.
     tags:
       - "v*.*.*"
 
@@ -10,21 +12,13 @@ permissions:
   id-token: write # For npm provenance
 
 jobs:
-  deploy-test:
-    name: Deploy Test
-    uses: ./.github/workflows/deploy-test.yml
-    permissions:
-      contents: read
-      id-token: write
-
   publish:
     name: Publish to npm
-    needs: deploy-test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm
     permissions:
-      contents: write # Create the GitHub Release once the deploy has passed
+      contents: write # Create the GitHub Release
       id-token: write
 
     steps:
@@ -45,8 +39,8 @@ jobs:
         env:
           NX_DAEMON: false
 
-      # Created here, after deploy-test has passed, rather than at tag time —
-      # so a release is only published once its artefacts have deployed cleanly.
+      # Created here rather than at tag time so the Release and the npm publish
+      # land together — a Release always has packages behind it.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

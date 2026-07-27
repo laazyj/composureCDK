@@ -4,7 +4,7 @@ CI/CD pipeline for ComposureCDK: how the workflows chain, how to bootstrap AWS a
 
 ## Pipeline overview
 
-Five GitHub Actions workflows chain together, with `coverage-comment.yml` hanging off CI as a listener rather than a link in the chain:
+Five GitHub Actions workflows chain together, with `coverage-comment.yml` and `release-notify.yml` hanging off CI and Release as listeners rather than links in the chain:
 
 ```
 ci.yml ──► deploy-test.yml ──► release-tag.yml ──► release.yml
@@ -24,6 +24,7 @@ coverage-comment.yml                  │
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`.
 - **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it runs deploy-test and then tags the commit. The tag is the release gate: it is only created once the example fleet has deployed and smoke-tested cleanly, so a bad release never leaves a dangling tag to clean up. It is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Creates the GitHub Release from the matching `CHANGELOG.md` section, then runs `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
+- **`release-notify.yml`** — `workflow_run` listener on Release. Comments on the issues the release addressed (see [Release notifications](#release-notifications)).
 
 ## Coverage reporting
 
@@ -122,6 +123,27 @@ Create a fine-grained PAT (or GitHub App) scoped to this repo with `contents:wri
 `release.yml` keeps its `push: tags: v*.*.*` trigger as an escape hatch — pushing a `vX.Y.Z` tag manually (typically by an admin with permission to push tags through branch protection) bypasses the automated chain and goes straight to Release + publish. deploy-test gates the tag, not the publish, so a hand-pushed tag skips it entirely: run **Deploy Test** via `workflow_dispatch` first if you take this route.
 
 [gha-token-rules]: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
+
+### Release notifications
+
+[`release-notify.yml`](../.github/workflows/release-notify.yml) listens for a successful Release run and posts one comment per issue that release addressed:
+
+> Addressed in **v0.9.1** — see the [release notes](https://github.com/laazyj/composureCDK/releases/tag/v0.9.1).
+>
+> Published to npm as `@composurecdk/*@0.9.1`.
+
+Which issues those are is worked out by [`scripts/release-issue-comments.mjs`](../scripts/release-issue-comments.mjs) (`npm run release:issue-comments`) from the published release body — see its header for the discovery rules and why the release body, rather than `CHANGELOG.md`, is the source. Every comment carries a hidden `<!-- composurecdk-release: vX.Y.Z -->` marker, so nothing is ever posted twice; issues are commented on whatever their state, since a closed one is exactly the case worth announcing.
+
+Notes:
+
+- **Re-running is safe and is the fix for a partial failure.** The script exits non-zero if any comment fails to post, and the release is already out by then. Re-run the workflow, or trigger it by hand: **Actions → Release Notify → Run workflow**, with the tag (e.g. `v0.9.1`).
+- Preview against any past release without posting:
+
+  ```sh
+  node scripts/release-issue-comments.mjs --tag=v0.9.1 --repo=laazyj/composureCDK --dry-run
+  ```
+
+- Like `coverage-comment.yml`, this workflow must exist on the **default branch** to fire — `workflow_run` always dispatches the default-branch copy, so changes to it are not exercised by the PR that introduces them.
 
 ### npm publishing setup
 

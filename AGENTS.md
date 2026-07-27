@@ -2,7 +2,9 @@
 
 ## Architecture
 
-Read [docs/architecture.md](docs/architecture.md) first — it's the primary guide to the library's shape: lifecycle, builders, composition, refs, defaults. For decisions that amend or add detail (and the rationale behind non-obvious patterns), see [docs/adr/](docs/adr/). Non-trivial changes that introduce a new pattern or reverse an existing one should ship with an ADR.
+Read [docs/architecture.md](docs/architecture.md) first — it's the primary guide to the library's shape: lifecycle, builders, composition, refs, defaults. For decisions that amend or add detail (and the rationale behind non-obvious patterns), see [docs/adr/](docs/adr/).
+
+**ADRs are for architecturally significant decisions only** — ones that change the library's shape or bind work across packages. An implementation choice localised to one feature, or to a set of features inside a single package, does not get an ADR: document it in the package README and the PR body. Applying an existing pattern to a new service is not a new decision. Read [when to write an ADR](docs/adr/README.md#when-to-write-an-adr) before adding one; the default answer is no.
 
 ## After making changes
 
@@ -40,11 +42,19 @@ Every publishable package ships dual ESM/CJS, built by `tshy` — see [ADR-0007]
 
 ## Adding a new example
 
+Examples are expansive demonstrations, not feature showcases. Each one is a simplified real-world application built from several features working together, deployed by CI and proven against live AWS by a smoke test. Before adding one, check it clears this bar:
+
+- **It demonstrates a system, not a resource.** One feature or one resource type is the job of the package README and that package's tests. An example earns its place by showing how a set of features composes into something recognisable — an API over a datastore, a queue-driven worker, a website behind a CDN.
+- **It is grounded in a use case.** Name the workload the stack would serve. If the best available description is "shows how X works", it is package-README material.
+- **It does not re-demonstrate what existing examples already cover.** Alarm routing through `alarmActionsPolicy` and an SNS topic, for instance, already appears in several stacks; repeating it adds deploy cost and obscures whatever is actually new. Prefer extending an existing example over adding a near-duplicate stack.
+- **It is deployable and verifiable.** CI deploys every example; an example whose behaviour cannot be exercised by a smoke test is not worth deploying, so write the smoke test as part of adding it (step 4).
+
 When adding a stack to `packages/examples/`:
 
 1. **Name the stack with the `ComposureCDK-` prefix.** The CI IAM policy and the smoke test discover stacks by this prefix — see [docs/ci.md](docs/ci.md#stack-naming-convention).
 2. **Register it in [`packages/examples/bin/app.ts`](packages/examples/bin/app.ts).**
 3. **Add a row to [`packages/examples/README.md`](packages/examples/README.md).**
-4. **Ensure it is covered by the post-deploy smoke test.** The runner at [`scripts/smoke-test.mjs`](scripts/smoke-test.mjs) (run by the `deploy-test` workflow) auto-discovers `*.smoke.mjs` files under [`packages/examples/test/smoke/`](packages/examples/test/smoke/). Stack-health checks are automatic via the prefix; if your example exposes a runtime surface that the smoke test should hit (HTTP endpoint, distribution, log output, etc.), add a sibling `<name>.smoke.mjs` file there. Each module default-exports `{ name, run(ctx) }`, where `ctx` provides `aws`, `region`, `pass(msg)`, and `fail(msg)`. Shared AWS CLI plumbing (output lookups, resource discovery, polling) lives in [`packages/examples/test/smoke/_helpers.mjs`](packages/examples/test/smoke/_helpers.mjs).
+4. **Add a post-deploy smoke test that exercises it.** The runner at [`scripts/smoke-test.mjs`](scripts/smoke-test.mjs) (run by the `deploy-test` workflow) auto-discovers `*.smoke.mjs` files under [`packages/examples/test/smoke/`](packages/examples/test/smoke/). Stack health (`CREATE_COMPLETE` / `UPDATE_COMPLETE`) is checked automatically via the prefix, but that only proves the stack deployed — **it is not sufficient**. Add a sibling `<name>.smoke.mjs` that drives the example's runtime surface end to end and asserts the effect: call the endpoint and check the response, send the message or write the record and check the consumer's log line (which also proves its execution role had the permissions it needed). Each module default-exports `{ name, run(ctx) }`, where `ctx` provides `aws`, `region`, `pass(msg)`, and `fail(msg)`. Shared AWS CLI plumbing (output lookups, resource discovery, log polling, retries) lives in [`packages/examples/test/smoke/_helpers.mjs`](packages/examples/test/smoke/_helpers.mjs) — extend it rather than re-implementing a variant per check.
+5. **Grant any AWS permissions the smoke test needs.** The check runs as the deploy-test OIDC role, not the CDK execution role, so an action it calls against the deployed stack (publishing a message, writing an item, invoking a function) needs a statement in [`.github/cloudformation/github-oidc-role.yml`](.github/cloudformation/github-oidc-role.yml), scoped the way its neighbours are, plus a line in [docs/ci.md](docs/ci.md#security-notes). That stack is deployed by hand, so say so in the PR — it must be redeployed before the next `deploy-test` run or the check fails with `AccessDenied`.
 
 Per-stack unit/synth tests live in [`packages/examples/test/`](packages/examples/test/) — add one alongside the example following the existing patterns. These are separate from the post-deploy smoke checks under `test/smoke/`.

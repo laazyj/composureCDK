@@ -2,6 +2,8 @@
 
 Example applications demonstrating ComposureCDK patterns. Each example is a self-contained CDK stack that can be synthesised and deployed to an AWS account.
 
+Every example is a simplified real-world application composed from several features, not a showcase of a single feature or resource type — that is what the package READMEs are for. Each one is deployed by CI and verified against live AWS by a smoke test under [`test/smoke/`](test/smoke/) that exercises its runtime behaviour; stack health alone does not count. Before adding one, read [Adding a new example](../../AGENTS.md#adding-a-new-example).
+
 All example stacks use the `ComposureCDK-` name prefix. This convention enables the CI deploy-test pipeline to scope IAM permissions and discover stacks automatically — see [CI documentation](../../docs/ci.md#stack-naming-convention) for details. **New examples must follow this prefix.**
 
 | Stack                                                                                               | Description                                                                                                                                                  |

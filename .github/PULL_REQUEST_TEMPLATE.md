@@ -16,3 +16,4 @@ Thanks for contributing! A few notes:
 - [ ] Linked to an issue (or it's a small, obvious fix)
 - [ ] `npm run verify` passes locally
 - [ ] Tests added/updated for the change
+- [ ] If it adds an example stack: registered, listed in the examples README, and covered by a smoke test that exercises its runtime behaviour

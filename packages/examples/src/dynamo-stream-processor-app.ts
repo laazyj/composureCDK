@@ -24,11 +24,6 @@ import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
  * - The processor gets the recommended Lambda alarms plus the stream contextual
  *   alarms (`IteratorAge`, failed-invocation, dropped-event) once the source is
  *   attached, and least-privilege `grantStreamRead` on the table's stream.
- *
- * Demonstrates:
- * - Enabling a DynamoDB stream via `.dynamoStream(...)` and consuming it with
- *   `dynamoEventSource` and a `ref` to the sibling table
- * - Bounded retries + an `onFailure` DLQ wired from a sibling `createQueueBuilder("dlq")`
  */
 export function createDynamoStreamProcessorApp(app = new App()) {
   const stack = new Stack(app, "ComposureCDK-DynamoStreamProcessorStack");

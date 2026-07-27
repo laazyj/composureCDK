@@ -1,4 +1,4 @@
-import { findStackResources, pollUntil, resolveLambdaLogGroup } from "./_helpers.mjs";
+import { findStackResources, resolveLambdaLogGroup, waitForLogEvents } from "./_helpers.mjs";
 
 const STACK = "ComposureCDK-DynamoStreamProcessorStack";
 
@@ -11,35 +11,34 @@ const STACK = "ComposureCDK-DynamoStreamProcessorStack";
 // is live: rounds before it attaches are skipped, the first one after it is
 // delivered.
 const WRITE_ROUNDS = 8;
-const ROUND_TIMEOUT_MS = 20_000;
+const ROUND_TIMEOUT_MS = 15_000;
 
 export default {
   name: "DynamoDB stream processing checks",
   run: async ({ aws, pass, fail }) => {
-    const [table] = findStackResources(aws, STACK, { type: "AWS::DynamoDB::GlobalTable" });
-    if (!table) {
-      fail(`${STACK} — orders table not found`);
-      return;
-    }
+    // One listing serves both lookups — the stack's resource set is fixed by
+    // the time a post-deploy check runs.
+    const resources = findStackResources(aws, STACK);
     // PhysicalResourceId of an AWS::DynamoDB::GlobalTable is the table name.
-    const tableName = table.PhysicalResourceId;
-
-    const [processorFn] = findStackResources(aws, STACK, {
-      type: "AWS::Lambda::Function",
-      namePattern: /processor/i,
-    });
-    if (!processorFn) {
-      fail(`${STACK} — processor Lambda not found`);
+    const tableName = resources.find(
+      (r) => r.ResourceType === "AWS::DynamoDB::GlobalTable",
+    )?.PhysicalResourceId;
+    const fnName = resources.find(
+      (r) => r.ResourceType === "AWS::Lambda::Function",
+    )?.PhysicalResourceId;
+    if (!tableName || !fnName) {
+      fail(
+        `${STACK} — expected a table and a processor Lambda, found ${resources.length} resources`,
+      );
       return;
     }
-    const fnName = processorFn.PhysicalResourceId;
     const logGroup = resolveLambdaLogGroup(aws, fnName);
 
     // Unique per run so the log poll can't match a stale change record from a
     // previous run. Every round's key carries this prefix, so one filter
     // pattern matches whichever round the consumer actually receives.
-    const marker = `smoke-${process.pid}-${Date.now()}`;
-    const firstWriteMs = Date.now();
+    const startedMs = Date.now();
+    const marker = `smoke-${process.pid}-${startedMs}`;
 
     for (let round = 1; round <= WRITE_ROUNDS; round++) {
       // put-item prints nothing on success, and the runner's `aws` helper
@@ -56,33 +55,21 @@ export default {
         "--output",
         "json",
       );
+      if (round === 1) {
+        pass(`${tableName} — change record written`);
+      }
 
       // The handler logs each record's Keys, so a log line carrying the marker
       // proves the function was invoked AND its execution role could read the
       // stream and write logs.
-      const processed = await pollUntil(
-        () => {
-          const { events } = aws(
-            "logs",
-            "filter-log-events",
-            "--log-group-name",
-            logGroup,
-            "--start-time",
-            String(firstWriteMs - 5_000),
-            "--filter-pattern",
-            `"${marker}"`,
-            "--max-items",
-            "1",
-            "--output",
-            "json",
-          );
-          return events && events.length > 0;
-        },
-        { timeoutMs: ROUND_TIMEOUT_MS, intervalMs: 3_000 },
-      );
-
+      const processed = await waitForLogEvents(aws, {
+        logGroup,
+        sinceMs: startedMs,
+        filterPattern: marker,
+        timeoutMs: ROUND_TIMEOUT_MS,
+        intervalMs: 5_000,
+      });
       if (processed) {
-        pass(`${tableName} — change record written`);
         pass(`${fnName} — consumed and logged the stream change record (round ${round})`);
         return;
       }

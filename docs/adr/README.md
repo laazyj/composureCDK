@@ -2,6 +2,24 @@
 
 This directory holds ADRs — short notes that capture a decision, its context, and the trade-offs we accepted. New maintainers should read [architecture.md](../architecture.md) first for the big picture, then scan ADRs for decisions that amend or add detail to it.
 
+## When to write an ADR
+
+An ADR records an **architecturally significant** decision — one that changes the shape of the library, or binds work beyond the change that prompted it. Write one when the decision:
+
+- introduces a cross-cutting mechanism other packages are expected to use — [ADR-0002](0002-policies.md) policies, [ADR-0011](0011-cross-component-relationship-guards.md) relationship guards;
+- constrains every package — [ADR-0007](0007-dual-esm-cjs-publishing.md) dual publishing, [ADR-0008](0008-aws-cdk-lib-version-floors.md) version floors;
+- reverses or supersedes a decision already recorded here; or
+- resolves a trade-off a future maintainer would otherwise re-litigate, where the rejected options matter as much as the chosen one.
+
+Do **not** write one for:
+
+- an implementation choice local to one feature, or to a set of features within a single package — that belongs in the package README, next to the API it explains;
+- applying an existing pattern to a new service or builder, however much code it takes. Reusing ADR-0011 for another guard, or [ADR-0015](0015-combine-multi-ref-combinator.md) for another multi-ref consumer, is the pattern working as intended — not a new decision;
+- defaults, thresholds, or props tables — package READMEs document those with their rationale;
+- anything you would have to argue is architectural. If it needs the argument, it isn't.
+
+When in doubt, ship without one. A missing ADR is cheap to add later, once a second consumer proves the pattern is general; an unnecessary one dilutes an index every new maintainer is asked to read.
+
 ## Format
 
 Each ADR is a single Markdown file named `NNNN-kebab-case-title.md`, numbered sequentially. Use this template:
@@ -25,7 +43,7 @@ What are we doing? Be specific — rules, patterns, or mechanisms.
 What becomes easier, what becomes harder, and what the reader should do differently as a result.
 ```
 
-ADRs are append-only. To change a decision, write a new ADR that supersedes the old one and update the old one's `Status` to `Superseded by ADR-NNNN`.
+ADRs are append-only. To change a decision, write a new ADR that supersedes the old one and update the old one's `Status` to `Superseded by ADR-NNNN`. The exception is an ADR that never reached `Accepted`: a `Proposed` record can be withdrawn by deleting it, since nothing was decided for a later one to supersede.
 
 ## Index
 

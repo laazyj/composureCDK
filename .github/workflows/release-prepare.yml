@@ -120,7 +120,7 @@ jobs:
           - [ ] Changelog reads correctly
           - [ ] Version bumps match expectations
 
-          On merge, the \`release-tag\` workflow will push tag \`v${VERSION}\`, which triggers \`release.yml\` (deploy-test → npm publish).
+          On merge, the \`release-tag\` workflow will deploy-test the examples and, if that passes, push tag \`v${VERSION}\` — which triggers \`release.yml\` (GitHub Release → npm publish).
           EOF
           )
 

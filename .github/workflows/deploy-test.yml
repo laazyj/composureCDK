@@ -99,6 +99,7 @@ jobs:
         run: node ../../scripts/smoke-test.mjs
 
       # Destroy runs in a separate sandbox-cleanup workflow (triggered by
-      # workflow_run on this workflow plus a nightly cron safety net). Keeping
+      # workflow_run on this workflow and on release-tag.yml, which calls it,
+      # plus a nightly cron safety net). Keeping
       # destroy off the critical path lets developer feedback land in ~10 min
       # instead of waiting for CloudFront propagation during teardown.

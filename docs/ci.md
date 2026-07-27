@@ -4,25 +4,40 @@ CI/CD pipeline for ComposureCDK: how the workflows chain, how to bootstrap AWS a
 
 ## Pipeline overview
 
-Five GitHub Actions workflows chain together, with `coverage-comment.yml` and `release-notify.yml` hanging off CI and Release as listeners rather than links in the chain:
+Each arrow below means "causes the thing under it"; the text beside it is the trigger that carries it. `coverage-comment.yml` and `release-notify.yml` hang off CI and Release as `workflow_run` listeners rather than links in the chain.
 
 ```
-ci.yml ──► deploy-test.yml ──► release-tag.yml ──► release.yml
-   ▲              ▲                   ▲                 ▲
-   │              │                   │                 │
- PRs/push  workflow_dispatch    push to main       tag push (PAT
-   │                            (chore(release):    or manual)
-   │ workflow_run                vX.Y.Z commits)
-   ▼                                  ▲
-coverage-comment.yml                  │
-                              release-prepare.yml (workflow_dispatch → opens PR)
+Every PR, and every push to main
+  ci.yml ──workflow_run──► coverage-comment.yml   (sticky coverage comment)
+
+Cutting a release
+  release-prepare.yml            workflow_dispatch, by hand
+    │ pushes release/vX.Y.Z with the PAT, opens the release PR
+    ▼
+  deploy-test.yml                push: release/**    ◄── the release gate,
+    │ uses: ci.yml, then deploys and smoke-tests         a check on the PR
+    │ workflow_run, pass or fail
+    ▼
+  sandbox-cleanup.yml            (also a nightly cron safety net)
+
+    ··········· squash-merge the release PR ···········
+
+  release-tag.yml                push: main, chore(release): vX.Y.Z commits
+    │ pushes tag vX.Y.Z with the PAT
+    ▼
+  release.yml                    push: tags v*.*.* — GitHub Release, then npm
+    │ workflow_run
+    ▼
+  release-notify.yml             (comments on the issues the release addressed)
 ```
+
+`deploy-test.yml` also runs standalone via `workflow_dispatch`.
 
 - **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20/22/24/26 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). The Node 24 leg also reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)). It holds no write scopes, so it stays callable from `deploy-test.yml`.
 - **`coverage-comment.yml`** — `workflow_run` listener on CI. Posts the coverage table as a sticky PR comment (see [Coverage reporting](#coverage-reporting)).
-- **`deploy-test.yml`** — manual `workflow_dispatch`, and called by `release-tag.yml`. Calls CI as a pre-deploy sanity check (Node 24 only, no floor shards — see [Trimming CI for deploy-test](#trimming-ci-for-deploy-test)), then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
-- **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`.
-- **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it runs deploy-test and then tags the commit. The tag is the release gate: it is only created once the example fleet has deployed and smoke-tested cleanly, so a bad release never leaves a dangling tag to clean up. It is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
+- **`deploy-test.yml`** — calls CI as a pre-deploy sanity check (Node 24 only, no floor shards — see [Trimming CI for deploy-test](#trimming-ci-for-deploy-test)), then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation. Runs on demand via `workflow_dispatch`, and automatically on any push to `release/**` — **that is the release gate**, and it lands as a check on the release PR next to CI. A release branch is the only ref holding exactly what is being released, version bumps and changelog included; `main`'s HEAD is a different tree, and tag time is too late to gate anything.
+- **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`; pushing the branch is also what starts the deploy gate above.
+- **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it tags the commit. The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Creates the GitHub Release from the matching `CHANGELOG.md` section, then runs `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
 - **`release-notify.yml`** — `workflow_run` listener on Release. Comments on the issues the release addressed (see [Release notifications](#release-notifications)).
 
@@ -39,7 +54,7 @@ How it fits together:
 
 Notes:
 
-- **Why two workflows.** `ci.yml` is `workflow_call`-able from `deploy-test.yml` (which `release-tag.yml` calls in turn), and GitHub only ever _narrows_ permissions down a reusable-workflow chain. A job inside `ci.yml` declaring `pull-requests: write` therefore fails validation for any caller that lacks that scope — statically, at parse time, regardless of whether the posting step's `if:` would ever let it run. Keeping `ci.yml` at `contents: read` makes it callable from anywhere; the write scope lives only in `coverage-comment.yml`.
+- **Why two workflows.** `ci.yml` is `workflow_call`-able from `deploy-test.yml`, and GitHub only ever _narrows_ permissions down a reusable-workflow chain. A job inside `ci.yml` declaring `pull-requests: write` therefore fails validation for any caller that lacks that scope — statically, at parse time, regardless of whether the posting step's `if:` would ever let it run. Keeping `ci.yml` at `contents: read` makes it callable from anywhere; the write scope lives only in `coverage-comment.yml`.
 - **Fork PRs** now get a comment too. `workflow_run` executes in the base-repo context with a writable `GITHUB_TOKEN`, which the old in-line comment step could not obtain. The listener never checks out or executes PR code — it only reads the uploaded markdown and the PR number, which it validates is numeric before use.
 - `coverage-comment.yml` must exist on the **default branch** to fire; `workflow_run` always dispatches the default-branch copy. Changes to it are not exercised by the PR that introduces them.
 - The summary and upload steps run with `if: always()`, so when a package dips below its threshold and fails `npm run test`, reviewers still see the table (with the offending package flagged). The job status still reflects the failure — the gate is unchanged. Because they now share a job with the earlier gates, they additionally guard on `steps.test.conclusion != 'skipped'`: a typecheck or lint failure skips `Test`, leaving no `coverage-summary.json` to merge, and the reporting steps should stay quiet rather than fail a second time on the same root cause.
@@ -106,9 +121,13 @@ Scopes are optional and do not affect the bump.
    - Set `specifier` (e.g. `0.6.1`) to force an exact version.
    - Set `specifier` _and_ tick `bump-peer-deps` for any 0.x minor bump (see below).
 
-3. **Review and merge.** CI runs against the PR; squash-merge it once green. (The release-tag filter assumes the release commit is HEAD on `main`.)
+   Pushing the `release/vX.Y.Z` branch fires `deploy-test.yml`, so the sandbox deploy starts on its own as soon as the PR exists — allow ~45 min for it alongside CI. The two overlap: the PR's own CI run covers the merge ref, and `deploy-test.yml` calls CI again for the branch tip. On a freshly cut release branch those are the same tree, so expect the trimmed Node 24 leg (see [Trimming CI for deploy-test](#trimming-ci-for-deploy-test)) to run twice per release.
 
-4. **Deploy-test, tag, publish — automatic.** `release-tag.yml` deploys the examples to the sandbox and only tags the commit if that passes (allow ~40 min); the tag then invokes `release.yml`, which creates the GitHub Release and publishes to npm. A deploy failure leaves `main` untagged — fix forward and re-run the workflow on the same commit.
+3. **Review and merge.** Squash-merge once **both** CI and **Deploy Test** are green on the PR. (The release-tag filter assumes the release commit is HEAD on `main`.) Deploy Test ran against the release branch — the exact tree being released — so nothing downstream re-runs it. Pushing a fix to the branch re-runs both checks.
+
+   The merge checklist is the enforcement here, not branch protection: required status checks are configured per _base_ branch, so requiring Deploy Test on `main` would block every PR — the check only ever runs on `release/**`.
+
+4. **Tag and publish — automatic.** `release-tag.yml` tags the merge commit, and the tag invokes `release.yml`, which creates the GitHub Release and publishes to npm. Neither re-runs the deploy: merging the release PR _is_ the release decision.
 
 #### Bumping the minor version in 0.x (breaking change)
 
@@ -127,16 +146,17 @@ Patch releases within the same minor (`0.6.0` → `0.6.1`) need neither input.
 
 #### `RELEASE_PR_TOKEN` (required)
 
-The automated chain depends on a fine-grained PAT stored as repository secret `RELEASE_PR_TOKEN`. Two reasons:
+The automated chain depends on a fine-grained PAT stored as repository secret `RELEASE_PR_TOKEN`. Three reasons, all the same underlying rule — per [GitHub's rules][gha-token-rules], anything authenticated with `GITHUB_TOKEN` does not fire downstream workflow triggers:
 
-- **Tag push triggers `release.yml`.** Per [GitHub's rules][gha-token-rules], pushes authenticated with `GITHUB_TOKEN` do not fire downstream workflow triggers. Without the PAT, `release-tag.yml` would tag the commit but `release.yml` would never publish.
+- **Tag push triggers `release.yml`.** Without the PAT, `release-tag.yml` would tag the commit but `release.yml` would never publish.
+- **Release-branch push triggers `deploy-test.yml`.** Without the PAT, the release gate would silently never run — the PR would simply have no Deploy Test check.
 - **PR auto-CI.** PRs opened by `GITHUB_TOKEN` do not trigger `pull_request` workflows, so CI would not run on the release PR until someone re-opened it. The PAT-opened PR triggers CI normally.
 
 Create a fine-grained PAT (or GitHub App) scoped to this repo with `contents:write` and `pull_requests:write`, store it as `RELEASE_PR_TOKEN`. Track its expiry — when it lapses, both `release-prepare.yml` and `release-tag.yml` will start failing at the checkout step.
 
 #### Manual fallback
 
-`release.yml` keeps its `push: tags: v*.*.*` trigger as an escape hatch — pushing a `vX.Y.Z` tag manually (typically by an admin with permission to push tags through branch protection) bypasses the automated chain and goes straight to Release + publish. deploy-test gates the tag, not the publish, so a hand-pushed tag skips it entirely: run **Deploy Test** via `workflow_dispatch` first if you take this route.
+`release.yml` keeps its `push: tags: v*.*.*` trigger as an escape hatch — pushing a `vX.Y.Z` tag manually (typically by an admin with permission to push tags through branch protection) bypasses the automated chain and goes straight to Release + publish. deploy-test gates the release branch, not the tag or the publish, so a hand-pushed tag skips it entirely: run **Deploy Test** via `workflow_dispatch` first if you take this route.
 
 [gha-token-rules]: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
 

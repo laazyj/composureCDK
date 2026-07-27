@@ -4,7 +4,7 @@ name: Coverage Comment
 # comment.
 #
 # This lives outside ci.yml because ci.yml is workflow_call-able from
-# release.yml, and permissions only narrow down a reusable-workflow chain: a
+# deploy-test.yml, and permissions only narrow down a reusable-workflow chain: a
 # `pull-requests: write` job inside ci.yml fails validation for every caller
 # that does not itself hold that scope. Splitting the write here keeps ci.yml
 # at `contents: read` and safe to call from anywhere.

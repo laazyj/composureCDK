@@ -2,8 +2,8 @@ name: Release
 
 on:
   push:
-    # deploy-test gates the tag, in release-tag.yml — so a tag pushed by hand
-    # skips it. See docs/ci.md#manual-fallback.
+    # deploy-test gates the release branch, not the tag — so a tag pushed by
+    # hand skips it entirely. See docs/ci.md#manual-fallback.
     tags:
       - "v*.*.*"
 

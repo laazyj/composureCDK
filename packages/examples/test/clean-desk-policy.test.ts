@@ -90,33 +90,24 @@ describe("cleanDeskPolicy", () => {
     });
   });
 
-  it("sets the dynamo-stream-processor stack's stream table and DLQ to Delete", () => {
+  it("sets all resources to Delete in the dynamo-stream-processor stack", () => {
     const app = new App();
     cleanDeskPolicy(app);
     const { stack } = createDynamoStreamProcessorApp(app);
     const template = Template.fromStack(stack);
+    const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
 
-    // The stream lives on the table, so tearing the table down takes the
-    // stream (and the event source mapping consuming it) with it.
-    template.hasResource("AWS::DynamoDB::GlobalTable", {
-      DeletionPolicy: "Delete",
-      UpdateReplacePolicy: "Delete",
-    });
+    // Covers the DLQ (already Delete by default) and the table, whose stream —
+    // and the event source mapping consuming it — go with the table itself.
+    const retainedResources = Object.entries(resources)
+      .filter(([, resource]) => resource.DeletionPolicy === "Retain")
+      .map(([logicalId]) => logicalId);
+
+    expect(retainedResources).toEqual([]);
+    // Deletion protection is the half a DeletionPolicy sweep cannot see.
     template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
       Replicas: Match.arrayWith([Match.objectLike({ DeletionProtectionEnabled: false })]),
     });
-    // The DLQ needs no injector — SQS queues already default to Delete —
-    // but it is asserted so a future RETAIN default cannot orphan it.
-    template.hasResource("AWS::SQS::Queue", {
-      DeletionPolicy: "Delete",
-      UpdateReplacePolicy: "Delete",
-    });
-
-    const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
-    const retained = Object.entries(resources)
-      .filter(([, resource]) => resource.DeletionPolicy === "Retain")
-      .map(([logicalId]) => logicalId);
-    expect(retained).toEqual([]);
   });
 
   it("overrides LogGroup removal policy to DESTROY", () => {

@@ -1,4 +1,4 @@
-import { findStackResources, pollUntil, resolveLambdaLogGroup } from "./_helpers.mjs";
+import { findStackResources, resolveLambdaLogGroup, waitForLogEvents } from "./_helpers.mjs";
 
 const STACK = "ComposureCDK-OrderProcessorStack";
 
@@ -43,26 +43,12 @@ export default {
     // The event source delivers the message to the consumer; a log line
     // carrying the marker proves the function was invoked AND its
     // execution role could read the queue and write logs.
-    const processed = await pollUntil(
-      () => {
-        const { events } = aws(
-          "logs",
-          "filter-log-events",
-          "--log-group-name",
-          logGroup,
-          "--start-time",
-          String(sendStartMs - 5_000),
-          "--filter-pattern",
-          `"${marker}"`,
-          "--max-items",
-          "1",
-          "--output",
-          "json",
-        );
-        return events && events.length > 0;
-      },
-      { timeoutMs: 60_000, intervalMs: 3_000 },
-    );
+    const processed = await waitForLogEvents(aws, {
+      logGroup,
+      sinceMs: sendStartMs,
+      filterPattern: marker,
+      timeoutMs: 60_000,
+    });
 
     if (processed) {
       pass(`${fnName} — consumed and logged the order message`);

@@ -61,13 +61,6 @@ describe("dynamo-stream-processor-app", () => {
     });
   });
 
-  it("routes alarms to the alert topic via alarmActionsPolicy", () => {
-    template.resourceCountIs("AWS::SNS::Topic", 1);
-    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
-      AlarmActions: Match.anyValue(),
-    });
-  });
-
   it("does not warn about a missing stream dead-letter destination (the DLQ is wired)", () => {
     expect(
       Annotations.fromStack(stack).findWarning("*", Match.stringLikeRegexp("stream-dlq-missing")),

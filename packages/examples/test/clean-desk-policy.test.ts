@@ -9,6 +9,7 @@ import { MockIntegration, RestApi } from "aws-cdk-lib/aws-apigateway";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
 import { createAgentVolumeApp } from "../src/agent-volume-app.js";
 import { createCrudApiApp } from "../src/crud-api-app.js";
+import { createDynamoStreamProcessorApp } from "../src/dynamo-stream-processor-app.js";
 import { createMockApiApp } from "../src/mock-api-app.js";
 import { createNeptuneGraphApp } from "../src/neptune-graph-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
@@ -87,6 +88,35 @@ describe("cleanDeskPolicy", () => {
     template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
       Replicas: Match.arrayWith([Match.objectLike({ DeletionProtectionEnabled: false })]),
     });
+  });
+
+  it("sets the dynamo-stream-processor stack's stream table and DLQ to Delete", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createDynamoStreamProcessorApp(app);
+    const template = Template.fromStack(stack);
+
+    // The stream lives on the table, so tearing the table down takes the
+    // stream (and the event source mapping consuming it) with it.
+    template.hasResource("AWS::DynamoDB::GlobalTable", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+    template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
+      Replicas: Match.arrayWith([Match.objectLike({ DeletionProtectionEnabled: false })]),
+    });
+    // The DLQ needs no injector — SQS queues already default to Delete —
+    // but it is asserted so a future RETAIN default cannot orphan it.
+    template.hasResource("AWS::SQS::Queue", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+
+    const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
+    const retained = Object.entries(resources)
+      .filter(([, resource]) => resource.DeletionPolicy === "Retain")
+      .map(([logicalId]) => logicalId);
+    expect(retained).toEqual([]);
   });
 
   it("overrides LogGroup removal policy to DESTROY", () => {

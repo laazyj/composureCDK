@@ -342,8 +342,7 @@ in an `SqsDlq` for you, resolving it alongside the table `ref` via `combine`:
 If retries or record-age are bounded but no `onFailure` destination is set, a
 suppressible synth-time warning (`STREAM_DLQ_WARNING_ID`) fires. Silence it —
 when dropping is intended — with
-`Annotations.of(scope).acknowledgeWarning(STREAM_DLQ_WARNING_ID)`. See
-[ADR-0017](../../docs/adr/0017-stream-event-source-failure-handling.md).
+`Annotations.of(scope).acknowledgeWarning(STREAM_DLQ_WARNING_ID)`.
 
 ### Cross-component invariants
 

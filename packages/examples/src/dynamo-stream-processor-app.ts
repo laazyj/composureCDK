@@ -1,12 +1,9 @@
 import { App, Duration, Stack } from "aws-cdk-lib";
-import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { AttributeType, StreamViewType } from "aws-cdk-lib/aws-dynamodb";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, ref } from "@composurecdk/core";
-import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
 import { createTableV2Builder, type TableV2BuilderResult } from "@composurecdk/dynamodb";
 import { createFunctionBuilder, dynamoEventSource } from "@composurecdk/lambda";
-import { createTopicBuilder } from "@composurecdk/sns";
 import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
 
 /**
@@ -27,23 +24,17 @@ import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
  * - The processor gets the recommended Lambda alarms plus the stream contextual
  *   alarms (`IteratorAge`, failed-invocation, dropped-event) once the source is
  *   attached, and least-privilege `grantStreamRead` on the table's stream.
- * - `alarmActionsPolicy` routes every alarm in the stack — table, DLQ, and
- *   function — to a single SNS alert topic, so adding alarms later is automatic.
  *
  * Demonstrates:
  * - Enabling a DynamoDB stream via `.dynamoStream(...)` and consuming it with
  *   `dynamoEventSource` and a `ref` to the sibling table
  * - Bounded retries + an `onFailure` DLQ wired from a sibling `createQueueBuilder("dlq")`
- * - Composing table + DLQ + processor + alert topic and routing all alarm
- *   actions through `alarmActionsPolicy`
  */
 export function createDynamoStreamProcessorApp(app = new App()) {
   const stack = new Stack(app, "ComposureCDK-DynamoStreamProcessorStack");
 
-  const { alerts } = compose(
+  compose(
     {
-      alerts: createTopicBuilder().displayName("Dynamo Stream Processor Alerts"),
-
       orders: createTableV2Builder()
         .partitionKey({ name: "pk", type: AttributeType.STRING })
         // NEW_AND_OLD_IMAGES gives the consumer both the before and after of
@@ -83,16 +74,11 @@ export function createDynamoStreamProcessorApp(app = new App()) {
         ),
     },
     {
-      alerts: [],
       orders: [],
       ordersDlq: [],
       processor: ["orders", "ordersDlq"],
     },
   ).build(stack, "DynamoStreamProcessor");
-
-  alarmActionsPolicy(stack, {
-    defaults: { alarmActions: [new SnsAction(alerts.topic)] },
-  });
 
   return { stack };
 }

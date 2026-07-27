@@ -319,6 +319,19 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:sqs:*:${AWS::AccountId}:*
 
+          # SNS — smoke test publishes an order event to the order-processor
+          # intake topic to verify the SNS -> SQS -> Lambda delivery path.
+          # The example leaves the topic unnamed, so CloudFormation generates
+          # a physical name prefixed with the stack name — which every example
+          # stack carries — letting this scope to ComposureCDK-* topics rather
+          # than the whole account.
+          - Sid: SNSPublish
+            Effect: Allow
+            Action:
+              - sns:Publish
+            Resource:
+              - !Sub arn:${AWS::Partition}:sns:*:${AWS::AccountId}:ComposureCDK-*
+
           # DynamoDB — smoke test writes one item to the stream-processor
           # table to verify the consumer Lambda. DynamoDB does not support
           # tag-based authorization for data-plane actions, so — as with SQS

@@ -319,17 +319,6 @@ second `props` argument and exported as `DEFAULT_SQS_EVENT_SOURCE_PROPS`:
 `startingPosition` is optional on `dynamoEventSource` (the default supplies it) —
 unlike CDK's `DynamoEventSourceProps`, which requires it.
 
-**`LATEST` has a first-deploy window.** The poller attaches to the stream's
-shards some time after CloudFormation reports the mapping `Enabled`, and
-`LATEST` starts it at the tip _as of that moment_ — so writes made between the
-deploy finishing and the poller attaching are skipped permanently, not merely
-delayed. They show up as an `Enabled` mapping with `LastProcessingResult: "No
-records processed"` and no invocations. This is invisible on a table with
-steady traffic, but it will bite a smoke test or a demo that writes
-immediately after `cdk deploy`. Pass
-`startingPosition: StartingPosition.TRIM_HORIZON` when a consumer must not miss
-records written around its own deployment.
-
 ### Failure handling (dead-letter queue)
 
 Bisecting isolates a poison record, but a record that never succeeds is still

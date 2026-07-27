@@ -27,7 +27,11 @@ describe.each(builders)("$name table alarms", ({ create }) => {
   } {
     const app = new App();
     const stack = new Stack(app, "TestStack");
-    const builder = create().partitionKey(PK);
+    // `partitionKey` is optional on TableProps but required on TablePropsV2, so
+    // the two setters differ and TS 7 mis-pairs them across the union. Setters
+    // mutate in place, so annotate up front and discard the return value.
+    const builder: AnyTableBuilder = create();
+    builder.partitionKey(PK);
     configureFn?.(builder);
     // `builder` is a union of the two builder types, so `.build()` is a union of
     // two call signatures. typescript-eslint's project service can intermittently

@@ -1,3 +1,20 @@
+## 0.9.2 (2026-07-27)
+
+### 🚀 Features
+
+- **lambda:** harden dynamo stream event source failure handling ([3436376](https://github.com/laazyj/composureCDK/commit/3436376))
+
+### 🩹 Fixes
+
+- **examples:** address PR feedback on dynamo stream example ([5f3bea6](https://github.com/laazyj/composureCDK/commit/5f3bea6))
+- **examples:** make the dynamo stream smoke check survive LATEST ([ec8477b](https://github.com/laazyj/composureCDK/commit/ec8477b))
+
+### 💀 Thank You
+
+- Claude
+- Claude Opus 4.8
+- Jason Duffett
+
 ## 0.9.1 (2026-07-25)
 
 ### 🚀 Features

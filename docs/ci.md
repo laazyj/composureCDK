@@ -296,7 +296,29 @@ Create a GitHub Environment called `sandbox` with:
 | `AWS_ROLE_ARN` | The `RoleArn` output from the OIDC stack       |
 | `AWS_REGION`   | The region you bootstrapped (e.g. `eu-west-1`) |
 
+Then restrict **which refs may deploy to it**. This is the control that actually holds the AWS credentials: the trust policy in `github-oidc-role.yml` scopes assumption to `repo:<org>/<repo>:environment:sandbox`, so any workflow that reaches the `sandbox` environment can assume the role. Set the environment's deployment branches to _selected branches and tags_ and allow exactly:
+
+| Pattern     | Type   | Why                                               |
+| ----------- | ------ | ------------------------------------------------- |
+| `main`      | branch | Manual **Deploy Test** dispatch                   |
+| `release/*` | branch | The release gate, on every release-branch push    |
+| `v*.*.*`    | tag    | Kept for a hand-pushed tag on the manual fallback |
+
+A wildcard like `*/*` would let any contributor push `anything/x` and obtain sandbox credentials. The flip side of the narrow list: **Deploy Test** can no longer be dispatched from a feature branch — merge to `main` or use a `release/` branch.
+
 Add protection rules (e.g. required reviewers) as desired.
+
+### 3a. Restrict release branches
+
+Because a push to `release/**` now deploys by itself, pair the environment policy with a repository ruleset so contributors cannot create such a branch in the first place:
+
+| Setting | Value                                                    |
+| ------- | -------------------------------------------------------- |
+| Target  | `refs/heads/release/**`                                  |
+| Rules   | Restrict creations, restrict updates, restrict deletions |
+| Bypass  | Repository admin                                         |
+
+`release-prepare.yml` pushes with `RELEASE_PR_TOKEN`, which acts as its owner — so that owner must hold the bypass, or the workflow fails at the branch push. The two controls are complementary: the ruleset governs who can make a release branch, the environment policy governs what a release branch can reach.
 
 ### 4. Trigger the workflow
 

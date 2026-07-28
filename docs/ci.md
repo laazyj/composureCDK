@@ -20,7 +20,7 @@ coverage-comment.yml                  │
 
 - **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20/22/24/26 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). The Node 24 leg also reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)). It holds no write scopes, so it stays callable from `deploy-test.yml`.
 - **`coverage-comment.yml`** — `workflow_run` listener on CI. Posts the coverage table as a sticky PR comment (see [Coverage reporting](#coverage-reporting)).
-- **`deploy-test.yml`** — manual `workflow_dispatch`, and called by `release-tag.yml`. Calls CI, then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
+- **`deploy-test.yml`** — manual `workflow_dispatch`, and called by `release-tag.yml`. Calls CI as a pre-deploy sanity check (Node 24 only, no floor shards — see [Trimming CI for deploy-test](#trimming-ci-for-deploy-test)), then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`.
 - **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it runs deploy-test and then tags the commit. The tag is the release gate: it is only created once the example fleet has deployed and smoke-tested cleanly, so a bad release never leaves a dangling tag to clean up. It is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Creates the GitHub Release from the matching `CHANGELOG.md` section, then runs `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
@@ -43,6 +43,21 @@ Notes:
 - `coverage-comment.yml` must exist on the **default branch** to fire; `workflow_run` always dispatches the default-branch copy. Changes to it are not exercised by the PR that introduces them.
 - The summary and upload steps run with `if: always()`, so when a package dips below its threshold and fails `npm run test`, reviewers still see the table (with the offending package flagged). The job status still reflects the failure — the gate is unchanged. Because they now share a job with the earlier gates, they additionally guard on `steps.test.conclusion != 'skipped'`: a typecheck or lint failure skips `Test`, leaving no `coverage-summary.json` to merge, and the reporting steps should stay quiet rather than fail a second time on the same root cause.
 - **A missing artifact is a normal outcome, not a failure of the listener.** A cancelled CI run (push-over-push) or one that fails an earlier gate in the Node 24 leg uploads nothing, so `coverage-comment.yml` tolerates the download (`continue-on-error`) and gates its posting steps on that step's `outcome`: no artifact, no comment, run stays green. Hard-failing there would report the same root cause a second time, as a separate red run alongside the CI failure that caused it. The listener is deliberately **not** gated on `workflow_run.conclusion == 'success'` — a coverage threshold miss fails `Test` but still uploads the table, and that is exactly the run whose comment reviewers want.
+
+## Trimming CI for deploy-test
+
+`ci.yml` takes two `workflow_call` inputs, both defaulting to the full run so `push` and `pull_request` are untouched — those events carry no inputs, and the expressions fall back accordingly:
+
+| Input             | Default              | Effect                                           |
+| ----------------- | -------------------- | ------------------------------------------------ |
+| `node-versions`   | `"[20, 22, 24, 26]"` | JSON array driving the matrix                    |
+| `skip-cdk-floors` | `false`              | Skips `cdk-floors-list` and its `enforce` shards |
+
+`deploy-test.yml` passes `"[24]"` and `true`, taking that call from 17 jobs to 1.
+
+The trimmed-away work cannot tell you whether the examples deploy. The Node 20/22/26 legs exist to prove dual ESM/CJS resolution across runtimes ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)); the floor shards pin `aws-cdk-lib` down to each package's declared minimum ([ADR-0008](adr/0008-aws-cdk-lib-version-floors.md)). A deploy runs on Node 24 against the installed `aws-cdk-lib` and touches neither dimension. What is kept is the whole `verify` chain on Node 24 — format, typecheck, build, `check:exports`, lint, `cdk-floors:check`, `validate` (synth + CloudFormation Validate), test — which is the part that can.
+
+`skip-cdk-floors` is phrased as a skip rather than a run because an unset input coerces to `false` in GitHub expressions, so `false` has to be the value that means "do the normal thing".
 
 ## Versioning
 

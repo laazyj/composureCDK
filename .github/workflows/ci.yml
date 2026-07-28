@@ -6,6 +6,24 @@ on:
   pull_request:
     branches: [main]
   workflow_call:
+    # Both inputs default to the full run, so `push`/`pull_request` are
+    # unaffected — those events carry no inputs at all, and the expressions
+    # below fall back accordingly. Only a caller that opts out gets less.
+    inputs:
+      node-versions:
+        description: "JSON array of Node major versions to run the matrix on."
+        required: false
+        default: "[20, 22, 24, 26]"
+        type: string
+      skip-cdk-floors:
+        # Phrased as a skip, not a run, deliberately. On a push or
+        # pull_request every input is unset, and GitHub expressions coerce an
+        # unset input to false — so false has to be the value that means "do
+        # the normal thing".
+        description: "Skip the aws-cdk-lib floor-enforcement shards."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -26,7 +44,7 @@ jobs:
       matrix:
         # Node 20 is the supported floor; 24 is current LTS; 26 is next.
         # Dual-published packages must resolve on all — see ADR-0007.
-        node-version: [20, 22, 24, 26]
+        node-version: ${{ fromJSON(inputs.node-versions || '[20, 22, 24, 26]') }}
 
     steps:
       - name: Checkout
@@ -135,6 +153,8 @@ jobs:
   # stays in sync without duplicating values in YAML.
   cdk-floors-list:
     name: List CDK floors
+    # Skipping this skips cdk-floors-enforce with it, via `needs`.
+    if: ${{ !inputs.skip-cdk-floors }}
     runs-on: ubuntu-latest
     outputs:
       floors: ${{ steps.read.outputs.floors }}

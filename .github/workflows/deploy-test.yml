@@ -33,6 +33,16 @@ jobs:
   ci:
     name: CI
     uses: ./.github/workflows/ci.yml
+    # A pre-deploy sanity check, not a second full CI run. The deploy runs on
+    # Node 24 against the pinned aws-cdk-lib, so the other matrix legs (which
+    # exist to prove dual ESM/CJS resolution across runtimes, ADR-0007) and the
+    # floor shards (which pin aws-cdk-lib down to each package's declared
+    # minimum, ADR-0008) cannot say anything about whether these stacks deploy.
+    # The Node 24 leg still runs the whole verify chain — including `npm run
+    # validate`, the synth + CloudFormation Validate pass that actually can.
+    with:
+      node-versions: "[24]"
+      skip-cdk-floors: true
 
   deploy-test:
     name: Deploy and Verify Examples

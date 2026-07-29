@@ -54,14 +54,16 @@ jobs:
         id: release
         env:
           TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+        shell: bash
         run: |
-          case "$TAG" in
-            v[0-9]*.[0-9]*.[0-9]*) ;;
-            *)
-              echo "::error::Refusing to announce: '$TAG' is not a vX.Y.Z release tag."
-              exit 1
-              ;;
-          esac
+          # The same SemVer shape release-tag.yml parses out of the release
+          # commit subject — MAJOR.MINOR.PATCH with optional -prerelease and
+          # +build — so the two ends of the chain accept exactly one set of
+          # tags between them.
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Refusing to announce: '$TAG' is not a vX.Y.Z release tag."
+            exit 1
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Checkout

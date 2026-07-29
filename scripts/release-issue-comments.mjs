@@ -22,9 +22,9 @@
  * resolves a PR number just as happily, and the changelog does contain such
  * links.
  *
- * Shells out to the `gh` CLI rather than taking an Octokit dependency — same
- * trade as `smoke-test.mjs` makes with the AWS CLI. Requires `GH_TOKEN` (or an
- * authenticated `gh`) with `issues: write`.
+ * Drives the `gh` CLI, so `scripts/` stays dependency-free — the same way
+ * `smoke-test.mjs` uses the AWS CLI. Requires `GH_TOKEN` (or an authenticated
+ * `gh`) with `issues: write`.
  *
  * Usage:
  *   node scripts/release-issue-comments.mjs                      # $GITHUB_REF_NAME

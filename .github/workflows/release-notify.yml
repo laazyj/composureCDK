@@ -54,12 +54,9 @@ jobs:
         id: release
         env:
           TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
-        shell: bash
         run: |
-          # The same SemVer shape release-tag.yml parses out of the release
-          # commit subject — MAJOR.MINOR.PATCH with optional -prerelease and
-          # +build — so the two ends of the chain accept exactly one set of
-          # tags between them.
+          # Same SemVer shape release-tag.yml requires of the release commit
+          # subject — the two ends of the chain must accept one set of tags.
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::Refusing to announce: '$TAG' is not a vX.Y.Z release tag."
             exit 1
@@ -70,8 +67,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # No `npm ci` or setup-node: the script has no dependencies and drives the
-      # preinstalled gh CLI, so installing the workspace would cost minutes for
-      # nothing.
+      # preinstalled gh CLI.
       - name: Comment on released issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

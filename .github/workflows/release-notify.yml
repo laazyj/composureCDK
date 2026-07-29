@@ -1,0 +1,75 @@
+name: Release Notify
+
+# Comments on every issue a release addressed, once the packages are live.
+#
+# A workflow_run listener rather than a job inside release.yml, for the same
+# reason coverage-comment.yml sits outside ci.yml — plus two specific to the
+# release path:
+#
+#   - release.yml's conclusion answers "did the publish work?". A rate-limited
+#     or otherwise failed comment must not turn it red after the packages are
+#     already on npm.
+#   - release.yml is the npm trusted-publisher anchor (trust is pinned to its
+#     job_workflow_ref), so it is the one file worth keeping free of unrelated
+#     write scopes.
+#
+# Listening also buys a re-run path for free — see the workflow_dispatch input
+# below, which is what the script's marker idempotency is built for.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to announce (e.g. v0.9.1)."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-notify-${{ inputs.tag || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    name: Comment on released issues
+    # Never announce a release that failed to publish. A manual dispatch names
+    # the tag itself, so it is trusted to know what it is doing.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # gh release view
+      issues: write # post the comments
+      pull-requests: read # resolve each PR's linked closing issues
+    steps:
+      # release.yml only ever runs on a tag push, which sets head_branch to the
+      # tag name — validated here rather than trusted, the same way
+      # coverage-comment.yml validates the PR number it reads from an artifact.
+      - name: Resolve release tag
+        id: release
+        env:
+          TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+        run: |
+          # Same SemVer shape release-tag.yml requires of the release commit
+          # subject — the two ends of the chain must accept one set of tags.
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Refusing to announce: '$TAG' is not a vX.Y.Z release tag."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # No `npm ci` or setup-node: the script has no dependencies and drives the
+      # preinstalled gh CLI.
+      - name: Comment on released issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: npm run release:issue-comments -- --tag="$TAG"

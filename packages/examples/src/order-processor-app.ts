@@ -36,8 +36,8 @@ import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
  * - SNS → SQS fan-out via `TopicBuilder.addSubscription`, with a
  *   **caller-owned dead-letter queue** on the subscription (see
  *   "Subscription reliability" in the SNS README): the DLQ is an explicit
- *   `createQueueBuilder("dlq")` sibling, not something the topic builder
- *   conjures, and `combine` assembles the subscription from both queues
+ *   `createQueueBuilder("dlq")` sibling, and `combine` assembles the
+ *   subscription from both queues
  * - Composing the queues alongside `createTopicBuilder` and routing all
  *   alarm actions through `alarmActionsPolicy`
  */
@@ -58,9 +58,7 @@ export function createOrderProcessorApp(app = new App()) {
         // subscription's dead-letter queue: SNS parks a notification there
         // when delivery to the queue keeps failing (throttling, a queue
         // policy change), so an intake event is never silently lost. The
-        // builder never creates this queue for you — a DLQ is a real,
-        // billable, caller-owned resource with its own retention and
-        // alarms, so it is declared as a sibling and referenced here.
+        // DLQ is declared as a sibling below and referenced here.
         .addSubscription(
           "orders",
           combine(

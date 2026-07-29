@@ -321,16 +321,18 @@ Resources:
 
           # SNS — smoke test publishes an order event to the order-processor
           # intake topic to verify the SNS -> SQS -> Lambda delivery path.
-          # The example leaves the topic unnamed, so CloudFormation generates
-          # a physical name prefixed with the stack name — which every example
-          # stack carries — letting this scope to ComposureCDK-* topics rather
-          # than the whole account.
+          # As with SQS above, CloudFormation's aws:cloudformation:* system
+          # tags do not propagate to SNS topics in a form IAM can evaluate
+          # via aws:ResourceTag, so this uses an ARN scope. The role is
+          # already restricted to the `sandbox` environment by the OIDC trust
+          # policy above, so the blast radius is the sandbox account's topics
+          # only.
           - Sid: SNSPublish
             Effect: Allow
             Action:
               - sns:Publish
             Resource:
-              - !Sub arn:${AWS::Partition}:sns:*:${AWS::AccountId}:ComposureCDK-*
+              - !Sub arn:${AWS::Partition}:sns:*:${AWS::AccountId}:*
 
           # DynamoDB — smoke test writes one item to the stream-processor
           # table to verify the consumer Lambda. DynamoDB does not support

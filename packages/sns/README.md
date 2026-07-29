@@ -217,28 +217,18 @@ const system = compose(
 
 Attaching a dead-letter queue is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)). Pass a queue to the `ITopicSubscription` constructor (e.g. `new EmailSubscription("ops@example.com", { deadLetterQueue: dlq })`).
 
-**Neither builder creates a DLQ for you.** ComposureCDK's defaults tighten the configuration of resources you asked for; they do not conjure additional resources. A dead-letter queue is a separate, billable SQS queue with its own retention, encryption, access policy, alarms, and — critically — its own deletion behaviour: an auto-created queue holding undelivered messages would be silently destroyed when the subscription is removed. It also needs an owner, because a DLQ nobody drains is just a slower way to lose messages. Those are workload decisions, so the queue is declared explicitly and referenced. This follows the boundary described in [Defaults](../../docs/architecture.md#defaults): defaults set properties on the resources you asked for, and build-time resources appear only where a resource is structurally required (an API Gateway access-log group, say) and the caller supplied none.
-
-Declaring it as a sibling costs three lines inside `compose`, and gets the queue ComposureCDK's dead-letter defaults (14-day retention) and alarm profile:
+**Neither builder creates a DLQ for you.** A dead-letter queue is a separate, billable queue that needs an owner — a DLQ nobody drains is just a slower way to lose messages — so it is declared as a sibling and referenced, which also gets it ComposureCDK's dead-letter defaults (14-day retention) and depth alarm:
 
 ```ts
-import { combine, compose, ref } from "@composurecdk/core";
-import { createTopicBuilder } from "@composurecdk/sns";
-import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
-import { SqsSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
-
 const system = compose(
   {
-    orders: createQueueBuilder().queueName("orders"),
-    ordersDlq: createQueueBuilder("dlq").queueName("order-events-dlq"),
+    orders: createQueueBuilder(),
+    ordersDlq: createQueueBuilder("dlq"),
 
     orderEvents: createTopicBuilder().addSubscription(
       "orders",
       combine(
-        {
-          orders: ref<QueueBuilderResult>("orders"),
-          dlq: ref<QueueBuilderResult>("ordersDlq"),
-        },
+        { orders: ref<QueueBuilderResult>("orders"), dlq: ref<QueueBuilderResult>("ordersDlq") },
         ({ orders, dlq }) => new SqsSubscription(orders.queue, { deadLetterQueue: dlq.queue }),
       ),
     ),

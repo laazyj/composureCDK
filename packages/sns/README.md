@@ -215,9 +215,33 @@ const system = compose(
 
 ### Subscription reliability
 
-Attaching a dead-letter queue is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)). Pass a queue to the `ITopicSubscription` constructor (e.g. `new EmailSubscription("ops@example.com", { deadLetterQueue: dlq })`); the builder does not create a DLQ automatically because the queue resource needs to be caller-owned.
+Attaching a dead-letter queue is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)). Pass a queue to the `ITopicSubscription` constructor (e.g. `new EmailSubscription("ops@example.com", { deadLetterQueue: dlq })`).
 
-The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached.
+**Neither builder creates a DLQ for you.** A dead-letter queue is a separate, billable queue that needs an owner — a DLQ nobody drains is just a slower way to lose messages — so it is declared as a sibling and referenced, which also gets it ComposureCDK's dead-letter defaults (14-day retention) and depth alarm:
+
+```ts
+const system = compose(
+  {
+    orders: createQueueBuilder(),
+    ordersDlq: createQueueBuilder("dlq"),
+
+    orderEvents: createTopicBuilder().addSubscription(
+      "orders",
+      combine(
+        { orders: ref<QueueBuilderResult>("orders"), dlq: ref<QueueBuilderResult>("ordersDlq") },
+        ({ orders, dlq }) => new SqsSubscription(orders.queue, { deadLetterQueue: dlq.queue }),
+      ),
+    ),
+  },
+  { orders: [], ordersDlq: [], orderEvents: ["orders", "ordersDlq"] },
+);
+```
+
+CDK's `Subscription` construct adds the queue policy that lets `sns.amazonaws.com` write to the DLQ (scoped to the topic ARN), so no extra grant is needed.
+
+The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached. Pair them with the DLQ's own depth alarm — that pair is what turns an undelivered notification into a page.
+
+[`ComposureCDK-OrderProcessorStack`](../examples/src/order-processor-app.ts) deploys this shape end to end and its [smoke test](../examples/test/smoke/order-processor.smoke.mjs) proves the delivery path against live AWS.
 
 ## Subscription Defaults
 
@@ -254,5 +278,6 @@ createSubscriptionBuilder()
 
 ## Examples
 
+- [OrderProcessorStack](../examples/src/order-processor-app.ts) — SNS → SQS fan-out with a dead-letter queue on the subscription
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with TopicBuilder for alarm actions
 - [StaticWebsiteStack](../examples/src/static-website/app.ts) — Static website with TopicBuilder for alarm actions

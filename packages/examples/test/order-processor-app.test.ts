@@ -6,12 +6,12 @@ describe("order-processor-app", () => {
   const { stack } = createOrderProcessorApp();
   const template = Template.fromStack(stack);
 
-  it("creates one SQS queue", () => {
-    template.resourceCountIs("AWS::SQS::Queue", 1);
+  it("creates the work queue and the subscription dead-letter queue", () => {
+    template.resourceCountIs("AWS::SQS::Queue", 2);
   });
 
-  it("creates one SNS alert topic", () => {
-    template.resourceCountIs("AWS::SNS::Topic", 1);
+  it("creates the alert topic and the order-events intake topic", () => {
+    template.resourceCountIs("AWS::SNS::Topic", 2);
   });
 
   it("creates one Lambda consumer wired to the queue via an event source", () => {
@@ -32,6 +32,53 @@ describe("order-processor-app", () => {
       MessageRetentionPeriod: 1_209_600,
       ReceiveMessageWaitTimeSeconds: 20,
       SqsManagedSseEnabled: true,
+    });
+  });
+
+  it("configures the dead-letter queue with the dlq role's 14-day retention", () => {
+    template.hasResourceProperties("AWS::SQS::Queue", {
+      QueueName: "order-events-dlq",
+      MessageRetentionPeriod: 1_209_600,
+    });
+  });
+
+  it("subscribes the work queue to the intake topic with raw delivery", () => {
+    template.resourceCountIs("AWS::SNS::Subscription", 1);
+    template.hasResourceProperties("AWS::SNS::Subscription", {
+      Protocol: "sqs",
+      // The SQS subscription default — the consumer sees the published
+      // payload, not an SNS envelope.
+      RawMessageDelivery: true,
+    });
+  });
+
+  it("attaches the caller-owned dead-letter queue to the subscription", () => {
+    template.hasResourceProperties("AWS::SNS::Subscription", {
+      RedrivePolicy: {
+        deadLetterTargetArn: {
+          "Fn::GetAtt": [Match.stringLikeRegexp("orderEventsDlq"), "Arn"],
+        },
+      },
+    });
+  });
+
+  it("lets SNS write undeliverable notifications to the dead-letter queue", () => {
+    // CDK's Subscription construct adds this statement when a DLQ is
+    // attached — the redrive path is dead without it.
+    template.hasResourceProperties("AWS::SQS::QueuePolicy", {
+      Queues: [{ Ref: Match.stringLikeRegexp("orderEventsDlq") }],
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: "Allow",
+            Action: "sqs:SendMessage",
+            Principal: { Service: "sns.amazonaws.com" },
+            Condition: {
+              ArnEquals: { "aws:SourceArn": { Ref: Match.stringLikeRegexp("orderEvents") } },
+            },
+          }),
+        ]),
+      }),
     });
   });
 
@@ -92,10 +139,25 @@ describe("order-processor-app", () => {
     template.resourcePropertiesCountIs("AWS::CloudWatch::Alarm", { Namespace: "AWS/Lambda" }, 4);
   });
 
+  it("creates the dead-letter depth alarm that surfaces undelivered notifications", () => {
+    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+      MetricName: "ApproximateNumberOfMessagesVisible",
+      Namespace: "AWS/SQS",
+      Threshold: 0,
+      Dimensions: [
+        {
+          Name: "QueueName",
+          Value: { "Fn::GetAtt": [Match.stringLikeRegexp("orderEventsDlq"), "QueueName"] },
+        },
+      ],
+    });
+  });
+
   it("creates the topic, queue, and consumer recommended alarms", () => {
-    // Topic ships 4 recommended; queue ships 2 recommended + 1 custom; the
-    // Lambda consumer ships 2 recommended (errors, throttles) + 2 contextual
-    // event-source alarms.
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 11);
+    // Each topic ships 4 recommended (8); the work queue ships 2 recommended
+    // + 1 custom, the DLQ 2 from the dlq alarm profile (5); the Lambda
+    // consumer ships 2 recommended (errors, throttles) + 2 contextual
+    // event-source alarms (4).
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 17);
   });
 });

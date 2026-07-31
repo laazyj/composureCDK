@@ -40,7 +40,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
   "Resources": {
     "CrudApiAppapi10BB4639": {
       "Properties": {
-        "Description": "Minimal REST API backed directly by DynamoDB — no Lambda in the request path",
+        "Description": "Minimal REST API backed directly by DynamoDB - no Lambda in the request path",
         "Name": "CrudApi",
       },
       "Type": "AWS::ApiGateway::RestApi",
@@ -130,7 +130,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
       "Type": "AWS::IAM::Role",
       "UpdateReplacePolicy": "Retain",
     },
-    "CrudApiAppapiDeploymentBBBA8FB4296656823acbce46a065d30dfd7c2214": {
+    "CrudApiAppapiDeploymentBBBA8FB46bdd15762d310f6d375bee5fc720052b": {
       "DependsOn": [
         "CrudApiAppapigadgetsidDELETE7DABC736",
         "CrudApiAppapigadgetsidGETD2E65655",
@@ -144,7 +144,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
         "aws:cdk:do-not-refactor": true,
       },
       "Properties": {
-        "Description": "Minimal REST API backed directly by DynamoDB — no Lambda in the request path",
+        "Description": "Minimal REST API backed directly by DynamoDB - no Lambda in the request path",
         "RestApiId": {
           "Ref": "CrudApiAppapi10BB4639",
         },
@@ -166,7 +166,7 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
           "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
         },
         "DeploymentId": {
-          "Ref": "CrudApiAppapiDeploymentBBBA8FB4296656823acbce46a065d30dfd7c2214",
+          "Ref": "CrudApiAppapiDeploymentBBBA8FB46bdd15762d310f6d375bee5fc720052b",
         },
         "MethodSettings": [
           {

@@ -61,7 +61,7 @@ exports[`dynamo-stream-processor-app > matches the expected synthesised template
     },
     "DynamoStreamProcessorordersDlqApproximateAgeOfOldestMessageAlarm58C1F628": {
       "Properties": {
-        "AlarmDescription": "Dead-letter queue's oldest message is approaching the queue's retentionPeriod — investigate and redrive it before SQS deletes it. Threshold: > 907200 seconds in 1 minute.",
+        "AlarmDescription": "Dead-letter queue's oldest message is approaching the queue's retentionPeriod - investigate and redrive it before SQS deletes it. Threshold: > 907200 seconds in 1 minute.",
         "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/orders-dlq/approximate-age-of-oldest-message",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -88,7 +88,7 @@ exports[`dynamo-stream-processor-app > matches the expected synthesised template
     },
     "DynamoStreamProcessorordersDlqApproximateNumberOfMessagesVisibleAlarm71A3ABD9": {
       "Properties": {
-        "AlarmDescription": "Dead-letter queue has messages present — any message here indicates a delivery failure that needs investigation. Threshold: > 0 in 1 minute.",
+        "AlarmDescription": "Dead-letter queue has messages present - any message here indicates a delivery failure that needs investigation. Threshold: > 0 in 1 minute.",
         "AlarmName": "composure-cdk-dynamo-stream-processor-stack/dynamo-stream-processor/orders-dlq/approximate-number-of-messages-visible",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 1,
@@ -463,7 +463,7 @@ exports[`dynamo-stream-processor-app > matches the expected synthesised template
         "Code": {
           "ZipFile": "exports.handler = async (event) => { for (const r of event.Records) console.log('processed change', r.eventName, JSON.stringify(r.dynamodb?.Keys)); };",
         },
-        "Description": "DynamoDB stream processor — consumes table change events",
+        "Description": "DynamoDB stream processor - consumes table change events",
         "Handler": "index.handler",
         "LoggingConfig": {
           "LogFormat": "JSON",

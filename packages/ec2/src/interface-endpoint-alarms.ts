@@ -46,7 +46,7 @@ function resolveEndpointAlarmDefinitions(
       datapointsToAlarm: cfg.datapointsToAlarm,
       treatMissingData: cfg.treatMissingData,
       description:
-        `VPC interface endpoint is dropping packets — possible endpoint service unhealthy, ` +
+        `VPC interface endpoint is dropping packets - possible endpoint service unhealthy, ` +
         `security group blocking traffic, or packets exceeding the 8,500-byte PrivateLink MTU. ` +
         `Threshold: > ${String(cfg.threshold)} (sum) over ` +
         `${String(cfg.evaluationPeriods)} x ${PACKETS_DROPPED_PERIOD_LABEL}.`,

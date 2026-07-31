@@ -38,7 +38,7 @@ export function createDualFunctionApp(app = new App()) {
         .memorySize(256)
         .timeout(Duration.seconds(30))
         .tracing(Tracing.ACTIVE)
-        .description("API handler — receives and validates incoming requests")
+        .description("API handler - receives and validates incoming requests")
         .addAlarm("highInvocations", (alarm) =>
           alarm
             .metric((fn) => fn.metricInvocations({ period: Duration.minutes(1) }))
@@ -58,7 +58,7 @@ export function createDualFunctionApp(app = new App()) {
         .timeout(Duration.minutes(5))
         .reservedConcurrentExecutions(50)
         .tracing(Tracing.ACTIVE)
-        .description("Worker — processes requests asynchronously")
+        .description("Worker - processes requests asynchronously")
         .recommendedAlarms({
           // Worker can tolerate occasional errors — only alarm after 5
           errors: { threshold: 5, evaluationPeriods: 3, datapointsToAlarm: 2 },

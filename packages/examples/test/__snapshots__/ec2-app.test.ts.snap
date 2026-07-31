@@ -862,7 +862,7 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
             "Ref": "Ec2Appalerts262D0F75",
           },
         ],
-        "AlarmDescription": "EC2 burstable instance CPU credit balance is low — baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
+        "AlarmDescription": "EC2 burstable instance CPU credit balance is low - baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
         "AlarmName": "composure-cdk-ec2-stack/ec2-app/server/cpu-credit-balance",
         "ComparisonOperator": "LessThanThreshold",
         "DatapointsToAlarm": 3,

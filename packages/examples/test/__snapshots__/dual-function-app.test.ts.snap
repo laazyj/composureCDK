@@ -182,7 +182,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         "Code": {
           "ZipFile": "exports.handler = async (event) => ({ statusCode: 200 })",
         },
-        "Description": "API handler — receives and validates incoming requests",
+        "Description": "API handler - receives and validates incoming requests",
         "Handler": "index.handler",
         "LoggingConfig": {
           "LogFormat": "JSON",
@@ -419,7 +419,7 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
         "Code": {
           "ZipFile": "exports.handler = async (event) => { /* process */ }",
         },
-        "Description": "Worker — processes requests asynchronously",
+        "Description": "Worker - processes requests asynchronously",
         "Handler": "index.handler",
         "LoggingConfig": {
           "LogFormat": "JSON",

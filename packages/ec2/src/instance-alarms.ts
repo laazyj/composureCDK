@@ -126,7 +126,7 @@ export function resolveInstanceAlarmDefinitions(
       evaluationPeriods: cfg.evaluationPeriods,
       datapointsToAlarm: cfg.datapointsToAlarm,
       treatMissingData: cfg.treatMissingData,
-      description: `EC2 burstable instance CPU credit balance is low — baseline throttling is imminent. Threshold: < ${String(cfg.threshold)} credits (minimum) over ${String(cfg.evaluationPeriods)} x ${CREDIT_METRIC_PERIOD_LABEL}.`,
+      description: `EC2 burstable instance CPU credit balance is low - baseline throttling is imminent. Threshold: < ${String(cfg.threshold)} credits (minimum) over ${String(cfg.evaluationPeriods)} x ${CREDIT_METRIC_PERIOD_LABEL}.`,
     });
   }
 

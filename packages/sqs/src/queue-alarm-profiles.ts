@@ -70,12 +70,12 @@ const DLQ_ALARM_ENABLEMENT: Record<QueueAlarmKey, boolean> = {
 
 const DLQ_ALARM_DESCRIPTIONS: QueueAlarmProfile["descriptions"] = {
   approximateAgeOfOldestMessage: (threshold) =>
-    `Dead-letter queue's oldest message is approaching the queue's retentionPeriod — ` +
+    `Dead-letter queue's oldest message is approaching the queue's retentionPeriod - ` +
     `investigate and redrive it before SQS deletes it. ` +
     `Threshold: > ${String(threshold)} seconds in ${METRIC_PERIOD_LABEL}.`,
   approximateNumberOfMessagesNotVisible: describeInFlight,
   approximateNumberOfMessagesVisible: (threshold) =>
-    `Dead-letter queue has messages present — any message here indicates a delivery ` +
+    `Dead-letter queue has messages present - any message here indicates a delivery ` +
     `failure that needs investigation. Threshold: > ${String(threshold)} in ${METRIC_PERIOD_LABEL}.`,
 };
 

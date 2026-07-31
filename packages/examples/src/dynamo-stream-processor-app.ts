@@ -54,7 +54,7 @@ export function createDynamoStreamProcessorApp(app = new App()) {
           ),
         )
         .memorySize(256)
-        .description("DynamoDB stream processor — consumes table change events")
+        .description("DynamoDB stream processor - consumes table change events")
         // Declared as data: the table and DLQ refs resolve at build time.
         // Bounded retries + an onFailure DLQ = durable failure handling.
         .addEventSource(

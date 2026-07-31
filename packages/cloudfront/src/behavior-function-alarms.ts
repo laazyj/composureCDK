@@ -161,7 +161,7 @@ export function resolveBehaviorFunctionAlarmDefinitions(
       evaluationPeriods: cfg.evaluationPeriods,
       datapointsToAlarm: cfg.datapointsToAlarm,
       treatMissingData: cfg.treatMissingData,
-      description: `CloudFront Function on ${scopeLabel} is being throttled — likely exceeding its 1ms compute budget. Threshold: > ${String(cfg.threshold)} throttles in ${METRIC_PERIOD_LABEL}.`,
+      description: `CloudFront Function on ${scopeLabel} is being throttled - likely exceeding its 1ms compute budget. Threshold: > ${String(cfg.threshold)} throttles in ${METRIC_PERIOD_LABEL}.`,
     });
   }
 

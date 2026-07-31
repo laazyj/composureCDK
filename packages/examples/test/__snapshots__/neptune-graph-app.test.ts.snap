@@ -278,7 +278,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppbastionCpuCreditBalanceAlarmAEAD4CAA": {
       "Properties": {
-        "AlarmDescription": "EC2 burstable instance CPU credit balance is low — baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
+        "AlarmDescription": "EC2 burstable instance CPU credit balance is low - baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/bastion/cpu-credit-balance",
         "ComparisonOperator": "LessThanThreshold",
         "DatapointsToAlarm": 3,
@@ -596,7 +596,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppec2MessagesEndpointPacketsDroppedAlarm048BC171": {
       "Properties": {
-        "AlarmDescription": "VPC interface endpoint is dropping packets — possible endpoint service unhealthy, security group blocking traffic, or packets exceeding the 8,500-byte PrivateLink MTU. Threshold: > 0 (sum) over 5 x 1 minute.",
+        "AlarmDescription": "VPC interface endpoint is dropping packets - possible endpoint service unhealthy, security group blocking traffic, or packets exceeding the 8,500-byte PrivateLink MTU. Threshold: > 0 (sum) over 5 x 1 minute.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/ec2-messages-endpoint/packets-dropped",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,
@@ -1201,7 +1201,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppssmEndpointPacketsDroppedAlarm064B700E": {
       "Properties": {
-        "AlarmDescription": "VPC interface endpoint is dropping packets — possible endpoint service unhealthy, security group blocking traffic, or packets exceeding the 8,500-byte PrivateLink MTU. Threshold: > 0 (sum) over 5 x 1 minute.",
+        "AlarmDescription": "VPC interface endpoint is dropping packets - possible endpoint service unhealthy, security group blocking traffic, or packets exceeding the 8,500-byte PrivateLink MTU. Threshold: > 0 (sum) over 5 x 1 minute.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/ssm-endpoint/packets-dropped",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,
@@ -1302,7 +1302,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppssmMessagesEndpointPacketsDroppedAlarmC6C03A15": {
       "Properties": {
-        "AlarmDescription": "VPC interface endpoint is dropping packets — possible endpoint service unhealthy, security group blocking traffic, or packets exceeding the 8,500-byte PrivateLink MTU. Threshold: > 0 (sum) over 5 x 1 minute.",
+        "AlarmDescription": "VPC interface endpoint is dropping packets - possible endpoint service unhealthy, security group blocking traffic, or packets exceeding the 8,500-byte PrivateLink MTU. Threshold: > 0 (sum) over 5 x 1 minute.",
         "AlarmName": "composure-cdk-neptune-graph-stack/neptune-graph-app/ssm-messages-endpoint/packets-dropped",
         "ComparisonOperator": "GreaterThanThreshold",
         "DatapointsToAlarm": 5,

@@ -63,3 +63,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0014: Role-parameterized builders for mutually-exclusive L2 surfaces](0014-role-parameterized-queue-builder.md)
 - [ADR-0015: Combining multiple refs into one — the `combine()` Ref combinator](0015-combine-multi-ref-combinator.md)
 - [ADR-0016: Encapsulate SDK-only operations as domain actions on the owning builder](0016-domain-action-custom-resource.md)
+- [ADR-0017: Template-text validity as an opt-in Aspect, not builder enforcement](0017-template-text-policy.md)

@@ -118,6 +118,71 @@ compose(
   .build(stack, "StaticWebsite");
 ```
 
+## templateTextPolicy
+
+CloudFormation stores template text as ASCII. An em-dash, a curly quote or an ellipsis is **silently transliterated to `?` at deploy time** — no error, no `CREATE_FAILED`. The deployed template simply stops matching the synthesised one, so `cdk diff` reports a change on every run afterwards, forever, on a stack nobody touched. The only way out is to notice the character and strip it by hand.
+
+`templateTextPolicy` is a [Policy](../../docs/architecture.md#policies) that finds those characters at synth time instead.
+
+```ts
+import { templateTextPolicy } from "@composurecdk/cloudformation";
+
+templateTextPolicy(app); // fail synth on anything CloudFormation would rewrite
+```
+
+### Modes
+
+| `onViolation`         | Behaviour                                                                                         | Use it when                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `"throw"` _(default)_ | Fails synth, naming the construct path, the field and the offending character.                    | You want the text fixed at the source.                     |
+| `"sanitize"`          | Rewrites the value so the synthesised template matches what CloudFormation stores. Nothing fails. | A large existing estate you cannot chase string by string. |
+| `"warn"`              | Annotates every violation and carries on.                                                         | Adoption: run it, fix the list, then switch to `"throw"`.  |
+
+`sanitize` replaces per character, not per run — `“value”` becomes `"value"`, not a single `-`. Common typographic characters map to readable ASCII; anything else becomes `?`, which is what CloudFormation would have stored anyway. Override with `replace`:
+
+```ts
+templateTextPolicy(app, {
+  onViolation: "sanitize",
+  replace: (char) => (char === "€" ? "EUR" : transliterate(char)),
+});
+```
+
+### Why it is opt-in
+
+Enforcing this inside every builder would turn a working — if diff-noisy — deployment into a synth failure for anyone who has been living with the transliteration. Installing the policy is how you say you would rather know. Constraints whose violation fails the _deploy_ rather than merely the diff, such as an EC2 `GroupDescription`, stay enforced at the builder regardless ([ADR-0010](../../docs/adr/0010-aws-property-constraints.md)).
+
+An Aspect also reaches further than a builder can. A per-builder validator only covers fields someone remembered to wire one into — which is exactly how the stack-level `Description` slipped through, since `StackBuilder` passes `description` straight to `StackProps`. The Aspect walks the whole construct tree, so for the resource types it knows about it also catches constructs this library never built: raw L1s and other libraries' L2s alike.
+
+### What it checks
+
+The stack's own `Description`, every `CfnOutput` / `CfnParameter` description, and these resource properties:
+
+| Resource type                                                                             | Property           |
+| ----------------------------------------------------------------------------------------- | ------------------ |
+| `AWS::CloudWatch::Alarm`, `AWS::CloudWatch::CompositeAlarm`                               | `alarmDescription` |
+| `AWS::Lambda::Function`, `AWS::Events::Rule`, `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` | `description`      |
+| `AWS::ApiGateway::RestApi`, `Stage`, `Deployment`, `UsagePlan`, `ApiKey`                  | `description`      |
+| `AWS::Neptune::DBClusterParameterGroup`, `AWS::Neptune::DBParameterGroup`                 | `description`      |
+| `AWS::EC2::SecurityGroup`                                                                 | `groupDescription` |
+| `AWS::SNS::Topic`                                                                         | `displayName`      |
+
+That is a seed list, not the whole of CloudFormation — several hundred resource types declare a free-text property. Add the ones you use:
+
+```ts
+templateTextPolicy(app, { fields: { "AWS::Custom::Widget": ["notes"] } });
+```
+
+Keys are CloudFormation resource types; values are **CDK L1 property names** (camelCase — `alarmDescription`, not `AlarmDescription`).
+
+### What it does not cover
+
+- Values that resolve to a CloudFormation intrinsic (`Ref`, `Fn::ImportValue`) — the text is not knowable at synth. A `Lazy` that resolves to a plain string **is** checked.
+- Values written through `addPropertyOverride`, or set on a bare `CfnResource`'s `properties`. Both bypass the typed L1 accessor the policy reads.
+- Nested properties such as `DistributionConfig.Comment`.
+- Resource types and properties not in the table above, until you add them. A property name that does not match an L1 accessor is skipped silently — the same outcome as not listing it.
+
+To check a single value directly rather than a whole tree, use `constraints.validate.templateText` / `constraints.sanitize.templateText` ([catalogue](../../docs/constraints.md)).
+
 ## Examples
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`

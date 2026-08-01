@@ -454,7 +454,7 @@ alarmActionsPolicy(app, {
 
 ### Design rationale
 
-- **Single-domain policies live in their package** under `src/policies/`, co-located with the detection logic and types they rely on (e.g. `alarmActionsPolicy` in `@composurecdk/cloudwatch`). Pan-domain policies that span services stay in `packages/examples/` until ≥ 2 of them justify a dedicated `@composurecdk/policies` package.
+- **Single-domain policies live in their package** under `src/policies/`, co-located with the detection logic and types they rely on (e.g. `alarmActionsPolicy` in `@composurecdk/cloudwatch`). Pan-domain policies that span services stay in `packages/examples/` until ≥ 2 of them justify a dedicated `@composurecdk/policies` package — unless the policy is keyed by CloudFormation resource-type _string_ and so imports no service package at all, in which case it lives in `@composurecdk/cloudformation` (e.g. `templateTextPolicy`). See [ADR-0017](adr/0017-template-text-policy.md).
 - **Named with a `<noun>Policy` suffix** to signal a scope-wide side effect applied at setup, distinct from builders and factories.
 
 See [ADR-0002](adr/0002-policies.md).

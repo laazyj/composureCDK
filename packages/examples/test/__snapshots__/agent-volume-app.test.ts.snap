@@ -161,7 +161,7 @@ exports[`agent-volume-app > matches the expected synthesised template 1`] = `
             "Ref": "AgentVolumeAppalerts0D02612E",
           },
         ],
-        "AlarmDescription": "EC2 burstable instance CPU credit balance is low — baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
+        "AlarmDescription": "EC2 burstable instance CPU credit balance is low - baseline throttling is imminent. Threshold: < 50 credits (minimum) over 3 x 5 minute.",
         "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/agent/cpu-credit-balance",
         "ComparisonOperator": "LessThanThreshold",
         "DatapointsToAlarm": 3,

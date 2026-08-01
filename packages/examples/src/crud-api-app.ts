@@ -153,7 +153,7 @@ export function createCrudApiApp(app = new App()) {
 
       api: createRestApiBuilder()
         .restApiName("CrudApi")
-        .description("Minimal REST API backed directly by DynamoDB — no Lambda in the request path")
+        .description("Minimal REST API backed directly by DynamoDB - no Lambda in the request path")
         .addResource("gadgets", (gadgets) =>
           gadgets
             .addMethod("GET", LIST_OPERATION, OK)

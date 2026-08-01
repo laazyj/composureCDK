@@ -21,7 +21,7 @@ describe("dual-function-app", () => {
       MemorySize: 256,
       Timeout: 30,
       TracingConfig: { Mode: "Active" },
-      Description: "API handler — receives and validates incoming requests",
+      Description: "API handler - receives and validates incoming requests",
     });
   });
 
@@ -32,7 +32,7 @@ describe("dual-function-app", () => {
       MemorySize: 512,
       Timeout: 300,
       TracingConfig: { Mode: "Active" },
-      Description: "Worker — processes requests asynchronously",
+      Description: "Worker - processes requests asynchronously",
     });
   });
 

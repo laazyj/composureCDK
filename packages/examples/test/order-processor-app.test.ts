@@ -20,7 +20,7 @@ describe("order-processor-app", () => {
       Runtime: "nodejs22.x",
       Handler: "index.handler",
       MemorySize: 256,
-      Description: "Order processor — consumes and processes order messages",
+      Description: "Order processor - consumes and processes order messages",
     });
     template.resourceCountIs("AWS::Lambda::EventSourceMapping", 1);
   });

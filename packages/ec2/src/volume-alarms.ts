@@ -73,7 +73,7 @@ export function resolveVolumeAlarmDefinitions(
       evaluationPeriods: cfg.evaluationPeriods,
       datapointsToAlarm: cfg.datapointsToAlarm,
       treatMissingData: cfg.treatMissingData,
-      description: `EBS burstable volume burst credit balance is low — baseline-IOPS throttling is imminent. Threshold: < ${String(cfg.threshold)}% (average) over ${String(cfg.evaluationPeriods)} x ${BURST_METRIC_PERIOD_LABEL}.`,
+      description: `EBS burstable volume burst credit balance is low - baseline-IOPS throttling is imminent. Threshold: < ${String(cfg.threshold)}% (average) over ${String(cfg.evaluationPeriods)} x ${BURST_METRIC_PERIOD_LABEL}.`,
     });
   }
 

@@ -101,7 +101,7 @@ export function createOrderProcessorApp(app = new App()) {
             .greaterThan()
             .description(
               (def) =>
-                `Consumers are polling but the queue is mostly empty — consider tuning concurrency or pausing pollers. ` +
+                `Consumers are polling but the queue is mostly empty - consider tuning concurrency or pausing pollers. ` +
                 `Threshold: > ${String(def.threshold)} empty receives per 5 minutes.`,
             ),
         ),
@@ -117,7 +117,7 @@ export function createOrderProcessorApp(app = new App()) {
           ),
         )
         .memorySize(256)
-        .description("Order processor — consumes and processes order messages")
+        .description("Order processor - consumes and processes order messages")
         // The event source is declared as data: `sqsEventSource` resolves
         // the sibling queue `ref` at build time and `addEventSource` grants
         // the consume permission onto the function's least-privilege role.

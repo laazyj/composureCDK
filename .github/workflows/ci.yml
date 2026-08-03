@@ -73,6 +73,21 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      # Workflow linting is Node-independent, so one leg is enough. Keyed to the
+      # matrix's first entry rather than a literal version: `[0]` always selects
+      # exactly one leg whatever `node-versions` holds, whereas `== 24` matches
+      # nothing the moment 24 leaves the matrix — silently dropping the gate,
+      # which is the failure mode this whole check exists to prevent.
+      #
+      # Runs before the build so a malformed workflow fails in seconds, matching
+      # its position in `npm run verify`. This is also the only pre-merge signal
+      # for workflow changes that cannot test themselves: `workflow_run`
+      # listeners always dispatch the default-branch copy, and an edited trigger
+      # is not exercised until it next fires.
+      - name: Lint workflows
+        if: matrix.node-version == fromJSON(inputs.node-versions || '[20, 22, 24, 26]')[0]
+        run: npm run actionlint
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -167,6 +182,10 @@ jobs:
       - name: Read distinct floors from manifest
         id: read
         run: |
+          # The single quotes below are load-bearing: they hand the script to
+          # node unexpanded. Double quotes would let the shell substitute the
+          # `${pkg}` / `${e.floor}` JS template placeholders before node sees them.
+          # shellcheck disable=SC2016
           node -e '
             const m = JSON.parse(require("node:fs").readFileSync("cdk-floors.json", "utf8")).floors;
             const rows = Object.entries(m)

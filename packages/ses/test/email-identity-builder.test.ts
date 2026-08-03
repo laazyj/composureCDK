@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { App, SecretValue, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
-import { EasyDkimSigningKeyLength, MailFromBehaviorOnMxFailure } from "aws-cdk-lib/aws-ses";
+import {
+  ConfigurationSet,
+  EasyDkimSigningKeyLength,
+  MailFromBehaviorOnMxFailure,
+} from "aws-cdk-lib/aws-ses";
+import { ref } from "@composurecdk/core";
 import { createEmailIdentityBuilder } from "../src/email-identity-builder.js";
 
 function newStack(): Stack {
@@ -113,6 +118,23 @@ describe("EmailIdentityBuilder", () => {
       .build(stack, "MailIdentity");
     Template.fromStack(stack).hasResourceProperties("AWS::SES::EmailIdentity", {
       MailFromAttributes: Match.objectLike({ BehaviorOnMxFailure: "USE_DEFAULT_VALUE" }),
+    });
+  });
+
+  it("associates a Resolvable configuration set from the build context", () => {
+    const stack = newStack();
+    const configurationSet = new ConfigurationSet(stack, "MailConfig");
+    createEmailIdentityBuilder()
+      .domain("example.com")
+      .configurationSet(
+        ref<{ configurationSet: ConfigurationSet }, ConfigurationSet>(
+          "config",
+          (r) => r.configurationSet,
+        ),
+      )
+      .build(stack, "MailIdentity", { config: { configurationSet } });
+    Template.fromStack(stack).hasResourceProperties("AWS::SES::EmailIdentity", {
+      ConfigurationSetAttributes: Match.objectLike({ ConfigurationSetName: Match.anyValue() }),
     });
   });
 

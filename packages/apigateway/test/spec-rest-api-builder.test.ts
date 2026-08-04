@@ -9,11 +9,19 @@ import {
 } from "aws-cdk-lib/aws-apigateway";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
+import { combine, compose, type Lifecycle, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createSpecRestApiBuilder } from "../src/spec-rest-api-builder.js";
 
-/** Minimal OpenAPI 3.0 spec with a single mock-integrated GET /pets endpoint. */
-function minimalOpenApiSpec() {
+/** Minimal OpenAPI 3.0 spec with a single GET /pets endpoint, mock-integrated
+ * unless the caller supplies an integration of its own. */
+function minimalOpenApiSpec(
+  integration: object = {
+    type: "MOCK",
+    requestTemplates: { "application/json": '{ "statusCode": 200 }' },
+    responses: { default: { statusCode: "200" } },
+  },
+) {
   return {
     openapi: "3.0.2",
     info: { title: "TestApi", version: "1.0" },
@@ -21,11 +29,7 @@ function minimalOpenApiSpec() {
       "/pets": {
         get: {
           responses: { "200": { description: "OK" } },
-          "x-amazon-apigateway-integration": {
-            type: "MOCK",
-            requestTemplates: { "application/json": '{ "statusCode": 200 }' },
-            responses: { default: { statusCode: "200" } },
-          },
+          "x-amazon-apigateway-integration": integration,
         },
       },
     },
@@ -34,12 +38,13 @@ function minimalOpenApiSpec() {
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createSpecRestApiBuilder>) => void,
+  context?: Record<string, object>,
 ): Template {
   const app = new App();
   const stack = new Stack(app, "TestStack");
   const builder = createSpecRestApiBuilder();
   configureFn(builder);
-  builder.build(stack, "TestApi");
+  builder.build(stack, "TestApi", context);
   return Template.fromStack(stack);
 }
 
@@ -136,6 +141,137 @@ describe("SpecRestApiBuilder", () => {
       const template = synthTemplate((b) => withStubDefinition(b.restApiName("My Service")));
 
       template.resourceCountIs("AWS::ApiGateway::RestApi", 1);
+    });
+  });
+
+  describe("resolvable apiDefinition", () => {
+    const HANDLER_ARN = "arn:aws:lambda:us-east-1:123456789012:function:Handler";
+    const ROLE_ARN = "arn:aws:iam::123456789012:role/GatewayRole";
+
+    /** Asserts the synthesised `Body` carries the given integration fields. */
+    function expectIntegration(template: Template, integration: Record<string, unknown>) {
+      template.hasResourceProperties("AWS::ApiGateway::RestApi", {
+        Body: Match.objectLike({
+          paths: {
+            "/pets": {
+              get: { "x-amazon-apigateway-integration": Match.objectLike(integration) },
+            },
+          },
+        }),
+      });
+    }
+
+    it("resolves a ref against the build context", () => {
+      const template = synthTemplate(
+        (b) =>
+          b
+            .restApiName("My Service")
+            .apiDefinition(
+              ref("handler", (r: { functionArn: string }) =>
+                ApiDefinition.fromInline(
+                  minimalOpenApiSpec({ type: "AWS_PROXY", uri: r.functionArn }),
+                ),
+              ),
+            ),
+        { handler: { functionArn: HANDLER_ARN } },
+      );
+
+      expectIntegration(template, { uri: HANDLER_ARN });
+    });
+
+    it("resolves a combine of several siblings into one definition", () => {
+      const template = synthTemplate(
+        (b) =>
+          b.restApiName("My Service").apiDefinition(
+            combine(
+              {
+                handler: ref<{ functionArn: string }>("handler"),
+                gatewayRole: ref<{ roleArn: string }>("gatewayRole"),
+              },
+              ({ handler, gatewayRole }) =>
+                ApiDefinition.fromInline(
+                  minimalOpenApiSpec({
+                    type: "AWS_PROXY",
+                    uri: handler.functionArn,
+                    credentials: gatewayRole.roleArn,
+                  }),
+                ),
+            ),
+          ),
+        {
+          handler: { functionArn: HANDLER_ARN },
+          gatewayRole: { roleArn: ROLE_ARN },
+        },
+      );
+
+      expectIntegration(template, { uri: HANDLER_ARN, credentials: ROLE_ARN });
+    });
+
+    it("carries a CDK token from a sibling into the synthesised body", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const sibling = new LogGroup(stack, "SiblingLogGroup");
+      const builder = createSpecRestApiBuilder()
+        .restApiName("My Service")
+        .apiDefinition(
+          ref("sibling", (r: { arn: string }) =>
+            ApiDefinition.fromInline(
+              minimalOpenApiSpec({ type: "AWS_PROXY", uri: `${r.arn}/invoke` }),
+            ),
+          ),
+        );
+
+      builder.build(stack, "TestApi", { sibling: { arn: sibling.logGroupArn } });
+
+      // An unresolved token would stringify to "${Token[...]}"; a Fn::Join
+      // proves the sibling's Fn::GetAtt survived into the API body.
+      expectIntegration(Template.fromStack(stack), { uri: { "Fn::Join": Match.anyValue() } });
+    });
+
+    it("throws when a ref names a component that is not a dependency", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const builder = createSpecRestApiBuilder()
+        .restApiName("My Service")
+        .apiDefinition(
+          ref("handler", (r: { functionArn: string }) =>
+            ApiDefinition.fromInline(minimalOpenApiSpec({ uri: r.functionArn })),
+          ),
+        );
+
+      expect(() => builder.build(stack, "TestApi")).toThrow(
+        /"handler" cannot be resolved: component not found in context/,
+      );
+    });
+
+    it("throws a descriptive error when no apiDefinition is set", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const builder = createSpecRestApiBuilder().restApiName("My Service");
+
+      expect(() => builder.build(stack, "TestApi")).toThrow(/requires an apiDefinition/);
+    });
+
+    it("resolves against a sibling built by compose", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const handler: Lifecycle<{ functionArn: string }> = {
+        build: () => ({ functionArn: HANDLER_ARN }),
+      };
+
+      compose(
+        {
+          handler,
+          api: createSpecRestApiBuilder()
+            .restApiName("My Service")
+            .apiDefinition(
+              ref("handler", (r: { functionArn: string }) =>
+                ApiDefinition.fromInline(
+                  minimalOpenApiSpec({ type: "AWS_PROXY", uri: r.functionArn }),
+                ),
+              ),
+            ),
+        },
+        { handler: [], api: ["handler"] },
+      ).build(stack, "System");
+
+      expectIntegration(Template.fromStack(stack), { uri: HANDLER_ARN });
     });
   });
 

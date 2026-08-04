@@ -33,9 +33,6 @@ Every [RestApiProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws
 `createSpecRestApiBuilder` builds a [SpecRestApi](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.SpecRestApi.html) — a REST API whose resources, methods and integrations come entirely from an OpenAPI specification rather than from `addResource`/`addMethod` calls. Every [SpecRestApiProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.SpecRestApiProps.html) property is a fluent setter, and the same secure defaults, access logging and recommended alarms apply as for `createRestApiBuilder`.
 
 ```ts
-import { ApiDefinition } from "aws-cdk-lib/aws-apigateway";
-import { createSpecRestApiBuilder } from "@composurecdk/apigateway";
-
 const api = createSpecRestApiBuilder()
   .restApiName("PetStore")
   .apiDefinition(ApiDefinition.fromInline(petstoreSpec))
@@ -49,27 +46,23 @@ A model-first spec — a Smithy or OpenAPI export, or a hand-written document �
 `apiDefinition` therefore accepts a `Resolvable<ApiDefinition>` — a concrete definition, or a `ref`/`combine` that produces one at build time. The specification stays declarative, the substitution stays a plain function you can test on its own, and the whole API stays inside `compose`:
 
 ```ts
-import { ApiDefinition } from "aws-cdk-lib/aws-apigateway";
-import { combine, compose, ref } from "@composurecdk/core";
-import { createSpecRestApiBuilder } from "@composurecdk/apigateway";
-import {
-  createFunctionBuilder,
-  functionGrants,
-  type FunctionBuilderResult,
-} from "@composurecdk/lambda";
-import { createServiceRoleBuilder, type RoleBuilderResult } from "@composurecdk/iam";
+// Substitution is an ordinary function of its inputs — no CDK scope, no builder.
+const withIntegration = (spec: object, arns: Record<string, string>) =>
+  JSON.parse(
+    Object.entries(arns).reduce(
+      (doc, [name, arn]) => doc.split(name).join(arn),
+      JSON.stringify(spec),
+    ),
+  );
 
 compose(
   {
-    handler: createFunctionBuilder()
-      .runtime(Runtime.NODEJS_22_X)
-      .handler("index.handler")
-      .code(code),
+    handler: createFunctionBuilder().handler("index.handler").code(code),
 
     // The role API Gateway assumes to invoke the handler — an ordinary
     // sibling, wired with a consumer-side grant (ADR-0013).
     gatewayRole: createServiceRoleBuilder("apigateway.amazonaws.com").grant(
-      functionGrants.invoke(ref<FunctionBuilderResult>("handler", (r) => r.function)),
+      functionGrants.invoke(ref("handler", (r: FunctionBuilderResult) => r.function)),
     ),
 
     api: createSpecRestApiBuilder()
@@ -83,8 +76,8 @@ compose(
           ({ handler, gatewayRole }) =>
             ApiDefinition.fromInline(
               withIntegration(petstoreSpec, {
-                functionArn: handler.function.functionArn,
-                credentialsArn: gatewayRole.role.roleArn,
+                "${PetFunction.Arn}": handler.function.functionArn,
+                "${ApiGatewayRole.Arn}": gatewayRole.role.roleArn,
               }),
             ),
         ),

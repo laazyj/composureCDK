@@ -39,7 +39,7 @@ export interface SpecRestApiBuilderProps
    *
    * // Resolvable — the spec is finished once the handler exists
    * .apiDefinition(
-   *   ref<FunctionBuilderResult>("handler", (r) =>
+   *   ref("handler", (r: FunctionBuilderResult) =>
    *     ApiDefinition.fromInline(withIntegration(spec, r.function.functionArn))),
    * )
    * ```

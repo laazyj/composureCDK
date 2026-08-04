@@ -1,3 +1,5 @@
+import { listRestApis, restApiUrl } from "./_helpers.mjs";
+
 // REST API name → root path to GET. New example REST APIs add an entry here;
 // switch to a sibling *.smoke.mjs file once this exceeds ~6 entries.
 const EXAMPLE_API_PATHS = {
@@ -9,8 +11,7 @@ const EXAMPLE_API_PATHS = {
 export default {
   name: "API endpoint checks",
   run: async ({ aws, region, pass, fail }) => {
-    const { items } = aws("apigateway", "get-rest-apis", "--output", "json");
-    const apis = (items ?? []).filter((api) => api.name in EXAMPLE_API_PATHS);
+    const apis = listRestApis(aws).filter((api) => api.name in EXAMPLE_API_PATHS);
 
     if (apis.length === 0) {
       fail("No example REST APIs found");
@@ -19,7 +20,7 @@ export default {
 
     await Promise.all(
       apis.map(async (api) => {
-        const url = `https://${api.id}.execute-api.${region}.amazonaws.com/prod${EXAMPLE_API_PATHS[api.name]}`;
+        const url = restApiUrl(api, region, EXAMPLE_API_PATHS[api.name]);
         try {
           const res = await fetch(url);
           if (res.ok) {

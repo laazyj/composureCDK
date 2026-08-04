@@ -87,7 +87,7 @@ compose(
 );
 ```
 
-A single dependency needs only a `ref`; `combine` is for the case above, where one definition is assembled from two or more siblings ([ADR-0015](../../docs/adr/0015-combine-multi-ref-combinator.md)).
+A single dependency needs only a `ref`; `combine` is for the case above, where one definition is assembled from two or more siblings ([ADR-0015](../../docs/adr/0015-combine-multi-ref-combinator.md)). [OpenApiPetstoreStack](../examples/src/openapi-petstore-app.ts) is this pattern as a deployable stack.
 
 Two things to know when writing the substitution:
 
@@ -285,3 +285,4 @@ for (const alarm of Object.values(result.alarms)) {
 - [CrudApiStack](../examples/src/crud-api-app.ts) — CRUD REST API backed directly by DynamoDB via `AwsIntegration`, with no Lambda in the request path
 - [MockApiStack](../examples/src/mock-api-app.ts) — CRUD REST API with mock integrations and recommended alarms with custom thresholds
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`, wired with `ref`
+- [OpenApiPetstoreStack](../examples/src/openapi-petstore-app.ts) — spec-driven REST API whose Lambda integration is resolved into the OpenAPI document at build time

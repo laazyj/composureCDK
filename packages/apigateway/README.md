@@ -43,18 +43,9 @@ const api = createSpecRestApiBuilder()
 
 A model-first spec — a Smithy or OpenAPI export, or a hand-written document — usually names the resources its integrations call: the ARN of the Lambda to invoke, the role API Gateway assumes to invoke it. Those values do not exist while the builder is being configured. They exist only once the siblings have been built.
 
-`apiDefinition` therefore accepts a `Resolvable<ApiDefinition>` — a concrete definition, or a `ref`/`combine` that produces one at build time. The specification stays declarative, the substitution stays a plain function you can test on its own, and the whole API stays inside `compose`:
+`apiDefinition` therefore accepts a `Resolvable<ApiDefinition>` — a concrete definition, or a `ref`/`combine` that produces one at build time. For the common shape of that — an inline document whose placeholders stand for sibling resources — `inlineSpecDefinition` is the whole wiring in one call:
 
 ```ts
-// Substitution is an ordinary function of its inputs — no CDK scope, no builder.
-const withIntegration = (spec: object, arns: Record<string, string>) =>
-  JSON.parse(
-    Object.entries(arns).reduce(
-      (doc, [name, arn]) => doc.split(name).join(arn),
-      JSON.stringify(spec),
-    ),
-  );
-
 compose(
   {
     handler: createFunctionBuilder().handler("index.handler").code(code),
@@ -68,28 +59,37 @@ compose(
     api: createSpecRestApiBuilder()
       .restApiName("PetStore")
       .apiDefinition(
-        combine(
-          {
-            handler: ref<FunctionBuilderResult>("handler"),
-            gatewayRole: ref<RoleBuilderResult>("gatewayRole"),
-          },
-          ({ handler, gatewayRole }) =>
-            ApiDefinition.fromInline(
-              withIntegration(petstoreSpec, {
-                "${PetFunction.Arn}": handler.function.functionArn,
-                "${ApiGatewayRole.Arn}": gatewayRole.role.roleArn,
-              }),
-            ),
-        ),
+        inlineSpecDefinition(petstoreSpec, {
+          "${PetFunction.Arn}": ref(
+            "handler",
+            (r: FunctionBuilderResult) => r.function.functionArn,
+          ),
+          "${ApiGatewayRole.Arn}": ref("gatewayRole", (r: RoleBuilderResult) => r.role.roleArn),
+        }),
       ),
   },
   { handler: [], gatewayRole: ["handler"], api: ["handler", "gatewayRole"] },
 );
 ```
 
-A single dependency needs only a `ref`; `combine` is for the case above, where one definition is assembled from two or more siblings ([ADR-0015](../../docs/adr/0015-combine-multi-ref-combinator.md)). [OpenApiPetstoreStack](../examples/src/openapi-petstore-app.ts) is this pattern as a deployable stack.
+The specification stays declarative, the API stays inside `compose`, and [OpenApiPetstoreStack](../examples/src/openapi-petstore-app.ts) is the same thing as a deployable stack.
 
-Two things to know when writing the substitution:
+No placeholder syntax is imposed — keys are replaced literally, so `${Function.Arn}`, `{{functionArn}}` and `__FUNCTION_ARN__` all work, and all of them are matched in a single pass so declaration order cannot matter. A key that appears nowhere in the document throws, since it is nearly always a typo. Note the reverse is undetectable without a syntax to scan for: a placeholder **in the document** that you never map is substituted by nothing and deploys verbatim.
+
+`inlineSpecDefinition` is `combine` + `substituteSpec` + `ApiDefinition.fromInline` in one call. Both halves are exported, so anything it does not cover composes from the parts — an asset- or bucket-backed definition, a substitution that is not a string replacement, or a document completed some other way, each passed to the same `apiDefinition` ([ADR-0015](../../docs/adr/0015-combine-multi-ref-combinator.md)):
+
+```ts
+// The same thing, written out
+.apiDefinition(
+  combine({ handler: ref<FunctionBuilderResult>("handler") }, ({ handler }) =>
+    ApiDefinition.fromInline(
+      substituteSpec(petstoreSpec, { "${PetFunction.Arn}": handler.function.functionArn }),
+    ),
+  ),
+)
+```
+
+Two things to know either way:
 
 - **Reach for the account, region or partition via `Aws.*`.** A transform receives the build context, not a construct scope, so `Stack.of(scope)` is not available to it — see [Resolvable](../../docs/architecture.md#resolvable). `Aws.PARTITION` and `Aws.REGION` need no scope and resolve correctly inside the API body.
 - **An inline body is embedded in the CloudFormation template.** A large generated specification counts against the template size limit; load it from S3 with `ApiDefinition.fromBucket` if it grows (at the cost of the in-process substitution shown here).

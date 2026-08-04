@@ -17,6 +17,14 @@ npm run format:check
 
 Fix any issues before moving on. Use npm run lint:fix and npm run format to auto-fix.
 
+If you touched anything under `.github/workflows/`, also run:
+
+```sh
+npm run actionlint
+```
+
+`npm run lint` is eslint only and will not look at a workflow file. See [linting the workflows](docs/ci.md#linting-the-workflows) — it is a separate gate because a broken workflow is one of the few things CI cannot catch for you.
+
 ## Build system
 
 Use npx nx to run build/test scripts — this is an nx monorepo.

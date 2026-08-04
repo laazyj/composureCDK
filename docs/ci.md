@@ -45,6 +45,22 @@ Notes:
 - The summary and upload steps run with `if: always()`, so when a package dips below its threshold and fails `npm run test`, reviewers still see the table (with the offending package flagged). The job status still reflects the failure — the gate is unchanged. Because they now share a job with the earlier gates, they additionally guard on `steps.test.conclusion != 'skipped'`: a typecheck or lint failure skips `Test`, leaving no `coverage-summary.json` to merge, and the reporting steps should stay quiet rather than fail a second time on the same root cause.
 - **A missing artifact is a normal outcome, not a failure of the listener.** A cancelled CI run (push-over-push) or one that fails an earlier gate in the Node 24 leg uploads nothing, so `coverage-comment.yml` tolerates the download (`continue-on-error`) and gates its posting steps on that step's `outcome`: no artifact, no comment, run stays green. Hard-failing there would report the same root cause a second time, as a separate red run alongside the CI failure that caused it. The listener is deliberately **not** gated on `workflow_run.conclusion == 'success'` — a coverage threshold miss fails `Test` but still uploads the table, and that is exactly the run whose comment reviewers want.
 
+## Linting the workflows
+
+`npm run actionlint` runs [actionlint](https://github.com/rhysd/actionlint) over `.github/workflows/`. It is chained into `npm run verify` (so the husky `pre-push` hook catches it), fires from `lint-staged` in `pre-commit` whenever a workflow file is staged, and runs in CI as the **Lint workflows** step. Same npm script in all three places — CI executes the gate, it does not define it.
+
+Workflow files are the case that most needs a local gate, because CI is least able to check them: a `workflow_run` listener always dispatches the _default-branch_ copy, and an edit to a trigger is not exercised until it next fires. `actionlint` is often the only pre-merge signal a workflow change gets.
+
+Three things make this reliable rather than decorative:
+
+- **Both binaries are pinned devDependencies** — `github-actionlint` (which fetches the official actionlint release binary) and `shellcheck`. [`scripts/actionlint.mjs`](../scripts/actionlint.mjs) resolves each from its installed package rather than from `PATH`, so a stray Homebrew copy cannot change the result between a laptop and a runner.
+- **A missing shellcheck fails the run.** actionlint treats shellcheck as optional: it shells out only if it finds it and reports a clean run when it does not — and it does the same for an explicit `-shellcheck=` path that resolves to nothing. Both exit `0` with no output. That matters more than it sounds, because _every finding this repo has ever had came from shellcheck rather than actionlint's own checks_, so a missing shellcheck does not weaken the gate, it empties it. The script therefore probes shellcheck first and refuses to lint until it has proven it runs.
+- **The CI step cannot silently vanish.** It runs on one matrix leg, selected as `fromJSON(...)[0]` rather than a literal `== 24`. The first entry always exists, so the gate follows the matrix; pinning it to a version number would drop the check the moment that version rotated out — the same silent-skip class the script guards against internally.
+
+The whole run takes ~300ms, so it is simply always run rather than cached or path-filtered: nx's own overhead on a cache _hit_ exceeds the cost of doing the work, and a path filter is one more thing to drift. It is a plain `node scripts/*.mjs` npm script like `catalogue:check` and `cdk-floors:check`.
+
+Suppress a false positive with a `# shellcheck disable=SCxxxx` comment inside the `run:` block, and say why — as `ci.yml`'s `Read distinct floors from manifest` step does, where single quotes are load-bearing and "fixing" SC2016 would break the script.
+
 ## Trimming CI for deploy-test
 
 `ci.yml` takes two `workflow_call` inputs, both defaulting to the full run so `push` and `pull_request` are untouched — those events carry no inputs, and the expressions fall back accordingly:
@@ -56,7 +72,7 @@ Notes:
 
 `deploy-test.yml` passes `"[24]"` and `true`, taking that call from 17 jobs to 1.
 
-The trimmed-away work cannot tell you whether the examples deploy. The Node 20/22/26 legs exist to prove dual ESM/CJS resolution across runtimes ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)); the floor shards pin `aws-cdk-lib` down to each package's declared minimum ([ADR-0008](adr/0008-aws-cdk-lib-version-floors.md)). A deploy runs on Node 24 against the installed `aws-cdk-lib` and touches neither dimension. What is kept is the whole `verify` chain on Node 24 — format, typecheck, build, `check:exports`, lint, `cdk-floors:check`, `validate` (synth + CloudFormation Validate), test — which is the part that can.
+The trimmed-away work cannot tell you whether the examples deploy. The Node 20/22/26 legs exist to prove dual ESM/CJS resolution across runtimes ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)); the floor shards pin `aws-cdk-lib` down to each package's declared minimum ([ADR-0008](adr/0008-aws-cdk-lib-version-floors.md)). A deploy runs on Node 24 against the installed `aws-cdk-lib` and touches neither dimension. What is kept is the whole `verify` chain on Node 24 — format, actionlint, typecheck, build, `check:exports`, lint, `cdk-floors:check`, `validate` (synth + CloudFormation Validate), test — which is the part that can.
 
 `skip-cdk-floors` is phrased as a skip rather than a run because an unset input coerces to `false` in GitHub expressions, so `false` has to be the value that means "do the normal thing".
 

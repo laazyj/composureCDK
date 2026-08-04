@@ -1,3 +1,19 @@
+## 0.9.3 (2026-08-04)
+
+### 🚀 Features
+
+- **apigateway:** accept a resolvable apiDefinition on the spec REST API builder ([#356](https://github.com/laazyj/composureCDK/pull/356), [#355](https://github.com/laazyj/composureCDK/issues/355))
+- **apigateway:** add inlineSpecDefinition for placeholder-bearing specs ([#358](https://github.com/laazyj/composureCDK/pull/358), [#355](https://github.com/laazyj/composureCDK/issues/355))
+- **ci:** comment on issues a release addressed ([#346](https://github.com/laazyj/composureCDK/pull/346), [#123](https://github.com/laazyj/composureCDK/issues/123))
+
+### 🩹 Fixes
+
+- strip non-ASCII from descriptions emitted into templates ([#351](https://github.com/laazyj/composureCDK/pull/351), [#336](https://github.com/laazyj/composureCDK/issues/336))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.9.2 (2026-07-27)
 
 ### 🚀 Features

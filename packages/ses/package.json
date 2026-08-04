@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/ses",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "Compose-native builders for AWS SES — email identities, receipt rule sets, filters, and rule actions",
   "repository": {
     "type": "git",

@@ -28,6 +28,72 @@ Every [RestApiProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws
 
 - [**CrudApiStack**](../examples/src/crud-api-app.ts) — a complete CRUD REST API wired straight to DynamoDB via `AwsIntegration` and VTL mapping templates (`Scan`/`PutItem`/`GetItem`/`DeleteItem`), with the credentials role assembled from sibling builders using `combine` and granted via consumer-side `tableGrants`. Start here for the `AwsIntegration` → DynamoDB pattern.
 
+## Spec REST API Builder
+
+`createSpecRestApiBuilder` builds a [SpecRestApi](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.SpecRestApi.html) — a REST API whose resources, methods and integrations come entirely from an OpenAPI specification rather than from `addResource`/`addMethod` calls. Every [SpecRestApiProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.SpecRestApiProps.html) property is a fluent setter, and the same secure defaults, access logging and recommended alarms apply as for `createRestApiBuilder`.
+
+```ts
+const api = createSpecRestApiBuilder()
+  .restApiName("PetStore")
+  .apiDefinition(ApiDefinition.fromInline(petstoreSpec))
+  .build(stack, "PetStoreApi");
+```
+
+### Specs that reference sibling resources
+
+A model-first spec — a Smithy or OpenAPI export, or a hand-written document — usually names the resources its integrations call: the ARN of the Lambda to invoke, the role API Gateway assumes to invoke it. Those values do not exist while the builder is being configured. They exist only once the siblings have been built.
+
+`apiDefinition` therefore accepts a `Resolvable<ApiDefinition>` — a concrete definition, or a `ref`/`combine` that produces one at build time. The specification stays declarative, the substitution stays a plain function you can test on its own, and the whole API stays inside `compose`:
+
+```ts
+// Substitution is an ordinary function of its inputs — no CDK scope, no builder.
+const withIntegration = (spec: object, arns: Record<string, string>) =>
+  JSON.parse(
+    Object.entries(arns).reduce(
+      (doc, [name, arn]) => doc.split(name).join(arn),
+      JSON.stringify(spec),
+    ),
+  );
+
+compose(
+  {
+    handler: createFunctionBuilder().handler("index.handler").code(code),
+
+    // The role API Gateway assumes to invoke the handler — an ordinary
+    // sibling, wired with a consumer-side grant (ADR-0013).
+    gatewayRole: createServiceRoleBuilder("apigateway.amazonaws.com").grant(
+      functionGrants.invoke(ref("handler", (r: FunctionBuilderResult) => r.function)),
+    ),
+
+    api: createSpecRestApiBuilder()
+      .restApiName("PetStore")
+      .apiDefinition(
+        combine(
+          {
+            handler: ref<FunctionBuilderResult>("handler"),
+            gatewayRole: ref<RoleBuilderResult>("gatewayRole"),
+          },
+          ({ handler, gatewayRole }) =>
+            ApiDefinition.fromInline(
+              withIntegration(petstoreSpec, {
+                "${PetFunction.Arn}": handler.function.functionArn,
+                "${ApiGatewayRole.Arn}": gatewayRole.role.roleArn,
+              }),
+            ),
+        ),
+      ),
+  },
+  { handler: [], gatewayRole: ["handler"], api: ["handler", "gatewayRole"] },
+);
+```
+
+A single dependency needs only a `ref`; `combine` is for the case above, where one definition is assembled from two or more siblings ([ADR-0015](../../docs/adr/0015-combine-multi-ref-combinator.md)).
+
+Two things to know when writing the substitution:
+
+- **Reach for the account, region or partition via `Aws.*`.** A transform receives the build context, not a construct scope, so `Stack.of(scope)` is not available to it — see [Resolvable](../../docs/architecture.md#resolvable). `Aws.PARTITION` and `Aws.REGION` need no scope and resolve correctly inside the API body.
+- **An inline body is embedded in the CloudFormation template.** A large generated specification counts against the template size limit; load it from S3 with `ApiDefinition.fromBucket` if it grows (at the cost of the in-process substitution shown here).
+
 ## Invoke grants
 
 To let a principal call an IAM-authorized API (`authorizationType: AuthorizationType.IAM`), `restApiGrants` provides a consumer-side grant helper — the mirror of DynamoDB's `tableGrants`. Declare it on the **grantee** (the caller), pointing at the API via a `ref`, exactly as you would any other grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)):

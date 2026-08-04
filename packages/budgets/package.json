@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/budgets",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "Composable AWS Budgets builder with well-architected defaults and automatic SNS topic policies",
   "repository": {
     "type": "git",

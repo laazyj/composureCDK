@@ -1,8 +1,7 @@
 import { App, Aws } from "aws-cdk-lib";
-import { ApiDefinition } from "aws-cdk-lib/aws-apigateway";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
-import { combine, compose, ref } from "@composurecdk/core";
-import { createSpecRestApiBuilder } from "@composurecdk/apigateway";
+import { compose, ref } from "@composurecdk/core";
+import { createSpecRestApiBuilder, inlineSpecDefinition } from "@composurecdk/apigateway";
 import { createStackBuilder } from "@composurecdk/cloudformation";
 import { createServiceRoleBuilder, type RoleBuilderResult } from "@composurecdk/iam";
 import {
@@ -28,22 +27,6 @@ const GET_PET_HANDLER = `exports.handler = async (event) => ({
     source: "lambda",
   }),
 });`;
-
-/**
- * Substitutes the resources the specification names by placeholder with the
- * concrete ARNs of the components that now serve it, returning a new document.
- *
- * An ordinary function of its inputs — no CDK scope, no builder — which is why
- * the substitution lives here rather than inside the builder.
- */
-function withIntegration(spec: object, arns: Record<string, string>): object {
-  const substituted = Object.entries(arns).reduce(
-    (doc, [placeholder, arn]) => doc.split(placeholder).join(arn),
-    JSON.stringify(spec),
-  );
-
-  return JSON.parse(substituted) as object;
-}
 
 /**
  * An inline OpenAPI 3.0 specification for a PetStore API.
@@ -171,14 +154,14 @@ const petstoreSpec = {
  * This is the model-first shape: a document generated before the
  * infrastructure serving it exists, so its integration names the backend by
  * placeholder. Those ARNs are unknown while the builder is configured and
- * exist only once the siblings are built, so the definition is passed as a
- * `combine` that resolves after them — keeping the whole system in one
- * `compose` call.
+ * exist only once the siblings are built, so the definition is assembled by
+ * `inlineSpecDefinition`, which resolves them first — keeping the whole system
+ * in one `compose` call.
  *
  * Demonstrates:
  * - Defining a REST API from an OpenAPI specification using SpecRestApiBuilder
  * - A resolvable `apiDefinition`: the specification is completed at build time
- *   from sibling components, via `combine` (ADR-0015)
+ *   from sibling components, via `inlineSpecDefinition`
  * - An `aws_proxy` integration authorised by a credentials role, granted
  *   consumer-side with `functionGrants.invoke` (ADR-0013)
  * - Mock and Lambda-backed integrations side by side in one document
@@ -216,19 +199,10 @@ export function createOpenApiPetstoreApp(app = new App()) {
         .restApiName("PetStore")
         .description("A PetStore API defined by an OpenAPI specification")
         .apiDefinition(
-          combine(
-            {
-              getPet: ref<FunctionBuilderResult>("getPet"),
-              apiGatewayRole: ref<RoleBuilderResult>("apiGatewayRole"),
-            },
-            ({ getPet, apiGatewayRole }) =>
-              ApiDefinition.fromInline(
-                withIntegration(petstoreSpec, {
-                  [FUNCTION_ARN]: getPet.function.functionArn,
-                  [ROLE_ARN]: apiGatewayRole.role.roleArn,
-                }),
-              ),
-          ),
+          inlineSpecDefinition(petstoreSpec, {
+            [FUNCTION_ARN]: ref("getPet", (r: FunctionBuilderResult) => r.function.functionArn),
+            [ROLE_ARN]: ref("apiGatewayRole", (r: RoleBuilderResult) => r.role.roleArn),
+          }),
         ),
     },
     {

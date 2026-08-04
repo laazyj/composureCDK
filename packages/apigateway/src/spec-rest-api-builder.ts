@@ -32,6 +32,10 @@ export interface SpecRestApiBuilderProps
    * assumes to invoke it) stays inside `compose`: the values are unknown when
    * the builder is configured and only exist after the siblings are built.
    *
+   * For the common case — an inline document whose placeholders stand for
+   * sibling resources — {@link inlineSpecDefinition} assembles the whole thing
+   * in one call.
+   *
    * @example
    * ```ts
    * // Concrete — the spec needs nothing from its siblings
@@ -40,7 +44,9 @@ export interface SpecRestApiBuilderProps
    * // Resolvable — the spec is finished once the handler exists
    * .apiDefinition(
    *   ref("handler", (r: FunctionBuilderResult) =>
-   *     ApiDefinition.fromInline(withIntegration(spec, r.function.functionArn))),
+   *     ApiDefinition.fromInline(substituteSpec(spec, {
+   *       "${Handler.Arn}": r.function.functionArn,
+   *     }))),
    * )
    * ```
    */

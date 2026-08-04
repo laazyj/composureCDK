@@ -61,19 +61,32 @@
     "@composurecdk/eslint-plugin": "*",
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
     "@eslint/js": "^10.0.1",
-    "@nx/eslint-plugin": "23.1.0",
-    "@nx/js": "23.1.0",
+    "@nx/eslint-plugin": "23.1.1",
+    "@nx/js": "23.1.1",
     "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^10.4.1",
     "eslint-config-prettier": "^10.1.8",
     "github-actionlint": "1.7.12",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.7",
-    "nx": "23.1.0",
+    "nx": "23.1.1",
     "prettier": "^3.9.0",
     "publint": "^0.3.21",
     "shellcheck": "4.1.0",
     "tshy": "^4.1.3",
     "typescript-eslint": "^8.61.0"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.9",
+    "adm-zip": "^0.6.0",
+    "@xhmikosr/decompress-tar": {
+      "file-type": "^21.3.4"
+    },
+    "@xhmikosr/decompress-unzip": {
+      "file-type": "^21.3.4"
+    },
+    "@felipecrs/decompress-tarxz": {
+      "file-type": "^21.3.4"
+    }
   }
 }

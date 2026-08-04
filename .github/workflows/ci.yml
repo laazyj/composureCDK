@@ -130,7 +130,7 @@ jobs:
       # vitest.config.base, so the table is a by-product of the Test step.
       #
       # The sticky PR comment is posted by coverage-comment.yml, not here: this
-      # workflow is workflow_call-able from release.yml, and a job requesting
+      # workflow is workflow_call-able from deploy-test.yml, and a job requesting
       # `pull-requests: write` fails validation under that caller's narrower
       # permission ceiling — even when the posting step could never run.
       #

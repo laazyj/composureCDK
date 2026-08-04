@@ -1,6 +1,16 @@
 name: Deploy Test
 
 on:
+  # The release gate. A release branch is the only ref holding exactly what
+  # ships — version bumps and CHANGELOG.md included — so it is the only ref
+  # worth deploying: `main`'s HEAD is a different tree, and tag time is too
+  # late to gate anything. The result lands as a check on the release PR.
+  #
+  # Fires because release-prepare.yml pushes the branch authenticated with
+  # RELEASE_PR_TOKEN; a push made with the default GITHUB_TOKEN would not
+  # trigger it. See docs/ci.md#release_pr_token-required.
+  push:
+    branches: ["release/**"]
   workflow_dispatch:
     inputs:
       environment:
@@ -51,7 +61,10 @@ jobs:
     # Neptune DB instance provisioning alone is a >15 min long pole; 30 min
     # left too little slack for a clean deploy of the full example fleet.
     timeout-minutes: 45
-    environment: ${{ inputs.environment }}
+    # Same fallback as the concurrency group above: a `push` event carries no
+    # inputs, and losing the environment binding would silently drop the AWS
+    # role and region vars with it.
+    environment: ${{ inputs.environment || 'sandbox' }}
 
     steps:
       - name: Checkout
@@ -109,7 +122,6 @@ jobs:
         run: node ../../scripts/smoke-test.mjs
 
       # Destroy runs in a separate sandbox-cleanup workflow (triggered by
-      # workflow_run on this workflow and on release-tag.yml, which calls it,
-      # plus a nightly cron safety net). Keeping
+      # workflow_run on this workflow, plus a nightly cron safety net). Keeping
       # destroy off the critical path lets developer feedback land in ~10 min
       # instead of waiting for CloudFront propagation during teardown.

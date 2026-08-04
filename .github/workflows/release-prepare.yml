@@ -117,10 +117,11 @@ jobs:
           ## Merge checklist
 
           - [ ] CI is green
+          - [ ] **Deploy Test** is green — it deploys this branch's examples to the sandbox and smoke-tests them
           - [ ] Changelog reads correctly
           - [ ] Version bumps match expectations
 
-          On merge, the \`release-tag\` workflow will deploy-test the examples and, if that passes, push tag \`v${VERSION}\` — which triggers \`release.yml\` (GitHub Release → npm publish).
+          On merge, the \`release-tag\` workflow pushes tag \`v${VERSION}\`, which triggers \`release.yml\` (GitHub Release → npm publish). Neither re-runs the deploy — merging this PR is the release decision.
           EOF
           )
 

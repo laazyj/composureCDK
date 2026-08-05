@@ -339,6 +339,22 @@ in an `SqsDlq` for you, resolving it alongside the table `ref` via `combine`:
 )
 ```
 
+A queue is the common case, not the only one: `onFailure` accepts any
+`IEventSourceDlq` — concrete or behind a `ref()` — and passes it through
+unwrapped. An S3 failure destination, which captures the whole failed batch
+rather than just the record metadata a DLQ message carries, wires up the same
+way:
+
+```ts
+.addEventSource(
+  "orders",
+  dynamoEventSource(ref("orders", (r) => r.table), {
+    retryAttempts: 3,
+    onFailure: ref("failures", (r) => new S3OnFailureDestination(r.bucket)),
+  }),
+)
+```
+
 If retries or record-age are bounded but no `onFailure` destination is set, a
 suppressible synth-time warning (`STREAM_DLQ_WARNING_ID`) fires. Silence it —
 when dropping is intended — with

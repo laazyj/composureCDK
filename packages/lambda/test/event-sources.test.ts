@@ -3,7 +3,13 @@ import { Annotations as CdkAnnotations, App, CfnParameter, Duration, Stack } fro
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { AttributeType, type ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Code, type IEventSource, Runtime, StartingPosition } from "aws-cdk-lib/aws-lambda";
-import { DynamoEventSource, SqsDlq, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import {
+  DynamoEventSource,
+  S3OnFailureDestination,
+  SqsDlq,
+  SqsEventSource,
+} from "aws-cdk-lib/aws-lambda-event-sources";
+import { Bucket, type IBucket } from "aws-cdk-lib/aws-s3";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { isRef, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
@@ -649,6 +655,44 @@ describe("dynamoEventSource onFailure DLQ", () => {
 
     Template.fromStack(stack).hasResourceProperties("AWS::Lambda::EventSourceMapping", {
       DestinationConfig: { OnFailure: { Destination: Match.anyValue() } },
+    });
+  });
+
+  it("resolves a Ref to a non-queue destination (an S3 bucket) without wrapping it", () => {
+    const stack = new Stack(new App(), "S");
+    const bucket = new Bucket(stack, "FailureBucket");
+
+    baseBuilder()
+      .addEventSource(
+        "orders",
+        dynamoEventSource(streamTable(stack), {
+          retryAttempts: 3,
+          onFailure: ref(
+            "failureBucket",
+            (r: { bucket: IBucket }) => new S3OnFailureDestination(r.bucket),
+          ),
+        }),
+      )
+      .build(stack, "Fn", { failureBucket: { bucket } });
+
+    const template = Template.fromStack(stack);
+    // The bucket's own ARN, not an SqsDlq wrapper's queue ARN.
+    template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      MaximumRetryAttempts: 3,
+      DestinationConfig: {
+        OnFailure: {
+          Destination: { "Fn::GetAtt": [Match.stringLikeRegexp("FailureBucket"), "Arn"] },
+        },
+      },
+    });
+    // `S3OnFailureDestination.bind` grants the execution role write access, so
+    // the grant proves the destination was bound rather than merely rendered.
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: Match.arrayWith(["s3:PutObject"]) }),
+        ]),
+      },
     });
   });
 

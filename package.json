@@ -78,6 +78,7 @@
   },
   "overrides": {
     "brace-expansion": "^5.0.9",
+    "decompress": "npm:@xhmikosr/decompress@^11.1.4",
     "adm-zip": "^0.6.0",
     "@xhmikosr/decompress-tar": {
       "file-type": "^21.3.4"

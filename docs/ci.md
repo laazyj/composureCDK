@@ -66,11 +66,14 @@ Notes:
 
 Workflow files are the case that most needs a local gate, because CI is least able to check them: a `workflow_run` listener always dispatches the _default-branch_ copy, and an edit to a trigger is not exercised until it next fires. `actionlint` is often the only pre-merge signal a workflow change gets.
 
-Three things make this reliable rather than decorative:
+Four things make this reliable rather than decorative:
 
-- **Both binaries are pinned devDependencies** — `github-actionlint` (which fetches the official actionlint release binary) and `shellcheck`. [`scripts/actionlint.mjs`](../scripts/actionlint.mjs) resolves each from its installed package rather than from `PATH`, so a stray Homebrew copy cannot change the result between a laptop and a runner.
+- **actionlint is a pinned devDependency** — `github-actionlint`, which fetches the official release binary for the version it is named after. [`scripts/actionlint.mjs`](../scripts/actionlint.mjs) resolves it from the installed package rather than from `PATH`.
 - **A missing shellcheck fails the run.** actionlint treats shellcheck as optional: it shells out only if it finds it and reports a clean run when it does not — and it does the same for an explicit `-shellcheck=` path that resolves to nothing. Both exit `0` with no output. That matters more than it sounds, because _every finding this repo has ever had came from shellcheck rather than actionlint's own checks_, so a missing shellcheck does not weaken the gate, it empties it. The script therefore probes shellcheck first and refuses to lint until it has proven it runs.
 - **The CI step cannot silently vanish.** It runs on one matrix leg, selected as `fromJSON(...)[0]` rather than a literal `== 24`. The first entry always exists, so the gate follows the matrix; pinning it to a version number would drop the check the moment that version rotated out — the same silent-skip class the script guards against internally.
+- **A missing shellcheck is a red build, not a skipped one.** CI relies on the GitHub-hosted `ubuntu-latest` image shipping shellcheck; nothing installs it. If that image ever drops it, the probe above exits non-zero and **Lint workflows** fails on every PR with the install hint — loudly, which is the point. That is why there is no `apt-get` step buying a network dependency to pre-empt a failure that already describes itself.
+
+shellcheck comes from `PATH` rather than npm because the packages that vendored its binary cost ~97 transitive dependencies — including the abandoned `decompress`, which has no fixed release for [GHSA-mp2f-45pm-3cg9](https://github.com/advisories/GHSA-mp2f-45pm-3cg9) — and pinned nothing in return: they resolved the _latest_ shellcheck at install time, so two clones a month apart already disagreed. The script enforces a **minimum of 0.9.0** instead, and names the version it found when it rejects one. Contributors need `shellcheck >= 0.9` on `PATH`; note that Debian bullseye and Ubuntu 20.04 still package 0.7.x.
 
 The whole run takes ~300ms, so it is simply always run rather than cached or path-filtered: nx's own overhead on a cache _hit_ exceeds the cost of doing the work, and a path filter is one more thing to drift. It is a plain `node scripts/*.mjs` npm script like `catalogue:check` and `cdk-floors:check`.
 

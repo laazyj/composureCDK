@@ -53,7 +53,11 @@ PR.
 
 ## Development setup
 
-Prerequisites: **Node.js >= 20** and npm.
+Prerequisites: **Node.js >= 20**, npm, and **shellcheck >= 0.9** on your `PATH`
+(`brew install shellcheck`, `sudo apt-get install shellcheck`). `npm run verify`
+lints the workflows unconditionally and the `pre-push` hook runs `verify`, so
+you need shellcheck to push whatever you changed — see
+[linting the workflows](docs/ci.md#linting-the-workflows).
 
 ```sh
 git clone https://github.com/laazyj/composureCDK.git

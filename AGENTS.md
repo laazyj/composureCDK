@@ -23,7 +23,7 @@ If you touched anything under `.github/workflows/`, also run:
 npm run actionlint
 ```
 
-`npm run lint` is eslint only and will not look at a workflow file. See [linting the workflows](docs/ci.md#linting-the-workflows) — it is a separate gate because a broken workflow is one of the few things CI cannot catch for you.
+`npm run lint` is eslint only and will not look at a workflow file. See [linting the workflows](docs/ci.md#linting-the-workflows) — it is a separate gate because a broken workflow is one of the few things CI cannot catch for you. It needs `shellcheck >= 0.9` on `PATH`, which containers often lack; install it rather than skipping the gate.
 
 ## Build system
 

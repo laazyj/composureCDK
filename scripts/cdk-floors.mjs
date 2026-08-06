@@ -159,6 +159,28 @@ function resolvedVersionFor(pkgName, dep = "aws-cdk-lib") {
 }
 
 /**
+ * Reinstalls node_modules from the restored manifest, returning whether it
+ * worked. `npm ci` first — it installs exactly the committed lockfile — with
+ * `npm install` as the fallback, because `npm ci` refuses a lockfile its own
+ * npm major would resolve differently. Ours is generated under npm 11, and
+ * npm 10 (what Node 20/22 ship) rejects it with `Missing: yaml@2.9.0 from lock
+ * file`; `ci.yml` sidesteps the same clash by pinning npm 11 before its
+ * install. Without the fallback, a restore on a Node 20/22 machine throws from
+ * `enforce`'s `finally` and leaves the tree pinned to the floor.
+ */
+function reinstall() {
+  for (const mode of ["ci", "install"]) {
+    try {
+      execFileSync("npm", [mode, "--no-audit", "--no-fund"], { cwd: REPO_ROOT, stdio: "inherit" });
+      return true;
+    } catch {
+      console.error(`  npm ${mode} failed`);
+    }
+  }
+  return false;
+}
+
+/**
  * For each target floor: temporarily force aws-cdk-lib to that floor via npm
  * `overrides` on a from-scratch install (overrides only bind on a clean tree),
  * assert a package in the group actually resolves the floor, then run that
@@ -167,7 +189,9 @@ function resolvedVersionFor(pkgName, dep = "aws-cdk-lib") {
  *
  * Mutates package.json / package-lock.json / node_modules. They are restored
  * on completion and on SIGINT/SIGTERM, so a local run never leaves a stray
- * `overrides` entry or a floor-pinned install behind.
+ * `overrides` entry or a floor-pinned install behind — and if the reinstall
+ * cannot restore node_modules, the run says so loudly rather than exiting as
+ * though it had.
  */
 function enforce() {
   const requested = process.env.CDK_FLOORS_FLOOR ?? process.argv[3];
@@ -220,6 +244,7 @@ function enforce() {
   process.on("SIGTERM", onSignal);
 
   let exitCode = 0;
+  let restored = true;
   try {
     for (const [floor, group] of targets) {
       console.log(`\n=== Enforcing aws-cdk-lib@${floor} for ${group.length} package(s) ===`);
@@ -278,22 +303,31 @@ function enforce() {
   } finally {
     restoreManifest();
     if (mutated && local) {
-      console.log("\nRestoring workspace (npm ci) …");
-      execFileSync("npm", ["ci", "--no-audit", "--no-fund"], { cwd: REPO_ROOT, stdio: "inherit" });
-      // A failed floor build leaves a `.tshy-build` dir behind, which would
-      // break the next `npm run lint`; clear tshy intermediates so the
-      // restored tree is clean.
+      // Before the reinstall, which is the step most likely to fail: a failed
+      // floor build leaves a `.tshy-build` dir behind, which would break the
+      // next `npm run lint`.
       for (const entry of readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
         rmSync(join(PACKAGES_DIR, entry.name, ".tshy"), { recursive: true, force: true });
         rmSync(join(PACKAGES_DIR, entry.name, ".tshy-build"), { recursive: true, force: true });
       }
+      console.log("\nRestoring workspace …");
+      restored = reinstall();
+      // `npm install` rewrites the lockfile it just resolved; put the committed
+      // one back so the restored tree is clean in git.
+      restoreManifest();
     }
   }
 
   if (exitCode === 0) {
     console.log(
       "\ncdk-floors enforce passed (every package's unit suite ran against its declared floor)",
+    );
+  }
+  if (!restored) {
+    console.error(
+      "\n⚠ node_modules is still pinned to a floor — neither `npm ci` nor `npm install` " +
+        "restored it. Fix the install and re-run one before trusting a local test run.",
     );
   }
   process.exit(exitCode);

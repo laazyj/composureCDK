@@ -630,16 +630,11 @@ describe("SQS visibility-timeout relationship guard", () => {
 
 /**
  * Whether the installed aws-cdk-lib accepts an S3 on-failure destination on a
- * **DynamoDB stream** mapping. CDK's `StreamEventSource.enrichMappingOptions`
- * rejects an `S3OnFailureDestination` unless the concrete source opts in via
- * `supportS3OnFailureDestination`, which `DynamoEventSource` only began passing
- * in aws-cdk-lib 2.184.0 — above this package's 2.168.0 floor, so `cdk-floors
- * enforce` runs this suite on versions that refuse it. (Kinesis opted in
- * earlier, which is why the class imports fine all the way down.)
- *
- * Probing by synthesis rather than comparing version strings follows the
- * graceful-degradation pattern in ADR-0008 — it stays correct without a table
- * of version numbers to maintain.
+ * DynamoDB stream mapping. CDK's `enrichMappingOptions` rejects one unless the
+ * source opts in via `supportS3OnFailureDestination`, which `DynamoEventSource`
+ * only passes from 2.184.0 — above this package's 2.168.0 floor, so `cdk-floors
+ * enforce` runs this suite on versions that refuse it. Probed by synthesis
+ * rather than by version string, per ADR-0008's graceful-degradation pattern.
  */
 function dynamoStreamsAcceptS3OnFailure(): boolean {
   const probe = new Stack(new App(), "S3OnFailureProbe");
@@ -718,11 +713,8 @@ describe("dynamoEventSource onFailure DLQ", () => {
     };
 
     if (!dynamoStreamsAcceptS3OnFailure()) {
-      // Below aws-cdk-lib 2.184.0 CDK itself refuses the combination. That the
-      // error is *this* one still proves this package's half: the `ref`
-      // resolved and the destination reached CDK as an S3OnFailureDestination
-      // — CDK's guard is an `instanceof` check, so a value wrongly wrapped in
-      // an SqsDlq could not have produced it.
+      // CDK's guard is an `instanceof`, so *this* error still proves the ref
+      // resolved and reached it unwrapped.
       expect(build).toThrow(/S3 onFailure Destination is not supported/);
       return;
     }

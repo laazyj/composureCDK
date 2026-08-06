@@ -2,7 +2,13 @@ import { describe, it, expect } from "vitest";
 import { Annotations as CdkAnnotations, App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { AttributeType, type ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
-import { Code, type IEventSource, Runtime, StartingPosition } from "aws-cdk-lib/aws-lambda";
+import {
+  Code,
+  Function as LambdaFunction,
+  type IEventSource,
+  Runtime,
+  StartingPosition,
+} from "aws-cdk-lib/aws-lambda";
 import {
   DynamoEventSource,
   S3OnFailureDestination,
@@ -622,6 +628,40 @@ describe("SQS visibility-timeout relationship guard", () => {
   });
 });
 
+/**
+ * Whether the installed aws-cdk-lib accepts an S3 on-failure destination on a
+ * **DynamoDB stream** mapping. CDK's `StreamEventSource.enrichMappingOptions`
+ * rejects an `S3OnFailureDestination` unless the concrete source opts in via
+ * `supportS3OnFailureDestination`, which `DynamoEventSource` only began passing
+ * in aws-cdk-lib 2.184.0 — above this package's 2.168.0 floor, so `cdk-floors
+ * enforce` runs this suite on versions that refuse it. (Kinesis opted in
+ * earlier, which is why the class imports fine all the way down.)
+ *
+ * Probing by synthesis rather than comparing version strings follows the
+ * graceful-degradation pattern in ADR-0008 — it stays correct without a table
+ * of version numbers to maintain.
+ */
+function dynamoStreamsAcceptS3OnFailure(): boolean {
+  const probe = new Stack(new App(), "S3OnFailureProbe");
+  const fn = new LambdaFunction(probe, "Probe", {
+    runtime: Runtime.NODEJS_22_X,
+    handler: "index.handler",
+    code: Code.fromInline("exports.handler = async () => {}"),
+  });
+
+  try {
+    fn.addEventSource(
+      new DynamoEventSource(streamTable(probe, "ProbeTable"), {
+        startingPosition: StartingPosition.LATEST,
+        onFailure: new S3OnFailureDestination(new Bucket(probe, "ProbeBucket")),
+      }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe("dynamoEventSource onFailure DLQ", () => {
   it("wraps a bare queue as an SqsDlq destination on the mapping", () => {
     const stack = new Stack(new App(), "S");
@@ -662,19 +702,32 @@ describe("dynamoEventSource onFailure DLQ", () => {
     const stack = new Stack(new App(), "S");
     const bucket = new Bucket(stack, "FailureBucket");
 
-    baseBuilder()
-      .addEventSource(
-        "orders",
-        dynamoEventSource(streamTable(stack), {
-          retryAttempts: 3,
-          onFailure: ref(
-            "failureBucket",
-            (r: { bucket: IBucket }) => new S3OnFailureDestination(r.bucket),
-          ),
-        }),
-      )
-      .build(stack, "Fn", { failureBucket: { bucket } });
+    const build = (): void => {
+      baseBuilder()
+        .addEventSource(
+          "orders",
+          dynamoEventSource(streamTable(stack), {
+            retryAttempts: 3,
+            onFailure: ref(
+              "failureBucket",
+              (r: { bucket: IBucket }) => new S3OnFailureDestination(r.bucket),
+            ),
+          }),
+        )
+        .build(stack, "Fn", { failureBucket: { bucket } });
+    };
 
+    if (!dynamoStreamsAcceptS3OnFailure()) {
+      // Below aws-cdk-lib 2.184.0 CDK itself refuses the combination. That the
+      // error is *this* one still proves this package's half: the `ref`
+      // resolved and the destination reached CDK as an S3OnFailureDestination
+      // — CDK's guard is an `instanceof` check, so a value wrongly wrapped in
+      // an SqsDlq could not have produced it.
+      expect(build).toThrow(/S3 onFailure Destination is not supported/);
+      return;
+    }
+
+    build();
     const template = Template.fromStack(stack);
     // The bucket's own ARN, not an SqsDlq wrapper's queue ARN.
     template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {

@@ -355,6 +355,13 @@ way:
 )
 ```
 
+An S3 destination on a **DynamoDB stream** mapping needs **aws-cdk-lib ≥ 2.184.0**,
+above this package's [floor](../../docs/adr/0008-aws-cdk-lib-version-floors.md) of
+2.168.0. `DynamoEventSource` only opts into S3 destinations from that release;
+below it CDK rejects the pairing at synth with `S3 onFailure Destination is not
+supported for this event source`. The limit is CDK's, not this package's — a
+queue destination works at the floor.
+
 If retries or record-age are bounded but no `onFailure` destination is set, a
 suppressible synth-time warning (`STREAM_DLQ_WARNING_ID`) fires. Silence it —
 when dropping is intended — with

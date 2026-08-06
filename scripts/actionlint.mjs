@@ -17,10 +17,12 @@
  *   actionlint                            # shellcheck not on PATH
  *   actionlint -shellcheck=/nonexistent   # explicit path resolving to nothing
  *
- * So this script refuses to lint until it has proven shellcheck runs, and
- * resolves both binaries from the installed packages rather than from PATH,
- * which would silently pick up an unpinned copy. A skipped check must fail,
- * not pass quietly.
+ * So this script refuses to lint until it has proven shellcheck runs, probing
+ * the same name actionlint will resolve from the same PATH. A skipped check
+ * must fail, not pass quietly.
+ *
+ * shellcheck is the one tool here that comes from PATH rather than npm;
+ * docs/ci.md#linting-the-workflows has the why.
  *
  * Any arguments are ignored: actionlint discovers every workflow itself, and a
  * workflow is not valid or invalid file-by-file. `lint-staged` therefore lints
@@ -31,66 +33,74 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+/**
+ * Chosen floor, not a verified one: old enough that every current distro and
+ * Homebrew clears it, new enough to reject the 0.7.x that Debian bullseye and
+ * Ubuntu 20.04 still ship. Raise it when a check we rely on needs it.
+ */
+const MINIMUM_SHELLCHECK = "0.9.0";
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
-
-/** Resolve a package's same-named `bin` entry to an absolute path. */
-function binOf(pkg) {
-  const manifestPath = require.resolve(`${pkg}/package.json`);
-  const relative = require(manifestPath).bin?.[pkg];
-  if (!relative) {
-    throw new Error(`${pkg} declares no "${pkg}" bin — has the package changed?`);
-  }
-  return resolve(dirname(manifestPath), relative);
-}
-
-function fail(...lines) {
-  for (const line of lines) console.error(line);
-  process.exit(1);
-}
 
 // spawnSync rather than the execFileSync used elsewhere in scripts/: a non-zero
 // exit is the expected outcome here and must be forwarded, not thrown.
 const spawn = (command, args, stdio = "inherit") =>
   spawnSync(command, args, { cwd: repoRoot, stdio, encoding: "utf8" });
 
-const shellcheckWrapper = binOf("shellcheck");
-const shellcheckBin = resolve(dirname(shellcheckWrapper), "shellcheck");
-
-// The wrapper downloads the native binary on demand, but loading its download
-// machinery costs ~100ms, so it is invoked only when there is nothing to run.
-if (!existsSync(shellcheckBin)) {
-  const download = spawn(process.execPath, [shellcheckWrapper, "--version"], "pipe");
-  if (download.status !== 0 || !existsSync(shellcheckBin)) {
-    fail(
-      "actionlint: shellcheck is pinned as a devDependency but could not be installed.",
-      (download.stderr || download.stdout || "").trim(),
-      "Run `npm ci` and retry; if the download is blocked, fix network access rather than",
-      "skipping the check — without shellcheck, actionlint reports a clean run regardless",
-      "of what the workflows contain.",
-    );
-  }
+function fail(...lines) {
+  for (const line of lines) console.error(line);
+  process.exit(1);
 }
 
-// Prove it actually executes. A path that resolves to nothing, or a binary that
-// will not run, would otherwise make actionlint silently skip every shell check.
-const probe = spawn(shellcheckBin, ["--version"], "pipe");
+/** SemVer compare (assumes plain `MAJOR.MINOR.PATCH`, no pre-release tags). */
+function compareSemver(a, b) {
+  const [a0, a1, a2] = a.split(".").map(Number);
+  const [b0, b1, b2] = b.split(".").map(Number);
+  return a0 - b0 || a1 - b1 || a2 - b2;
+}
+
+const INSTALL_HINT = [
+  "  macOS          brew install shellcheck",
+  "  Debian/Ubuntu  sudo apt-get install shellcheck",
+  "  other          https://github.com/koalaman/shellcheck#installing",
+  "Do not skip the check instead — without shellcheck, actionlint reports a clean run",
+  "regardless of what the workflows contain.",
+];
+
+// Resolving shellcheck and proving it runs are the same step: `--version` fails
+// the same way for a missing binary, an unexecutable one, and a wrong-arch one.
+const probe = spawn("shellcheck", ["--version"], "pipe");
 if (probe.status !== 0) {
   fail(
-    `actionlint: shellcheck will not run (${probe.error?.message ?? `exit ${probe.status}`}).`,
-    (probe.stderr || probe.stdout || "").trim(),
-    "Reinstall with `npm ci`. Do not fall back to a PATH lookup, which silently finds an",
-    "unpinned copy, or nothing at all.",
+    `actionlint: shellcheck is required but will not run (${probe.error?.message ?? `exit ${probe.status}`}).`,
+    "Install it and retry:",
+    ...INSTALL_HINT,
   );
 }
 
-const result = spawn(process.execPath, [
-  binOf("github-actionlint"),
-  `-shellcheck=${shellcheckBin}`,
-]);
-process.exit(result.status ?? 1);
+// "version: 0.11.0" — absent only if the output format changed under us, which
+// is worth failing on rather than guessing a version we cannot read.
+const version = /^version: (\d+\.\d+\.\d+)/m.exec(probe.stdout)?.[1];
+if (!version) {
+  fail("actionlint: could not read a version from `shellcheck --version`.", probe.stdout.trim());
+}
+if (compareSemver(version, MINIMUM_SHELLCHECK) < 0) {
+  fail(
+    `actionlint: shellcheck ${version} is older than the required ${MINIMUM_SHELLCHECK}.`,
+    "Upgrade it and retry:",
+    ...INSTALL_HINT,
+  );
+}
+
+const manifest = require.resolve("github-actionlint/package.json");
+const actionlint = resolve(dirname(manifest), require(manifest).bin["github-actionlint"]);
+
+// Passing -shellcheck is not redundant with actionlint's default: were that
+// default ever to change, the probe above would still pass and the gate would
+// go hollow — the exact failure this script exists to prevent.
+process.exit(spawn(process.execPath, [actionlint, "-shellcheck=shellcheck"]).status ?? 1);

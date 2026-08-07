@@ -2,8 +2,20 @@ import { describe, it, expect } from "vitest";
 import { Annotations as CdkAnnotations, App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { AttributeType, type ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
-import { Code, type IEventSource, Runtime, StartingPosition } from "aws-cdk-lib/aws-lambda";
-import { DynamoEventSource, SqsDlq, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import {
+  Code,
+  Function as LambdaFunction,
+  type IEventSource,
+  Runtime,
+  StartingPosition,
+} from "aws-cdk-lib/aws-lambda";
+import {
+  DynamoEventSource,
+  S3OnFailureDestination,
+  SqsDlq,
+  SqsEventSource,
+} from "aws-cdk-lib/aws-lambda-event-sources";
+import { Bucket, type IBucket } from "aws-cdk-lib/aws-s3";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { isRef, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
@@ -616,6 +628,35 @@ describe("SQS visibility-timeout relationship guard", () => {
   });
 });
 
+/**
+ * Whether the installed aws-cdk-lib accepts an S3 on-failure destination on a
+ * DynamoDB stream mapping. CDK's `enrichMappingOptions` rejects one unless the
+ * source opts in via `supportS3OnFailureDestination`, which `DynamoEventSource`
+ * only passes from 2.184.0 — above this package's 2.168.0 floor, so `cdk-floors
+ * enforce` runs this suite on versions that refuse it. Probed by synthesis
+ * rather than by version string, per ADR-0008's graceful-degradation pattern.
+ */
+function dynamoStreamsAcceptS3OnFailure(): boolean {
+  const probe = new Stack(new App(), "S3OnFailureProbe");
+  const fn = new LambdaFunction(probe, "Probe", {
+    runtime: Runtime.NODEJS_22_X,
+    handler: "index.handler",
+    code: Code.fromInline("exports.handler = async () => {}"),
+  });
+
+  try {
+    fn.addEventSource(
+      new DynamoEventSource(streamTable(probe, "ProbeTable"), {
+        startingPosition: StartingPosition.LATEST,
+        onFailure: new S3OnFailureDestination(new Bucket(probe, "ProbeBucket")),
+      }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe("dynamoEventSource onFailure DLQ", () => {
   it("wraps a bare queue as an SqsDlq destination on the mapping", () => {
     const stack = new Stack(new App(), "S");
@@ -649,6 +690,54 @@ describe("dynamoEventSource onFailure DLQ", () => {
 
     Template.fromStack(stack).hasResourceProperties("AWS::Lambda::EventSourceMapping", {
       DestinationConfig: { OnFailure: { Destination: Match.anyValue() } },
+    });
+  });
+
+  it("resolves a Ref to a non-queue destination (an S3 bucket) without wrapping it", () => {
+    const stack = new Stack(new App(), "S");
+    const bucket = new Bucket(stack, "FailureBucket");
+
+    const build = (): void => {
+      baseBuilder()
+        .addEventSource(
+          "orders",
+          dynamoEventSource(streamTable(stack), {
+            retryAttempts: 3,
+            onFailure: ref(
+              "failureBucket",
+              (r: { bucket: IBucket }) => new S3OnFailureDestination(r.bucket),
+            ),
+          }),
+        )
+        .build(stack, "Fn", { failureBucket: { bucket } });
+    };
+
+    if (!dynamoStreamsAcceptS3OnFailure()) {
+      // CDK's guard is an `instanceof`, so *this* error still proves the ref
+      // resolved and reached it unwrapped.
+      expect(build).toThrow(/S3 onFailure Destination is not supported/);
+      return;
+    }
+
+    build();
+    const template = Template.fromStack(stack);
+    // The bucket's own ARN, not an SqsDlq wrapper's queue ARN.
+    template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      MaximumRetryAttempts: 3,
+      DestinationConfig: {
+        OnFailure: {
+          Destination: { "Fn::GetAtt": [Match.stringLikeRegexp("FailureBucket"), "Arn"] },
+        },
+      },
+    });
+    // `S3OnFailureDestination.bind` grants the execution role write access, so
+    // the grant proves the destination was bound rather than merely rendered.
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: Match.arrayWith(["s3:PutObject"]) }),
+        ]),
+      },
     });
   });
 

@@ -339,6 +339,29 @@ in an `SqsDlq` for you, resolving it alongside the table `ref` via `combine`:
 )
 ```
 
+A queue is the common case, not the only one: `onFailure` accepts any
+`IEventSourceDlq` — concrete or behind a `ref()` — and passes it through
+unwrapped. An S3 failure destination, which captures the whole failed batch
+rather than just the record metadata a DLQ message carries, wires up the same
+way:
+
+```ts
+.addEventSource(
+  "orders",
+  dynamoEventSource(ref("orders", (r) => r.table), {
+    retryAttempts: 3,
+    onFailure: ref("failures", (r) => new S3OnFailureDestination(r.bucket)),
+  }),
+)
+```
+
+An S3 destination on a **DynamoDB stream** mapping needs **aws-cdk-lib ≥ 2.184.0**,
+above this package's [floor](../../docs/adr/0008-aws-cdk-lib-version-floors.md) of
+2.168.0. `DynamoEventSource` only opts into S3 destinations from that release;
+below it CDK rejects the pairing at synth with `S3 onFailure Destination is not
+supported for this event source`. The limit is CDK's, not this package's — a
+queue destination works at the floor.
+
 If retries or record-age are bounded but no `onFailure` destination is set, a
 suppressible synth-time warning (`STREAM_DLQ_WARNING_ID`) fires. Silence it —
 when dropping is intended — with

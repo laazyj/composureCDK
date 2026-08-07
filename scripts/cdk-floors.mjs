@@ -159,14 +159,9 @@ function resolvedVersionFor(pkgName, dep = "aws-cdk-lib") {
 }
 
 /**
- * Reinstalls node_modules from the restored manifest, returning whether it
- * worked. `npm ci` first — it installs exactly the committed lockfile — with
- * `npm install` as the fallback, because `npm ci` refuses a lockfile its own
- * npm major would resolve differently. Ours is generated under npm 11, and
- * npm 10 (what Node 20/22 ship) rejects it with `Missing: yaml@2.9.0 from lock
- * file`; `ci.yml` sidesteps the same clash by pinning npm 11 before its
- * install. Without the fallback, a restore on a Node 20/22 machine throws from
- * `enforce`'s `finally` and leaves the tree pinned to the floor.
+ * Reinstalls node_modules after a floor run, returning whether it worked.
+ * `npm ci` first (exact lockfile), falling back to `npm install`: npm 10
+ * rejects our npm 11-generated lockfile, the clash `ci.yml` avoids by pinning.
  */
 function reinstall() {
   for (const mode of ["ci", "install"]) {
@@ -181,17 +176,12 @@ function reinstall() {
 }
 
 /**
- * For each target floor: temporarily force aws-cdk-lib to that floor via npm
- * `overrides` on a from-scratch install (overrides only bind on a clean tree),
- * assert a package in the group actually resolves the floor, then run that
- * group's unit suite. With no arg, runs every floor; with a floor arg or
- * `CDK_FLOORS_FLOOR`, just that one (a CI matrix shard).
- *
- * Mutates package.json / package-lock.json / node_modules. They are restored
- * on completion and on SIGINT/SIGTERM, so a local run never leaves a stray
- * `overrides` entry or a floor-pinned install behind — and if the reinstall
- * cannot restore node_modules, the run says so loudly rather than exiting as
- * though it had.
+ * For each target floor: pin aws-cdk-lib to it via a temporary npm `overrides`
+ * on a from-scratch install (they only bind on a clean tree), assert the pin
+ * bound, then run that floor group's unit suite. No arg runs every floor; a
+ * floor arg or `CDK_FLOORS_FLOOR` runs one (a CI matrix shard). Mutates
+ * package.json / package-lock.json / node_modules, restoring them on
+ * completion and on SIGINT/SIGTERM — and saying so loudly if it cannot.
  */
 function enforce() {
   const requested = process.env.CDK_FLOORS_FLOOR ?? process.argv[3];
@@ -303,9 +293,7 @@ function enforce() {
   } finally {
     restoreManifest();
     if (mutated && local) {
-      // Before the reinstall, which is the step most likely to fail: a failed
-      // floor build leaves a `.tshy-build` dir behind, which would break the
-      // next `npm run lint`.
+      // Before the reinstall, which can fail: stale tshy dirs break the next lint.
       for (const entry of readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
         rmSync(join(PACKAGES_DIR, entry.name, ".tshy"), { recursive: true, force: true });
@@ -313,9 +301,7 @@ function enforce() {
       }
       console.log("\nRestoring workspace …");
       restored = reinstall();
-      // `npm install` rewrites the lockfile it just resolved; put the committed
-      // one back so the restored tree is clean in git.
-      restoreManifest();
+      restoreManifest(); // `npm install` rewrites the lockfile; put the committed one back.
     }
   }
 

@@ -6,6 +6,7 @@ import {
   type IEventSource,
 } from "aws-cdk-lib/aws-lambda";
 import type { ILogGroup, LogGroup } from "aws-cdk-lib/aws-logs";
+import type { Trigger } from "aws-cdk-lib/triggers";
 import { type IConstruct } from "constructs";
 import {
   COPY_STATE,
@@ -33,6 +34,7 @@ import {
   isComposureEventSource,
 } from "./event-sources/composure-event-source.js";
 import { EVENT_SOURCE_RELATIONSHIP_GUARDS } from "./event-sources/event-source-relationship-guards.js";
+import { createDeploymentInvocation, type InvokeOnDeployOptions } from "./deployment-invocation.js";
 
 const LOGS_WRITER_POLICY_NAME = "LogsWriter";
 
@@ -142,6 +144,16 @@ export interface FunctionBuilderResult {
    * Always present — `{}` when no event sources were added.
    */
   eventSources: Record<string, IEventSource>;
+
+  /**
+   * The custom resource that invokes the function during deployment, or
+   * `undefined` unless {@link IFunctionBuilder.invokeOnDeploy} was called.
+   *
+   * Exposed so a sibling can be ordered against the invocation — e.g.
+   * `deploymentTrigger.executeBefore(...)` to gate another resource on the
+   * call having succeeded.
+   */
+  deploymentTrigger?: Trigger;
 }
 
 /**
@@ -213,6 +225,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   readonly #grants = new GrantQueue<IGrantable>();
   #configureRole?: (rb: IRoleBuilder) => unknown;
   #useCdkAutoRole = false;
+  #invokeOnDeploy?: InvokeOnDeployOptions;
 
   addAlarm(
     key: string,
@@ -289,6 +302,45 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   }
 
   /**
+   * Invoke this function once during deployment, and **fail the deployment if
+   * it fails** — a domain action for work that must happen as part of shipping
+   * the stack, such as registering the release with an external service,
+   * verifying the deployed system answers correctly, or seeding reference data
+   * through a service API (ADR-0016).
+   *
+   * The deployment waits for the handler's response. If the handler throws or
+   * times out, the stack fails and rolls back, and the handler's error message
+   * reaches the CloudFormation stack events.
+   *
+   * **The handler must throw to fail the deployment.** Returning an error
+   * object — an HTTP-shaped `{ statusCode: 500 }`, or a caught error swallowed
+   * into the response — is a *successful* invocation as far as Lambda is
+   * concerned, and the deployment goes green.
+   *
+   * Ordering is data: the function's own execution role is always waited for,
+   * and anything else the call needs is declared with
+   * {@link InvokeOnDeployOptions.after}.
+   *
+   * Calling this more than once replaces the previous options. The resulting
+   * custom resource is exposed on
+   * {@link FunctionBuilderResult.deploymentTrigger}.
+   *
+   * @example
+   * ```ts
+   * createFunctionBuilder()
+   *   .runtime(Runtime.NODEJS_22_X)
+   *   .handler("index.handler")
+   *   .code(Code.fromAsset("register"))
+   *   .timeout(Duration.seconds(30))
+   *   .invokeOnDeploy({ after: [ref("api", (r: RestApiBuilderResult) => r.api)] });
+   * ```
+   */
+  invokeOnDeploy(options: InvokeOnDeployOptions = {}): this {
+    this.#invokeOnDeploy = options;
+    return this;
+  }
+
+  /**
    * Grant this function's execution role access to a resource built by a
    * sibling component.
    *
@@ -319,6 +371,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     this.#grants.copyInto(target.#grants);
     target.#configureRole = this.#configureRole;
     target.#useCdkAutoRole = this.#useCdkAutoRole;
+    target.#invokeOnDeploy = this.#invokeOnDeploy;
   }
 
   build(
@@ -417,7 +470,13 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       throw new Error(`FunctionBuilder "${id}": Lambda function has no execution role.`);
     }
 
-    return { function: fn, role: resolvedRole, logGroup, alarms, eventSources };
+    // Built last so the invocation is ordered after everything the builder
+    // attached to the function — grants included.
+    const deploymentTrigger = this.#invokeOnDeploy
+      ? createDeploymentInvocation(scope, id, fn, resolvedRole, this.#invokeOnDeploy, context)
+      : undefined;
+
+    return { function: fn, role: resolvedRole, logGroup, alarms, eventSources, deploymentTrigger };
   }
 
   #buildDefaultRole(

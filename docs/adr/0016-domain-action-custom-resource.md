@@ -1,6 +1,6 @@
 # ADR 0016: Encapsulate SDK-only operations as domain actions on the owning builder
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-12
 
 ## Context
@@ -26,5 +26,6 @@ The first application is `@composurecdk/ses` `.activate()`: a receipt rule set i
 
 - SDK-only operations a domain builder owns are expressed as domain actions, not consumer-assembled plumbing — encapsulated, in-domain, IAM-scoped, and surfaced on the build result.
 - The stateless-vs-stateful backing is implementation guidance, not part of the core decision: the same `.activate()` encapsulation would hold even if activation used an unconditional stateless `AwsCustomResource`.
-- **Proposed** until a second SDK-only operation is encapsulated this way. The second instance prices whether to extract shared scaffolding — a `domainActionProvider(scope, id, { handler, actions })` for the stateful case, and/or handler-serialisation helpers — rather than each builder rolling its own.
+- **Accepted.** The second instance is `@composurecdk/lambda` `.invokeOnDeploy()` (invoke this function during deployment, and fail the deployment if it fails — an operation with no CloudFormation resource, owned by the builder that owns the Lambda domain). It settles the pricing question the **Proposed** status was held open for: **no shared scaffolding is extracted yet.** Both instances so far need a different backing, and neither reuses the other's plumbing — so `domainActionProvider(...)` and handler-serialisation helpers stay unbuilt until two actions actually want the same one.
+- The backing categories are **three**, not two: alongside the stateless single call (case 1) and the bespoke `Provider` (case 2) sits **case 3 — an upstream `aws-cdk-lib` construct that already implements the operation** (here `triggers.Trigger`, which invokes synchronously and reports `FAILED` on a handler error). Prefer it when one exists: it is the least code and the semantics are maintained upstream. The domain action's job is then to express the operation in domain language, apply the defaults, and wire the ordering the raw construct leaves to the consumer.
 - Consumers running multiple instances of an account-global operation (e.g. several SES rule sets across stacks) must understand the shared-state arbitration; document it on the builder, and keep `createAwsCustomResourceBuilder` as the escape hatch for bespoke behaviour.

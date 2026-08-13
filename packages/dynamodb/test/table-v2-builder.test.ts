@@ -11,6 +11,7 @@ import {
   TableEncryptionV2,
 } from "aws-cdk-lib/aws-dynamodb";
 import { Key } from "aws-cdk-lib/aws-kms";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createTableV2Builder } from "../src/table-v2-builder.js";
 
@@ -156,6 +157,26 @@ describe("TableV2Builder", () => {
 
       const template = Template.fromStack(stack);
       template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
+        SSESpecification: { SSEEnabled: true, SSEType: "KMS" },
+      });
+    });
+
+    it("resolves a Resolvable encryption from the build context", () => {
+      const stack = new Stack(new App(), "TestStack", {
+        env: { account: "123456789012", region: "us-east-1" },
+      });
+      const key = new Key(stack, "Key");
+
+      createTableV2Builder()
+        .partitionKey(PK)
+        .encryption(
+          ref<{ key: Key }, TableEncryptionV2>("tableKey", (r) =>
+            TableEncryptionV2.customerManagedKey(r.key),
+          ),
+        )
+        .build(stack, "TestTable", { tableKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::DynamoDB::GlobalTable", {
         SSESpecification: { SSEEnabled: true, SSEType: "KMS" },
       });
     });

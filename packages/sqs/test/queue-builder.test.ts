@@ -4,6 +4,7 @@ import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type IQueue, Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
 import { Key } from "aws-cdk-lib/aws-kms";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createQueueBuilder } from "../src/queue-builder.js";
 import { setUntypedProp } from "./_helpers.js";
@@ -106,6 +107,31 @@ describe("QueueBuilder", () => {
       const template = Template.fromStack(stack);
       template.hasResourceProperties("AWS::SQS::Queue", {
         KmsMasterKeyId: Match.anyValue(),
+      });
+    });
+
+    it("infers SSE-KMS from a supplied master key", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      createQueueBuilder().encryptionMasterKey(key).build(stack, "TestQueue");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SQS::Queue", {
+        KmsMasterKeyId: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
+        SqsManagedSseEnabled: Match.absent(),
+      });
+    });
+
+    it("resolves a Resolvable master key from the build context", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      createQueueBuilder()
+        .encryptionMasterKey(ref<{ key: Key }, Key>("queueKey", (r) => r.key))
+        .build(stack, "TestQueue", { queueKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SQS::Queue", {
+        KmsMasterKeyId: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
       });
     });
   });

@@ -111,8 +111,24 @@ Every role applies the following defaults. Each can be overridden via the builde
 | Property                 | Default                       | Rationale                                                                                                                                                                                                                                                             |
 | ------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `enforceSSL`             | `true`                        | Denies any request that doesn't use TLS (resource policy `Deny` on `aws:SecureTransport: false`). Mirrors the SNS topic default. ([SNS/SQS security best practices](https://docs.aws.amazon.com/AmazonSQS/latest/SQSDeveloperGuide/sqs-security-best-practices.html)) |
-| `encryption`             | `QueueEncryption.SQS_MANAGED` | Encrypts at rest with the SQS-managed key (SSE-SQS). KMS encryption is opt-in via `.encryption(QueueEncryption.KMS)` + `.encryptionMasterKey(key)`. ([SQS data protection](https://docs.aws.amazon.com/AmazonSQS/latest/SQSDeveloperGuide/sqs-data-protection.html))  |
+| `encryption`             | `QueueEncryption.SQS_MANAGED` | Encrypts at rest with the SQS-managed key (SSE-SQS). Yields to SSE-KMS when `.encryptionMasterKey(key)` is set — see below. ([SQS data protection](https://docs.aws.amazon.com/AmazonSQS/latest/SQSDeveloperGuide/sqs-data-protection.html))                          |
 | `receiveMessageWaitTime` | `Duration.seconds(20)`        | Enables [long polling](https://docs.aws.amazon.com/AmazonSQS/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html#sqs-long-polling) — fewer empty receives, lower cost, lower latency. 20s is the SQS maximum.                                                    |
+
+### Customer-managed encryption keys
+
+`.encryptionMasterKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+
+```ts
+compose(
+  {
+    queueKey: createKeyBuilder().description("Encrypts the orders queue at rest."),
+    orders: createQueueBuilder().encryptionMasterKey(ref<KeyBuilderResult>("queueKey").get("key")),
+  },
+  { queueKey: [], orders: ["queueKey"] },
+);
+```
+
+Supplying a key switches `encryption` from the `SQS_MANAGED` default to `QueueEncryption.KMS` — the two are mutually exclusive, so the default yields rather than making you set both ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)).
 
 `visibilityTimeout` is intentionally not defaulted — it must match the longest consumer processing time, which is workload-specific. `retentionPeriod` is left at CDK's default of 4 days on the primary roles (the dead-letter roles raise it to 14 days, see above).
 

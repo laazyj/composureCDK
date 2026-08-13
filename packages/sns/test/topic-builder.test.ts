@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
 import { type ITopic } from "aws-cdk-lib/aws-sns";
 import { Queue } from "aws-cdk-lib/aws-sqs";
@@ -246,6 +247,38 @@ describe("TopicBuilder", () => {
           alarms: Object.keys(r.alarms).sort(),
           subscriptions: Object.keys(r.subscriptions).sort(),
         }),
+      });
+    });
+  });
+
+  describe("masterKey", () => {
+    it("leaves the topic unencrypted at rest when no key is supplied", () => {
+      const template = synthTemplate();
+
+      template.hasResourceProperties("AWS::SNS::Topic", { KmsMasterKeyId: Match.absent() });
+    });
+
+    it("passes a concrete key through to the topic", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      createTopicBuilder().masterKey(key).build(stack, "TestTopic");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SNS::Topic", {
+        KmsMasterKeyId: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
+      });
+    });
+
+    it("resolves a Resolvable key from the build context", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      createTopicBuilder()
+        .masterKey(ref<{ key: Key }, Key>("topicKey", (r) => r.key))
+        .build(stack, "TestTopic", { topicKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SNS::Topic", {
+        KmsMasterKeyId: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
       });
     });
   });

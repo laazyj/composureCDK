@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, RemovalPolicy, Stack, Tags } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBucketBuilder } from "../src/bucket-builder.js";
 
@@ -586,6 +588,56 @@ describe("BucketBuilder", () => {
         build: (b) => b.build(new Stack(new App(), "S"), "Bucket"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
+    });
+  });
+
+  describe("encryptionKey", () => {
+    /** The SSE-KMS rule a bucket encrypted with `Key` (logical id `Key961B73FD`) renders. */
+    const SSE_KMS_WITH_KEY = {
+      BucketEncryption: {
+        ServerSideEncryptionConfiguration: [
+          {
+            ServerSideEncryptionByDefault: {
+              SSEAlgorithm: "aws:kms",
+              KMSMasterKeyID: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
+            },
+          },
+        ],
+      },
+    };
+
+    it("infers SSE-KMS from a supplied key", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      createBucketBuilder().serverAccessLogs(false).encryptionKey(key).build(stack, "TestBucket");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::S3::Bucket", SSE_KMS_WITH_KEY);
+    });
+
+    it("resolves a Resolvable key from the build context", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      createBucketBuilder()
+        .serverAccessLogs(false)
+        .encryptionKey(ref<{ key: Key }, Key>("bucketKey", (r) => r.key))
+        .build(stack, "TestBucket", { bucketKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::S3::Bucket", SSE_KMS_WITH_KEY);
+    });
+
+    it("does not override an explicitly configured encryption mode, so CDK rejects a mismatch", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      expect(() =>
+        createBucketBuilder()
+          .serverAccessLogs(false)
+          .encryption(BucketEncryption.KMS_MANAGED)
+          .encryptionKey(key)
+          .build(stack, "TestBucket"),
+      ).toThrow(/encryptionKey is specified, so 'encryption' must be set to KMS/);
     });
   });
 });

@@ -1,4 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { type IKey } from "aws-cdk-lib/aws-kms";
 import {
   type ITopic,
   type ITopicSubscription,
@@ -20,7 +21,21 @@ import { applySubscriptionDefaults } from "./subscription-defaults.js";
  *
  * Extends the CDK {@link TopicProps} with additional builder-specific options.
  */
-export interface TopicBuilderProps extends TopicProps {
+export interface TopicBuilderProps extends Omit<TopicProps, "masterKey"> {
+  /**
+   * The customer-managed KMS key used for server-side encryption of messages
+   * at rest.
+   *
+   * Accepts a concrete {@link IKey} or a {@link Resolvable} — typically a
+   * {@link Ref} to a composed `@composurecdk/kms` key builder, so the key is a
+   * component of the system rather than a construct built outside it.
+   *
+   * SNS has no service-managed encryption option, so a topic is unencrypted at
+   * rest until a key is supplied. There is nothing for this to conflict with —
+   * it is the only encryption prop on a topic.
+   */
+  masterKey?: Resolvable<IKey>;
+
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
@@ -149,12 +164,13 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): TopicBuilderResult {
-    const { recommendedAlarms: alarmConfig, ...topicProps } = this.props;
+    const { recommendedAlarms: alarmConfig, masterKey, ...topicProps } = this.props;
 
-    const mergedProps = {
+    const mergedProps: TopicProps = {
       ...TOPIC_DEFAULTS,
       ...topicProps,
-    } as TopicBuilderProps;
+      ...(masterKey !== undefined ? { masterKey: resolve(masterKey, context) } : {}),
+    };
 
     const topic = new Topic(scope, id, mergedProps);
 

@@ -1,7 +1,12 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { type ITable, TableV2, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
+import {
+  type ITable,
+  TableV2,
+  type TableEncryptionV2,
+  type TablePropsV2,
+} from "aws-cdk-lib/aws-dynamodb";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TableAlarmConfig } from "./table-alarm-config.js";
@@ -13,7 +18,29 @@ import { TABLE_V2_DEFAULTS } from "./defaults.js";
  *
  * Extends the CDK {@link TablePropsV2} with additional builder-specific options.
  */
-export interface TableV2BuilderProps extends TablePropsV2 {
+export interface TableV2BuilderProps extends Omit<TablePropsV2, "encryption"> {
+  /**
+   * Server-side encryption for the table and its replicas.
+   *
+   * Accepts a concrete {@link TableEncryptionV2} or a {@link Resolvable} — so
+   * a customer-managed key produced by a composed `@composurecdk/kms` builder
+   * can be wired in with `ref()`:
+   *
+   * ```ts
+   * .encryption(ref("tableKey", (r: KeyBuilderResult) =>
+   *   TableEncryptionV2.customerManagedKey(r.key),
+   * ))
+   * ```
+   *
+   * The `Resolvable` sits on the whole {@link TableEncryptionV2} rather than on
+   * a narrower `encryptionKey` prop, so every encryption mode — including a
+   * customer-managed key with per-replica key ARNs — is expressed the one way
+   * CDK expresses it.
+   *
+   * @default TableEncryptionV2.awsManagedKey()
+   */
+  encryption?: Resolvable<TableEncryptionV2>;
+
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
@@ -113,14 +140,18 @@ class TableV2Builder implements Lifecycle<TableV2BuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string): TableV2BuilderResult {
-    const { recommendedAlarms: alarmConfig, ...tableProps } = this.props;
+  build(scope: IConstruct, id: string, context?: Record<string, object>): TableV2BuilderResult {
+    const { recommendedAlarms: alarmConfig, encryption, ...tableProps } = this.props;
 
     // TableV2's billing and encryption defaults are single helper objects with
     // no flat sibling props, so a same-key spread is sufficient — unlike the
     // classic builder, there are no mutually-exclusive defaults to yield
     // (ADR-0009).
-    const mergedProps = { ...TABLE_V2_DEFAULTS, ...tableProps } as TablePropsV2;
+    const mergedProps = {
+      ...TABLE_V2_DEFAULTS,
+      ...tableProps,
+      ...(encryption !== undefined ? { encryption: resolve(encryption, context) } : {}),
+    } as TablePropsV2;
 
     const table = new TableV2(scope, id, mergedProps);
 

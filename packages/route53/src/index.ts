@@ -5,6 +5,7 @@ export {
   type IHostedZoneBuilder,
 } from "./hosted-zone-builder.js";
 export { type QueryLoggingConfig } from "./query-logging.js";
+export { hostedZoneGrants } from "./grants.js";
 export {
   createARecordBuilder,
   type ARecordBuilderProps,

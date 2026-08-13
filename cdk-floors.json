@@ -65,10 +65,13 @@
         "@aws-cdk/aws-neptune-alpha": "2.190.0-alpha.0"
       }
     },
-    "route53": { "floor": "2.216.0", "gatedBy": "aws-route53.HttpsRecord (introduced 2.216.0)" },
+    "route53": {
+      "floor": "2.225.0",
+      "gatedBy": "aws-route53.GrantDelegationOptions and the second parameter of IHostedZone.grantDelegation, which hostedZoneGrants.delegation forwards for least-privilege delegatedZoneNames scoping — both introduced in 2.225.0 (2.224.0 has the single-argument grantDelegation only), so the package does not compile below it. Also aws-route53.HttpsRecord (2.216.0)."
+    },
     "ses": {
-      "floor": "2.216.0",
-      "gatedBy": "Peers @composurecdk/route53 and consumes its `/zone` DSL (zoneRecords/CNAME/TXT with the absoluteName primitive) for .publishDkim(), so ses cannot install below route53's own floor of 2.216.0 (aws-route53.HttpsRecord). The SES APIs themselves are all lower: EmailIdentity + DkimIdentity (2.51.0), EmailIdentityProps.mailFromBehaviorOnMxFailure (~2.130.0), the aws-ses-actions module, ReceiptRuleSet/ReceiptRule/ReceiptFilter, and custom_resources.Provider. Also Annotations.addWarningV2 (2.93.0)."
+      "floor": "2.225.0",
+      "gatedBy": "Peers @composurecdk/route53 and consumes its `/zone` DSL (zoneRecords/CNAME/TXT with the absoluteName primitive) for .publishDkim(), so ses cannot install below route53's own floor of 2.225.0 (aws-route53.GrantDelegationOptions). The SES APIs themselves are all lower: EmailIdentity + DkimIdentity (2.51.0), EmailIdentityProps.mailFromBehaviorOnMxFailure (~2.130.0), the aws-ses-actions module, ReceiptRuleSet/ReceiptRule/ReceiptFilter, and custom_resources.Provider. Also Annotations.addWarningV2 (2.93.0)."
     },
     "custom-resources": {
       "floor": "2.37.0",

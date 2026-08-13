@@ -72,6 +72,44 @@ If the stack's region resolves to a known non-`us-east-1` region, `build()` thro
 
 Default-on query logging adds two long-lived resources per stack: the log group (charged per ingested GB and per stored GB after retention) and the resource policy (free). For high-traffic zones consider lowering retention via the `configure` callback or disabling logging on zones with low security/audit value.
 
+## Delegation grants
+
+Handing a subdomain to another account means letting that account write the subdomain's `NS` records into the parent zone. The account's role is the consumer and the zone is the resource, so the grant is declared on the **role**, pointing at the zone via a `ref` — the same consumer-side shape as every other grant in the library ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)):
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createRoleBuilder } from "@composurecdk/iam";
+import { AccountPrincipal } from "aws-cdk-lib/aws-iam";
+import {
+  createHostedZoneBuilder,
+  hostedZoneGrants,
+  type HostedZoneBuilderResult,
+} from "@composurecdk/route53";
+
+compose(
+  {
+    rootZone: createHostedZoneBuilder().zoneName("example.com"),
+
+    betaDelegationRole: createRoleBuilder()
+      .roleName("delegation-beta")
+      .assumedBy(new AccountPrincipal(betaAccountId))
+      .grant(
+        hostedZoneGrants.delegation(
+          ref("rootZone", (r: HostedZoneBuilderResult) => r.hostedZone),
+          { delegatedZoneNames: ["beta.example.com"] },
+        ),
+      ),
+  },
+  { rootZone: [], betaDelegationRole: ["rootZone"] }, // role → zone; no reverse edge
+);
+```
+
+`hostedZoneGrants.delegation(zone)` delegates to the zone's native `grantDelegation`, which grants `route53:ChangeResourceRecordSets` on the zone — conditioned to `UPSERT`/`DELETE` of `NS` records — plus `route53:ListHostedZonesByName`. `IHostedZone` is implemented by `PublicHostedZone`, `PrivateHostedZone`, and zones imported via `fromLookup`/`fromHostedZoneAttributes`, so the same helper serves any of them.
+
+**Name the delegated zones.** Without `delegatedZoneNames` the grantee may replace or remove the `NS` records of any name in the parent zone, including delegations belonging to other accounts — one over-broad role is enough to take a sibling account's subdomain offline. Passing the names adds the `route53:ChangeResourceRecordSetsNormalizedRecordNames` condition, confining each role to the subdomain it owns. Each name must be lowercase, carry no trailing dot, and be a subdomain of the granting zone; CDK validates all three at synth.
+
+Publishing the delegated zone's own `NS` records into a parent zone owned by **another** account is the other half of this story, and has no builder yet — use CDK's `CrossAccountZoneDelegationRecord` with the role granted above.
+
 ## Record Builders
 
 ```ts

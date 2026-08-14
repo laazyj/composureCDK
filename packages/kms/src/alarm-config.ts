@@ -3,12 +3,12 @@ import type { AlarmConfig } from "@composurecdk/cloudwatch";
 /**
  * Controls which recommended alarms are created for a KMS key.
  *
- * Unlike the other builder packages, the single AWS-recommended KMS alarm is
- * **opt-in**: `SecondsUntilKeyMaterialExpiration` is only published for keys
- * whose key material was imported with an expiration date, so on a key created
- * by CloudFormation it would never leave `INSUFFICIENT_DATA`. Set
- * {@link keyMaterialExpiration} to `true` (or to an {@link AlarmConfig}) on a
- * key you import material into.
+ * The single AWS-recommended KMS alarm is **opt-in**.
+ * `SecondsUntilKeyMaterialExpiration` is published only for keys whose key
+ * material was imported with an expiration date, so on a key created by
+ * CloudFormation the alarm would never leave `INSUFFICIENT_DATA`. Opt in by
+ * setting {@link keyMaterialExpiration} to `true` (or to an
+ * {@link AlarmConfig}) on a key you import material into.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html
  */

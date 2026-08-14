@@ -10,10 +10,10 @@ interface KeyAlarmDefaults {
 /**
  * AWS-recommended default alarm configuration for KMS keys.
  *
- * `enabled` is the master switch for the recommended set, and defaults on as
- * it does in every other package. The `keyMaterialExpiration` alarm itself is
- * still opt-in — see {@link KeyAlarmConfig.keyMaterialExpiration} — so these
- * values apply once it is switched on.
+ * `enabled` is the master switch for the recommended set and defaults on. The
+ * `keyMaterialExpiration` alarm itself is opt-in — see
+ * {@link KeyAlarmConfig.keyMaterialExpiration} — so these values apply once it
+ * is switched on.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html
  */

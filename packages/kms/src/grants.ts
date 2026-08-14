@@ -74,11 +74,10 @@ export const keyGrants = {
    * without any permission to use it cryptographically. Reserve it for an
    * operator or automation role; workloads want {@link keyGrants.encryptDecrypt}.
    *
-   * Takes a concrete {@link Key} rather than an {@link IKey}: `grantAdmin` is
-   * declared on the class, and the alternative — the library carrying its own
-   * copy of AWS's admin action set — is what ADR-0013 rules out. A
-   * `createKeyBuilder` result satisfies it (`KeyBuilderResult.key` is a `Key`);
-   * an imported key does not, so administer that one on the construct.
+   * Takes a concrete {@link Key} rather than an {@link IKey}, because
+   * `grantAdmin` is declared on the class. A `createKeyBuilder` result
+   * satisfies that (`KeyBuilderResult.key` is a `Key`); an imported key does
+   * not, so administer that one on the construct.
    */
   admin: (key: Resolvable<Key>): Grant<IGrantable> =>
     grantVia(key, (k: Key, grantee: IGrantable) => {

@@ -124,7 +124,7 @@ A grant on the encrypted **resource** usually covers its key already: `bucketGra
 
 ## Recommended Alarms
 
-AWS's [recommended alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) for KMS cover one metric: `SecondsUntilKeyMaterialExpiration`. Unlike every other builder in the library, it is **opt-in** rather than on by default — KMS publishes the metric only for keys whose material was [imported](https://docs.aws.amazon.com/kms/latest/developerguide/importing-keys.html) with an expiration date, so on a key created by CloudFormation the alarm could never leave `INSUFFICIENT_DATA`.
+AWS's [recommended alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) for KMS cover one metric: `SecondsUntilKeyMaterialExpiration`. It is **opt-in** — KMS publishes the metric only for keys whose material was [imported](https://docs.aws.amazon.com/kms/latest/developerguide/importing-keys.html) with an expiration date, so on a key created by CloudFormation the alarm could never leave `INSUFFICIENT_DATA`.
 
 Switch it on for a key you import material into:
 

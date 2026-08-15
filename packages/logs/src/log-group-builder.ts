@@ -1,4 +1,3 @@
-import { type IKey } from "aws-cdk-lib/aws-kms";
 import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
@@ -15,18 +14,24 @@ export interface LogGroupBuilderProps extends Omit<LogGroupProps, "encryptionKey
   /**
    * The customer-managed KMS key used to encrypt the log group.
    *
-   * Accepts a concrete {@link IKey} or a {@link Resolvable} — typically a
-   * {@link Ref} to a composed `@composurecdk/kms` key builder, so the key is a
-   * component of the system rather than a construct built outside it.
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
    *
    * CloudWatch Logs encrypts every log group with a service-managed key by
    * default, so this prop opts into a customer-managed one. The key policy
    * must allow the `logs.<region>.amazonaws.com` service principal — CDK adds
    * that statement for a key it can see.
    *
+   * The inner type is read from the consumer's own `aws-cdk-lib` rather than
+   * named as `IKey`: CDK widened this prop from `kms.IKey` to `kms.IKeyRef` in
+   * 2.215.0, and naming either one would make the builder disagree with the
+   * CDK it is installed against — `IKey` narrows what a consumer above 2.215.0
+   * can pass, `IKeyRef` does not exist at this package's floor (2.1.0).
+   *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html
    */
-  encryptionKey?: Resolvable<IKey>;
+  encryptionKey?: Resolvable<NonNullable<LogGroupProps["encryptionKey"]>>;
 }
 
 /**

@@ -49,6 +49,31 @@ const handler = createFunctionBuilder()
   .build(stack, "MyFunction");
 ```
 
+## Environment variable encryption
+
+Lambda encrypts environment variables at rest with an AWS-managed key. `.environmentEncryption(...)` opts into a customer-managed one, and accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system rather than a construct created before `compose`:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createKeyBuilder, type KeyBuilderResult } from "@composurecdk/kms";
+
+compose(
+  {
+    envKey: createKeyBuilder().description("Encrypts the checkout handler's environment."),
+    checkout: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("lambda"))
+      .environmentEncryption(ref<KeyBuilderResult>("envKey").get("key")),
+  },
+  { envKey: [], checkout: ["envKey"] },
+);
+```
+
+CDK grants the function's execution role decrypt on a key it can see, so no extra grant is needed for the function to read its own variables.
+
+The prop's inner type is read from the consumer's own aws-cdk-lib (`NonNullable<FunctionProps["environmentEncryption"]>`) rather than named as `IKey`, because CDK widened `FunctionProps.environmentEncryption` from `kms.IKey` to `kms.IKeyRef` in aws-cdk-lib 2.215.0. Naming either interface would make the builder disagree with the CDK it is installed against — `IKey` would reject an `IKeyRef` that CDK itself accepts, and `IKeyRef` does not exist at this package's 2.168.0 floor.
+
 ## Execution role
 
 By default, `createFunctionBuilder` creates an explicit IAM execution role with an inline `LogsWriter` policy scoped to the function's auto-created log group:

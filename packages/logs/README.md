@@ -51,7 +51,7 @@ CloudWatch Logs encrypts all log data at rest using AWS-managed keys. For additi
 const logGroup = createLogGroupBuilder().encryptionKey(myKmsKey).build(stack, "EncryptedLogs");
 ```
 
-`.encryptionKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+`.encryptionKey(...)` accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
 
 ```ts
 compose(
@@ -62,3 +62,5 @@ compose(
   { logKey: [], audit: ["logKey"] },
 );
 ```
+
+The prop's inner type is read from the consumer's own aws-cdk-lib (`NonNullable<LogGroupProps["encryptionKey"]>`) rather than named as `IKey`, because CDK widened `LogGroupProps.encryptionKey` from `kms.IKey` to `kms.IKeyRef` in aws-cdk-lib 2.215.0. Naming either interface would make the builder disagree with the CDK it is installed against — `IKey` would reject an `IKeyRef` that CDK itself accepts, and `IKeyRef` does not exist at this package's 2.1.0 floor.

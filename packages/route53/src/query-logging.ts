@@ -1,6 +1,6 @@
-import { Annotations, Aws, Stack, Token } from "aws-cdk-lib";
+import { Annotations, Aws, CfnResource, Stack, Token } from "aws-cdk-lib";
 import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { type LogGroup, ResourcePolicy } from "aws-cdk-lib/aws-logs";
+import { CfnResourcePolicy, type LogGroup, ResourcePolicy } from "aws-cdk-lib/aws-logs";
 import type { IConstruct } from "constructs";
 import { createLogGroupBuilder, type ILogGroupBuilder } from "@composurecdk/logs";
 import {
@@ -124,8 +124,8 @@ function stripTrailingDot(name: string): string {
 
 function ensureSharedResourcePolicy(scope: IConstruct): ResourcePolicy {
   const stack = Stack.of(scope);
-  const existing = stack.node.tryFindChild(QUERY_LOGGING_RESOURCE_POLICY_ID);
-  if (existing instanceof ResourcePolicy) return existing;
+  const existing = findExistingResourcePolicy(stack);
+  if (existing) return existing;
 
   return new ResourcePolicy(stack, QUERY_LOGGING_RESOURCE_POLICY_ID, {
     resourcePolicyName: QUERY_LOGGING_RESOURCE_POLICY_NAME,
@@ -144,6 +144,25 @@ function ensureSharedResourcePolicy(scope: IConstruct): ResourcePolicy {
       }),
     ],
   });
+}
+
+/**
+ * Find the shared query-logging policy an earlier hosted zone already created
+ * on this stack, identified by its L1's `cfnResourceType`.
+ *
+ * Deliberately not `instanceof ResourcePolicy`, which is realm-bound: the
+ * `ResourcePolicy` class an earlier zone constructed can be a different class
+ * object from the one this module imported, so the dedup is skipped and the
+ * rebuild fails synth on a duplicate construct id. Same hazard, same jsii-safe
+ * idiom, and the same reasoning spelled out in full as
+ * {@link findExistingLogGroup} in `cross-account-delegation-provider-logging.ts`.
+ */
+function findExistingResourcePolicy(stack: Stack): ResourcePolicy | undefined {
+  const existing = stack.node.tryFindChild(QUERY_LOGGING_RESOURCE_POLICY_ID);
+  const l1 = existing?.node.defaultChild;
+  if (!CfnResource.isCfnResource(l1)) return undefined;
+  if (l1.cfnResourceType !== CfnResourcePolicy.CFN_RESOURCE_TYPE_NAME) return undefined;
+  return existing as ResourcePolicy;
 }
 
 function errorIfStackNotUsEast1(scope: IConstruct): void {

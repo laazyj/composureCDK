@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Key } from "aws-cdk-lib/aws-kms";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { CfnResourcePolicy, ResourcePolicy, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Construct } from "constructs";
 import { ref } from "@composurecdk/core";
 import { createHostedZoneBuilder } from "../src/hosted-zone-builder.js";
 import {
   QUERY_LOGGING_LOG_GROUP_NAME_PREFIX,
+  QUERY_LOGGING_RESOURCE_POLICY_ID,
   QUERY_LOGGING_RESOURCE_POLICY_NAME,
 } from "../src/defaults.js";
 
@@ -112,6 +114,26 @@ describe("HostedZoneBuilder query logging", () => {
       ),
     );
     expect(policy).toMatch(/aws:SourceAccount/);
+  });
+
+  it("dedups on the policy's L1 type, not instanceof", () => {
+    const stack = newStack({ region: "us-east-1" });
+
+    // Stands in for the dual-package hazard (ADR-0007): a policy built by
+    // another realm's copy of aws-cdk-lib fails `instanceof ResourcePolicy`
+    // here, while its L1 still reports AWS::Logs::ResourcePolicy. An
+    // `instanceof` dedup would miss it and rebuild at the same construct id,
+    // failing synth.
+    const settled = new Construct(stack, QUERY_LOGGING_RESOURCE_POLICY_ID);
+    new CfnResourcePolicy(settled, "Resource", {
+      policyName: QUERY_LOGGING_RESOURCE_POLICY_NAME,
+      policyDocument: "{}",
+    });
+    expect(settled instanceof ResourcePolicy).toBe(false);
+
+    createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone");
+
+    Template.fromStack(stack).resourceCountIs("AWS::Logs::ResourcePolicy", 1);
   });
 
   it("user-supplied logGroupArn wins and skips auto-creation", () => {

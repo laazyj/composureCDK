@@ -414,8 +414,6 @@ class MyBuilder implements Lifecycle<MyResult> {
 
 This is the only change required. The builder does not need to know whether it received a concrete value or a `Ref` — `resolve` handles both uniformly.
 
-When the widened prop is an `Omit`-and-re-declare of a CDK prop, take `T` from the CDK prop itself — `Resolvable<NonNullable<FunctionProps["environmentEncryption"]>>` — rather than naming the interface CDK happens to use today. Re-declaring is the one place a builder stops tracking the consumer's `aws-cdk-lib`, and CDK's prop types move: the key-consuming props are migrating from `kms.IKey` to the wider `kms.IKeyRef` one release at a time, and a hardcoded `Resolvable<IKey>` starts rejecting keys the underlying CDK accepts the moment that prop moves. Reading the type keeps the builder honest above and below the change, and compiles at floors that predate the new interface. See the table in [`@composurecdk/kms`](../packages/kms/README.md#keys-as-components) for which props this currently affects.
-
 ## Policies
 
 Some concerns are not builder-local: they apply to whatever matching constructs happen to exist under a scope, not to any one component. Examples: attaching CloudWatch alarm actions to every `Alarm` in a stack, overriding `removalPolicy` on every stateful resource for a throwaway environment, or enforcing a tagging convention across services.

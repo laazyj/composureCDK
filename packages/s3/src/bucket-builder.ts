@@ -1,8 +1,9 @@
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { Bucket, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
+import { type IKey } from "aws-cdk-lib/aws-kms";
+import { Bucket, BucketEncryption, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BucketAlarmConfig } from "./alarm-config.js";
@@ -36,10 +37,23 @@ export type ServerAccessLogsConfig =
  */
 export interface BucketBuilderProps extends Omit<
   BucketProps,
-  "serverAccessLogsBucket" | "serverAccessLogsPrefix"
+  "serverAccessLogsBucket" | "serverAccessLogsPrefix" | "encryptionKey"
 > {
   /** See {@link ServerAccessLogsConfig}. Defaults to `{ prefix: "logs/" }`. */
   serverAccessLogs?: ServerAccessLogsConfig;
+
+  /**
+   * The KMS key used for server-side encryption (SSE-KMS).
+   *
+   * Accepts a concrete {@link IKey} or a {@link Resolvable} — typically a
+   * {@link Ref} to a composed `@composurecdk/kms` key builder, so the key is a
+   * component of the system rather than a construct built outside it.
+   *
+   * Supplying a key implies `BucketEncryption.KMS`: the `S3_MANAGED` default is
+   * mutually exclusive with a customer key, so `build()` drops it rather than
+   * making you set both (ADR-0009). Setting `encryption` explicitly still wins.
+   */
+  encryptionKey?: Resolvable<IKey>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -125,8 +139,13 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string): BucketBuilderResult {
-    const { serverAccessLogs, recommendedAlarms: alarmConfig, ...bucketProps } = this.props;
+  build(scope: IConstruct, id: string, context?: Record<string, object>): BucketBuilderResult {
+    const {
+      serverAccessLogs,
+      recommendedAlarms: alarmConfig,
+      encryptionKey,
+      ...bucketProps
+    } = this.props;
     const { serverAccessLogs: defaultServerAccessLogs, ...cdkDefaults } = BUCKET_DEFAULTS;
     const cfg = serverAccessLogs ?? defaultServerAccessLogs;
 
@@ -136,6 +155,7 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
       ...cdkDefaults,
       ...accessLogProps,
       ...bucketProps,
+      ...encryptionKeyProps(encryptionKey, bucketProps.encryption, context),
       ...autoDeleteProps(bucketProps, BUCKET_DEFAULTS),
     } as BucketProps;
 
@@ -198,6 +218,29 @@ function resolveAccessLogs(
       serverAccessLogsBucket: accessLogsBucket,
       ...(cfg.prefix !== undefined ? { serverAccessLogsPrefix: cfg.prefix } : {}),
     },
+  };
+}
+
+/**
+ * Resolves a {@link Resolvable} encryption key and infers the encryption mode
+ * it implies.
+ *
+ * The `BucketEncryption.S3_MANAGED` default is mutually exclusive with a
+ * customer-managed key — CDK rejects the pair — and supplying a key is an
+ * unambiguous request for SSE-KMS, so the default yields rather than forcing
+ * the user to set both (ADR-0009). An explicit `encryption` still wins, and an
+ * incompatible explicit pairing is left for CDK to reject.
+ */
+function encryptionKeyProps(
+  encryptionKey: Resolvable<IKey> | undefined,
+  userEncryption: BucketEncryption | undefined,
+  context: Record<string, object> | undefined,
+): Partial<BucketProps> {
+  if (encryptionKey === undefined) return {};
+
+  return {
+    encryptionKey: resolve(encryptionKey, context),
+    ...(userEncryption === undefined ? { encryption: BucketEncryption.KMS } : {}),
   };
 }
 

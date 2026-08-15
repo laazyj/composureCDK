@@ -61,7 +61,7 @@ export const DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES: LifecycleRule[] = [
  * with {@link createBucketBuilder}. Each property can be individually
  * overridden via the builder's fluent API.
  */
-export const BUCKET_DEFAULTS: Partial<BucketBuilderProps> = {
+export const BUCKET_DEFAULTS: Partial<Omit<BucketBuilderProps, "encryptionKey">> = {
   /**
    * Auto-create a dedicated logging bucket and write S3 server access logs
    * to it under the `logs/` prefix. Access logging provides an audit trail

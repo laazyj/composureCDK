@@ -66,6 +66,34 @@ The defaults are exported for visibility and testing:
 import { TABLE_DEFAULTS, TABLE_V2_DEFAULTS } from "@composurecdk/dynamodb";
 ```
 
+### Customer-managed encryption keys
+
+Both builders accept a `Resolvable` for the key, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system rather than a construct created outside it.
+
+`TableV2` takes the whole `TableEncryptionV2` — one prop that covers every mode, including per-replica key ARNs:
+
+```ts
+compose(
+  {
+    tableKey: createKeyBuilder().description("Encrypts the Orders table at rest."),
+    orders: createTableV2Builder()
+      .partitionKey({ name: "orderId", type: AttributeType.STRING })
+      .encryption(
+        ref("tableKey", (r: KeyBuilderResult) => TableEncryptionV2.customerManagedKey(r.key)),
+      ),
+  },
+  { tableKey: [], orders: ["tableKey"] },
+);
+```
+
+The classic `Table` takes the key directly on `.encryptionKey(...)`, which infers `TableEncryption.CUSTOMER_MANAGED` — the `AWS_MANAGED` default is mutually exclusive with a customer key, so it yields rather than making you set both ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)):
+
+```ts
+createTableBuilder()
+  .partitionKey({ name: "orderId", type: AttributeType.STRING })
+  .encryptionKey(ref<KeyBuilderResult>("tableKey").get("key"));
+```
+
 ## DynamoDB Streams
 
 Enable a stream with `.dynamoStream(StreamViewType…)` (TableV2) or `.stream(StreamViewType…)` (classic). The build result surfaces the stream ARN so a downstream component can wire a consumer:

@@ -35,6 +35,7 @@
     "@composurecdk/ec2": "^0.9.0",
     "@composurecdk/events": "^0.9.0",
     "@composurecdk/iam": "^0.9.0",
+    "@composurecdk/kms": "^0.9.0",
     "@composurecdk/lambda": "^0.9.0",
     "@composurecdk/logs": "^0.9.0",
     "@composurecdk/neptune": "^0.9.0",

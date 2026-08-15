@@ -10,6 +10,7 @@ import {
   TableEncryption,
 } from "aws-cdk-lib/aws-dynamodb";
 import { Key } from "aws-cdk-lib/aws-kms";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createTableBuilder } from "../src/table-builder.js";
 
@@ -146,6 +147,20 @@ describe("TableBuilder", () => {
 
       const template = Template.fromStack(stack);
       template.hasResourceProperties("AWS::DynamoDB::Table", {
+        SSESpecification: { SSEEnabled: true, SSEType: "KMS", KMSMasterKeyId: Match.anyValue() },
+      });
+    });
+
+    it("resolves a Resolvable encryptionKey from the build context", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      createTableBuilder()
+        .partitionKey(PK)
+        .encryptionKey(ref<{ key: Key }, Key>("tableKey", (r) => r.key))
+        .build(stack, "TestTable", { tableKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::DynamoDB::Table", {
         SSESpecification: { SSEEnabled: true, SSEType: "KMS", KMSMasterKeyId: Match.anyValue() },
       });
     });

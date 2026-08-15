@@ -17,6 +17,10 @@
       "floor": "2.93.0",
       "gatedBy": "Annotations.addWarningV2 used by queue-builder.ts (introduced 2.93.0); also QueueEncryption.SQS_MANAGED (~2.45) and QueueProps.enforceSSL (~2.50) builder defaults"
     },
+    "kms": {
+      "floor": "2.93.0",
+      "gatedBy": "Annotations.addWarningV2 reached transitively via @composurecdk/cloudwatch's alarm-threshold-basis.ts (introduced 2.93.0), which the package peers for its recommended alarms. The aws-kms APIs the builder uses are all lower — Key/KeyProps (alias, enableKeyRotation, pendingWindow, removalPolicy), Alias, KeySpec, Key.grantAdmin, and IKey's grantEncrypt/grantDecrypt/grantEncryptDecrypt/grantGenerateMac/grantVerifyMac — as is the AWS/KMS Metric the expiry alarm is built from. Note IKey.grantSign/grantVerify/grantSignVerify do NOT exist at this floor (verified by `enforce 2.93.0`), which is why keyGrants.sign/verify name kms:Sign / kms:Verify via IKey.grant instead of delegating; do not 'simplify' them to the native methods without raising the floor."
+    },
     "iam": {
       "floor": "2.26.0",
       "gatedBy": "aws-iam.PolicyStatement.resources getter used by statement-builder.test.ts (introduced 2.26.0); also Match.stringLikeRegexp used by role-builder.test.ts (2.9.0)"

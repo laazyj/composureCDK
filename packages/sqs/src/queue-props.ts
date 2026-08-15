@@ -1,4 +1,6 @@
+import type { IKey } from "aws-cdk-lib/aws-kms";
 import type { QueueProps } from "aws-cdk-lib/aws-sqs";
+import type { Resolvable } from "@composurecdk/core";
 import type { QueueAlarmConfig } from "./queue-alarm-config.js";
 
 /**
@@ -29,12 +31,28 @@ export const FIFO_ONLY_PROP_KEYS = [
 export type FifoOnlyPropKey = (typeof FIFO_ONLY_PROP_KEYS)[number];
 
 /**
- * Builder-only props every queue builder in this package layers on top
- * of the CDK {@link QueueProps}. Defined once so the builders and the
- * shared build core agree on what must be stripped before the props
- * reach the `Queue` construct.
+ * The props every queue builder in this package layers on top of the CDK
+ * {@link QueueProps} — both builder-only additions and CDK props widened
+ * to accept a {@link Resolvable}. Defined once so the builders and the
+ * shared build core agree on what must be stripped from the merged props
+ * (and, for a widened prop, resolved and re-added) before they reach the
+ * `Queue` construct.
  */
 export interface QueueBuilderExtensionProps {
+  /**
+   * The customer-managed KMS key used for server-side encryption (SSE-KMS).
+   *
+   * Accepts a concrete {@link IKey} or a {@link Resolvable} — typically a
+   * {@link Ref} to a composed `@composurecdk/kms` key builder, so the key is a
+   * component of the system rather than a construct built outside it.
+   *
+   * Supplying a key implies `QueueEncryption.KMS`: the `SQS_MANAGED` default
+   * is mutually exclusive with a customer key, so `build()` drops it rather
+   * than making you set both (ADR-0009). Setting `encryption` explicitly
+   * still wins.
+   */
+  encryptionMasterKey?: Resolvable<IKey>;
+
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
@@ -60,7 +78,7 @@ export interface QueueBuilderExtensionProps {
  * (`createQueueBuilder("fifo")`), not a prop.
  */
 export interface QueueBuilderProps
-  extends Omit<QueueProps, FifoOnlyPropKey>, QueueBuilderExtensionProps {}
+  extends Omit<QueueProps, FifoOnlyPropKey | "encryptionMasterKey">, QueueBuilderExtensionProps {}
 
 /**
  * Prop surface of `createQueueBuilder("fifo")`. `fifo` itself is not
@@ -69,7 +87,9 @@ export interface QueueBuilderProps
  * suffix is a compile error rather than a synth failure.
  */
 export interface FifoQueueBuilderProps
-  extends Omit<QueueProps, "fifo" | "queueName">, QueueBuilderExtensionProps {
+  extends
+    Omit<QueueProps, "fifo" | "queueName" | "encryptionMasterKey">,
+    QueueBuilderExtensionProps {
   /**
    * Physical name of the FIFO queue. Must end in `.fifo` (AWS
    * requirement, enforced by the type and validated at build for

@@ -27,6 +27,20 @@ Every [TopicProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s
 
 These defaults are guided by the [AWS SNS Security Best Practices](https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html#enforce-encryption-data-in-transit).
 
+### Encryption at rest
+
+SNS has no service-managed encryption option — a topic is unencrypted at rest until a KMS key is supplied. `.masterKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+
+```ts
+compose(
+  {
+    topicKey: createKeyBuilder().description("Encrypts the alerts topic at rest."),
+    alerts: createTopicBuilder().masterKey(ref<KeyBuilderResult>("topicKey").get("key")),
+  },
+  { topicKey: [], alerts: ["topicKey"] },
+);
+```
+
 The defaults are exported as `TOPIC_DEFAULTS` for visibility and testing:
 
 ```ts

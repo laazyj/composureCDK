@@ -41,11 +41,15 @@ export type ClusterAccessor = IConnectable & IGrantable;
  * - `vpc` is supplied via the dedicated {@link IClusterBuilder.vpc | .vpc()}
  *   method (it is required).
  * - `securityGroups` accepts `Resolvable<ISecurityGroup>` entries.
+ * - `kmsKey` accepts a `Resolvable` key.
  *
  * It also adds builder-specific options for the auto-created cluster
  * parameter group and recommended alarms.
  */
-export interface ClusterBuilderProps extends Omit<DatabaseClusterProps, "vpc" | "securityGroups"> {
+export interface ClusterBuilderProps extends Omit<
+  DatabaseClusterProps,
+  "vpc" | "securityGroups" | "kmsKey"
+> {
   /**
    * Security groups to attach to the cluster. Accepts concrete
    * {@link ISecurityGroup}s or {@link Ref}s that resolve to them at build
@@ -54,6 +58,30 @@ export interface ClusterBuilderProps extends Omit<DatabaseClusterProps, "vpc" | 
    * @default - CDK creates a security group for the cluster.
    */
   securityGroups?: readonly Resolvable<ISecurityGroup>[];
+
+  /**
+   * The customer-managed KMS key used to encrypt the cluster's storage at
+   * rest.
+   *
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
+   *
+   * The builder already sets `storageEncrypted: true`, so this selects a
+   * customer-managed key in place of the AWS-managed Neptune key rather than
+   * turning encryption on. Both the key and the encryption setting are fixed
+   * at creation — Neptune cannot encrypt an existing unencrypted cluster, nor
+   * rotate to a different key, without a snapshot restore.
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction —
+   * see the table in `@composurecdk/kms`'s README.
+   *
+   * @default - the AWS-managed key for Neptune (`aws/rds`).
+   *
+   * @see https://docs.aws.amazon.com/neptune/latest/userguide/encrypt.html
+   */
+  kmsKey?: Resolvable<NonNullable<DatabaseClusterProps["kmsKey"]>>;
 
   /**
    * Parameters to set on the auto-created cluster parameter group, merged
@@ -220,6 +248,7 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
     const {
       recommendedAlarms: alarmConfig,
       securityGroups: resolvableSgs,
+      kmsKey,
       clusterParameters,
       clusterParameterGroup: userParameterGroup,
       ...clusterProps
@@ -256,6 +285,7 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
       vpc: resolvedVpc,
       clusterParameterGroup,
       ...(securityGroups ? { securityGroups } : {}),
+      ...(kmsKey !== undefined ? { kmsKey: resolve(kmsKey, context) } : {}),
     } as DatabaseClusterProps;
 
     const cluster = new DatabaseCluster(scope, id, mergedProps);

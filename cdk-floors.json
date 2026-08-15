@@ -27,7 +27,7 @@
     },
     "logs": {
       "floor": "2.1.0",
-      "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-logs)"
+      "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-logs). Note LogGroupBuilderProps.encryptionKey deliberately re-declares the prop as Resolvable<NonNullable<LogGroupProps[\"encryptionKey\"]>> rather than naming a key interface: CDK widened this prop from kms.IKey to kms.IKeyRef in 2.215.0, so IKey narrows what a consumer above that release can pass and IKeyRef does not exist at this floor. Do not 'simplify' it to either interface without raising the floor — `enforce` runs the unit suite, which does not typecheck, so nothing catches it here."
     },
     "events": {
       "floor": "2.93.0",
@@ -57,14 +57,17 @@
       "floor": "2.119.0",
       "gatedBy": "aws-certificatemanager.KeyAlgorithm (introduced 2.119.0)"
     },
-    "lambda": { "floor": "2.168.0", "gatedBy": "aws-lambda.MetricType (introduced 2.168.0)" },
+    "lambda": {
+      "floor": "2.168.0",
+      "gatedBy": "aws-lambda.MetricType (introduced 2.168.0). Note FunctionBuilderProps.environmentEncryption deliberately re-declares the prop as Resolvable<NonNullable<FunctionProps[\"environmentEncryption\"]>> rather than naming a key interface: CDK widened this prop from kms.IKey to kms.IKeyRef in 2.215.0, so IKey narrows what a consumer above that release can pass and IKeyRef does not exist at this floor. Do not 'simplify' it to either interface without raising the floor — `enforce` runs the unit suite, which does not typecheck, so nothing catches it here."
+    },
     "dynamodb": {
       "floor": "2.178.0",
       "gatedBy": "aws-dynamodb TableProps.pointInTimeRecoverySpecification and TablePropsV2.pointInTimeRecoverySpecification — the L2 props both builders' PITR default sets — were introduced in 2.178.0 (absent in 2.177.0); below this the prop is silently ignored and the point-in-time-recovery default no-ops. TableV2 / Billing / Capacity / TableEncryptionV2 (2.135.0), metricSystemErrorsForOperations and the Operation enum are all lower; peers @composurecdk/cloudwatch at 2.93.0."
     },
     "neptune": {
       "floor": "2.190.0",
-      "gatedBy": "ParameterGroupFamily.NEPTUNE_1_4 (used as the default parameter-group family in cluster-parameter-group-defaults.ts) and EngineVersion.V1_4_0_0 were introduced in @aws-cdk/aws-neptune-alpha 2.190.0-alpha.0, whose own aws-cdk-lib peer is ^2.190.0; the alpha just below (2.189.x-alpha.0) lacks both symbols so the package fails to compile. @aws-cdk/aws-neptune-alpha is version-locked to its matching aws-cdk-lib release, so the alpha peer (see peerFloors) tracks the same 2.190.0 line.",
+      "gatedBy": "ParameterGroupFamily.NEPTUNE_1_4 (used as the default parameter-group family in cluster-parameter-group-defaults.ts) and EngineVersion.V1_4_0_0 were introduced in @aws-cdk/aws-neptune-alpha 2.190.0-alpha.0, whose own aws-cdk-lib peer is ^2.190.0; the alpha just below (2.189.x-alpha.0) lacks both symbols so the package fails to compile. @aws-cdk/aws-neptune-alpha is version-locked to its matching aws-cdk-lib release, so the alpha peer (see peerFloors) tracks the same 2.190.0 line. Note ClusterBuilderProps.kmsKey deliberately re-declares the prop as Resolvable<NonNullable<DatabaseClusterProps[\"kmsKey\"]>> rather than naming a key interface: the alpha widened this prop from kms.IKey to kms.IKeyRef in 2.215.0-alpha.0, so IKey narrows what a consumer above that release can pass and IKeyRef does not exist at this floor. Do not 'simplify' it to either interface without raising the floor — `enforce` runs the unit suite, which does not typecheck, so nothing catches it here.",
       "peerFloors": {
         "@aws-cdk/aws-neptune-alpha": "2.190.0-alpha.0"
       }

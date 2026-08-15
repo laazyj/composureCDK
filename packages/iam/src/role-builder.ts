@@ -18,7 +18,7 @@ import {
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { ROLE_DEFAULTS } from "./role-defaults.js";
-import { StatementBuilder } from "./statement-builder.js";
+import { isStatementBuilder, type StatementBuilder } from "./statement-builder.js";
 
 /**
  * Configuration properties for the IAM role builder.
@@ -189,7 +189,7 @@ class RoleBuilder implements Lifecycle<RoleBuilderResult> {
     const addedInlinePolicies: Record<string, PolicyDocument> = {};
     for (const entry of this.#inlinePolicies) {
       const resolvedStatements = entry.statements.map((s) =>
-        s instanceof StatementBuilder ? s.build() : s,
+        isStatementBuilder(s) ? s.build() : s,
       );
       addedInlinePolicies[entry.name] = new PolicyDocument({ statements: resolvedStatements });
     }

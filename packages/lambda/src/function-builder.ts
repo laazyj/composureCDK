@@ -40,10 +40,14 @@ const LOGS_WRITER_POLICY_NAME = "LogsWriter";
  * Configuration properties for the Lambda function builder.
  *
  * Extends the CDK {@link FunctionProps} with builder-specific options. The
- * `role` prop is widened to {@link Resolvable} so a role built by a sibling
- * component can be referenced via `ref(...)` at configuration time.
+ * `role` and `environmentEncryption` props are widened to {@link Resolvable}
+ * so a role or key built by a sibling component can be referenced via
+ * `ref(...)` at configuration time.
  */
-export interface FunctionBuilderProps extends Omit<FunctionProps, "role"> {
+export interface FunctionBuilderProps extends Omit<
+  FunctionProps,
+  "role" | "environmentEncryption"
+> {
   /**
    * The IAM execution role to attach to the function. When set, the builder
    * skips creating its own role and the auto-created `LogsWriter` inline
@@ -57,6 +61,27 @@ export interface FunctionBuilderProps extends Omit<FunctionProps, "role"> {
    * {@link IFunctionBuilder.useCdkAutoRole}.
    */
   role?: Resolvable<IRole>;
+
+  /**
+   * The customer-managed KMS key used to encrypt the function's environment
+   * variables at rest.
+   *
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
+   *
+   * Lambda encrypts environment variables with an AWS-managed key by default,
+   * so this prop opts into a customer-managed one. The key policy must allow
+   * the function's execution role to decrypt — CDK adds that grant for a key
+   * it can see.
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction —
+   * see the table in `@composurecdk/kms`'s README.
+   *
+   * @see https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-encryption
+   */
+  environmentEncryption?: Resolvable<NonNullable<FunctionProps["environmentEncryption"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -326,7 +351,12 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     id: string,
     context: Record<string, object> = {},
   ): FunctionBuilderResult {
-    const { role: roleResolvable, recommendedAlarms: alarmConfig, ...functionProps } = this.props;
+    const {
+      role: roleResolvable,
+      environmentEncryption,
+      recommendedAlarms: alarmConfig,
+      ...functionProps
+    } = this.props;
 
     const seamCount =
       (roleResolvable !== undefined ? 1 : 0) +
@@ -363,6 +393,9 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       ...logGroupProps,
       ...functionProps,
       ...(role ? { role } : {}),
+      ...(environmentEncryption !== undefined
+        ? { environmentEncryption: resolve(environmentEncryption, context) }
+        : {}),
     } as FunctionProps;
 
     const fn = new LambdaFunction(scope, id, mergedProps);

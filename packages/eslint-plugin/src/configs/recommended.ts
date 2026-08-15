@@ -13,6 +13,7 @@ export const recommended: Linter.Config = {
     "composurecdk/builder-must-implement-copy-state": "error",
     "composurecdk/constraint-metadata-required": "error",
     "composurecdk/lifecycle-build-context-required": "error",
+    "composurecdk/lifecycle-build-must-forward-context": "error",
     "composurecdk/no-cdk-api-above-floor": "error",
     "composurecdk/no-cjs-incompatible-syntax": "error",
     // Bans the TypeScript `private` modifier in favour of ECMAScript private

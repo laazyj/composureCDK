@@ -30,10 +30,10 @@ The key-consuming props on the library's stateful resources accept a `Resolvable
 | `@composurecdk/dynamodb` | `encryptionKey`         | `Resolvable<IKey>` (classic `Table`) |
 | `@composurecdk/sqs`      | `encryptionMasterKey`   | `Resolvable<IKey>`                   |
 | `@composurecdk/sns`      | `masterKey`             | `Resolvable<IKey>`                   |
-| `@composurecdk/logs`     | `encryptionKey`         | `Resolvable` of the CDK prop type    |
-| `@composurecdk/lambda`   | `environmentEncryption` | `Resolvable` of the CDK prop type    |
+| `@composurecdk/logs`     | `encryptionKey`         | `Resolvable<IKey>` \*                |
+| `@composurecdk/lambda`   | `environmentEncryption` | `Resolvable<IKey>` \*                |
 
-Two of those rows do not name `IKey`. CDK is migrating key-consuming props from `kms.IKey` to the wider `kms.IKeyRef` ([reference interfaces](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kms.IKeyRef.html), aws-cdk-lib 2.215.0); `LogGroupProps.encryptionKey` and `FunctionProps.environmentEncryption` have already moved, while the other four have not. Those two props take `Resolvable<NonNullable<LogGroupProps["encryptionKey"]>>` and `Resolvable<NonNullable<FunctionProps["environmentEncryption"]>>` — the inner type is read from the consumer's own aws-cdk-lib, so the builder accepts exactly what CDK accepts at whatever version is installed, above and below the migration. A concrete `IKey` and a `Ref` to a key builder satisfy both spellings, so the wiring below is the same either way.
+\* These two accept more than an `IKey`, because CDK is migrating key-consuming props to the wider [`kms.IKeyRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kms.IKeyRef.html) (aws-cdk-lib 2.215.0) and these are the two that have moved. Naming either interface would put the builder at odds with the CDK it is installed against — `IKey` would reject an `IKeyRef` that CDK itself accepts, and `IKeyRef` does not exist at those packages' floors — so their inner type is read from the consumer's own aws-cdk-lib (`Resolvable<NonNullable<FunctionProps["environmentEncryption"]>>`) and tracks the migration in both directions. Passing an `IKey` or a `Ref` to a key builder is unaffected. The `keyGrants` helpers below still take `Resolvable<IKey>`, so a bare `IKeyRef` reaches those two props but not a grant.
 
 One key-consuming prop elsewhere still takes a concrete key — `@composurecdk/neptune`'s `kmsKey` ([#380](https://github.com/laazyj/composureCDK/issues/380)). Build the key as a component and pass `result.key` to it until it is widened.
 

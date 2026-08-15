@@ -23,11 +23,9 @@ export interface LogGroupBuilderProps extends Omit<LogGroupProps, "encryptionKey
    * must allow the `logs.<region>.amazonaws.com` service principal — CDK adds
    * that statement for a key it can see.
    *
-   * The inner type is read from the consumer's own `aws-cdk-lib` rather than
-   * named as `IKey`: CDK widened this prop from `kms.IKey` to `kms.IKeyRef` in
-   * 2.215.0, and naming either one would make the builder disagree with the
-   * CDK it is installed against — `IKey` narrows what a consumer above 2.215.0
-   * can pass, `IKeyRef` does not exist at this package's floor (2.1.0).
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction —
+   * see the table in `@composurecdk/kms`'s README.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html
    */

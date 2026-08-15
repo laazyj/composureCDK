@@ -70,9 +70,7 @@ compose(
 );
 ```
 
-CDK grants the function's execution role decrypt on a key it can see, so no extra grant is needed for the function to read its own variables.
-
-The prop's inner type is read from the consumer's own aws-cdk-lib (`NonNullable<FunctionProps["environmentEncryption"]>`) rather than named as `IKey`, because CDK widened `FunctionProps.environmentEncryption` from `kms.IKey` to `kms.IKeyRef` in aws-cdk-lib 2.215.0. Naming either interface would make the builder disagree with the CDK it is installed against — `IKey` would reject an `IKeyRef` that CDK itself accepts, and `IKeyRef` does not exist at this package's 2.168.0 floor.
+The prop's inner type is read from CDK's own `FunctionProps["environmentEncryption"]` rather than named as `IKey`, so it tracks CDK's `kms.IKey` → `kms.IKeyRef` migration in either direction — see [the table in `@composurecdk/kms`](../kms/README.md#keys-as-components).
 
 ## Execution role
 

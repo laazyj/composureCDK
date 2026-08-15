@@ -63,4 +63,4 @@ compose(
 );
 ```
 
-The prop's inner type is read from the consumer's own aws-cdk-lib (`NonNullable<LogGroupProps["encryptionKey"]>`) rather than named as `IKey`, because CDK widened `LogGroupProps.encryptionKey` from `kms.IKey` to `kms.IKeyRef` in aws-cdk-lib 2.215.0. Naming either interface would make the builder disagree with the CDK it is installed against — `IKey` would reject an `IKeyRef` that CDK itself accepts, and `IKeyRef` does not exist at this package's 2.1.0 floor.
+The prop's inner type is read from CDK's own `LogGroupProps["encryptionKey"]` rather than named as `IKey`, so it tracks CDK's `kms.IKey` → `kms.IKeyRef` migration in either direction — see [the table in `@composurecdk/kms`](../kms/README.md#keys-as-components).

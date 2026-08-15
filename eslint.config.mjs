@@ -81,6 +81,17 @@ export default defineConfig(
     rules: composurecdk.configs.recommended.rules,
   },
   {
+    // The examples are application entry points, not library internals: they
+    // build at the root of an App or Stack, where there is no enclosing
+    // component and so no context to forward. Every `.build(app, "…")` there
+    // would trip the rule for no reason, which is consumer-shaped code
+    // behaving correctly rather than a defect to fix.
+    files: ["packages/examples/src/**/*.ts"],
+    rules: {
+      "composurecdk/lifecycle-build-must-forward-context": "off",
+    },
+  },
+  {
     // @composurecdk/core is the root of the dependency graph. It stays
     // CDK-version-agnostic — depending only on `constructs` (peer) and
     // `@dagrejs/graphlib` — and must never import a sibling @composurecdk

@@ -133,7 +133,7 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
     let logGroupProps = {};
 
     if (!deployProps.logGroup) {
-      logGroup = createLogGroupBuilder().build(scope, `${id}LogGroup`).logGroup;
+      logGroup = createLogGroupBuilder().build(scope, `${id}LogGroup`, ctx).logGroup;
       logGroupProps = { logGroup };
     }
 

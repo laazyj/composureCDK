@@ -372,7 +372,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     let logGroupProps = {};
 
     if (!this.props.logGroup) {
-      logGroup = createLogGroupBuilder().build(scope, `${id}LogGroup`).logGroup;
+      logGroup = createLogGroupBuilder().build(scope, `${id}LogGroup`, context).logGroup;
       logGroupProps = { logGroup };
     }
 

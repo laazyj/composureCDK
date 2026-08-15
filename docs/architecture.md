@@ -412,7 +412,22 @@ class MyBuilder implements Lifecycle<MyResult> {
 }
 ```
 
-This is the only change required. The builder does not need to know whether it received a concrete value or a `Ref` — `resolve` handles both uniformly.
+The builder does not need to know whether it received a concrete value or a `Ref` — `resolve` handles both uniformly.
+
+#### Builders that delegate to a sub-builder
+
+A builder can also be a _conduit_ for someone else's refs: it holds no `Resolvable` of its own, but builds a sub-builder that does — typically one exposed to the caller through a `configure` callback. Such a builder must still accept `context` and **pass it on**:
+
+```typescript
+// The sub-builder resolves its own Resolvables against whatever context it is
+// given. Omit the third argument and it resolves against `{}`, so any ref the
+// caller supplied through `configure` throws "component not found in context".
+const logGroup = subBuilder.build(scope, `${id}Logs`, context).logGroup;
+```
+
+Thread `context` through any helper function in between — that is where the call usually lives, and where it is easiest to forget. The `composurecdk/lifecycle-build-must-forward-context` lint rule enforces this at the call site; its sibling `lifecycle-build-context-required` only checks the declaration, and cannot see a resolvable that lives one delegation away.
+
+A builder that neither holds a `Resolvable` nor builds a sub-builder needs none of this — `build(scope, id)` stays correct and is the right signature for it.
 
 ## Policies
 

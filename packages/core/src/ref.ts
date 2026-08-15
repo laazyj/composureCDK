@@ -56,7 +56,17 @@ export class Ref<T> {
       if (!(component in context)) {
         throw new Error(
           `Ref to "${component}" cannot be resolved: component not found in context. ` +
-            `Ensure "${component}" is declared as a dependency.`,
+            `Ensure "${component}" is declared as a dependency.` +
+            // The context being empty is the signature of a builder that built
+            // a sub-builder without forwarding its context, rather than of a
+            // genuinely undeclared dependency. That failure surfaces one
+            // delegation away from the ref, so name it here — the alternative
+            // is a consumer bug report against a prop that looks correct.
+            (Object.keys(context).length === 0
+              ? ` The context is empty: if this ref was passed to a sub-builder through a ` +
+                `\`configure\` callback, the enclosing builder may not be forwarding its ` +
+                `build context to that sub-builder's build().`
+              : ""),
         );
       }
       return context[component] as T;

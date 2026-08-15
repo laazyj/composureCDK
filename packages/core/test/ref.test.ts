@@ -33,6 +33,19 @@ describe("Ref", () => {
       expect(() => r.resolve(fakeContext)).toThrow("declared as a dependency");
     });
 
+    it("names the un-forwarded sub-builder context when the context is empty", () => {
+      const r = ref<FakeResult>("missing");
+
+      expect(() => r.resolve({})).toThrow(/context is empty/);
+      expect(() => r.resolve({})).toThrow(/forwarding its build context/);
+    });
+
+    it("omits the sub-builder hint when the context is populated but lacks the key", () => {
+      const r = ref<FakeResult>("missing");
+
+      expect(() => r.resolve(fakeContext)).not.toThrow(/context is empty/);
+    });
+
     it("applies an inline transform when a second argument is provided", () => {
       const r = ref<FakeResult, string>("component", (v) => v.value.toUpperCase());
 

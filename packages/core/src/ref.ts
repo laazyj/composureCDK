@@ -1,3 +1,5 @@
+import { currentAmbientContext } from "./ambient-context.js";
+
 /**
  * @internal Brands every {@link Ref} instance so {@link isRef} can recognise
  * one without `instanceof`. `instanceof` is realm-bound: when `@composurecdk/core`
@@ -248,5 +250,10 @@ export function isRef<T>(value: Resolvable<T>): value is Ref<T> {
  * @returns The concrete value.
  */
 export function resolve<T>(value: Resolvable<T>, context?: Record<string, object>): T {
-  return isRef(value) ? value.resolve(context ?? {}) : value;
+  if (!isRef(value)) return value;
+  // An explicit context always wins; the ambient one is a fallback for the
+  // `undefined` case only. That is what lets a sub-builder built without an
+  // explicit context still resolve against the enclosing component's — see
+  // ambient-context.ts.
+  return value.resolve(context ?? currentAmbientContext() ?? {});
 }

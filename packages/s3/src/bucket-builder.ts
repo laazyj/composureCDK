@@ -153,7 +153,8 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
     const { serverAccessLogs: defaultServerAccessLogs, ...cdkDefaults } = BUCKET_DEFAULTS;
     const cfg = serverAccessLogs ?? defaultServerAccessLogs;
 
-    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg, context);
+    // DEMO (ambient context): context is no longer threaded into the helper.
+    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg);
 
     const mergedProps = {
       ...cdkDefaults,
@@ -186,7 +187,6 @@ function resolveAccessLogs(
   scope: IConstruct,
   id: string,
   cfg: ServerAccessLogsConfig | undefined,
-  context?: Record<string, object>,
 ): { accessLogsBucket?: Bucket; accessLogProps: Partial<BucketProps> } {
   if (cfg === false || cfg === undefined) {
     return { accessLogProps: {} };
@@ -215,11 +215,8 @@ function resolveAccessLogs(
   if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }
-  // Pass the build context down: `IBucketBuilder` widens `encryptionKey` to a
-  // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
-  // KMS key. Without the context that ref resolves against an empty record and
-  // throws "component not found".
-  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`, context).bucket;
+  // DEMO (ambient context): no context passed, and none available to pass.
+  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`).bucket;
 
   return {
     accessLogsBucket,

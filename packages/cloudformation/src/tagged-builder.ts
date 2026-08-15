@@ -1,4 +1,4 @@
-import { Builder, type IBuilder } from "@composurecdk/core";
+import { Builder, type IBuilder, withAmbientContext } from "@composurecdk/core";
 import { applyBuilderTags } from "./apply-builder-tags.js";
 import { validateTag, validateTagRecord } from "./tag-validator.js";
 
@@ -144,7 +144,12 @@ function wrapTagged<Props extends object, T extends ObjectWithProps<Props>>(
 
   const buildFn = (...args: unknown[]): object => {
     const target = inner as unknown as { build: (...a: unknown[]) => object };
-    const result = target.build(...args);
+    // Install this build's context as ambient so a sub-builder created inside
+    // `target.build` inherits it without the builder having to thread it down.
+    // Every library builder is wrapped here, making this the one place that
+    // covers them all. See @composurecdk/core's ambient-context.ts.
+    const context = args[2] as Record<string, object> | undefined;
+    const result = withAmbientContext(context, () => target.build(...args));
     applyBuilderTags(result, accumulator);
     return result;
   };

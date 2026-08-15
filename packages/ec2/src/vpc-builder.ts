@@ -96,10 +96,18 @@ const DEFAULT_FLOW_LOG_KEY = "DefaultFlowLog";
 class VpcBuilder implements Lifecycle<VpcBuilderResult> {
   props: Partial<VpcBuilderProps> = {};
 
+  // DEMO (ambient context): `context` stays in the signature — it is the
+  // public `Lifecycle` contract and callers pass it — but it is no longer
+  // threaded into `resolveFlowLogs` or down to the sub-builder. The flow-log
+  // sub-builder still resolves refs, because `taggedBuilder` made this build's
+  // context ambient before calling in. The regression test from #393 passes
+  // unchanged. Note the parameter is now unused, which is the residual cost
+  // this experiment is meant to expose.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- demo: retained for the public contract, consumed ambiently
   build(scope: IConstruct, id: string, context?: Record<string, object>): VpcBuilderResult {
     const { flowLogs: flowLogsConfig, ...vpcProps } = this.props;
 
-    const { flowLogsLogGroup, flowLogProps } = resolveFlowLogs(scope, id, flowLogsConfig, context);
+    const { flowLogsLogGroup, flowLogProps } = resolveFlowLogs(scope, id, flowLogsConfig);
 
     // CDK accepts `availabilityZones` or `maxAzs`, but not both. When the user
     // pins AZs explicitly, the default `maxAzs` must yield to their intent;
@@ -132,7 +140,6 @@ function resolveFlowLogs(
   scope: IConstruct,
   id: string,
   cfg: FlowLogsConfig | undefined,
-  context?: Record<string, object>,
 ): { flowLogsLogGroup?: LogGroup; flowLogProps: Pick<VpcProps, "flowLogs"> } {
   if (cfg === false) {
     return { flowLogProps: {} };
@@ -156,11 +163,9 @@ function resolveFlowLogs(
   if (cfg?.configure) {
     subBuilder = cfg.configure(subBuilder);
   }
-  // Pass the build context down: `ILogGroupBuilder` widens `encryptionKey` to a
-  // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
-  // KMS key. Without the context that ref resolves against an empty record and
-  // throws "component not found".
-  const flowLogsLogGroup = subBuilder.build(scope, `${id}FlowLogsLogGroup`, context).logGroup;
+  // DEMO (ambient context): no context passed, and none available to pass.
+  // The sub-builder picks up the enclosing build's context ambiently.
+  const flowLogsLogGroup = subBuilder.build(scope, `${id}FlowLogsLogGroup`).logGroup;
 
   return {
     flowLogsLogGroup,

@@ -1,5 +1,6 @@
 import { Graph, alg, json } from "@dagrejs/graphlib";
 import { type IConstruct } from "constructs";
+import { withAmbientContext } from "./ambient-context.js";
 import { buildIdOf } from "./build-id.js";
 import { CyclicDependencyError } from "./cyclic-dependency-error.js";
 import { DuplicateConstructIdError } from "./duplicate-construct-id-error.js";
@@ -278,7 +279,12 @@ class ComposedLifecycle<
       }
       usedIds.add(componentId);
 
-      results[key] = component.build(componentScope, componentId, context);
+      // Install the context as ambient for the duration of this component's
+      // build, so a sub-builder created inside it inherits the context even if
+      // the component does not thread it down. See ambient-context.ts.
+      results[key] = withAmbientContext(context, () =>
+        component.build(componentScope, componentId, context),
+      );
     }
 
     return {

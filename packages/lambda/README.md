@@ -70,8 +70,6 @@ compose(
 );
 ```
 
-The prop's inner type is read from CDK's own `FunctionProps["environmentEncryption"]` rather than named as `IKey`, so it tracks CDK's `kms.IKey` → `kms.IKeyRef` migration in either direction — see [the table in `@composurecdk/kms`](../kms/README.md#keys-as-components).
-
 ## Execution role
 
 By default, `createFunctionBuilder` creates an explicit IAM execution role with an inline `LogsWriter` policy scoped to the function's auto-created log group:

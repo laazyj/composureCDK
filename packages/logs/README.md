@@ -62,5 +62,3 @@ compose(
   { logKey: [], audit: ["logKey"] },
 );
 ```
-
-The prop's inner type is read from CDK's own `LogGroupProps["encryptionKey"]` rather than named as `IKey`, so it tracks CDK's `kms.IKey` → `kms.IKeyRef` migration in either direction — see [the table in `@composurecdk/kms`](../kms/README.md#keys-as-components).

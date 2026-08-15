@@ -174,6 +174,10 @@ export type AccessLogsConfig =
        * pre-seeded with `versioned: false`, `objectOwnership:
        * BUCKET_OWNER_PREFERRED`, `removalPolicy: RETAIN`, and recursive
        * S3 server access logging disabled.
+       *
+       * The callback receives the build context, so anything `IBucketBuilder`
+       * accepts as a `Resolvable` can be a `ref` to a sibling component.
+       * Declare that component as a dependency.
        */
       configure?: (b: IBucketBuilder) => IBucketBuilder;
     };
@@ -442,7 +446,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
     } = DISTRIBUTION_DEFAULTS;
     const cfg = accessLogs ?? defaultAccessLogs;
 
-    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg);
+    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg, context);
 
     const behaviors = resolveBehaviors({
       scope,
@@ -526,6 +530,7 @@ function resolveAccessLogs(
   scope: IConstruct,
   id: string,
   cfg: AccessLogsConfig | undefined,
+  context?: Record<string, object>,
 ): {
   accessLogsBucket?: Bucket;
   accessLogProps: Partial<
@@ -567,7 +572,11 @@ function resolveAccessLogs(
   if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }
-  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`).bucket;
+  // Pass the build context down: `IBucketBuilder` widens `encryptionKey` to a
+  // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
+  // KMS key. Without the context that ref resolves against an empty record and
+  // throws "component not found".
+  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`, context).bucket;
 
   return {
     accessLogsBucket,

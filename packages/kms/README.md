@@ -32,7 +32,7 @@ The key-consuming props on the library's stateful resources accept a `Resolvable
 | `@composurecdk/sns`      | `masterKey`           | `Resolvable<IKey>`                   |
 | `@composurecdk/logs`     | `encryptionKey`       | `Resolvable<IKey>`                   |
 
-Two key-consuming props elsewhere still take a concrete key — `@composurecdk/lambda`'s `environmentEncryption` and `@composurecdk/neptune`'s `kmsKey`. Build the key as a component and pass `result.key` to those until they are widened.
+Two key-consuming props elsewhere still take a concrete key — `@composurecdk/lambda`'s `environmentEncryption` ([#379](https://github.com/laazyj/composureCDK/issues/379)) and `@composurecdk/neptune`'s `kmsKey` ([#380](https://github.com/laazyj/composureCDK/issues/380)). Build the key as a component and pass `result.key` to those until they are widened.
 
 ```ts
 import { AttributeType, TableEncryptionV2 } from "aws-cdk-lib/aws-dynamodb";

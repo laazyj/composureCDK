@@ -7,8 +7,8 @@ describe("crud-api-app", () => {
   const template = Template.fromStack(stack);
 
   it("creates one DynamoDB table keyed on id", () => {
-    template.resourceCountIs("AWS::DynamoDB::GlobalTable", 1);
-    template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
+    template.resourceCountIs("AWS::DynamoDB::Table", 1);
+    template.hasResourceProperties("AWS::DynamoDB::Table", {
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
   });
@@ -72,6 +72,36 @@ describe("crud-api-app", () => {
         Statement: Match.arrayWith([
           Match.objectLike({
             Action: Match.arrayWith(["dynamodb:GetItem", "dynamodb:Scan", "dynamodb:PutItem"]),
+            Effect: "Allow",
+          }),
+        ]),
+      }),
+    });
+  });
+
+  it("encrypts the table with a customer-managed key built as a component", () => {
+    template.resourceCountIs("AWS::KMS::Key", 1);
+    template.hasResourceProperties("AWS::DynamoDB::Table", {
+      SSESpecification: { SSEEnabled: true, SSEType: "KMS" },
+    });
+  });
+
+  it("gives the key an alias and rotation on, from the builder defaults", () => {
+    template.hasResourceProperties("AWS::KMS::Alias", {
+      AliasName: "alias/composurecdk-examples/crud-api/gadgets",
+    });
+    template.hasResourceProperties("AWS::KMS::Key", { EnableKeyRotation: true });
+  });
+
+  it("extends the role's table grant to the key, with no separate KMS grant declared", () => {
+    // `tableGrants.readWrite` is the only grant in the stack; CDK's own
+    // grantReadWriteData reaches the table's encryptionKey, so the API role
+    // can decrypt without the example asking for it.
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(["kms:Decrypt", "kms:GenerateDataKey*"]),
             Effect: "Allow",
           }),
         ]),

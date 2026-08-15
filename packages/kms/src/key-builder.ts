@@ -65,12 +65,9 @@ export interface KeyBuilderResult {
  * The builder implements {@link Lifecycle}, so a key can be an ordinary
  * component of a {@link compose | composed system} — placed by the stack
  * strategy, ordered by the dependency graph, and referenced by the resources
- * it encrypts via `ref()`. Key-consuming props across the library
- * (`@composurecdk/s3`'s `encryptionKey`, `@composurecdk/dynamodb`'s
- * `encryption`, `@composurecdk/sqs`'s `encryptionMasterKey`,
- * `@composurecdk/sns`'s `masterKey`, `@composurecdk/logs`'s `encryptionKey`)
- * accept a `Resolvable`, so the edge is declared in the dependency map rather
- * than closed over from an imperative prologue.
+ * it encrypts via `ref()`. The key-consuming props across the library accept a
+ * `Resolvable` — the package README tabulates them — so the edge is declared in
+ * the dependency map rather than closed over from an imperative prologue.
  *
  * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kms.Key.html
  *

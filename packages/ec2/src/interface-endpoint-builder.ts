@@ -215,7 +215,7 @@ class InterfaceEndpointBuilder implements Lifecycle<InterfaceEndpointBuilderResu
       managedSecurityGroup = createSecurityGroupBuilder()
         .vpc(resolvedVpc)
         .description(`Interface endpoint ${id}`)
-        .build(scope, `${id}Sg`).securityGroup;
+        .build(scope, `${id}Sg`, context).securityGroup;
       securityGroups = [managedSecurityGroup];
     }
 

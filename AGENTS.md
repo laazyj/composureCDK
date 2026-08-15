@@ -23,11 +23,13 @@ If you touched anything under `.github/workflows/`, also run:
 npm run actionlint
 ```
 
-`npm run lint` is eslint only and will not look at a workflow file. See [linting the workflows](docs/ci.md#linting-the-workflows) — it is a separate gate because a broken workflow is one of the few things CI cannot catch for you.
+`npm run lint` is eslint only and will not look at a workflow file. See [linting the workflows](docs/ci.md#linting-the-workflows) — it is a separate gate because a broken workflow is one of the few things CI cannot catch for you. It needs `shellcheck >= 0.9` on `PATH`, which containers often lack; install it rather than skipping the gate.
 
 ## Build system
 
 Use npx nx to run build/test scripts — this is an nx monorepo.
+
+**Install dependencies with npm 11** (`npm install -g npm@11`). npm 10 and 11 disagree on how optional peer deps are pinned in the lockfile, and ours is generated under npm 11 — so under npm 10 `npm ci` fails with `Missing: yaml@2.9.0 from lock file`, and `npm install` "fixes" it by rewriting the lockfile, stripping `libc` fields npm 11 wrote. Neither is a defect in the lockfile and neither wants committing: CI pins npm 11 across the whole Node matrix for exactly this reason (see the `Pin npm` step in [ci.yml](.github/workflows/ci.yml)). Node 20 and 22 ship npm 10, so a default install on either needs the pin.
 
 Lint is an nx target too: `npm run lint` runs `nx run-many -t lint`, which caches per project so unchanged packages fast-succeed. Each package carries a `"lint": "eslint ."` script, so nx infers a `lint` target the same way it infers `build`/`test`/`typecheck` from package.json scripts — add that line when you create a package. Three things make this correct rather than merely fast:
 

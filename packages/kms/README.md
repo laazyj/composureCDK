@@ -23,15 +23,16 @@ The point of the builder is that a CMK stops being a construct you create impera
 
 The key-consuming props on the library's stateful resources accept a `Resolvable`, so the key is wired in with `ref()`:
 
-| Package                  | Prop                  | Accepts                              |
-| ------------------------ | --------------------- | ------------------------------------ |
-| `@composurecdk/s3`       | `encryptionKey`       | `Resolvable<IKey>`                   |
-| `@composurecdk/dynamodb` | `encryption` (V2)     | `Resolvable<TableEncryptionV2>`      |
-| `@composurecdk/dynamodb` | `encryptionKey`       | `Resolvable<IKey>` (classic `Table`) |
-| `@composurecdk/sqs`      | `encryptionMasterKey` | `Resolvable<IKey>`                   |
-| `@composurecdk/sns`      | `masterKey`           | `Resolvable<IKey>`                   |
-| `@composurecdk/logs`     | `encryptionKey`       | `Resolvable<IKey>`                   |
-| `@composurecdk/neptune`  | `kmsKey`              | `Resolvable<IKey>`                   |
+| Package                  | Prop                    | Accepts                              |
+| ------------------------ | ----------------------- | ------------------------------------ |
+| `@composurecdk/s3`       | `encryptionKey`         | `Resolvable<IKey>`                   |
+| `@composurecdk/dynamodb` | `encryption` (V2)       | `Resolvable<TableEncryptionV2>`      |
+| `@composurecdk/dynamodb` | `encryptionKey`         | `Resolvable<IKey>` (classic `Table`) |
+| `@composurecdk/sqs`      | `encryptionMasterKey`   | `Resolvable<IKey>`                   |
+| `@composurecdk/sns`      | `masterKey`             | `Resolvable<IKey>`                   |
+| `@composurecdk/logs`     | `encryptionKey`         | `Resolvable<IKey>`                   |
+| `@composurecdk/lambda`   | `environmentEncryption` | `Resolvable<IKey>`                   |
+| `@composurecdk/neptune`  | `kmsKey`                | `Resolvable<IKey>`                   |
 
 An `IKey` is what these props are written against, but it is not the limit of what they take: where CDK has widened a prop to the broader [`kms.IKeyRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kms.IKeyRef.html), the builder's prop is read from CDK's own type rather than pinned to an interface, so it accepts whatever the `aws-cdk-lib` you have installed accepts. The `keyGrants` helpers below are pinned to `IKey`, so a key that is only an `IKeyRef` reaches a resource prop but not a grant.
 

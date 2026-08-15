@@ -27,7 +27,7 @@
     },
     "logs": {
       "floor": "2.1.0",
-      "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-logs)"
+      "gatedBy": "aws-cdk-lib ESM subpath exports (aws-cdk-lib/aws-logs). Note LogGroupBuilderProps.encryptionKey deliberately re-declares the prop as Resolvable<NonNullable<LogGroupProps[\"encryptionKey\"]>> rather than naming a key interface: CDK widened this prop from kms.IKey to kms.IKeyRef in 2.215.0, so IKey narrows what a consumer above that release can pass and IKeyRef does not exist at this floor. Do not 'simplify' it to either interface without raising the floor — `enforce` runs the unit suite, which does not typecheck, so nothing catches it here."
     },
     "events": {
       "floor": "2.93.0",
@@ -57,7 +57,10 @@
       "floor": "2.119.0",
       "gatedBy": "aws-certificatemanager.KeyAlgorithm (introduced 2.119.0)"
     },
-    "lambda": { "floor": "2.168.0", "gatedBy": "aws-lambda.MetricType (introduced 2.168.0)" },
+    "lambda": {
+      "floor": "2.168.0",
+      "gatedBy": "aws-lambda.MetricType (introduced 2.168.0). Note FunctionBuilderProps.environmentEncryption deliberately re-declares the prop as Resolvable<NonNullable<FunctionProps[\"environmentEncryption\"]>> rather than naming a key interface: CDK widened this prop from kms.IKey to kms.IKeyRef in 2.215.0, so IKey narrows what a consumer above that release can pass and IKeyRef does not exist at this floor. Do not 'simplify' it to either interface without raising the floor — `enforce` runs the unit suite, which does not typecheck, so nothing catches it here."
+    },
     "dynamodb": {
       "floor": "2.178.0",
       "gatedBy": "aws-dynamodb TableProps.pointInTimeRecoverySpecification and TablePropsV2.pointInTimeRecoverySpecification — the L2 props both builders' PITR default sets — were introduced in 2.178.0 (absent in 2.177.0); below this the prop is silently ignored and the point-in-time-recovery default no-ops. TableV2 / Billing / Capacity / TableEncryptionV2 (2.135.0), metricSystemErrorsForOperations and the Operation enum are all lower; peers @composurecdk/cloudwatch at 2.93.0."

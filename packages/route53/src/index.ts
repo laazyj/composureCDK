@@ -7,6 +7,13 @@ export {
 export { type QueryLoggingConfig } from "./query-logging.js";
 export { hostedZoneGrants } from "./grants.js";
 export {
+  createCrossAccountZoneDelegationBuilder,
+  type CrossAccountZoneDelegationBuilderProps,
+  type CrossAccountZoneDelegationBuilderResult,
+  type ICrossAccountZoneDelegationBuilder,
+} from "./cross-account-zone-delegation-builder.js";
+export { type DelegationProviderLoggingConfig } from "./cross-account-delegation-provider-logging.js";
+export {
   createARecordBuilder,
   type ARecordBuilderProps,
   type ARecordBuilderResult,
@@ -107,4 +114,5 @@ export {
   HTTPS_RECORD_DEFAULTS,
   SVCB_RECORD_DEFAULTS,
   HEALTH_CHECK_DEFAULTS,
+  CROSS_ACCOUNT_ZONE_DELEGATION_DEFAULTS,
 } from "./defaults.js";

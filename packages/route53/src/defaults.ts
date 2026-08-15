@@ -1,5 +1,6 @@
-import { Duration } from "aws-cdk-lib";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import type { HostedZoneBuilderProps } from "./hosted-zone-builder.js";
+import type { CrossAccountZoneDelegationBuilderProps } from "./cross-account-zone-delegation-builder.js";
 import type { ARecordBuilderProps } from "./a-record-builder.js";
 import type { AaaaRecordBuilderProps } from "./aaaa-record-builder.js";
 import type { CnameRecordBuilderProps } from "./cname-record-builder.js";
@@ -183,3 +184,43 @@ export const HEALTH_CHECK_DEFAULTS: Partial<HealthCheckBuilderProps> = {
   requestInterval: Duration.seconds(30),
   measureLatency: true,
 };
+
+/**
+ * Defaults for {@link createCrossAccountZoneDelegationBuilder}. Overridable via
+ * the fluent API.
+ *
+ * `ttl` and `removalPolicy` match CDK's own defaults but are set explicitly so
+ * both appear in this package's defaults table and can be reasoned about
+ * without reading CDK source. Neither `parentHostedZoneName` nor
+ * `parentHostedZoneId` is defaulted: they are mutually exclusive, so a default
+ * on either would collide with the user's choice of the other
+ * ([ADR-0009](../../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)),
+ * and neither has a value that could be guessed.
+ */
+export const CROSS_ACCOUNT_ZONE_DELEGATION_DEFAULTS: Partial<CrossAccountZoneDelegationBuilderProps> =
+  {
+    /**
+     * Two days, matching CDK. Delegation `NS` records are stable steady-state,
+     * and a long TTL keeps resolvers off the parent's name servers. Lower it to
+     * minutes *before* a planned delegation change — a change takes up to the
+     * previously published TTL to propagate — then raise it again afterwards.
+     */
+    ttl: Duration.days(2),
+    /**
+     * Remove the `NS` records from the parent zone when this stack is deleted,
+     * matching CDK. Retaining them would leave a lame delegation pointing at a
+     * hosted zone that no longer exists — a subdomain that resolves to failure
+     * rather than to nothing, and a subdomain-takeover surface. Note this
+     * reaches across an account boundary: deleting this stack deletes records in
+     * the parent account's zone.
+     */
+    removalPolicy: RemovalPolicy.DESTROY,
+    /**
+     * Bring the shared provider Lambda's log group under the `@composurecdk/logs`
+     * retention and removal defaults. Without it the Lambda service creates
+     * `/aws/lambda/<generated-name>` on first invocation with indefinite
+     * retention, absent from the template.
+     * @see https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/ops_observability_config_telemetry.html
+     */
+    providerLogging: {},
+  };

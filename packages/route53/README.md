@@ -2,7 +2,7 @@
 
 Route 53 hosted zone and record builders for [ComposureCDK](../../README.md).
 
-This package provides fluent builders for Route 53 public hosted zones and for the record types most commonly needed when fronting an AWS workload (A/AAAA alias, CNAME, TXT, MX, SRV, CAA, NS, DS, HTTPS, SVCB). It wraps the CDK [aws-route53](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_route53-readme.html) constructs — refer to the CDK documentation for the full set of configurable properties.
+This package provides fluent builders for Route 53 public hosted zones, for the record types most commonly needed when fronting an AWS workload (A/AAAA alias, CNAME, TXT, MX, SRV, CAA, NS, DS, HTTPS, SVCB), and for both halves of a cross-account subdomain delegation. It wraps the CDK [aws-route53](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_route53-readme.html) constructs — refer to the CDK documentation for the full set of configurable properties.
 
 ## Hosted Zone Builder
 
@@ -108,7 +108,96 @@ compose(
 
 **Name the delegated zones.** Without `delegatedZoneNames` the grantee may replace or remove the `NS` records of any name in the parent zone, including delegations belonging to other accounts — one over-broad role is enough to take a sibling account's subdomain offline. Passing the names adds the `route53:ChangeResourceRecordSetsNormalizedRecordNames` condition, confining each role to the subdomain it owns. Each name must be lowercase, carry no trailing dot, and be a subdomain of the granting zone; CDK validates all three at synth.
 
-Publishing the delegated zone's own `NS` records into a parent zone owned by **another** account is the other half of this story, and has no builder yet — use CDK's `CrossAccountZoneDelegationRecord` with the role granted above.
+Publishing the delegated zone's own `NS` records into that parent zone is the other half of this story, and it happens in the child account — see [Cross-account zone delegation](#cross-account-zone-delegation) below.
+
+## Cross-account zone delegation
+
+A delegation spans two accounts and needs a builder in each:
+
+| Account    | Declares                                                      | Builder                                      |
+| ---------- | ------------------------------------------------------------- | -------------------------------------------- |
+| **Parent** | A role the child may assume to write `NS` records in its zone | `hostedZoneGrants.delegation(...)` on a role |
+| **Child**  | Its own zone, and the `NS` records published into the parent  | `createCrossAccountZoneDelegationBuilder()`  |
+
+The two halves meet at one role ARN. The parent's half is the [delegation grant](#delegation-grants) above; the child's is:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { Duration } from "aws-cdk-lib";
+import {
+  createHostedZoneBuilder,
+  createCrossAccountZoneDelegationBuilder,
+  type HostedZoneBuilderResult,
+} from "@composurecdk/route53";
+
+compose(
+  {
+    childZone: createHostedZoneBuilder().zoneName("beta.example.com"),
+
+    parentDelegation: createCrossAccountZoneDelegationBuilder()
+      .delegatedZone(ref("childZone", (r: HostedZoneBuilderResult) => r.hostedZone))
+      .parentHostedZoneName("example.com")
+      // The role the parent account granted, scoped to beta.example.com.
+      .delegationRole("arn:aws:iam::111122223333:role/delegation-beta")
+      .ttl(Duration.minutes(30)),
+  },
+  { childZone: [], parentDelegation: ["childZone"] },
+);
+```
+
+At deploy time a Lambda-backed custom resource assumes the delegation role and `UPSERT`s the child zone's four name servers into the parent zone.
+
+**`delegationRole` takes an ARN.** The role lives in the parent account, so the child stack has nothing to `ref` — passing the ARN saves the `Role.fromRoleArn(...)` line every call site would otherwise repeat. The builder imports it as immutable: this stack assumes the role, it never attaches policies to it. An `IRole`, or a `ref` to either, works for the same-account and same-app cases.
+
+**Name the parent zone, or its id — not both.** `parentHostedZoneName` is the usual choice; reach for `parentHostedZoneId` when the parent account holds several zones with the same name. Setting both, or neither, fails at build time naming both setters.
+
+**The delegated zone must be a public zone created in this stack.** The record forwards `hostedZone.hostedZoneNameServers` to the custom resource, and that attribute is `undefined` for private hosted zones and for zones imported with `fromLookup` / `fromHostedZoneAttributes` or referenced from another stack. CDK would deploy a delegation with an empty `NS` set — a subdomain that resolves nowhere, with no error. The builder fails at build time instead, naming the zone.
+
+### Nothing to tighten on this side
+
+The child half is already least privilege: CDK grants the custom-resource provider `sts:AssumeRole` on exactly the one ARN passed to `delegationRole`, and this builder does not widen it. The lever that decides how much damage that role can do is `delegatedZoneNames` on the parent's grant — see [Delegation grants](#delegation-grants) above, where the unscoped form is the tempting shortcut.
+
+### Provider logging
+
+The delegation record is backed by a Lambda custom resource, and aws-cdk-lib creates that Lambda as a raw `AWS::Lambda::Function` with no `LoggingConfig`. Left alone, the Lambda service creates `/aws/lambda/<generated-name>` on first invocation with **indefinite** retention — a log group no template describes and no `@composurecdk/logs` default reaches.
+
+**The builder brings it under the same defaults as every other log group in the library.** It declares `/aws/lambda/<stackName>-cross-account-zone-delegation` with `RetentionDays.TWO_YEARS` / `RemovalPolicy.RETAIN` and points the provider's `LoggingConfig` at it. The provider is a stack-level singleton, so the log group is one too: every delegation record in the stack shares it, and each build result returns the same handle as `result.providerLogGroup`.
+
+```ts
+type DelegationProviderLoggingConfig =
+  false | { configure?: (b: ILogGroupBuilder) => ILogGroupBuilder };
+```
+
+```ts
+createCrossAccountZoneDelegationBuilder()
+  // ...
+  .providerLogging({ configure: (lg) => lg.retention(RetentionDays.ONE_MONTH) });
+
+// Or leave the provider's logging to the Lambda service:
+createCrossAccountZoneDelegationBuilder().providerLogging(false);
+```
+
+Because the provider is a singleton, `providerLogging` is a per-record knob over a stack-wide resource. The first delegation record built in the stack settles the log group; a later record that sets `providerLogging` to something else is handed the group it will really log to and warned (`@composurecdk/route53:delegation-provider-logging-conflict`) that its setting had no effect — including `providerLogging(false)`, which cannot remove a group a sibling record already created. Configure it on one record per stack.
+
+The callback receives the build context, so anything `ILogGroupBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the delegation record.
+
+Keep any customised name under `/aws/lambda/`. CDK owns the provider's execution role and gives it only `AWSLambdaBasicExecutionRole`, which permits `logs:PutLogEvents` on `/aws/lambda/*` and nothing else — a log group named elsewhere silently receives nothing. The builder emits the synth warning `@composurecdk/route53:delegation-provider-log-group-name` if you move it.
+
+### Operational trade-offs
+
+**`ttl` defaults to two days**, matching CDK. That is right steady-state — delegation records are stable, and a long TTL keeps resolvers off the parent's name servers. It is painful mid-migration: an `NS` change takes up to the _previously published_ TTL to propagate. Lower it to minutes ahead of a planned delegation change, deploy, wait out the old TTL, make the change, then raise it again.
+
+**`removalPolicy` defaults to `DESTROY`**, also matching CDK, and it should stay that way: `RETAIN` leaves a lame delegation pointing at a hosted zone that no longer exists — a subdomain that resolves to failure rather than to nothing, and a takeover surface. Be clear-eyed about what it means, though. The records live in _another account's_ zone, so deleting the child stack reaches across an account boundary to delete them.
+
+**The record is written at deploy time only.** If the child hosted zone is ever replaced, its name servers change and the parent's `NS` records go stale until the next deploy of this stack. Nothing detects that drift.
+
+### What to alarm on
+
+**There is nothing to alarm on for the record itself.** Route 53 publishes no CloudWatch metrics for record sets, and the custom resource runs only at deploy time — a failure there already fails the deployment, so an alarm on the provider Lambda would be noise, not signal. This builder provisions no alarms.
+
+The delegation's practical liveness signal is one layer out, on a **health check** against an endpoint in the delegated zone: it only stays healthy while resolution works end to end through the parent's `NS` records, which makes `HealthCheckStatus` — [AWS's recommended Route 53 alarm](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Route53) — the check that actually catches a broken delegation. This package already ships it: see [Health Check Builder](#health-check-builder) and [Recommended Alarms](#recommended-alarms). The builder cannot create one for you, since a health check needs an endpoint it has no way to know.
+
+If the delegated zone is DNSSEC-signed, the delegation's `DS` half is the part that breaks, and AWS recommends alarming on `DNSSECInternalFailure` and `DNSSECKeySigningKeysNeedingAction`. This package has no zone-level alarms yet — that is a separate gap, not something this builder covers.
 
 ## Record Builders
 
@@ -155,23 +244,26 @@ Each helper accepts a `Resolvable`, so targets produced by other composed compon
 
 ## Secure Defaults
 
-| Builder                    | Property         | Default               | Rationale                                                                                |
-| -------------------------- | ---------------- | --------------------- | ---------------------------------------------------------------------------------------- |
-| `createHostedZoneBuilder`  | `addTrailingDot` | `true`                | Matches RFC 1035 and the CDK default; unambiguous apex.                                  |
-| `createHostedZoneBuilder`  | `queryLogging`   | _auto-managed_        | DNS query logs to a `/aws/route53/<zoneName>` log group with a shared resource policy.   |
-| `createARecordBuilder`     | `ttl`            | `Duration.minutes(5)` | Balances propagation latency against DNS cache churn; skipped for alias targets.[^alias] |
-| `createAaaaRecordBuilder`  | `ttl`            | `Duration.minutes(5)` | Same as A records; skipped for alias targets.[^alias]                                    |
-| `createCnameRecordBuilder` | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
-| `createTxtRecordBuilder`   | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
-| `createMxRecordBuilder`    | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
-| `createSrvRecordBuilder`   | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
-| `createCaaRecordBuilder`   | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
-| `createNsRecordBuilder`    | `ttl`            | `Duration.hours(24)`  | Delegation records change rarely; long TTL cuts lookups.                                 |
-| `createDsRecordBuilder`    | `ttl`            | `Duration.hours(24)`  | DNSSEC trust anchors change on key rollover only.                                        |
-| `createHttpsRecordBuilder` | `ttl`            | `Duration.minutes(5)` | Same as A records; skipped for alias targets.[^alias]                                    |
-| `createSvcbRecordBuilder`  | `ttl`            | `Duration.minutes(5)` | Same rationale as A records.                                                             |
+| Builder                                   | Property          | Default               | Rationale                                                                                           |
+| ----------------------------------------- | ----------------- | --------------------- | --------------------------------------------------------------------------------------------------- |
+| `createHostedZoneBuilder`                 | `addTrailingDot`  | `true`                | Matches RFC 1035 and the CDK default; unambiguous apex.                                             |
+| `createHostedZoneBuilder`                 | `queryLogging`    | _auto-managed_        | DNS query logs to a `/aws/route53/<zoneName>` log group with a shared resource policy.              |
+| `createARecordBuilder`                    | `ttl`             | `Duration.minutes(5)` | Balances propagation latency against DNS cache churn; skipped for alias targets.[^alias]            |
+| `createAaaaRecordBuilder`                 | `ttl`             | `Duration.minutes(5)` | Same as A records; skipped for alias targets.[^alias]                                               |
+| `createCnameRecordBuilder`                | `ttl`             | `Duration.minutes(5)` | Same rationale as A records.                                                                        |
+| `createTxtRecordBuilder`                  | `ttl`             | `Duration.minutes(5)` | Same rationale as A records.                                                                        |
+| `createMxRecordBuilder`                   | `ttl`             | `Duration.minutes(5)` | Same rationale as A records.                                                                        |
+| `createSrvRecordBuilder`                  | `ttl`             | `Duration.minutes(5)` | Same rationale as A records.                                                                        |
+| `createCaaRecordBuilder`                  | `ttl`             | `Duration.minutes(5)` | Same rationale as A records.                                                                        |
+| `createNsRecordBuilder`                   | `ttl`             | `Duration.hours(24)`  | Delegation records change rarely; long TTL cuts lookups.                                            |
+| `createDsRecordBuilder`                   | `ttl`             | `Duration.hours(24)`  | DNSSEC trust anchors change on key rollover only.                                                   |
+| `createHttpsRecordBuilder`                | `ttl`             | `Duration.minutes(5)` | Same as A records; skipped for alias targets.[^alias]                                               |
+| `createSvcbRecordBuilder`                 | `ttl`             | `Duration.minutes(5)` | Same rationale as A records.                                                                        |
+| `createCrossAccountZoneDelegationBuilder` | `ttl`             | `Duration.days(2)`    | Matches CDK; delegation records are stable. [Lower it before a migration.](#operational-trade-offs) |
+| `createCrossAccountZoneDelegationBuilder` | `removalPolicy`   | `DESTROY`             | Matches CDK; `RETAIN` leaves a lame delegation. [Reaches across accounts.](#operational-trade-offs) |
+| `createCrossAccountZoneDelegationBuilder` | `providerLogging` | _auto-managed_        | The provider Lambda's log group otherwise never expires and is absent from the template.            |
 
-The defaults are exported as `HOSTED_ZONE_DEFAULTS`, `A_RECORD_DEFAULTS`, `AAAA_RECORD_DEFAULTS`, `CNAME_RECORD_DEFAULTS`, `TXT_RECORD_DEFAULTS`, `MX_RECORD_DEFAULTS`, `SRV_RECORD_DEFAULTS`, `CAA_RECORD_DEFAULTS`, `NS_RECORD_DEFAULTS`, `DS_RECORD_DEFAULTS`, `HTTPS_RECORD_DEFAULTS`, and `SVCB_RECORD_DEFAULTS` for visibility and testing.
+The defaults are exported as `HOSTED_ZONE_DEFAULTS`, `A_RECORD_DEFAULTS`, `AAAA_RECORD_DEFAULTS`, `CNAME_RECORD_DEFAULTS`, `TXT_RECORD_DEFAULTS`, `MX_RECORD_DEFAULTS`, `SRV_RECORD_DEFAULTS`, `CAA_RECORD_DEFAULTS`, `NS_RECORD_DEFAULTS`, `DS_RECORD_DEFAULTS`, `HTTPS_RECORD_DEFAULTS`, `SVCB_RECORD_DEFAULTS`, and `CROSS_ACCOUNT_ZONE_DELEGATION_DEFAULTS` for visibility and testing.
 
 [^alias]: AWS ignores TTL on alias records and CDK emits a warning when one is set, so `A`, `AAAA`, and `HTTPS` builders skip the default TTL whenever the target is an alias.
 

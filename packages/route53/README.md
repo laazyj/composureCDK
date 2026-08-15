@@ -50,6 +50,8 @@ createHostedZoneBuilder()
   .queryLogging({ configure: (lg) => lg.retention(RetentionDays.SIX_MONTHS) });
 ```
 
+The callback receives the build context, so anything `ILogGroupBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the hosted zone.
+
 Bring your own log group (you own the resource policy too):
 
 ```ts

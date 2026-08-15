@@ -124,6 +124,7 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
       accessLogging,
       SPEC_REST_API_DEFAULTS.deployOptions,
       specRestApiProps.deployOptions ?? {},
+      context,
     );
 
     const api = new SpecRestApi(scope, id, {

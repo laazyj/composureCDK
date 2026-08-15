@@ -1,7 +1,15 @@
-import { Aspects, CfnDeletionPolicy, PropertyInjectors, RemovalPolicy, Stack } from "aws-cdk-lib";
+import {
+  Aspects,
+  CfnDeletionPolicy,
+  Duration,
+  PropertyInjectors,
+  RemovalPolicy,
+  Stack,
+} from "aws-cdk-lib";
 import type { IAspect, IPropertyInjector } from "aws-cdk-lib";
 import { Bucket, CfnBucket, type BucketProps } from "aws-cdk-lib/aws-s3";
-import { TableV2, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
+import { Table, TableV2, type TableProps, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
+import { Key, type KeyProps } from "aws-cdk-lib/aws-kms";
 import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
 import { RestApi, type RestApiProps } from "aws-cdk-lib/aws-apigateway";
@@ -90,6 +98,46 @@ class TableV2RemovalPolicyInjector implements IPropertyInjector {
 
   inject(originalProps: TablePropsV2): TablePropsV2 {
     return { ...originalProps, removalPolicy: RemovalPolicy.DESTROY, deletionProtection: false };
+  }
+}
+
+/**
+ * A {@link IPropertyInjector} for classic DynamoDB `Table`s that sets
+ * `removalPolicy` to `DESTROY` and `deletionProtection` to `false`. The
+ * `TableV2` injector above keys on a different construct id, so the classic
+ * table used by the crud-api example needs its own.
+ */
+class TableRemovalPolicyInjector implements IPropertyInjector {
+  readonly constructUniqueId = Table.PROPERTY_INJECTION_ID;
+
+  inject(originalProps: TableProps): TableProps {
+    return { ...originalProps, removalPolicy: RemovalPolicy.DESTROY, deletionProtection: false };
+  }
+}
+
+/**
+ * A {@link IPropertyInjector} for KMS keys that sets `removalPolicy` to
+ * `DESTROY` and shortens the pending-deletion window to the AWS minimum.
+ *
+ * `@composurecdk/kms` defaults a key to `RETAIN` with the maximum 30-day
+ * window, which is right for real data and wrong for a sandbox: every CI
+ * deploy would leave behind a key that bills for a month after the stack it
+ * belonged to is gone.
+ *
+ * Seven days is as short as this gets — AWS enforces a 7-to-30 day waiting
+ * period on `ScheduleKeyDeletion` and there is no immediate-delete option, so
+ * a torn-down example's key still bills for a week. That is the floor, not a
+ * choice.
+ */
+class KeyRemovalPolicyInjector implements IPropertyInjector {
+  readonly constructUniqueId = Key.PROPERTY_INJECTION_ID;
+
+  inject(originalProps: KeyProps): KeyProps {
+    return {
+      ...originalProps,
+      removalPolicy: RemovalPolicy.DESTROY,
+      pendingWindow: Duration.days(7),
+    };
   }
 }
 
@@ -214,6 +262,9 @@ function resolveLogsBucketInStack(
  * - `aws-cdk-lib/aws-apigateway.RestApi` (Account + CloudWatch Role)
  * - `@aws-cdk/aws-neptune-alpha.DatabaseCluster` (also clears `deletionProtection`)
  * - `aws-cdk-lib/aws-dynamodb.TableV2` (also clears `deletionProtection`)
+ * - `aws-cdk-lib/aws-dynamodb.Table` (also clears `deletionProtection`)
+ * - `aws-cdk-lib/aws-kms.Key` (also shortens the pending-deletion window to
+ *   the 7-day AWS minimum)
  *
  * If new stateful construct types are added to example stacks (e.g.
  * SQS queues), add a corresponding injector here.
@@ -228,6 +279,8 @@ export function cleanDeskPolicy(scope: IConstruct): void {
   injectors.add(new RestApiRemovalPolicyInjector());
   injectors.add(new NeptuneClusterRemovalPolicyInjector());
   injectors.add(new TableV2RemovalPolicyInjector());
+  injectors.add(new TableRemovalPolicyInjector());
+  injectors.add(new KeyRemovalPolicyInjector());
 
   Aspects.of(scope).add(new DisableSourceLoggingOnDeleteAspect());
 }

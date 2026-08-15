@@ -204,6 +204,8 @@ createVpcBuilder().flowLogs({
 });
 ```
 
+The callback receives the build context, so anything `ILogGroupBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the VPC.
+
 Use a user-managed destination (e.g. an S3 bucket):
 
 ```ts

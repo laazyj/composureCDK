@@ -431,6 +431,30 @@ describe("BucketBuilder", () => {
         encryption.ServerSideEncryptionConfiguration[0].ServerSideEncryptionByDefault.SSEAlgorithm,
       ).toBe("aws:kms");
     });
+
+    it("configure callback can reach a sibling component through a ref", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "LogsKey");
+
+      createBucketBuilder()
+        .bucketName("main")
+        .serverAccessLogs({
+          configure: (sub) => sub.encryptionKey(ref<{ key: Key }>("logsKey").get("key")),
+        })
+        .build(stack, "TestBucket", { logsKey: { key } });
+
+      const encryption = findLogBucket(Template.fromStack(stack)).Properties.BucketEncryption as {
+        ServerSideEncryptionConfiguration: {
+          ServerSideEncryptionByDefault: { SSEAlgorithm: string; KMSMasterKeyID: unknown };
+        }[];
+      };
+      const byDefault =
+        encryption.ServerSideEncryptionConfiguration[0].ServerSideEncryptionByDefault;
+      expect(byDefault.SSEAlgorithm).toBe("aws:kms");
+      expect(byDefault.KMSMasterKeyID).toMatchObject({
+        "Fn::GetAtt": [expect.stringContaining("LogsKey"), "Arn"],
+      });
+    });
   });
 
   describe("autoDeleteObjects", () => {

@@ -12,6 +12,7 @@ import {
   Runtime,
   Tracing,
 } from "aws-cdk-lib/aws-lambda";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
 import { compose, ref } from "@composurecdk/core";
@@ -673,6 +674,43 @@ describe("FunctionBuilder", () => {
       const serialized = JSON.stringify(Object.values(roles));
       // CDK attaches AWSLambdaVPCAccessExecutionRole when a VPC is set.
       expect(serialized).toContain("AWSLambdaVPCAccessExecutionRole");
+    });
+  });
+
+  describe("environmentEncryption", () => {
+    /** The KmsKeyArn a function encrypted with `Key` (logical id `Key961B73FD`) renders. */
+    const KMS_KEY_ARN = { "Fn::GetAtt": ["Key961B73FD", "Arn"] };
+
+    it("passes a concrete key through to the function", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .environmentEncryption(key)
+        .build(stack, "TestFunction");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Lambda::Function", {
+        KmsKeyArn: KMS_KEY_ARN,
+      });
+    });
+
+    it("resolves a Resolvable key from the build context", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const key = new Key(stack, "Key");
+
+      createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .environmentEncryption(ref<{ key: Key }, Key>("envKey", (r) => r.key))
+        .build(stack, "TestFunction", { envKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Lambda::Function", {
+        KmsKeyArn: KMS_KEY_ARN,
+      });
     });
   });
 

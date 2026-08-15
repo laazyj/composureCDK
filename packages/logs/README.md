@@ -51,7 +51,7 @@ CloudWatch Logs encrypts all log data at rest using AWS-managed keys. For additi
 const logGroup = createLogGroupBuilder().encryptionKey(myKmsKey).build(stack, "EncryptedLogs");
 ```
 
-`.encryptionKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+`.encryptionKey(...)` accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
 
 ```ts
 compose(

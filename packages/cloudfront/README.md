@@ -111,6 +111,8 @@ createDistributionBuilder()
 
 `destination` and `configure` cannot be combined — the destination bucket is user-managed and is not built by this builder.
 
+The `configure` callback receives the build context, so anything `IBucketBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the distribution.
+
 The config object replaces the default wholesale rather than merging with it. For example, `.accessLogs({ includeCookies: true })` does **not** preserve the default `prefix: "logs/"` — restate any default you want to keep.
 
 The auto-created logging bucket uses `DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES` from `@composurecdk/s3`: incomplete multipart uploads are aborted after 7 days and access log objects expire after 2 years (matching the default `LogGroup` retention so the audit window is consistent across log destinations). CloudFront never deletes its own logs, so this lifecycle is the only thing that bounds the bucket's growth.

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import {
@@ -343,6 +344,34 @@ describe("DistributionBuilder", () => {
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         BucketName: "my-cdn-logs",
+      });
+    });
+
+    it("configure callback can reach a sibling component through a ref", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const key = new Key(stack, "LogsKey");
+
+      createDistributionBuilder()
+        .origin(withBucketOrigin(stack))
+        .accessLogs({
+          configure: (lb) =>
+            lb.bucketName("my-cdn-logs").encryptionKey(ref<{ key: Key }>("logsKey").get("key")),
+        })
+        .build(stack, "TestDistribution", { logsKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::S3::Bucket", {
+        BucketName: "my-cdn-logs",
+        BucketEncryption: {
+          ServerSideEncryptionConfiguration: [
+            {
+              ServerSideEncryptionByDefault: {
+                SSEAlgorithm: "aws:kms",
+                KMSMasterKeyID: { "Fn::GetAtt": [Match.stringLikeRegexp("LogsKey"), "Arn"] },
+              },
+            },
+          ],
+        },
       });
     });
 

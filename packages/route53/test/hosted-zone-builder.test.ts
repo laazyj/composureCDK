@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { ref } from "@composurecdk/core";
 import { createHostedZoneBuilder } from "../src/hosted-zone-builder.js";
 import {
   QUERY_LOGGING_LOG_GROUP_NAME_PREFIX,
@@ -149,6 +151,22 @@ describe("HostedZoneBuilder query logging", () => {
       RetentionInDays: RetentionDays.ONE_YEAR,
     });
     template.resourceCountIs("AWS::Logs::ResourcePolicy", 1);
+  });
+
+  it("configure callback can reach a sibling component through a ref", () => {
+    const stack = newStack({ region: "us-east-1" });
+    const key = new Key(stack, "LogsKey");
+
+    createHostedZoneBuilder()
+      .zoneName("example.com")
+      .queryLogging({
+        configure: (lg) => lg.encryptionKey(ref<{ key: Key }>("logsKey").get("key")),
+      })
+      .build(stack, "TestZone", { logsKey: { key } });
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Logs::LogGroup", {
+      KmsKeyId: { "Fn::GetAtt": [Match.stringLikeRegexp("LogsKey"), "Arn"] },
+    });
   });
 
   it("disabled with queryLogging(false) creates no log group, no resource policy, no QueryLoggingConfig", () => {

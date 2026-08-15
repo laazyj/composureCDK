@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import { App, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { FlowLogDestination } from "aws-cdk-lib/aws-ec2";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { ref } from "@composurecdk/core";
 import { createVpcBuilder } from "../src/vpc-builder.js";
 
 function buildVpc(configureFn?: (builder: ReturnType<typeof createVpcBuilder>) => void) {
@@ -133,6 +135,22 @@ describe("VpcBuilder", () => {
       expect(result.flowLogsLogGroup).toBeDefined();
       template.hasResourceProperties("AWS::Logs::LogGroup", {
         RetentionInDays: 7,
+      });
+    });
+
+    it("configure callback can reach a sibling component through a ref", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const key = new Key(stack, "FlowLogsKey");
+
+      createVpcBuilder()
+        .flowLogs({
+          configure: (lg) => lg.encryptionKey(ref<{ key: Key }>("flowLogsKey").get("key")),
+        })
+        .build(stack, "Network", { flowLogsKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Logs::LogGroup", {
+        KmsKeyId: { "Fn::GetAtt": [Match.stringLikeRegexp("FlowLogsKey"), "Arn"] },
       });
     });
 

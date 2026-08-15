@@ -36,6 +36,10 @@ export type QueryLoggingConfig =
        * {@link createLogGroupBuilder} are merged in at `build()` time and
        * are overridable by anything set on the builder here. Cannot be
        * combined with {@link logGroupArn}.
+       *
+       * The callback receives the build context, so anything
+       * `ILogGroupBuilder` accepts as a `Resolvable` can be a `ref` to a
+       * sibling component. Declare that component as a dependency.
        */
       configure?: (b: ILogGroupBuilder) => ILogGroupBuilder;
 
@@ -77,6 +81,7 @@ export function resolveQueryLogging(
   id: string,
   zoneName: string,
   cfg: QueryLoggingConfig | undefined,
+  context?: Record<string, object>,
 ): ResolvedQueryLogging {
   if (cfg === false) return {};
 
@@ -99,7 +104,11 @@ export function resolveQueryLogging(
     subBuilder = cfg.configure(subBuilder);
   }
 
-  const queryLogGroup = subBuilder.build(scope, `${id}QueryLogs`).logGroup;
+  // Pass the build context down: `ILogGroupBuilder` widens `encryptionKey` to a
+  // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
+  // KMS key. Without the context that ref resolves against an empty record and
+  // throws "component not found".
+  const queryLogGroup = subBuilder.build(scope, `${id}QueryLogs`, context).logGroup;
   warnIfLogGroupNameOutsidePrefix(scope, id, subBuilder.logGroupName());
 
   return {

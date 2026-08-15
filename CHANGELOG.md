@@ -1,3 +1,30 @@
+## 0.9.4 (2026-08-15)
+
+### 🚀 Features
+
+- **eslint-plugin:** add lifecycle-build-must-forward-context ([#398](https://github.com/laazyj/composureCDK/pull/398))
+- **examples:** encrypt the crud-api table with a composed customer-managed key ([#383](https://github.com/laazyj/composureCDK/pull/383))
+- **kms:** add @composurecdk/kms and widen key-consuming props to Resolvable ([#375](https://github.com/laazyj/composureCDK/pull/375), [#373](https://github.com/laazyj/composureCDK/issues/373))
+- **lambda:** widen environmentEncryption to Resolvable so a composed CMK can be referenced ([#387](https://github.com/laazyj/composureCDK/pull/387), [#379](https://github.com/laazyj/composureCDK/issues/379))
+- **neptune:** widen kmsKey to Resolvable so a composed CMK can be referenced ([#389](https://github.com/laazyj/composureCDK/pull/389), [#380](https://github.com/laazyj/composureCDK/issues/380))
+- **route53:** add consumer-side hostedZoneGrants.delegation ([#376](https://github.com/laazyj/composureCDK/pull/376), [#374](https://github.com/laazyj/composureCDK/issues/374))
+- **route53:** add a CrossAccountZoneDelegationRecord builder ([#381](https://github.com/laazyj/composureCDK/pull/381), [#378](https://github.com/laazyj/composureCDK/issues/378))
+
+### 🩹 Fixes
+
+- **apigateway:** forward the build context to the access-log sub-builder ([#396](https://github.com/laazyj/composureCDK/pull/396))
+- **cloudfront:** pass the build context to the access-log sub-builder ([#395](https://github.com/laazyj/composureCDK/pull/395))
+- **ec2:** pass the build context to the flow-log and endpoint sub-builders ([#393](https://github.com/laazyj/composureCDK/pull/393))
+- **iam:** brand StatementBuilder so the wildcard guard survives a realm crossing ([#392](https://github.com/laazyj/composureCDK/pull/392), [#385](https://github.com/laazyj/composureCDK/issues/385))
+- **route53:** pass the build context to the query-log sub-builder ([#390](https://github.com/laazyj/composureCDK/pull/390))
+- **route53:** dedup the shared query-logging policy by L1 type, not instanceof ([#391](https://github.com/laazyj/composureCDK/pull/391), [#381](https://github.com/laazyj/composureCDK/issues/381), [#384](https://github.com/laazyj/composureCDK/issues/384))
+- **s3:** pass the build context to the access-log sub-builder ([#394](https://github.com/laazyj/composureCDK/pull/394))
+- **scripts:** restore the workspace after a local cdk-floors enforce ([#367](https://github.com/laazyj/composureCDK/pull/367))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.9.3 (2026-08-04)
 
 ### 🚀 Features

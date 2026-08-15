@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/sqs",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Composable SQS queue builder with well-architected defaults",
   "repository": {
     "type": "git",

@@ -103,6 +103,8 @@ createBucketBuilder().serverAccessLogs({ destination: myBucket, prefix: "x/" });
 
 `destination` and `configure` cannot be combined — the destination bucket is user-managed and is not built by this builder.
 
+The `configure` callback receives the build context, so anything `IBucketBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the bucket.
+
 ## Recommended Alarms
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#S3) automatically when [CloudWatch request metrics](https://docs.aws.amazon.com/AmazonS3/latest/userguide/configure-request-metrics-bucket.html) are configured on the bucket via `.metrics()`. One alarm per metric is created for each metrics configuration entry. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

@@ -27,6 +27,10 @@ export type ServerAccessLogsConfig =
        * Customize the auto-created logging sub-builder. Receives a builder
        * pre-seeded with `versioned: false`, `removalPolicy: RETAIN`, and
        * recursive access logging disabled.
+       *
+       * The callback receives the build context, so anything `IBucketBuilder`
+       * accepts as a `Resolvable` can be a `ref` to a sibling component.
+       * Declare that component as a dependency.
        */
       configure?: (b: IBucketBuilder) => IBucketBuilder;
     };
@@ -149,7 +153,7 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
     const { serverAccessLogs: defaultServerAccessLogs, ...cdkDefaults } = BUCKET_DEFAULTS;
     const cfg = serverAccessLogs ?? defaultServerAccessLogs;
 
-    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg);
+    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg, context);
 
     const mergedProps = {
       ...cdkDefaults,
@@ -182,6 +186,7 @@ function resolveAccessLogs(
   scope: IConstruct,
   id: string,
   cfg: ServerAccessLogsConfig | undefined,
+  context?: Record<string, object>,
 ): { accessLogsBucket?: Bucket; accessLogProps: Partial<BucketProps> } {
   if (cfg === false || cfg === undefined) {
     return { accessLogProps: {} };
@@ -210,7 +215,11 @@ function resolveAccessLogs(
   if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }
-  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`).bucket;
+  // Pass the build context down: `IBucketBuilder` widens `encryptionKey` to a
+  // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
+  // KMS key. Without the context that ref resolves against an empty record and
+  // throws "component not found".
+  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`, context).bucket;
 
   return {
     accessLogsBucket,

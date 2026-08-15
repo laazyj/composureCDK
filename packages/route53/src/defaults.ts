@@ -1,5 +1,6 @@
-import { Duration } from "aws-cdk-lib";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import type { HostedZoneBuilderProps } from "./hosted-zone-builder.js";
+import type { CrossAccountZoneDelegationBuilderProps } from "./cross-account-zone-delegation-builder.js";
 import type { ARecordBuilderProps } from "./a-record-builder.js";
 import type { AaaaRecordBuilderProps } from "./aaaa-record-builder.js";
 import type { CnameRecordBuilderProps } from "./cname-record-builder.js";
@@ -183,3 +184,62 @@ export const HEALTH_CHECK_DEFAULTS: Partial<HealthCheckBuilderProps> = {
   requestInterval: Duration.seconds(30),
   measureLatency: true,
 };
+
+/**
+ * Naming prefix for the auto-created log group of the shared
+ * `Custom::CrossAccountZoneDelegation` provider Lambda. Fixed at
+ * `/aws/lambda` because that is the only prefix CDK's provider execution role
+ * (`AWSLambdaBasicExecutionRole`) may write to — a log group named elsewhere
+ * silently receives nothing.
+ *
+ * @see https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AWSLambdaBasicExecutionRole.html
+ */
+export const DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX = "/aws/lambda";
+
+/**
+ * Construct id of the log group materialised once per stack for the
+ * cross-account delegation provider. The provider is a CDK stack singleton, so
+ * its log group is one too. Package-internal — used by the dedup helper, and
+ * intentionally not re-exported from the package barrel.
+ */
+export const DELEGATION_PROVIDER_LOG_GROUP_ID = "ComposureCDKRoute53DelegationProviderLogs";
+
+/**
+ * Defaults for {@link createCrossAccountZoneDelegationBuilder}. Overridable via
+ * the fluent API.
+ *
+ * `ttl` and `removalPolicy` match CDK's own defaults but are set explicitly so
+ * both appear in this package's defaults table and can be reasoned about
+ * without reading CDK source. Neither `parentHostedZoneName` nor
+ * `parentHostedZoneId` is defaulted: they are mutually exclusive, so a default
+ * on either would collide with the user's choice of the other
+ * ([ADR-0009](../../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)),
+ * and neither has a value that could be guessed.
+ */
+export const CROSS_ACCOUNT_ZONE_DELEGATION_DEFAULTS: Partial<CrossAccountZoneDelegationBuilderProps> =
+  {
+    /**
+     * Two days, matching CDK. Delegation `NS` records are stable steady-state,
+     * and a long TTL keeps resolvers off the parent's name servers. Lower it to
+     * minutes *before* a planned delegation change — a change takes up to the
+     * previously published TTL to propagate — then raise it again afterwards.
+     */
+    ttl: Duration.days(2),
+    /**
+     * Remove the `NS` records from the parent zone when this stack is deleted,
+     * matching CDK. Retaining them would leave a lame delegation pointing at a
+     * hosted zone that no longer exists — a subdomain that resolves to failure
+     * rather than to nothing, and a subdomain-takeover surface. Note this
+     * reaches across an account boundary: deleting this stack deletes records in
+     * the parent account's zone.
+     */
+    removalPolicy: RemovalPolicy.DESTROY,
+    /**
+     * Bring the shared provider Lambda's log group under the `@composurecdk/logs`
+     * retention and removal defaults. Without it the Lambda service creates
+     * `/aws/lambda/<generated-name>` on first invocation with indefinite
+     * retention, absent from the template.
+     * @see https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/ops_observability_config_telemetry.html
+     */
+    providerLogging: {},
+  };

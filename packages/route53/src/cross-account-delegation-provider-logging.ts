@@ -1,12 +1,32 @@
 import { Annotations, CfnResource, Stack, Token } from "aws-cdk-lib";
 import { CfnFunction } from "aws-cdk-lib/aws-lambda";
-import { LogGroup } from "aws-cdk-lib/aws-logs";
+import { CfnLogGroup, type LogGroup } from "aws-cdk-lib/aws-logs";
 import type { IConstruct } from "constructs";
 import { createLogGroupBuilder, type ILogGroupBuilder } from "@composurecdk/logs";
-import {
-  DELEGATION_PROVIDER_LOG_GROUP_ID,
-  DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX,
-} from "./defaults.js";
+
+/**
+ * Naming prefix for the auto-created log group of the shared
+ * `Custom::CrossAccountZoneDelegation` provider Lambda. Fixed at `/aws/lambda`
+ * because that is the only prefix CDK's provider execution role
+ * (`AWSLambdaBasicExecutionRole`) may write to — a log group named elsewhere
+ * silently receives nothing.
+ *
+ * Package-internal: this is not a default a caller can override, only a value
+ * the builder derives the log group from, so it is deliberately absent from the
+ * package barrel.
+ *
+ * @see https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AWSLambdaBasicExecutionRole.html
+ */
+export const DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX = "/aws/lambda";
+
+/**
+ * Construct id of the log group materialised once per stack for the
+ * cross-account delegation provider. The provider is a CDK stack singleton, so
+ * its log group is one too. Package-internal for the same reason as the prefix
+ * above — used by the dedup helper and the unit tests, and not re-exported from
+ * the package barrel.
+ */
+export const DELEGATION_PROVIDER_LOG_GROUP_ID = "ComposureCDKRoute53DelegationProviderLogs";
 
 /**
  * Configures the CloudWatch log group for the Lambda-backed
@@ -91,8 +111,8 @@ export function applyDelegationProviderLogging(
   // settled the singleton, and this record cannot unsettle it. Returning the
   // group it will actually log to beats returning `undefined` and implying an
   // isolation that does not exist.
-  const existing = stack.node.tryFindChild(DELEGATION_PROVIDER_LOG_GROUP_ID);
-  if (existing instanceof LogGroup) {
+  const existing = findExistingLogGroup(stack);
+  if (existing) {
     warnIfSettingIgnored(scope, cfg, existing);
     return existing;
   }
@@ -126,6 +146,29 @@ export function applyDelegationProviderLogging(
   handler.node.addDependency(logGroup);
 
   return logGroup;
+}
+
+/**
+ * Find the log group an earlier delegation record already settled on this
+ * stack, identified by its L1's `cfnResourceType`.
+ *
+ * Deliberately not `instanceof LogGroup`. `instanceof` is realm-bound: when
+ * aws-cdk-lib is loaded as both ESM and CommonJS in one process (the
+ * dual-package hazard this library ships for — ADR-0007), the `LogGroup` class
+ * the earlier record constructed can be a different class object from the one
+ * this module imported, so the check returns `false` for a log group that is
+ * plainly there. The dedup would then be skipped and the rebuild would fail
+ * synth on a duplicate construct id. Reading the L1's resource type is the
+ * jsii-safe idiom the codebase already uses for exactly this (`isCfnAlarm` in
+ * `@composurecdk/cloudwatch`, ADR-0011 §3) and is stable across the whole
+ * `^2` peer range.
+ */
+function findExistingLogGroup(stack: Stack): LogGroup | undefined {
+  const existing = stack.node.tryFindChild(DELEGATION_PROVIDER_LOG_GROUP_ID);
+  const l1 = existing?.node.defaultChild;
+  if (!CfnResource.isCfnResource(l1)) return undefined;
+  if (l1.cfnResourceType !== CfnLogGroup.CFN_RESOURCE_TYPE_NAME) return undefined;
+  return existing as LogGroup;
 }
 
 /**

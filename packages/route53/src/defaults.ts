@@ -186,25 +186,6 @@ export const HEALTH_CHECK_DEFAULTS: Partial<HealthCheckBuilderProps> = {
 };
 
 /**
- * Naming prefix for the auto-created log group of the shared
- * `Custom::CrossAccountZoneDelegation` provider Lambda. Fixed at
- * `/aws/lambda` because that is the only prefix CDK's provider execution role
- * (`AWSLambdaBasicExecutionRole`) may write to — a log group named elsewhere
- * silently receives nothing.
- *
- * @see https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AWSLambdaBasicExecutionRole.html
- */
-export const DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX = "/aws/lambda";
-
-/**
- * Construct id of the log group materialised once per stack for the
- * cross-account delegation provider. The provider is a CDK stack singleton, so
- * its log group is one too. Package-internal — used by the dedup helper, and
- * intentionally not re-exported from the package barrel.
- */
-export const DELEGATION_PROVIDER_LOG_GROUP_ID = "ComposureCDKRoute53DelegationProviderLogs";
-
-/**
  * Defaults for {@link createCrossAccountZoneDelegationBuilder}. Overridable via
  * the fluent API.
  *

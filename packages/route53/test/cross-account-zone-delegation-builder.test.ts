@@ -3,13 +3,16 @@ import { App, CfnResource, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Construct } from "constructs";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { CfnLogGroup, LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import type { ILogGroupBuilder } from "@composurecdk/logs";
 import { HostedZone, PublicHostedZone } from "aws-cdk-lib/aws-route53";
 import { ref } from "@composurecdk/core";
 import { createCrossAccountZoneDelegationBuilder } from "../src/cross-account-zone-delegation-builder.js";
-import { applyDelegationProviderLogging } from "../src/cross-account-delegation-provider-logging.js";
-import { DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX } from "../src/defaults.js";
+import {
+  applyDelegationProviderLogging,
+  DELEGATION_PROVIDER_LOG_GROUP_ID,
+  DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX,
+} from "../src/cross-account-delegation-provider-logging.js";
 
 const PARENT_ROLE_ARN = "arn:aws:iam::111122223333:role/delegation-beta";
 
@@ -314,6 +317,21 @@ describe("createCrossAccountZoneDelegationBuilder", () => {
       expect(
         Annotations.fromStack(stack).findWarning("*", Match.stringLikeRegexp(expected)),
       ).not.toHaveLength(0);
+    });
+
+    it("dedups on the log group's L1 type, not instanceof", () => {
+      const { stack } = setup();
+
+      // Stands in for the dual-package hazard (ADR-0007): a log group built by
+      // another realm's copy of aws-cdk-lib fails `instanceof LogGroup` here,
+      // while its L1 still reports AWS::Logs::LogGroup. An `instanceof` dedup
+      // would miss it and rebuild at the same construct id, failing synth.
+      const settled = new Construct(stack, DELEGATION_PROVIDER_LOG_GROUP_ID);
+      new CfnLogGroup(settled, "Resource");
+      expect(settled instanceof LogGroup).toBe(false);
+
+      expect(applyDelegationProviderLogging(stack, undefined)).toBe(settled);
+      Template.fromStack(stack).resourceCountIs("AWS::Logs::LogGroup", 1);
     });
 
     it("stays silent when a later record simply inherits the default", () => {

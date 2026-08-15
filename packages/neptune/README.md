@@ -76,6 +76,29 @@ interface ClusterBuilderResult {
 
 The defaults are exported as `CLUSTER_DEFAULTS` for visibility and testing.
 
+### Encryption at rest
+
+`storageEncrypted` is on by default, using the AWS-managed Neptune key. `.kmsKey(...)` selects a customer-managed key instead — for independent rotation, a key policy you control, and CloudTrail visibility of decrypt calls. It accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system rather than a construct created before `compose`:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createKeyBuilder, type KeyBuilderResult } from "@composurecdk/kms";
+
+compose(
+  {
+    graphKey: createKeyBuilder().description("Encrypts the knowledge-graph cluster at rest."),
+    graph: createClusterBuilder()
+      .vpc(vpc)
+      .instanceType(InstanceType.SERVERLESS)
+      .serverlessScalingConfiguration({ minCapacity: 1, maxCapacity: 8 })
+      .kmsKey(ref<KeyBuilderResult>("graphKey").get("key")),
+  },
+  { graphKey: [], graph: ["graphKey"] },
+).build(stack, "Knowledge");
+```
+
+Both the key and the encryption setting are fixed at creation: Neptune cannot encrypt an existing unencrypted cluster, nor move to a different key, without restoring from a snapshot. Setting `.storageEncrypted(false)` alongside a key is a contradiction CDK rejects at synth — the builder does not silently reconcile it.
+
 ### Audit-log parameter group
 
 Audit log _export_ only emits data once audit logging is _enabled_ in the cluster parameter group. So the builder auto-creates a cluster parameter group with `neptune_enable_audit_log = "1"` (parallel to how `createVpcBuilder` auto-creates a flow-log group), with the family derived from the configured engine version. Add or override parameters with `.clusterParameters({...})`, or supply your own group with `.clusterParameterGroup(myGroup)` (mutually exclusive with `.clusterParameters()`).

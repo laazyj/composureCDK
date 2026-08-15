@@ -32,6 +32,7 @@ The key-consuming props on the library's stateful resources accept a `Resolvable
 | `@composurecdk/sns`      | `masterKey`             | `Resolvable<IKey>`                   |
 | `@composurecdk/logs`     | `encryptionKey`         | `Resolvable<IKey>`                   |
 | `@composurecdk/lambda`   | `environmentEncryption` | `Resolvable<IKey>`                   |
+| `@composurecdk/neptune`  | `kmsKey`                | `Resolvable<IKey>`                   |
 
 An `IKey` is what these props are written against, but it is not the limit of what they take: where CDK has widened a prop to the broader [`kms.IKeyRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kms.IKeyRef.html), the builder's prop is read from CDK's own type rather than pinned to an interface, so it accepts whatever the `aws-cdk-lib` you have installed accepts. The `keyGrants` helpers below are pinned to `IKey`, so a key that is only an `IKeyRef` reaches a resource prop but not a grant.
 

@@ -3,6 +3,7 @@ import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { SecurityGroup, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { Key } from "aws-cdk-lib/aws-kms";
 import {
   ClusterParameterGroup,
   EngineVersion,
@@ -359,6 +360,71 @@ describe("ClusterBuilder", () => {
           { "Fn::GetAtt": [stack.getLogicalId(sg.node.defaultChild as never), "GroupId"] },
         ]),
       });
+    });
+  });
+
+  describe("kmsKey", () => {
+    /** The KmsKeyId a cluster encrypted with `Key` (logical id `Key961B73FD`) renders. */
+    const KMS_KEY_ARN = { "Fn::GetAtt": ["Key961B73FD", "Arn"] };
+
+    it("passes a concrete key through to the cluster, alongside the storageEncrypted default", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = isolatedVpc(stack);
+      const key = new Key(stack, "Key");
+
+      createClusterBuilder()
+        .vpc(vpc)
+        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+        .instanceType(InstanceType.R6G_LARGE)
+        .kmsKey(key)
+        .build(stack, "Graph");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Neptune::DBCluster", {
+        KmsKeyId: KMS_KEY_ARN,
+        StorageEncrypted: true,
+      });
+    });
+
+    it("resolves a Resolvable key from the build context", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = isolatedVpc(stack);
+      const key = new Key(stack, "Key");
+
+      createClusterBuilder()
+        .vpc(vpc)
+        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+        .instanceType(InstanceType.R6G_LARGE)
+        .kmsKey(ref<{ key: Key }, Key>("clusterKey", (r) => r.key))
+        .build(stack, "Graph", { clusterKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Neptune::DBCluster", {
+        KmsKeyId: KMS_KEY_ARN,
+        StorageEncrypted: true,
+      });
+    });
+
+    // The storageEncrypted default already agrees with a customer key, so there
+    // is nothing for a key to infer (contrast s3/sqs, where supplying a key has
+    // to flip a mutually exclusive encryption mode — ADR-0009). Turning
+    // encryption off while supplying a key is a contradiction only the caller
+    // can have meant, so it is left to CDK to reject.
+    it("does not reconcile an explicit storageEncrypted(false), so CDK rejects the mismatch", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = isolatedVpc(stack);
+      const key = new Key(stack, "Key");
+
+      expect(() =>
+        createClusterBuilder()
+          .vpc(vpc)
+          .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+          .instanceType(InstanceType.R6G_LARGE)
+          .storageEncrypted(false)
+          .kmsKey(key)
+          .build(stack, "Graph"),
+      ).toThrow(/KMS key supplied but storageEncrypted is false/);
     });
   });
 

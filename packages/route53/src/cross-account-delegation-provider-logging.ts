@@ -104,6 +104,7 @@ const DELEGATION_PROVIDER_LOGGING_CONFLICT_ANNOTATION =
 export function applyDelegationProviderLogging(
   scope: IConstruct,
   cfg: DelegationProviderLoggingConfig | undefined,
+  context?: Record<string, object>,
 ): LogGroup | undefined {
   const stack = Stack.of(scope);
 
@@ -138,7 +139,11 @@ export function applyDelegationProviderLogging(
     subBuilder = cfg.configure(subBuilder);
   }
 
-  const logGroup = subBuilder.build(stack, DELEGATION_PROVIDER_LOG_GROUP_ID).logGroup;
+  // Pass the build context down: `ILogGroupBuilder` widens `encryptionKey` to a
+  // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
+  // KMS key. Without the context that ref resolves against an empty record and
+  // throws "component not found".
+  const logGroup = subBuilder.build(stack, DELEGATION_PROVIDER_LOG_GROUP_ID, context).logGroup;
   warnIfNameOutsideLambdaPrefix(scope, subBuilder.logGroupName());
 
   handler.addPropertyOverride("LoggingConfig", { LogGroup: logGroup.logGroupName });

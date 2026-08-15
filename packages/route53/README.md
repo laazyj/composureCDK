@@ -179,6 +179,8 @@ createCrossAccountZoneDelegationBuilder().providerLogging(false);
 
 Because the provider is a singleton, `providerLogging` is a per-record knob over a stack-wide resource. The first delegation record built in the stack settles the log group; a later record that sets `providerLogging` to something else is handed the group it will really log to and warned (`@composurecdk/route53:delegation-provider-logging-conflict`) that its setting had no effect — including `providerLogging(false)`, which cannot remove a group a sibling record already created. Configure it on one record per stack.
 
+The callback receives the build context, so anything `ILogGroupBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the delegation record.
+
 Keep any customised name under `/aws/lambda/`. CDK owns the provider's execution role and gives it only `AWSLambdaBasicExecutionRole`, which permits `logs:PutLogEvents` on `/aws/lambda/*` and nothing else — a log group named elsewhere silently receives nothing. The builder emits the synth warning `@composurecdk/route53:delegation-provider-log-group-name` if you move it.
 
 ### Operational trade-offs

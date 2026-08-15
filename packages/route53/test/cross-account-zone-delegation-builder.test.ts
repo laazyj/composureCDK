@@ -3,6 +3,7 @@ import { App, CfnResource, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Construct } from "constructs";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { CfnLogGroup, LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import type { ILogGroupBuilder } from "@composurecdk/logs";
 import { HostedZone, PublicHostedZone } from "aws-cdk-lib/aws-route53";
@@ -248,6 +249,22 @@ describe("createCrossAccountZoneDelegationBuilder", () => {
       Template.fromStack(stack).hasResourceProperties("AWS::Logs::LogGroup", {
         LogGroupName: `${DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX}/S-cross-account-zone-delegation`,
         RetentionInDays: 30,
+      });
+    });
+
+    it("resolves a ref inside the configure callback against the build context", () => {
+      const { stack, childZone } = setup();
+      const key = new Key(stack, "LogsKey");
+
+      minimal()
+        .delegatedZone(childZone)
+        .providerLogging({
+          configure: (lg) => lg.encryptionKey(ref<{ key: Key }, Key>("logsKey", (r) => r.key)),
+        })
+        .build(stack, "ParentDelegation", { logsKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Logs::LogGroup", {
+        KmsKeyId: { "Fn::GetAtt": [Match.anyValue(), "Arn"] },
       });
     });
 

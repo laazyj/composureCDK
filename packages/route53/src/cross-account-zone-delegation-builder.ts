@@ -200,7 +200,7 @@ class CrossAccountZoneDelegationBuilder implements Lifecycle<CrossAccountZoneDel
     });
 
     // After the record: constructing it is what materialises the provider.
-    const providerLogGroup = applyDelegationProviderLogging(scope, providerLogging);
+    const providerLogGroup = applyDelegationProviderLogging(scope, providerLogging, context);
 
     return { record, delegationRole: role, providerLogGroup };
   }

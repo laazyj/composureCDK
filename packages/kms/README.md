@@ -31,11 +31,11 @@ The key-consuming props on the library's stateful resources accept a `Resolvable
 | `@composurecdk/sqs`      | `encryptionMasterKey` | `Resolvable<IKey>`                   |
 | `@composurecdk/sns`      | `masterKey`           | `Resolvable<IKey>`                   |
 | `@composurecdk/logs`     | `encryptionKey`       | `Resolvable<IKey>`                   |
-| `@composurecdk/neptune`  | `kmsKey`              | `Resolvable<IKey>` \*                |
+| `@composurecdk/neptune`  | `kmsKey`              | `Resolvable<IKey>`                   |
 
-\* Neptune's accepts more than an `IKey`, because CDK is migrating key-consuming props to the wider [`kms.IKeyRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kms.IKeyRef.html) (aws-cdk-lib 2.215.0, and the matching `@aws-cdk/aws-neptune-alpha`) and `DatabaseClusterProps.kmsKey` is one of the props that has moved. Naming either interface would put the builder at odds with the CDK it is installed against — `IKey` would reject an `IKeyRef` that CDK itself accepts, and `IKeyRef` does not exist at the package's floor — so its inner type is read from the consumer's own alpha module (`Resolvable<NonNullable<DatabaseClusterProps["kmsKey"]>>`) and tracks the migration in both directions. Passing an `IKey` or a `Ref` to a key builder is unaffected; the `keyGrants` helpers below still take `Resolvable<IKey>`, so a bare `IKeyRef` reaches the prop but not a grant.
+An `IKey` is what these props are written against, but it is not the limit of what they take: where CDK has widened a prop to the broader [`kms.IKeyRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kms.IKeyRef.html), the builder's prop is read from CDK's own type rather than pinned to an interface, so it accepts whatever the `aws-cdk-lib` you have installed accepts. The `keyGrants` helpers below are pinned to `IKey`, so a key that is only an `IKeyRef` reaches a resource prop but not a grant.
 
-One key-consuming prop elsewhere still takes a concrete key — `@composurecdk/lambda`'s `environmentEncryption` ([#379](https://github.com/laazyj/composureCDK/issues/379)). Build the key as a component and pass `result.key` to it until it is widened.
+For a key-consuming prop not listed above, build the key as a component and pass `result.key` to it.
 
 ```ts
 import { AttributeType, TableEncryptionV2 } from "aws-cdk-lib/aws-dynamodb";

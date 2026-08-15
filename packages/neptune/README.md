@@ -99,8 +99,6 @@ compose(
 
 Both the key and the encryption setting are fixed at creation: Neptune cannot encrypt an existing unencrypted cluster, nor move to a different key, without restoring from a snapshot. Setting `.storageEncrypted(false)` alongside a key is a contradiction CDK rejects at synth — the builder does not silently reconcile it.
 
-The prop's inner type is read from CDK's own `DatabaseClusterProps["kmsKey"]` rather than named as `IKey`, so it tracks CDK's `kms.IKey` → `kms.IKeyRef` migration in either direction — see [the table in `@composurecdk/kms`](../kms/README.md#keys-as-components).
-
 ### Audit-log parameter group
 
 Audit log _export_ only emits data once audit logging is _enabled_ in the cluster parameter group. So the builder auto-creates a cluster parameter group with `neptune_enable_audit_log = "1"` (parallel to how `createVpcBuilder` auto-creates a flow-log group), with the family derived from the configured engine version. Add or override parameters with `.clusterParameters({...})`, or supply your own group with `.clusterParameterGroup(myGroup)` (mutually exclusive with `.clusterParameters()`).

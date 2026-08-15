@@ -7,12 +7,9 @@ import {
 import { AttributeType } from "aws-cdk-lib/aws-dynamodb";
 import { compose, combine, ref } from "@composurecdk/core";
 import { createRestApiBuilder } from "@composurecdk/apigateway";
-import {
-  createTableV2Builder,
-  tableGrants,
-  type TableV2BuilderResult,
-} from "@composurecdk/dynamodb";
+import { createTableBuilder, tableGrants, type TableBuilderResult } from "@composurecdk/dynamodb";
 import { createServiceRoleBuilder, type RoleBuilderResult } from "@composurecdk/iam";
+import { createKeyBuilder, type KeyBuilderResult } from "@composurecdk/kms";
 
 /** Every method here returns a bare `200` — no error mapping. A production
  * API would add `selectionPattern` integration responses (e.g. matching
@@ -38,7 +35,7 @@ function gadgetIntegration(
 ) {
   return combine(
     {
-      tableName: ref("table", (r: TableV2BuilderResult) => r.table.tableName),
+      tableName: ref("table", (r: TableBuilderResult) => r.table.tableName),
       role: ref("apiRole", (r: RoleBuilderResult) => r.role),
     },
     ({ tableName, role }) =>
@@ -139,17 +136,43 @@ const DELETE_OPERATION = gadgetIntegration(
  * `apiRole.grant(tableGrants.readWrite(ref("table", …)))`. The grant edge
  * runs from the role (the consumer) to the table, matching the data flow —
  * no reverse edge, no cycle.
+ *
+ * The table is encrypted with a customer-managed KMS key that is itself a
+ * component: `tableKey` is a `createKeyBuilder()` sibling the table depends on
+ * by name, so the key is placed by the stack strategy and ordered by the
+ * graph rather than built imperatively before `compose`. Supplying the key is
+ * the whole of it — the builder infers `TableEncryption.CUSTOMER_MANAGED`,
+ * because its `AWS_MANAGED` default is mutually exclusive with a customer key
+ * (ADR-0009).
+ *
+ * This stack uses the classic `Table` rather than `TableV2` for one reason:
+ * `TableV2` encodes SSE per replica, which CDK cannot render in a
+ * region-agnostic stack, and every example here is region-agnostic so CI can
+ * deploy it anywhere. A `TableV2` with a customer-managed key needs a stack
+ * bound to an explicit `env`.
+ *
+ * Note what does **not** appear here: any KMS grant. `tableGrants.readWrite`
+ * already reaches the key, because CDK's own `grantReadWriteData` extends to
+ * the table's `encryptionKey`. `keyGrants` exists for what a resource grant
+ * cannot infer — a principal decrypting ciphertext it fetched elsewhere, say —
+ * and adding one here would be redundant permission, not extra safety.
  */
 export function createCrudApiApp(app = new App()) {
   const stack = new Stack(app, "ComposureCDK-CrudApiStack");
 
   compose(
     {
-      table: createTableV2Builder().partitionKey({ name: "id", type: AttributeType.STRING }),
+      tableKey: createKeyBuilder()
+        .description("Encrypts the gadgets table at rest.")
+        .alias("composurecdk-examples/crud-api/gadgets"),
+
+      table: createTableBuilder()
+        .partitionKey({ name: "id", type: AttributeType.STRING })
+        .encryptionKey(ref<KeyBuilderResult>("tableKey").get("key")),
 
       apiRole: createServiceRoleBuilder("apigateway.amazonaws.com")
         .description("Assumed by API Gateway to call DynamoDB directly for the gadgets table")
-        .grant(tableGrants.readWrite(ref("table", (r: TableV2BuilderResult) => r.table))),
+        .grant(tableGrants.readWrite(ref("table", (r: TableBuilderResult) => r.table))),
 
       api: createRestApiBuilder()
         .restApiName("CrudApi")
@@ -167,7 +190,8 @@ export function createCrudApiApp(app = new App()) {
         ),
     },
     {
-      table: [],
+      tableKey: [],
+      table: ["tableKey"],
       apiRole: ["table"],
       api: ["table", "apiRole"],
     },

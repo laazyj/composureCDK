@@ -81,13 +81,28 @@ describe("cleanDeskPolicy", () => {
     const { stack } = createCrudApiApp(app);
     const template = Template.fromStack(stack);
 
-    template.hasResource("AWS::DynamoDB::GlobalTable", {
+    template.hasResource("AWS::DynamoDB::Table", {
       DeletionPolicy: "Delete",
       UpdateReplacePolicy: "Delete",
     });
-    template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
-      Replicas: Match.arrayWith([Match.objectLike({ DeletionProtectionEnabled: false })]),
+    template.hasResourceProperties("AWS::DynamoDB::Table", {
+      DeletionProtectionEnabled: false,
     });
+  });
+
+  it("sets the crud-api stack's KMS key to Delete with the 7-day minimum window", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createCrudApiApp(app);
+    const template = Template.fromStack(stack);
+
+    template.hasResource("AWS::KMS::Key", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+    // 7 days is the AWS minimum for ScheduleKeyDeletion — there is no
+    // immediate delete, so a torn-down sandbox key still bills for a week.
+    template.hasResourceProperties("AWS::KMS::Key", { PendingWindowInDays: 7 });
   });
 
   it("sets all resources to Delete in the dynamo-stream-processor stack", () => {

@@ -249,9 +249,27 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CrudApiApptableE9F135F3",
+                    "Arn",
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
               "Resource": {
                 "Fn::GetAtt": [
-                  "CrudApiApptableE9F135F3",
+                  "CrudApiApptableKeyAA33ABA6",
                   "Arn",
                 ],
               },
@@ -262,12 +280,14 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "CrudApiApptableE9F135F3",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CrudApiApptableE9F135F3",
+                    "Arn",
+                  ],
+                },
+              ],
             },
           ],
           "Version": "2012-10-17",
@@ -691,30 +711,79 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
           },
         ],
         "BillingMode": "PAY_PER_REQUEST",
+        "DeletionProtectionEnabled": true,
         "KeySchema": [
           {
             "AttributeName": "id",
             "KeyType": "HASH",
           },
         ],
-        "Replicas": [
-          {
-            "DeletionProtectionEnabled": true,
-            "PointInTimeRecoverySpecification": {
-              "PointInTimeRecoveryEnabled": true,
-            },
-            "Region": {
-              "Ref": "AWS::Region",
-            },
-          },
-        ],
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true,
+        },
         "SSESpecification": {
+          "KMSMasterKeyId": {
+            "Fn::GetAtt": [
+              "CrudApiApptableKeyAA33ABA6",
+              "Arn",
+            ],
+          },
           "SSEEnabled": true,
           "SSEType": "KMS",
         },
       },
-      "Type": "AWS::DynamoDB::GlobalTable",
+      "Type": "AWS::DynamoDB::Table",
       "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiApptableKeyAA33ABA6": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "Description": "Encrypts the gadgets table at rest.",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Statement": [
+            {
+              "Action": "kms:*",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PendingWindowInDays": 30,
+      },
+      "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiApptableKeyAlias38A49B89": {
+      "Properties": {
+        "AliasName": "alias/composurecdk-examples/crud-api/gadgets",
+        "TargetKeyId": {
+          "Fn::GetAtt": [
+            "CrudApiApptableKeyAA33ABA6",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::KMS::Alias",
     },
     "CrudApiApptableReadThrottleEventsAlarm91003BFE": {
       "Properties": {

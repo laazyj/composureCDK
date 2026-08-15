@@ -13,6 +13,10 @@ import {
  * Wildcard-resource allow statements grant the widest possible permission
  * surface and should be an intentional choice, not an accident.
  *
+ * Catch this by `name`, not `instanceof`: under the dual ESM/CJS build
+ * (ADR-0007) the copy that threw may not be the copy the catching module
+ * imported, and `instanceof` is realm-bound.
+ *
  * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/permissions-management.html
  */
 export class WildcardResourceError extends Error {
@@ -24,6 +28,17 @@ export class WildcardResourceError extends Error {
     this.name = "WildcardResourceError";
   }
 }
+
+/**
+ * @internal Brands every {@link StatementBuilder} instance so
+ * {@link isStatementBuilder} can recognise one without `instanceof`.
+ * `instanceof` is realm-bound: when `@composurecdk/iam` is loaded as both ESM
+ * and CommonJS in the same process (the dual-package hazard — ADR-0007), each
+ * copy has its own `StatementBuilder` class and `instanceof` fails across the
+ * boundary. A `Symbol.for(...)` brand is registered in the global symbol
+ * registry, so a builder minted by either copy is still recognised by either.
+ */
+export const STATEMENT_BUILDER_BRAND = Symbol.for("composurecdk.statement-builder");
 
 /**
  * Fluent wrapper around the CDK {@link PolicyStatement}.
@@ -53,6 +68,9 @@ export class WildcardResourceError extends Error {
  * ```
  */
 export class StatementBuilder {
+  /** @internal Realm-agnostic brand — see {@link STATEMENT_BUILDER_BRAND}. */
+  readonly [STATEMENT_BUILDER_BRAND] = true;
+
   #sid?: string;
   #effect: Effect = Effect.ALLOW;
   #actions: string[] = [];
@@ -164,6 +182,21 @@ export class StatementBuilder {
 
     return new PolicyStatement(props);
   }
+}
+
+/**
+ * Type guard distinguishing a {@link StatementBuilder} from an already-built
+ * {@link PolicyStatement}.
+ *
+ * Recognises a builder by its {@link STATEMENT_BUILDER_BRAND} symbol rather
+ * than `instanceof`, so it works across the dual-package boundary — a builder
+ * produced by the ESM copy of `@composurecdk/iam` is still recognised by the
+ * CommonJS copy and vice versa. Getting this wrong is not merely a type
+ * confusion: the discrimination decides whether {@link StatementBuilder.build}
+ * runs, and `build()` is where the wildcard-resource guard lives.
+ */
+export function isStatementBuilder(value: unknown): value is StatementBuilder {
+  return typeof value === "object" && value !== null && STATEMENT_BUILDER_BRAND in value;
 }
 
 /**

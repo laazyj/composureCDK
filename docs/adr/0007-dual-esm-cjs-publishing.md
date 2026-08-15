@@ -71,6 +71,15 @@ used `value instanceof Ref`. It now brands every `Ref` with
 `Symbol.for("composurecdk.ref")` and `isRef` checks that brand (see
 [architecture.md](../architecture.md#ref)).
 
+`StatementBuilder` needed the same treatment later (#385), and it is the
+class most exposed to the hazard: a consumer constructs one and hands it back
+across a public API. Every exported class a consumer can pass **into** library
+code and that the library then **type-tests** needs a brand. As of #385 that is
+`Ref` and `StatementBuilder`. Errors are the remaining gap: a consumer's
+`catch (e) { e instanceof WildcardResourceError }` is realm-bound the same way,
+so the library's error classes set `name` and that — not `instanceof` — is the
+cross-realm-safe discriminator.
+
 ## Consequences
 
 - CommonJS consumers — including the `cdk synth` path from issue #119 — can use

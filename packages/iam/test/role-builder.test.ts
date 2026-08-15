@@ -11,6 +11,7 @@ import { compose, type Lifecycle, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createRoleBuilder } from "../src/role-builder.js";
 import { createStatementBuilder, WildcardResourceError } from "../src/statement-builder.js";
+import { asForeignRealm } from "./foreign-realm.js";
 
 function synth(configureFn?: (builder: ReturnType<typeof createRoleBuilder>) => void): Template {
   const app = new App();
@@ -125,6 +126,31 @@ describe("RoleBuilder", () => {
       });
     });
 
+    // A StatementBuilder is public API the consumer constructs and hands back
+    // in, so under the dual ESM/CJS build (ADR-0007) the realm boundary can sit
+    // directly across this call. `instanceof` misses such a builder, which both
+    // skips the wildcard guard below and hands CDK an unbuilt object.
+    it("builds StatementBuilders that came from another realm", () => {
+      const template = synth((b) =>
+        b.addInlinePolicyStatements("StopEC2", [
+          asForeignRealm(
+            createStatementBuilder().allow().actions(["ec2:StopInstances"]).resources(["*"]),
+          ).allowWildcardResources(true),
+        ]),
+      );
+
+      template.hasResourceProperties("AWS::IAM::Role", {
+        Policies: Match.arrayWith([
+          Match.objectLike({
+            PolicyName: "StopEC2",
+            PolicyDocument: Match.objectLike({
+              Statement: Match.arrayWith([Match.objectLike({ Action: "ec2:StopInstances" })]),
+            }),
+          }),
+        ]),
+      });
+    });
+
     it("propagates StatementBuilder wildcard errors at build time", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
@@ -132,6 +158,20 @@ describe("RoleBuilder", () => {
         .assumedBy(new ServicePrincipal("lambda.amazonaws.com"))
         .addInlinePolicyStatements("TooBroad", [
           createStatementBuilder().allow().actions(["ec2:DescribeInstances"]).resources(["*"]),
+        ]);
+
+      expect(() => builder.build(stack, "TestRole")).toThrow(WildcardResourceError);
+    });
+
+    it("still enforces the wildcard guard on a StatementBuilder from another realm", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const builder = createRoleBuilder()
+        .assumedBy(new ServicePrincipal("lambda.amazonaws.com"))
+        .addInlinePolicyStatements("TooBroad", [
+          asForeignRealm(
+            createStatementBuilder().allow().actions(["ec2:DescribeInstances"]).resources(["*"]),
+          ),
         ]);
 
       expect(() => builder.build(stack, "TestRole")).toThrow(WildcardResourceError);

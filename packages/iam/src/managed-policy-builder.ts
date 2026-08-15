@@ -1,7 +1,7 @@
 import { ManagedPolicy, type ManagedPolicyProps, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
 import { Builder, COPY_STATE, type IBuilder, type Lifecycle } from "@composurecdk/core";
-import { StatementBuilder } from "./statement-builder.js";
+import { isStatementBuilder, type StatementBuilder } from "./statement-builder.js";
 
 /**
  * Configuration properties for the customer-managed IAM policy builder.
@@ -64,7 +64,7 @@ class ManagedPolicyBuilder implements Lifecycle<ManagedPolicyBuilderResult> {
 
   build(scope: IConstruct, id: string): ManagedPolicyBuilderResult {
     const resolvedExtras = this.#extraStatements.map((s) =>
-      s instanceof StatementBuilder ? s.build() : s,
+      isStatementBuilder(s) ? s.build() : s,
     );
 
     const mergedProps: ManagedPolicyProps = {

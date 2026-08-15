@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ArnPrincipal, Effect, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { createStatementBuilder, WildcardResourceError } from "../src/statement-builder.js";
+import { ArnPrincipal, Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import {
+  createStatementBuilder,
+  isStatementBuilder,
+  StatementBuilder,
+  WildcardResourceError,
+} from "../src/statement-builder.js";
+import { asForeignRealm } from "./foreign-realm.js";
 
 describe("StatementBuilder", () => {
   describe("build", () => {
@@ -128,5 +134,22 @@ describe("StatementBuilder", () => {
         StringEquals: { "aws:ResourceTag/Env": "dev" },
       });
     });
+  });
+});
+
+describe("isStatementBuilder", () => {
+  it("recognises a StatementBuilder", () => {
+    expect(isStatementBuilder(createStatementBuilder())).toBe(true);
+  });
+
+  it("rejects a raw PolicyStatement", () => {
+    expect(isStatementBuilder(new PolicyStatement({ actions: ["s3:GetObject"] }))).toBe(false);
+  });
+
+  it("recognises a builder from another realm, which instanceof does not", () => {
+    const foreign = asForeignRealm(createStatementBuilder().allow().actions(["s3:GetObject"]));
+
+    expect(foreign instanceof StatementBuilder).toBe(false);
+    expect(isStatementBuilder(foreign)).toBe(true);
   });
 });

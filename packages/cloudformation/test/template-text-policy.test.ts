@@ -10,7 +10,8 @@ import {
   Stack,
 } from "aws-cdk-lib";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+import type { IConstruct } from "constructs";
+import { Template } from "aws-cdk-lib/assertions";
 import {
   TEMPLATE_TEXT_WARNING_NAME,
   templateTextPolicy,
@@ -27,6 +28,19 @@ function alarm(scope: Stack, id: string, description: string): Alarm {
     evaluationPeriods: 1,
     alarmDescription: description,
   });
+}
+
+/**
+ * Warnings recorded anywhere under `node`, read from construct metadata rather
+ * than `aws-cdk-lib/assertions`' `Annotations`. That helper — and
+ * `Match.stringLikeRegexp` — postdate this package's declared aws-cdk-lib floor
+ * of 2.1.0, and the floor guard typechecks the suite against it (ADR-0008).
+ */
+function warnings(node: IConstruct): { path: string; message: string }[] {
+  const here = node.node.metadata
+    .filter((entry) => entry.type === "aws:cdk:warning")
+    .map((entry) => ({ path: node.node.path, message: String(entry.data) }));
+  return [here, ...node.node.children.map(warnings)].flat();
 }
 
 /** A one-stack app; pass a description to put non-ASCII on the stack itself. */
@@ -89,10 +103,10 @@ describe("templateTextPolicy — sanitize mode", () => {
 
   it("rewrites a CfnOutput description", () => {
     const { app, stack } = tree();
-    new CfnOutput(stack, "Url", { value: "https://example.com", description: DIRTY });
+    const url = new CfnOutput(stack, "Url", { value: "https://example.com", description: DIRTY });
     templateTextPolicy(app, { onViolation: "sanitize" });
     app.synth();
-    Template.fromStack(stack).hasOutput("Url", { Description: CLEAN });
+    expect(url.description).toBe(CLEAN);
   });
 
   it("honours a custom replacement", () => {
@@ -106,30 +120,55 @@ describe("templateTextPolicy — warn mode", () => {
   it("reports every violation in one pass, without failing synth", () => {
     const { app, stack } = dirtyTree({ onViolation: "warn" });
     expect(() => app.synth()).not.toThrow();
-    Annotations.fromStack(stack).hasWarning(
-      "/TestStack/Alarm/Resource",
-      Match.stringLikeRegexp(".*U\\+2014.*"),
-    );
+
+    const reported = warnings(stack);
+    expect(reported.map((w) => w.path)).toEqual(["TestStack", "TestStack/Alarm/Resource"]);
+    expect(reported.every((w) => w.message.includes("U+2014"))).toBe(true);
   });
 
   it("uses an acknowledgeable warning id", () => {
     expect(TEMPLATE_TEXT_WARNING_NAME).toBe("composurecdk:templateText");
   });
 
-  it("degrades to addWarning below aws-cdk-lib 2.93.0, this package's floor being 2.1.0", () => {
+  /**
+   * Swaps the annotation methods on the shared prototype for the duration of
+   * `run`. Both branches of the version shim have to be forced: `addWarningV2`
+   * does not exist at this package's 2.1.0 floor, and the `addWarning`
+   * fallback is unreachable on a current aws-cdk-lib — so whichever version
+   * the suite happens to run against, one branch is dead without this.
+   */
+  function withAnnotationMethods(methods: Record<string, unknown>, run: () => void): void {
     const proto = CdkAnnotations.prototype as unknown as Record<string, unknown>;
-    const addWarningV2 = proto.addWarningV2;
-    const addWarning = vi.fn();
+    const original = { addWarningV2: proto.addWarningV2, addWarning: proto.addWarning };
     delete proto.addWarningV2;
-    proto.addWarning = addWarning;
-
+    Object.assign(proto, methods);
     try {
+      run();
+    } finally {
+      delete proto.addWarningV2;
+      Object.assign(proto, original);
+    }
+  }
+
+  it("uses addWarningV2 with the acknowledgeable id where the runtime has it", () => {
+    const addWarningV2 = vi.fn();
+    withAnnotationMethods({ addWarningV2 }, () => {
+      const { app } = dirtyTree({ onViolation: "warn" });
+      expect(() => app.synth()).not.toThrow();
+      expect(addWarningV2).toHaveBeenCalledWith(
+        TEMPLATE_TEXT_WARNING_NAME,
+        expect.stringContaining("U+2014"),
+      );
+    });
+  });
+
+  it("degrades to addWarning below aws-cdk-lib 2.93.0, this package's floor being 2.1.0", () => {
+    const addWarning = vi.fn();
+    withAnnotationMethods({ addWarning }, () => {
       const { app } = dirtyTree({ onViolation: "warn" });
       expect(() => app.synth()).not.toThrow();
       expect(addWarning).toHaveBeenCalledWith(expect.stringContaining("U+2014"));
-    } finally {
-      proto.addWarningV2 = addWarningV2;
-    }
+    });
   });
 });
 

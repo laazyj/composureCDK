@@ -1,5 +1,6 @@
-import type { Rule, Scope } from "eslint";
-import type { Identifier, MemberExpression } from "estree";
+import type { Rule } from "eslint";
+import type { MemberExpression } from "estree";
+import { chainRoot, importSourceOf, isCdkSource } from "./lib/imports.js";
 
 /**
  * An `aws-cdk-lib` API that postdates @composurecdk's supported peer-dependency
@@ -38,18 +39,6 @@ const ALLOWED_CFN_GUARDS = new Set(["isCfnResource", "isCfnElement"]);
  * them (e.g. `CfnAlarm.isCfnAlarm(node)`) throws `TypeError` on the older
  * versions in our `^2` peer range — see issue #146.
  */
-/**
- * Loose shape used by `chainRoot` to walk MemberExpression + TS-wrapper nodes
- * uniformly. estree's static types don't model the typescript-eslint-specific
- * wrappers (`TSAsExpression`, `TSNonNullExpression`, `TSSatisfiesExpression`,
- * `TSTypeAssertion`) or `ChainExpression`, so the walk checks `.type` at runtime.
- */
-interface WalkNode {
-  type: string;
-  object?: unknown;
-  expression?: unknown;
-}
-
 const FORBIDDEN: ForbiddenMember[] = [
   {
     matches: (name) => /^isCfn[A-Z]/.test(name) && !ALLOWED_CFN_GUARDS.has(name),
@@ -94,63 +83,14 @@ export const rule: Rule.RuleModule = {
     },
   },
   create(ctx) {
-    // The leftmost identifier a member chain reads from, peeling MemberExpression
-    // and the TS-only wrappers typescript-eslint produces (`as`, `!`, `satisfies`,
-    // angle-bracket assertion, `?.` ChainExpression). Returns undefined if a call
-    // or other expression breaks the chain — `f().isCfnX` reads a runtime value
-    // rather than the imported class.
-    const TS_WRAPPERS = new Set([
-      "ChainExpression",
-      "TSAsExpression",
-      "TSNonNullExpression",
-      "TSSatisfiesExpression",
-      "TSTypeAssertion",
-    ]);
-    const chainRoot = (expr: MemberExpression["object"]): Identifier | undefined => {
-      let current = expr as unknown as WalkNode;
-      while (current.type === "MemberExpression" || TS_WRAPPERS.has(current.type)) {
-        current = (
-          current.type === "MemberExpression" ? current.object : current.expression
-        ) as WalkNode;
-      }
-      return current.type === "Identifier" ? (current as unknown as Identifier) : undefined;
-    };
-
-    // True when `name` resolves, in the current scope chain, to a binding from
-    // an `aws-cdk-lib` ImportDeclaration. This is scope-aware: a local that
-    // shadows the import name (e.g. a function parameter named `CfnAlarm`)
-    // resolves to its own binding and is NOT treated as the cdk class.
-    const rootIsCdkImport = (scope: Scope.Scope, name: string): boolean => {
-      for (let current: Scope.Scope | null = scope; current !== null; current = current.upper) {
-        const variable = current.set.get(name);
-        if (variable === undefined) continue;
-        // `.at(0)` (not `[0]`) — defs can be empty at runtime for predefined
-        // globals (e.g. `console`), even though `Variable.defs: Definition[]`
-        // says otherwise; `.at` gives us the honest `Definition | undefined`.
-        const def = variable.defs.at(0);
-        if (def?.type !== "ImportBinding") return false;
-        // `def.parent` is typed as `ImportDeclaration` but at runtime
-        // typescript-eslint also reports `ImportBinding` for `import x =
-        // require(...)`, whose parent is a `TSImportEqualsDeclaration` with no
-        // `.source`. Widen and check the discriminator before reading `source`.
-        const parent = def.parent as { type: string; source?: { value?: unknown } };
-        if (parent.type !== "ImportDeclaration") return false;
-        const source = parent.source?.value;
-        return (
-          source === "aws-cdk-lib" ||
-          (typeof source === "string" && source.startsWith("aws-cdk-lib/"))
-        );
-      }
-      return false;
-    };
-
     return {
       MemberExpression(node: MemberExpression) {
         if (node.property.type !== "Identifier") return;
         const property = node.property;
         const root = chainRoot(node.object);
         if (root === undefined) return;
-        if (!rootIsCdkImport(ctx.sourceCode.getScope(node), root.name)) return;
+        const source = importSourceOf(ctx.sourceCode.getScope(node), root.name);
+        if (source === undefined || !isCdkSource(source)) return;
 
         const forbidden = FORBIDDEN.find((entry) => entry.matches(property.name));
         if (forbidden === undefined) return;

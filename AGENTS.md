@@ -42,7 +42,7 @@ Lint is an nx target too: `npm run lint` runs `nx run-many -t lint`, which cache
 Every publishable package ships dual ESM/CJS, built by `tshy` — see [ADR-0007](docs/adr/0007-dual-esm-cjs-publishing.md). When touching a builder package:
 
 - Do not use `import.meta` or top-level `await` in `src/` — neither emits to CommonJS. The `composurecdk/no-cjs-incompatible-syntax` ESLint rule enforces this.
-- Cross-realm identity checks must use a `Symbol.for(...)` brand, never `instanceof` — the ESM and CommonJS copies of a package can both load in one process.
+- Cross-realm identity checks must use a `Symbol.for(...)` brand, never `instanceof` — the ESM and CommonJS copies of a package can both load in one process. The `composurecdk/no-realm-bound-instanceof` ESLint rule enforces this, for imports from a relative path as much as a bare specifier. For a CDK construct, brand the L2 you cannot modify by reading its L1 instead (`CfnResource.isCfnResource` + `cfnResourceType`, [ADR-0011](docs/adr/0011-cross-component-relationship-guards.md)).
 - Run `npm run verify` before pushing. It chains the same gate CI runs — build, `check:exports` (`attw` + `publint`), lint, test — and a husky `pre-push` hook runs it automatically.
 - A new package must be added to `@composurecdk/module-compat`'s `DUAL_PACKAGES` list and `peerDependencies`.
 

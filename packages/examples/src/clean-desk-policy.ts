@@ -1,6 +1,7 @@
 import {
   Aspects,
   CfnDeletionPolicy,
+  CfnResource,
   Duration,
   PropertyInjectors,
   RemovalPolicy,
@@ -168,35 +169,52 @@ class KeyRemovalPolicyInjector implements IPropertyInjector {
  */
 const DISABLE_LOGGING_CR_ID = "CleanDeskDisableLogging";
 
+/**
+ * Recognise an S3 bucket L2 by its L1's `cfnResourceType`.
+ *
+ * Deliberately not `instanceof Bucket`, which is realm-bound and is banned by
+ * the `composurecdk/no-realm-bound-instanceof` rule: an Aspect visits whatever
+ * is in the tree, including buckets built by another realm's copy of
+ * aws-cdk-lib (ADR-0007), and `instanceof` would silently skip those — leaving
+ * exactly the delete-order race this Aspect exists to prevent. Reading the L1's
+ * resource type is the jsii-safe idiom (ADR-0011).
+ */
+function asBucket(node: IConstruct): Bucket | undefined {
+  const l1 = node.node.defaultChild;
+  if (!CfnResource.isCfnResource(l1)) return undefined;
+  if (l1.cfnResourceType !== CfnBucket.CFN_RESOURCE_TYPE_NAME) return undefined;
+  return node as Bucket;
+}
+
 class DisableSourceLoggingOnDeleteAspect implements IAspect {
   visit(node: IConstruct): void {
-    if (!(node instanceof Bucket)) return;
+    const bucket = asBucket(node);
+    if (!bucket) return;
 
-    const cfn = node.node.defaultChild as CfnBucket | undefined;
-    if (!cfn) return;
+    const cfn = bucket.node.defaultChild as CfnBucket;
     if (cfn.cfnOptions.deletionPolicy !== CfnDeletionPolicy.DELETE) return;
 
     const logging = cfn.loggingConfiguration as CfnBucket.LoggingConfigurationProperty | undefined;
     if (!logging?.destinationBucketName) return;
 
-    const logsBucket = resolveLogsBucketInStack(node, logging.destinationBucketName);
+    const logsBucket = resolveLogsBucketInStack(bucket, logging.destinationBucketName);
     if (!logsBucket) return;
 
-    if (node.node.tryFindChild(DISABLE_LOGGING_CR_ID)) return;
+    if (bucket.node.tryFindChild(DISABLE_LOGGING_CR_ID)) return;
 
-    const disableLoggingCr = new AwsCustomResource(node, DISABLE_LOGGING_CR_ID, {
+    const disableLoggingCr = new AwsCustomResource(bucket, DISABLE_LOGGING_CR_ID, {
       resourceType: "Custom::DisableBucketLogging",
       onDelete: {
         service: "S3",
         action: "putBucketLogging",
         parameters: {
-          Bucket: node.bucketName,
+          Bucket: bucket.bucketName,
           BucketLoggingStatus: {},
         },
-        physicalResourceId: PhysicalResourceId.of(`${node.node.addr}-disable-logging`),
+        physicalResourceId: PhysicalResourceId.of(`${bucket.node.addr}-disable-logging`),
         ignoreErrorCodesMatching: "NoSuchBucket",
       },
-      policy: AwsCustomResourcePolicy.fromSdkCalls({ resources: [node.bucketArn] }),
+      policy: AwsCustomResourcePolicy.fromSdkCalls({ resources: [bucket.bucketArn] }),
       installLatestAwsSdk: false,
     });
 
@@ -206,7 +224,7 @@ class DisableSourceLoggingOnDeleteAspect implements IAspect {
     // CDK wires `autoDeleteObjects: true` as a child construct with id
     // "AutoDeleteObjectsCustomResource" — fragile if CDK renames it, but this
     // is sandbox-only and regressions surface at synth-time in the tests.
-    const sourceAutoDelete = node.node.tryFindChild("AutoDeleteObjectsCustomResource");
+    const sourceAutoDelete = bucket.node.tryFindChild("AutoDeleteObjectsCustomResource");
     if (sourceAutoDelete) {
       disableLoggingCr.node.addDependency(sourceAutoDelete);
     }
@@ -230,10 +248,10 @@ function resolveLogsBucketInStack(
   const destinationToken = JSON.stringify(stack.resolve(destinationBucketName));
 
   for (const candidate of stack.node.findAll()) {
-    if (!(candidate instanceof Bucket)) continue;
-    if (candidate === source) continue;
-    if (JSON.stringify(stack.resolve(candidate.bucketName)) === destinationToken) {
-      return candidate;
+    const bucket = asBucket(candidate);
+    if (!bucket || bucket === source) continue;
+    if (JSON.stringify(stack.resolve(bucket.bucketName)) === destinationToken) {
+      return bucket;
     }
   }
   return undefined;

@@ -5,6 +5,7 @@ import { rule as lifecycleBuildContextRequired } from "./lifecycle-build-context
 import { rule as lifecycleBuildMustForwardContext } from "./lifecycle-build-must-forward-context.js";
 import { rule as noCdkApiAboveFloor } from "./no-cdk-api-above-floor.js";
 import { rule as noCjsIncompatibleSyntax } from "./no-cjs-incompatible-syntax.js";
+import { rule as noRealmBoundInstanceof } from "./no-realm-bound-instanceof.js";
 
 export const rules = {
   "builder-must-be-tagged": builderMustBeTagged,
@@ -14,4 +15,5 @@ export const rules = {
   "lifecycle-build-must-forward-context": lifecycleBuildMustForwardContext,
   "no-cdk-api-above-floor": noCdkApiAboveFloor,
   "no-cjs-incompatible-syntax": noCjsIncompatibleSyntax,
+  "no-realm-bound-instanceof": noRealmBoundInstanceof,
 };

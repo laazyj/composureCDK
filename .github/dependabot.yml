@@ -31,3 +31,13 @@ updates:
           - "@aws-cdk/*"
           - "nx"
           - "@nx/*"
+    ignore:
+      # 4.0.5 declares "type": "module" while still shipping .d.ts files that
+      # import their siblings without a file extension. Under NodeNext those
+      # declarations are ESM, the extensionless specifiers do not resolve, and
+      # every graphlib type @composurecdk/core imports degrades to `any` —
+      # invisible to tsc (skipLibCheck) but fatal to the type-aware lint rules.
+      # @composurecdk/core pins 4.0.3. Drop this once upstream ships either the
+      # extensions or a CJS type build. See packages/core/README.md.
+      - dependency-name: "@dagrejs/graphlib"
+        versions: [">=4.0.4"]

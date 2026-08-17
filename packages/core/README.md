@@ -90,6 +90,17 @@ ref<FunctionBuilderResult>("handler")
 ref<FunctionBuilderResult>("handler", (r) => new LambdaIntegration(r.function));
 ```
 
+## Dependencies
+
+`@dagrejs/graphlib` is pinned to an exact `4.0.3` rather than a caret range. 4.0.5 added
+`"type": "module"` to its `package.json` but still emits `.d.ts` files whose relative imports
+carry no file extension (`export { Graph } from './lib/graph'`). Under `moduleResolution:
+NodeNext` those declarations are now ESM, where extensionless specifiers do not resolve, so
+`Graph`, `json` and `alg` all arrive as error types. `skipLibCheck` keeps `tsc` quiet about it,
+but the type-aware lint rules see `any` and `compose.ts` fails to lint. Dependabot is told to
+skip the package in [dependabot.yml](../../.github/dependabot.yml); lift both the pin and the
+ignore once upstream ships the extensions or a CommonJS type build.
+
 ## Examples
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`

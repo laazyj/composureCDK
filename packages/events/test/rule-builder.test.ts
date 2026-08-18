@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { EventBus, Schedule } from "aws-cdk-lib/aws-events";
+import { EventBus, type RuleProps, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
 import { ref } from "@composurecdk/core";
-import { createRuleBuilder } from "../src/rule-builder.js";
+import { createRuleBuilder, type RuleBuilderProps } from "../src/rule-builder.js";
 
 function newStack(): Stack {
   return new Stack(new App(), "TestStack");
@@ -147,8 +147,20 @@ describe("RuleBuilder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own RuleProps accepts, bar targets (type-level guard)", () => {
+      // Every re-declared prop must widen what CDK takes, never narrow it:
+      // pinning `eventBus` to `IEventBus` rejected a bus CDK itself takes,
+      // once CDK widened `RuleProps.eventBus` to `IEventBusRef` in 2.235.0.
+      // Asserted over the whole interface so a prop re-declared later — CDK
+      // has widened `role` the same way — cannot reintroduce the narrowing.
+      const props: RuleBuilderProps = undefined as unknown as Omit<RuleProps, "targets">;
+      void props;
+    });
+  });
+
   describe("eventBus", () => {
-    it("resolves a Resolvable<IEventBus> from the compose context", () => {
+    it("resolves a Resolvable event bus from the compose context", () => {
       const stack = newStack();
       const fn = makeFn(stack);
       const bus = new EventBus(stack, "Bus", { eventBusName: "my-bus" });

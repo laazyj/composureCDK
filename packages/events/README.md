@@ -23,7 +23,7 @@ Every [RuleProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ev
 
 ### Cross-component event bus
 
-The `eventBus` property accepts a `Resolvable<IEventBus>` so the rule can attach to a custom bus built by another component:
+The `eventBus` property accepts a concrete bus or a `Ref` to one, so the rule can attach to a custom bus built by another component:
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
@@ -40,6 +40,8 @@ compose(
 ```
 
 When omitted, the rule attaches to the account default bus, matching CDK's `RuleProps.eventBus` default.
+
+The prop's inner type is read from CDK's own `RuleProps.eventBus` rather than pinned to `IEventBus`, so it accepts whatever the `aws-cdk-lib` you have installed accepts — including the broader [`events.IEventBusRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_events.IEventBusRef.html) where CDK has widened the prop.
 
 ## Recommended Alarms
 
@@ -179,6 +181,8 @@ This package ships small free-function helpers that wrap the corresponding [`aws
 | `sfnStateMachineTarget`    | `SfnStateMachine`    | `IStateMachine`     |
 | `eventBusTarget`           | `EventBus`           | `IEventBus`         |
 | `cloudWatchLogGroupTarget` | `CloudWatchLogGroup` | `ILogGroup`         |
+
+`eventBusTarget` is pinned to `IEventBus`, because CDK's own `EventBus` target still is, so a bus that is only an `IEventBusRef` reaches a rule's `eventBus` but not a target.
 
 The second argument is the matching CDK target props type (`LambdaFunctionProps`, `SqsQueueProps`, …) — refer to the CDK docs for available options. Common ones include `deadLetterQueue` (concrete `IQueue`), `retryAttempts`, `maxEventAge`, and target-specific input transforms (`event` / `input` / `message`).
 

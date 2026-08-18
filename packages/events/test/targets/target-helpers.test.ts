@@ -7,6 +7,7 @@ import { LogGroup } from "aws-cdk-lib/aws-logs";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { DefinitionBody, Pass, StateMachine } from "aws-cdk-lib/aws-stepfunctions";
+import { EventBus as EventBusTarget } from "aws-cdk-lib/aws-events-targets";
 import { isRef, ref } from "@composurecdk/core";
 import { createRuleBuilder } from "../../src/rule-builder.js";
 import { lambdaTarget } from "../../src/targets/lambda-target.js";
@@ -226,6 +227,16 @@ describe("target helpers", () => {
           Statement: Match.arrayWith([Match.objectLike({ Action: "events:PutEvents" })]),
         }),
       });
+    });
+
+    it("accepts every bus CDK's own EventBus target accepts (type-level guard)", () => {
+      // The helper is pinned to `IEventBus` because CDK's target still is.
+      // If CDK widens the target the way it widened `RuleProps.eventBus` in
+      // 2.235.0, this stops compiling — the pin, and the README note about
+      // it, become the narrowing that issue #401 was about.
+      const bus: Parameters<typeof eventBusTarget>[0] =
+        undefined as unknown as ConstructorParameters<typeof EventBusTarget>[0];
+      void bus;
     });
 
     it("returns a Ref<IRuleTarget> for a Ref<IEventBus> and synths the rule", () => {

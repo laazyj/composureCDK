@@ -56,6 +56,7 @@ _lives_. A maintainer running `npm run verify` gets the exact gate CI runs.
 | Mechanism                                             | What it catches                                                                                  | Feedback point                             |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------ |
 | `composurecdk/no-cjs-incompatible-syntax` ESLint rule | `import.meta` / top-level `await` in `src/` — no CJS emit                                        | In-editor, instant                         |
+| `composurecdk/no-realm-bound-instanceof` ESLint rule  | `instanceof` against an imported class in `src/` — realm-bound, silently false across the hazard | In-editor, instant                         |
 | `attw` + `publint` (`check:exports` nx target)        | Broken/masquerading exports, dual-package issues, packaging mistakes                             | `npm run check:exports` / `npm run verify` |
 | `@composurecdk/module-compat` consumption tests       | A package failing to resolve under `require()` or `import`, or the CJS `cdk synth` path breaking | `npm test` / `npm run verify`              |
 | husky `pre-push` hook                                 | Any of the above reaching GitHub                                                                 | Automatic, before push                     |

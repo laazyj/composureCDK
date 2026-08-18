@@ -33,6 +33,8 @@ const cdn = createDistributionBuilder().origin(
 compose({ site: createBucketBuilder(), cdn }, { site: [], cdn: ["site"] }).build(stack, "Website");
 ```
 
+`.certificate(...)` takes a `Ref` the same way, so an [`@composurecdk/acm`](../acm/README.md) certificate (issued in `us-east-1`) can be a component of the same system. Its inner type is read from CDK's own `DistributionProps.certificate` rather than pinned to `ICertificate`, so it accepts whatever the `aws-cdk-lib` you have installed accepts — including the broader [`acm.ICertificateRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_certificatemanager.ICertificateRef.html) where CDK has widened the prop.
+
 ## Secure Defaults
 
 `createDistributionBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.

@@ -1,16 +1,14 @@
 import {
   Distribution,
   type DistributionProps,
-  type IOrigin,
   type AddBehaviorOptions,
   type BehaviorOptions,
   type Function as CfFunction,
   type FunctionCode,
   type FunctionEventType,
+  type FunctionProps,
   type FunctionRuntime,
-  type IKeyValueStore,
 } from "aws-cdk-lib/aws-cloudfront";
-import { type ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type Bucket, type IBucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { RemovalPolicy } from "aws-cdk-lib";
@@ -97,8 +95,13 @@ export interface InlineFunctionDefinition {
   /**
    * Key-value store to associate with the function. Only supported on the
    * `cloudfront-js-2.0` runtime.
+   *
+   * Read from CDK's own prop rather than named as `IKeyValueStore`, so it
+   * tracks the `IKeyValueStore` → `IKeyValueStoreRef` migration in either
+   * direction, the same way {@link DistributionBuilderProps.certificate}
+   * does.
    */
-  keyValueStore?: IKeyValueStore;
+  keyValueStore?: NonNullable<FunctionProps["keyValueStore"]>;
 
   /**
    * Per-function alarm configuration. Defaults to the three AWS-recommended
@@ -138,15 +141,15 @@ export interface DefaultBehaviorConfig extends Omit<AddBehaviorOptions, "functio
  * via {@link IDistributionBuilder.behavior}.
  *
  * Unlike {@link DefaultBehaviorConfig}, `origin` is required. It may be a
- * concrete {@link IOrigin} or a {@link Resolvable} (typically a {@link ref})
- * for cross-component wiring.
+ * concrete `IOrigin` or a {@link Resolvable} (typically a {@link ref}) for
+ * cross-component wiring.
  */
 export interface AdditionalBehaviorConfig extends Omit<
   BehaviorOptions,
   "origin" | "functionAssociations"
 > {
   /** The origin for this behavior, concrete or resolved at build time. */
-  origin: Resolvable<IOrigin>;
+  origin: Resolvable<BehaviorOptions["origin"]>;
 
   /**
    * CloudFront Functions to associate with this behavior. At most one
@@ -211,11 +214,16 @@ export interface DistributionBuilderProps extends Omit<
   /**
    * The ACM certificate to associate with the distribution for HTTPS.
    *
-   * Accepts a concrete {@link ICertificate} or a {@link Resolvable} —
-   * typically a {@link Ref} produced by a composed `@composurecdk/acm`
-   * certificate builder. The certificate must be issued in `us-east-1`.
+   * Accepts a concrete certificate or a {@link Ref} to one — typically the
+   * output of a composed `@composurecdk/acm` certificate builder. The
+   * certificate must be issued in `us-east-1`.
+   *
+   * The inner type is read from CDK's own prop rather than named as
+   * `ICertificate`, so it tracks the `acm.ICertificate` →
+   * `acm.ICertificateRef` migration in either direction — see the note in
+   * this package's README.
    */
-  certificate?: Resolvable<ICertificate>;
+  certificate?: Resolvable<NonNullable<DistributionProps["certificate"]>>;
 
   /**
    * Configuration for the default cache behavior. The origin is set via
@@ -316,7 +324,7 @@ export interface DistributionBuilderResult {
  *
  * Properties from CDK {@link DistributionProps} are exposed as overloaded
  * getter/setter methods. The origin is set via {@link origin}, which accepts
- * a concrete {@link IOrigin} or a {@link Ref} for cross-component wiring.
+ * a concrete `IOrigin` or a {@link Ref} for cross-component wiring.
  * Additional cache behaviors are added via {@link behavior}, which takes a
  * path pattern and a config including its own origin and inline functions.
  *
@@ -349,7 +357,7 @@ export type IDistributionBuilder = ITaggedBuilder<DistributionBuilderProps, Dist
 
 class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
   props: Partial<DistributionBuilderProps> = {};
-  #origin?: Resolvable<IOrigin>;
+  #origin?: Resolvable<BehaviorOptions["origin"]>;
   readonly #additionalBehaviors = new Map<string, AdditionalBehaviorConfig>();
   readonly #behaviorSlugs = new Map<string, string>();
   readonly #customAlarms: AlarmDefinitionBuilder<Distribution>[] = [];
@@ -367,13 +375,13 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
   /**
    * Sets the default origin for the distribution.
    *
-   * Accepts a concrete {@link IOrigin} or a {@link Ref} that resolves to one
+   * Accepts a concrete `IOrigin` or a {@link Ref} that resolves to one
    * at build time — enabling cross-component wiring with S3 buckets.
    *
    * @param origin - The origin or a Ref to one.
    * @returns This builder for chaining.
    */
-  origin(origin: Resolvable<IOrigin>): this {
+  origin(origin: Resolvable<BehaviorOptions["origin"]>): this {
     this.#origin = origin;
     return this;
   }

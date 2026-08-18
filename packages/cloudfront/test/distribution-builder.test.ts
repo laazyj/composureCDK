@@ -7,6 +7,8 @@ import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import {
   CachePolicy,
   type Distribution,
+  type DistributionProps,
+  type FunctionProps,
   PriceClass,
   ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
@@ -15,7 +17,11 @@ import { Certificate } from "aws-cdk-lib/aws-certificatemanager";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { type BucketBuilderResult } from "@composurecdk/s3";
-import { createDistributionBuilder } from "../src/distribution-builder.js";
+import {
+  createDistributionBuilder,
+  type DistributionBuilderProps,
+  type InlineFunctionDefinition,
+} from "../src/distribution-builder.js";
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) => void,
@@ -34,6 +40,27 @@ function withBucketOrigin(stack: Stack) {
 }
 
 describe("DistributionBuilder", () => {
+  describe("props", () => {
+    it("accept everything CDK's own DistributionProps accepts (type-level guard)", () => {
+      // A re-declared prop must widen what CDK takes, never narrow it: pinning
+      // `certificate` to `ICertificate` rejected a certificate CDK itself
+      // takes, once CDK widened `DistributionProps.certificate` to
+      // `ICertificateRef` in 2.235.0. Asserted over the whole interface, so a
+      // prop re-declared later cannot reintroduce the narrowing. Structural
+      // assignment ignores the props the builder replaces outright, so they
+      // need no exemption here — and a prop that is merely widened must never
+      // be given one.
+      const props: DistributionBuilderProps = undefined as unknown as DistributionProps;
+      void props;
+    });
+
+    it("accept every key-value store CDK's own FunctionProps accepts (type-level guard)", () => {
+      const keyValueStore: NonNullable<InlineFunctionDefinition["keyValueStore"]> =
+        undefined as unknown as NonNullable<FunctionProps["keyValueStore"]>;
+      void keyValueStore;
+    });
+  });
+
   describe("build", () => {
     it("returns a DistributionBuilderResult with a distribution property", () => {
       const app = new App();

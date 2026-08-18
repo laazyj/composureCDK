@@ -51,7 +51,7 @@
     },
     "cloudfront": {
       "floor": "2.124.0",
-      "gatedBy": "aws-cloudfront.FunctionProps.keyValueStore association wiring (introduced 2.124.0); also peers @composurecdk/s3 at 2.123.0. Builder tags reaching CloudFront Functions degrade gracefully below 2.251.0 and are not floor-gating."
+      "gatedBy": "aws-cloudfront.FunctionProps.keyValueStore association wiring (introduced 2.124.0); also peers @composurecdk/s3 at 2.123.0. Builder tags reaching CloudFront Functions degrade gracefully below 2.251.0 and are not floor-gating. Note DistributionBuilderProps.certificate and InlineFunctionDefinition.keyValueStore deliberately re-declare their props as NonNullable<DistributionProps[\"certificate\"]> and NonNullable<FunctionProps[\"keyValueStore\"]> rather than naming an interface: CDK widened both in 2.235.0 — acm.ICertificate to acm.ICertificateRef, IKeyValueStore to IKeyValueStoreRef — so the L2 interface narrows what a consumer above that release can pass and the Ref interface does not exist at this floor. Do not 'simplify' either to an interface without raising the floor; the type-level guards in test/distribution-builder.test.ts are what catch that, at typecheck time."
     },
     "acm": {
       "floor": "2.119.0",

@@ -1,11 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import {
-  type IEventBus,
-  type IRule,
-  type IRuleTarget,
-  Rule,
-  type RuleProps,
-} from "aws-cdk-lib/aws-events";
+import { type IRule, type IRuleTarget, Rule, type RuleProps } from "aws-cdk-lib/aws-events";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -31,12 +25,16 @@ import { createRuleAlarms } from "./rule-alarms.js";
  */
 export interface RuleBuilderProps extends Omit<RuleProps, "targets" | "eventBus"> {
   /**
-   * The event bus the rule listens on. Accepts a concrete {@link IEventBus} or
-   * a {@link Ref} to another component's output. When omitted, the rule
+   * The event bus the rule listens on. Accepts a concrete bus or a
+   * {@link Ref} to another component's output. When omitted, the rule
    * attaches to the account default bus, matching CDK's `RuleProps.eventBus`
    * default.
+   *
+   * The inner type is read from CDK's own prop rather than named as
+   * `IEventBus`, so it tracks the `events.IEventBus` → `events.IEventBusRef`
+   * migration in either direction — see the note in this package's README.
    */
-  eventBus?: Resolvable<IEventBus>;
+  eventBus?: Resolvable<NonNullable<RuleProps["eventBus"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.

@@ -31,7 +31,7 @@
     },
     "events": {
       "floor": "2.93.0",
-      "gatedBy": "Annotations.addWarningV2 reached transitively via @composurecdk/cloudwatch's alarm-threshold-basis.ts (introduced 2.93.0); also aws-stepfunctions.DefinitionBody used by target-helpers.test (2.85.0) and Match.stringLikeRegexp used by rule-alarms.test (2.9.0)"
+      "gatedBy": "Annotations.addWarningV2 reached transitively via @composurecdk/cloudwatch's alarm-threshold-basis.ts (introduced 2.93.0); also aws-stepfunctions.DefinitionBody used by target-helpers.test (2.85.0) and Match.stringLikeRegexp used by rule-alarms.test (2.9.0). Note RuleBuilderProps.eventBus deliberately re-declares the prop as Resolvable<NonNullable<RuleProps[\"eventBus\"]>> rather than naming a bus interface: CDK widened this prop from events.IEventBus to events.IEventBusRef in 2.235.0, so IEventBus narrows what a consumer above that release can pass and IEventBusRef does not exist at this floor. Do not 'simplify' it to either interface without raising the floor; the type-level guard in test/rule-builder.test.ts is what catches that, at typecheck time"
     },
     "budgets": {
       "floor": "2.93.0",

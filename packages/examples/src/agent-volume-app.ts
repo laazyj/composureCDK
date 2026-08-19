@@ -1,4 +1,4 @@
-import { App, Size, Stack } from "aws-cdk-lib";
+import { Size, Stack } from "aws-cdk-lib";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import {
   InstanceClass,
@@ -17,6 +17,7 @@ import {
   type VpcBuilderResult,
 } from "@composurecdk/ec2";
 import { createTopicBuilder } from "@composurecdk/sns";
+import { exampleApp } from "./app-context.js";
 
 /**
  * A VPC + EC2 instance with a persistent EBS data volume attached at
@@ -37,7 +38,7 @@ import { createTopicBuilder } from "@composurecdk/sns";
  *
  * NAT gateways are disabled to keep deploy/destroy fast and cheap.
  */
-export function createAgentVolumeApp(app = new App()) {
+export function createAgentVolumeApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-AgentVolumeStack");
 
   const { alerts } = compose(

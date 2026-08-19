@@ -1,4 +1,4 @@
-import { App, Stack } from "aws-cdk-lib";
+import { Stack } from "aws-cdk-lib";
 import {
   AwsIntegration,
   PassthroughBehavior,
@@ -10,6 +10,7 @@ import { createRestApiBuilder } from "@composurecdk/apigateway";
 import { createTableBuilder, tableGrants, type TableBuilderResult } from "@composurecdk/dynamodb";
 import { createServiceRoleBuilder, type RoleBuilderResult } from "@composurecdk/iam";
 import { createKeyBuilder, type KeyBuilderResult } from "@composurecdk/kms";
+import { exampleApp } from "./app-context.js";
 
 /** Every method here returns a bare `200` — no error mapping. A production
  * API would add `selectionPattern` integration responses (e.g. matching
@@ -157,7 +158,7 @@ const DELETE_OPERATION = gadgetIntegration(
  * cannot infer — a principal decrypting ciphertext it fetched elsewhere, say —
  * and adding one here would be redundant permission, not extra safety.
  */
-export function createCrudApiApp(app = new App()) {
+export function createCrudApiApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-CrudApiStack");
 
   compose(

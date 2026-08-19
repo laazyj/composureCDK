@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App } from "aws-cdk-lib";
+import { exampleApp } from "../src/app-context.js";
 import { buildExampleApp } from "../src/apps.js";
 
 /** Enough offenders to see the pattern; a UTF-8 blob would otherwise dump thousands. */
@@ -20,7 +20,7 @@ const MAX_REPORTED = 5;
  */
 describe("synthesised example templates", () => {
   it("contain only ASCII", () => {
-    const offenders = buildExampleApp(new App({ outdir: "cdk.out/ascii-templates" }))
+    const offenders = buildExampleApp(exampleApp({ outdir: "cdk.out/ascii-templates" }))
       .synth()
       .stacks.flatMap(({ stackName, template }) => {
         const json = JSON.stringify(template);

@@ -1,4 +1,5 @@
 import { App } from "aws-cdk-lib";
+import { exampleApp } from "./app-context.js";
 import { cleanDeskPolicy } from "./clean-desk-policy.js";
 import { createAgentVolumeApp } from "./agent-volume-app.js";
 import { createCrudApiApp } from "./crud-api-app.js";
@@ -20,7 +21,7 @@ import { createTaggedSystemApp } from "./tagged-system-app.js";
  * tests that assert across all stacks at once. Register a new example here
  * and it is covered by both.
  */
-export function buildExampleApp(app = new App()): App {
+export function buildExampleApp(app = exampleApp()): App {
   cleanDeskPolicy(app);
 
   createAgentVolumeApp(app);

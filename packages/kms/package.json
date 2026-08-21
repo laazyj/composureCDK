@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/kms",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "Composable AWS KMS customer-managed key builder with well-architected defaults",
   "repository": {
     "type": "git",

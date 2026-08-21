@@ -1,3 +1,21 @@
+## 0.9.5 (2026-08-21)
+
+### 🚀 Features
+
+- **cloudformation:** add templateTextPolicy, an opt-in guard for template text ([14df9b8](https://github.com/laazyj/composureCDK/commit/14df9b8))
+- **eslint-plugin:** ban realm-bound instanceof in dual-published source ([#404](https://github.com/laazyj/composureCDK/pull/404))
+
+### 🩹 Fixes
+
+- **cloudformation:** keep the policy tests inside the 2.1.0 CDK floor ([7bed666](https://github.com/laazyj/composureCDK/commit/7bed666))
+- **cloudfront:** read certificate and keyValueStore types from CDK's own props ([#411](https://github.com/laazyj/composureCDK/pull/411), [#402](https://github.com/laazyj/composureCDK/issues/402))
+- **events:** read RuleBuilderProps.eventBus type from CDK's own prop ([#410](https://github.com/laazyj/composureCDK/pull/410), [#401](https://github.com/laazyj/composureCDK/issues/401))
+
+### 💀 Thank You
+
+- Claude
+- Jason Duffett
+
 ## 0.9.4 (2026-08-15)
 
 ### 🚀 Features

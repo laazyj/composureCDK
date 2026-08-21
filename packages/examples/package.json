@@ -22,7 +22,7 @@
   "dependencies": {
     "@aws-cdk/aws-neptune-alpha": "2.257.0-alpha.0",
     "aws-cdk-lib": "^2.264.0",
-    "constructs": "^10.6.0"
+    "constructs": "^10.8.1"
   },
   "peerDependencies": {
     "@composurecdk/apigateway": "^0.9.0",
@@ -43,9 +43,9 @@
     "@composurecdk/sqs": "^0.9.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.2.0",
     "aws-cdk": "^2.1136.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.8"
   },
   "nx": {

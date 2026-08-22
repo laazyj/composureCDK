@@ -162,6 +162,7 @@ The stack's own `Description`, every `CfnOutput` / `CfnParameter` description, a
 | Resource type                                                                             | Property           |
 | ----------------------------------------------------------------------------------------- | ------------------ |
 | `AWS::CloudFront::Function`                                                               | `functionCode`     |
+| `AWS::CloudFront::KeyValueStore`                                                          | `comment`          |
 | `AWS::CloudWatch::Alarm`, `AWS::CloudWatch::CompositeAlarm`                               | `alarmDescription` |
 | `AWS::Lambda::Function`, `AWS::Events::Rule`, `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` | `description`      |
 | `AWS::ApiGateway::RestApi`, `Stage`, `Deployment`, `UsagePlan`, `ApiKey`                  | `description`      |
@@ -183,7 +184,7 @@ Keys are CloudFormation resource types; values are **CDK L1 property names** (ca
 
 - Values that resolve to a CloudFormation intrinsic (`Ref`, `Fn::ImportValue`) — the text is not knowable at synth. A `Lazy` that resolves to a plain string **is** checked.
 - Values written through `addPropertyOverride`, or set on a bare `CfnResource`'s `properties`. Both bypass the typed L1 accessor the policy reads.
-- Nested properties such as `DistributionConfig.Comment` and `FunctionConfig.Comment` — so CloudFront is covered at `functionCode` only, not wherever a comment can be typed.
+- Nested properties such as `DistributionConfig.Comment` and `FunctionConfig.Comment`. The two CloudFront rows above are the whole of what is reachable in that service — every other free-text field it declares sits behind a `*Config` object — so CloudFront is covered where the registry can see, not wherever a comment can be typed.
 - Resource types and properties not in the table above, until you add them. A property name that does not match an L1 accessor is skipped silently — the same outcome as not listing it.
 
 To check a single value directly rather than a whole tree, use `constraints.validate.templateText` / `constraints.sanitize.templateText` ([catalogue](../../docs/constraints.md)).

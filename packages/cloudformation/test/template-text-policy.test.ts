@@ -257,6 +257,21 @@ describe("templateTextPolicy — coverage", () => {
     expect(() => app.synth()).toThrow("AWS::CloudFront::Function functionCode contains");
   });
 
+  it("checks a CloudFront KeyValueStore comment", () => {
+    const { app, stack } = tree();
+    // Stubbed rather than built from `CfnKeyValueStore`: that L1 does not exist
+    // at this package's 2.1.0 floor (absent at 2.110.0, present by 2.124.0,
+    // which is where @composurecdk/cloudfront floors), and the floor shard runs
+    // this suite. The policy reads `cfnResourceType` then the property off the
+    // instance, which is exactly what this stands in for.
+    const store = new CfnResource(stack, "Redirects", {
+      type: "AWS::CloudFront::KeyValueStore",
+    });
+    (store as unknown as Record<string, unknown>).comment = DIRTY;
+    templateTextPolicy(app);
+    expect(() => app.synth()).toThrow("AWS::CloudFront::KeyValueStore comment contains");
+  });
+
   it("cannot reach a nested Comment, even on a registered type, even if asked to", () => {
     const { app, stack } = tree();
     cloudFrontFunction(stack, "Redirects", "comment", DIRTY);

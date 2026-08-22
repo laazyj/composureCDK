@@ -10,6 +10,7 @@ import {
   Stack,
 } from "aws-cdk-lib";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { CfnFunction } from "aws-cdk-lib/aws-cloudfront";
 import type { IConstruct } from "constructs";
 import { Template } from "aws-cdk-lib/assertions";
 import {
@@ -27,6 +28,19 @@ function alarm(scope: Stack, id: string, description: string): Alarm {
     threshold: 1,
     evaluationPeriods: 1,
     alarmDescription: description,
+  });
+}
+
+/**
+ * A CloudFront Function carrying `text` in one of its two free-text positions:
+ * a comment in the inline source, which the registry reaches, or the nested
+ * `FunctionConfig.Comment`, which it does not.
+ */
+function cloudFrontFunction(scope: Stack, id: string, where: "code" | "comment", text: string) {
+  return new CfnFunction(scope, id, {
+    name: id,
+    functionCode: `function handler(event) { /* ${where === "code" ? text : id} */ return event.request; }`,
+    functionConfig: { comment: where === "comment" ? text : id, runtime: "cloudfront-js-1.0" },
   });
 }
 
@@ -233,6 +247,25 @@ describe("templateTextPolicy — coverage", () => {
     const { app, stack } = tree();
     alarm(stack, "Alarm", Fn.importValue("SomeExport"));
     templateTextPolicy(app);
+    expect(() => app.synth()).not.toThrow();
+  });
+
+  it("checks a CloudFront Function's inline source", () => {
+    const { app, stack } = tree();
+    cloudFrontFunction(stack, "Redirects", "code", DIRTY);
+    templateTextPolicy(app);
+    expect(() => app.synth()).toThrow("AWS::CloudFront::Function functionCode contains");
+  });
+
+  it("cannot reach a nested Comment, even on a registered type, even if asked to", () => {
+    const { app, stack } = tree();
+    cloudFrontFunction(stack, "Redirects", "comment", DIRTY);
+    templateTextPolicy(app, {
+      fields: { "AWS::CloudFront::Function": ["functionConfig.comment"] },
+    });
+    // `functionConfig` is object-valued, so its `Comment` sits behind a nested
+    // path no property name reaches — registering the dotted path no-ops
+    // rather than erroring. CloudFront is covered at `functionCode` only.
     expect(() => app.synth()).not.toThrow();
   });
 

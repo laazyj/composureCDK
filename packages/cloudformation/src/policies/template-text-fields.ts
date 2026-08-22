@@ -20,8 +20,8 @@ export type TemplateTextFields = Readonly<Record<string, readonly string[]>>;
  * Only top-level scalar properties are listed. Nested paths
  * (`DistributionConfig.Comment`, `HostedZoneConfig.Comment`) need a resolve on
  * the way in and an `addPropertyOverride` on the way out; they are a separate
- * change. A field earns a place here if a consumer can put arbitrary prose in
- * it.
+ * change. A field earns a place here if a consumer can put arbitrary text in
+ * it that CloudFormation stores verbatim — usually prose, but not necessarily.
  */
 export const TEMPLATE_TEXT_FIELDS: TemplateTextFields = {
   "AWS::ApiGateway::ApiKey": ["description"],
@@ -29,6 +29,7 @@ export const TEMPLATE_TEXT_FIELDS: TemplateTextFields = {
   "AWS::ApiGateway::RestApi": ["description"],
   "AWS::ApiGateway::Stage": ["description"],
   "AWS::ApiGateway::UsagePlan": ["description"],
+  "AWS::CloudFront::Function": ["functionCode"], // a whole JS body, not prose
   "AWS::CloudWatch::Alarm": ["alarmDescription"],
   "AWS::CloudWatch::CompositeAlarm": ["alarmDescription"],
   "AWS::EC2::SecurityGroup": ["groupDescription"],

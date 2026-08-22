@@ -159,12 +159,15 @@ The stack's own `Description`, every `CfnOutput` / `CfnParameter` description, a
 
 | Resource type                                                                             | Property           |
 | ----------------------------------------------------------------------------------------- | ------------------ |
+| `AWS::CloudFront::Function`                                                               | `functionCode`     |
 | `AWS::CloudWatch::Alarm`, `AWS::CloudWatch::CompositeAlarm`                               | `alarmDescription` |
 | `AWS::Lambda::Function`, `AWS::Events::Rule`, `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` | `description`      |
 | `AWS::ApiGateway::RestApi`, `Stage`, `Deployment`, `UsagePlan`, `ApiKey`                  | `description`      |
 | `AWS::Neptune::DBClusterParameterGroup`, `AWS::Neptune::DBParameterGroup`                 | `description`      |
 | `AWS::EC2::SecurityGroup`                                                                 | `groupDescription` |
 | `AWS::SNS::Topic`                                                                         | `displayName`      |
+
+`functionCode` is the odd one out: a whole JavaScript body rather than a line of prose, so the policy checks a source file. That is deliberate — it is usually the largest block of free text in a template, and often the only one built from external data, such as a redirect map read at synth. It also means a legitimately non-ASCII string literal in a CloudFront Function — a `€` in a redirect target, a non-Latin `Location` header — moves from a silent bad deploy to a synth failure. `"warn"` is the adoption path, and the right long-term mode if you have one of those: `fields` unions with the built-in registry rather than replacing it, so a built-in entry cannot be dropped from config. Avoid `sanitize` on a function body — substituting a `?` into a string literal rewrites deployed source, which is a behaviour change rather than a cosmetic one.
 
 That is a seed list, not the whole of CloudFormation — several hundred resource types declare a free-text property. Add the ones you use:
 
@@ -178,7 +181,7 @@ Keys are CloudFormation resource types; values are **CDK L1 property names** (ca
 
 - Values that resolve to a CloudFormation intrinsic (`Ref`, `Fn::ImportValue`) — the text is not knowable at synth. A `Lazy` that resolves to a plain string **is** checked.
 - Values written through `addPropertyOverride`, or set on a bare `CfnResource`'s `properties`. Both bypass the typed L1 accessor the policy reads.
-- Nested properties such as `DistributionConfig.Comment`.
+- Nested properties such as `DistributionConfig.Comment` and `FunctionConfig.Comment`. CloudFront is covered at `AWS::CloudFront::Function`'s `functionCode` only — the distribution and function `Comment` fields sit inside an object-valued L1 property, so registering `distributionConfig` or a dotted `"distributionConfig.comment"` silently no-ops.
 - Resource types and properties not in the table above, until you add them. A property name that does not match an L1 accessor is skipped silently — the same outcome as not listing it.
 
 To check a single value directly rather than a whole tree, use `constraints.validate.templateText` / `constraints.sanitize.templateText` ([catalogue](../../docs/constraints.md)).

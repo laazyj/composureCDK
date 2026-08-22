@@ -10,6 +10,7 @@ import {
   Stack,
 } from "aws-cdk-lib";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { CfnDistribution, CfnFunction } from "aws-cdk-lib/aws-cloudfront";
 import type { IConstruct } from "constructs";
 import { Template } from "aws-cdk-lib/assertions";
 import {
@@ -27,6 +28,15 @@ function alarm(scope: Stack, id: string, description: string): Alarm {
     threshold: 1,
     evaluationPeriods: 1,
     alarmDescription: description,
+  });
+}
+
+/** A CloudFront Function whose inline source carries `code` in a comment. */
+function cloudFrontFunction(scope: Stack, id: string, code: string): CfnFunction {
+  return new CfnFunction(scope, id, {
+    name: id,
+    functionCode: `function handler(event) { /* ${code} */ return event.request; }`,
+    functionConfig: { comment: id, runtime: "cloudfront-js-1.0" },
   });
 }
 
@@ -107,6 +117,14 @@ describe("templateTextPolicy — sanitize mode", () => {
     templateTextPolicy(app, { onViolation: "sanitize" });
     app.synth();
     expect(url.description).toBe(CLEAN);
+  });
+
+  it("rewrites a CloudFront Function's inline source through the L1 setter", () => {
+    const { app, stack } = tree();
+    const fn = cloudFrontFunction(stack, "Redirects", DIRTY);
+    templateTextPolicy(app, { onViolation: "sanitize" });
+    app.synth();
+    expect(fn.functionCode).toContain(CLEAN);
   });
 
   it("honours a custom replacement", () => {
@@ -233,6 +251,28 @@ describe("templateTextPolicy — coverage", () => {
     const { app, stack } = tree();
     alarm(stack, "Alarm", Fn.importValue("SomeExport"));
     templateTextPolicy(app);
+    expect(() => app.synth()).not.toThrow();
+  });
+
+  it("checks a CloudFront Function's inline source", () => {
+    const { app, stack } = tree();
+    cloudFrontFunction(stack, "Redirects", DIRTY);
+    templateTextPolicy(app);
+    expect(() => app.synth()).toThrow("AWS::CloudFront::Function functionCode contains");
+  });
+
+  it("leaves a nested Comment unchecked, CloudFront being covered at functionCode only", () => {
+    const { app, stack } = tree();
+    new CfnDistribution(stack, "Cdn", {
+      distributionConfig: {
+        enabled: false,
+        comment: DIRTY,
+        defaultCacheBehavior: { targetOriginId: "origin", viewerProtocolPolicy: "https-only" },
+      },
+    });
+    templateTextPolicy(app);
+    // `distributionConfig` is object-valued, so the comment sits behind a
+    // nested path the registry cannot reach — the boundary the README states.
     expect(() => app.synth()).not.toThrow();
   });
 

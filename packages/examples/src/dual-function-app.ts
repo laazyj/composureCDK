@@ -1,4 +1,4 @@
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Schedule } from "aws-cdk-lib/aws-events";
 import { Code, Runtime, Tracing } from "aws-cdk-lib/aws-lambda";
@@ -7,6 +7,7 @@ import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
 import { createRuleBuilder, lambdaTarget } from "@composurecdk/events";
 import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
 import { createTopicBuilder } from "@composurecdk/sns";
+import { exampleApp } from "./app-context.js";
 
 /**
  * Two Lambda functions — an API handler and an async worker — composed
@@ -24,7 +25,7 @@ import { createTopicBuilder } from "@composurecdk/sns";
  * - Routing every alarm (function + rule) to the alert topic via
  *   `alarmActionsPolicy`
  */
-export function createDualFunctionApp(app = new App()) {
+export function createDualFunctionApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-DualFunctionStack");
 
   const { alerts } = compose(

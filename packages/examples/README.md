@@ -42,6 +42,20 @@ npx nx cdk examples -- destroy --all                                          # 
 
 To skip IAM approval prompts (e.g. in CI): add `--require-approval never` to deploy commands.
 
+## Feature flags
+
+CDK feature flags are declared, not inherited. [`cdk.json`](cdk.json) carries the context the CLI synthesises with, and [`src/app-context.ts`](src/app-context.ts) carries the same map for the tests — CDK applies CLI context _after_ an `App`'s `context` prop, so a divergence would leave the tests asserting a template CI never deploys. `test/app-context.test.ts` asserts the two stay in sync.
+
+Examples are the pattern people copy, so a default left implicit here becomes a default inherited downstream — and CDK's unconfigured behaviour shifts between releases.
+
+| Flag                                        | Value    | Why                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@aws-cdk/core:defaultCrossStackReferences` | `"weak"` | Cross-stack consumers read the producer's output with `Fn::GetStackOutput` rather than importing a CloudFormation export. Strong references stop a producer from deleting an export a consumer still reads — worth having for a long-lived system, and the wrong trade for stacks CI deploys and destroys on every run. This is CDK's recommended value; unconfigured, CDK behaves as `"strong"` and warns that the choice was never made. |
+
+Despite what the flag's own description says, it is not limited to cross-region references: a same-account, same-region consumer resolves to `Fn::GetStackOutput` under `"weak"` too, which is what [`ComposureCDK-MultiStackApiStack`](src/multi-stack-app.ts)'s snapshot shows.
+
+**Migrating an existing system from strong to weak takes two deploys**, not one: set the flag to `"both"`, deploy everywhere, then set it to `"weak"`. A producer cannot drop an export while a consumer still imports it, so `"both"` keeps the export alive while consumers move across. Setting `"weak"` directly is only safe from a clean slate — which is what these examples are.
+
 ## Costs
 
 These examples create minimal resources (Lambda functions, API Gateway endpoints, S3 buckets, CloudFront distributions, t3.micro EC2 instances) and should fall within the [AWS Free Tier](https://aws.amazon.com/free/) for the first 12 months. EC2 instances and VPC flow logs (CloudWatch Logs ingestion + storage) accrue charges once the free-tier window closes, so destroy stacks when done to avoid unexpected charges.

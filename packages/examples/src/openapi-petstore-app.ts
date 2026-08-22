@@ -1,4 +1,4 @@
-import { App, Aws } from "aws-cdk-lib";
+import { Aws } from "aws-cdk-lib";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, ref } from "@composurecdk/core";
 import { createSpecRestApiBuilder, inlineSpecDefinition } from "@composurecdk/apigateway";
@@ -9,6 +9,7 @@ import {
   functionGrants,
   type FunctionBuilderResult,
 } from "@composurecdk/lambda";
+import { exampleApp } from "./app-context.js";
 
 /** The names the specification's integration refers its backend by — the shape
  * a model-first export takes, written before the infrastructure exists. */
@@ -177,7 +178,7 @@ const petstoreSpec = {
  *         └── GET → { id, name: "Fido", … }        (Lambda, via aws_proxy)
  * ```
  */
-export function createOpenApiPetstoreApp(app = new App()) {
+export function createOpenApiPetstoreApp(app = exampleApp()) {
   const { stack } = createStackBuilder()
     .description("A PetStore API defined by an OpenAPI specification")
     .build(app, "ComposureCDK-OpenApiPetstoreStack");

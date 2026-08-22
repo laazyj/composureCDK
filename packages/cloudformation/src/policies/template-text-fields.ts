@@ -30,6 +30,7 @@ export const TEMPLATE_TEXT_FIELDS: TemplateTextFields = {
   "AWS::ApiGateway::Stage": ["description"],
   "AWS::ApiGateway::UsagePlan": ["description"],
   "AWS::CloudFront::Function": ["functionCode"], // a whole JS body, not prose
+  "AWS::CloudFront::KeyValueStore": ["comment"],
   "AWS::CloudWatch::Alarm": ["alarmDescription"],
   "AWS::CloudWatch::CompositeAlarm": ["alarmDescription"],
   "AWS::EC2::SecurityGroup": ["groupDescription"],

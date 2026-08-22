@@ -147,6 +147,8 @@ templateTextPolicy(app, {
 });
 ```
 
+One field is not cosmetic: `AWS::CloudFront::Function`'s `functionCode` is executable source, so a `?` substituted into a string literal there is a behaviour change rather than a tidier template. Use `"throw"` or `"warn"` for an estate with CloudFront Functions.
+
 ### Why it is opt-in
 
 Enforcing this inside every builder would turn a working — if diff-noisy — deployment into a synth failure for anyone who has been living with the transliteration. Installing the policy is how you say you would rather know. Constraints whose violation fails the _deploy_ rather than merely the diff, such as an EC2 `GroupDescription`, stay enforced at the builder regardless ([ADR-0010](../../docs/adr/0010-aws-property-constraints.md)).
@@ -167,7 +169,7 @@ The stack's own `Description`, every `CfnOutput` / `CfnParameter` description, a
 | `AWS::EC2::SecurityGroup`                                                                 | `groupDescription` |
 | `AWS::SNS::Topic`                                                                         | `displayName`      |
 
-`functionCode` is the odd one out: a whole JavaScript body rather than a line of prose, so the policy checks a source file. That is deliberate — it is usually the largest block of free text in a template, and often the only one built from external data, such as a redirect map read at synth. It also means a legitimately non-ASCII string literal in a CloudFront Function — a `€` in a redirect target, a non-Latin `Location` header — moves from a silent bad deploy to a synth failure. `"warn"` is the adoption path, and the right long-term mode if you have one of those: `fields` unions with the built-in registry rather than replacing it, so a built-in entry cannot be dropped from config. Avoid `sanitize` on a function body — substituting a `?` into a string literal rewrites deployed source, which is a behaviour change rather than a cosmetic one.
+`functionCode` is the odd one out: a whole JavaScript body rather than a line of prose. It is in the list because it is usually the largest block of free text in a template, and often the only one built from external data — a redirect map read at synth carries whatever was pasted into it. The cost is a wider blast radius than another `description`: a legitimately non-ASCII string literal in a function — a `€` in a redirect target, a non-Latin `Location` header — becomes a synth failure rather than a silent bad deploy. Run `"warn"` first if that might be you.
 
 That is a seed list, not the whole of CloudFormation — several hundred resource types declare a free-text property. Add the ones you use:
 
@@ -175,13 +177,13 @@ That is a seed list, not the whole of CloudFormation — several hundred resourc
 templateTextPolicy(app, { fields: { "AWS::Custom::Widget": ["notes"] } });
 ```
 
-Keys are CloudFormation resource types; values are **CDK L1 property names** (camelCase — `alarmDescription`, not `AlarmDescription`).
+Keys are CloudFormation resource types; values are **CDK L1 property names** (camelCase — `alarmDescription`, not `AlarmDescription`). `fields` is merged over the built-in registry, never replacing it, so a built-in entry cannot be narrowed away from config.
 
 ### What it does not cover
 
 - Values that resolve to a CloudFormation intrinsic (`Ref`, `Fn::ImportValue`) — the text is not knowable at synth. A `Lazy` that resolves to a plain string **is** checked.
 - Values written through `addPropertyOverride`, or set on a bare `CfnResource`'s `properties`. Both bypass the typed L1 accessor the policy reads.
-- Nested properties such as `DistributionConfig.Comment` and `FunctionConfig.Comment`. CloudFront is covered at `AWS::CloudFront::Function`'s `functionCode` only — the distribution and function `Comment` fields sit inside an object-valued L1 property, so registering `distributionConfig` or a dotted `"distributionConfig.comment"` silently no-ops.
+- Nested properties such as `DistributionConfig.Comment` and `FunctionConfig.Comment` — so CloudFront is covered at `functionCode` only, not wherever a comment can be typed.
 - Resource types and properties not in the table above, until you add them. A property name that does not match an L1 accessor is skipped silently — the same outcome as not listing it.
 
 To check a single value directly rather than a whole tree, use `constraints.validate.templateText` / `constraints.sanitize.templateText` ([catalogue](../../docs/constraints.md)).

@@ -10,7 +10,7 @@ import {
   Stack,
 } from "aws-cdk-lib";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { CfnDistribution, CfnFunction } from "aws-cdk-lib/aws-cloudfront";
+import { CfnFunction } from "aws-cdk-lib/aws-cloudfront";
 import type { IConstruct } from "constructs";
 import { Template } from "aws-cdk-lib/assertions";
 import {
@@ -31,12 +31,16 @@ function alarm(scope: Stack, id: string, description: string): Alarm {
   });
 }
 
-/** A CloudFront Function whose inline source carries `code` in a comment. */
-function cloudFrontFunction(scope: Stack, id: string, code: string): CfnFunction {
+/**
+ * A CloudFront Function carrying `text` in one of its two free-text positions:
+ * a comment in the inline source, which the registry reaches, or the nested
+ * `FunctionConfig.Comment`, which it does not.
+ */
+function cloudFrontFunction(scope: Stack, id: string, where: "code" | "comment", text: string) {
   return new CfnFunction(scope, id, {
     name: id,
-    functionCode: `function handler(event) { /* ${code} */ return event.request; }`,
-    functionConfig: { comment: id, runtime: "cloudfront-js-1.0" },
+    functionCode: `function handler(event) { /* ${where === "code" ? text : id} */ return event.request; }`,
+    functionConfig: { comment: where === "comment" ? text : id, runtime: "cloudfront-js-1.0" },
   });
 }
 
@@ -117,14 +121,6 @@ describe("templateTextPolicy — sanitize mode", () => {
     templateTextPolicy(app, { onViolation: "sanitize" });
     app.synth();
     expect(url.description).toBe(CLEAN);
-  });
-
-  it("rewrites a CloudFront Function's inline source through the L1 setter", () => {
-    const { app, stack } = tree();
-    const fn = cloudFrontFunction(stack, "Redirects", DIRTY);
-    templateTextPolicy(app, { onViolation: "sanitize" });
-    app.synth();
-    expect(fn.functionCode).toContain(CLEAN);
   });
 
   it("honours a custom replacement", () => {
@@ -256,23 +252,20 @@ describe("templateTextPolicy — coverage", () => {
 
   it("checks a CloudFront Function's inline source", () => {
     const { app, stack } = tree();
-    cloudFrontFunction(stack, "Redirects", DIRTY);
+    cloudFrontFunction(stack, "Redirects", "code", DIRTY);
     templateTextPolicy(app);
     expect(() => app.synth()).toThrow("AWS::CloudFront::Function functionCode contains");
   });
 
-  it("leaves a nested Comment unchecked, CloudFront being covered at functionCode only", () => {
+  it("cannot reach a nested Comment, even on a registered type, even if asked to", () => {
     const { app, stack } = tree();
-    new CfnDistribution(stack, "Cdn", {
-      distributionConfig: {
-        enabled: false,
-        comment: DIRTY,
-        defaultCacheBehavior: { targetOriginId: "origin", viewerProtocolPolicy: "https-only" },
-      },
+    cloudFrontFunction(stack, "Redirects", "comment", DIRTY);
+    templateTextPolicy(app, {
+      fields: { "AWS::CloudFront::Function": ["functionConfig.comment"] },
     });
-    templateTextPolicy(app);
-    // `distributionConfig` is object-valued, so the comment sits behind a
-    // nested path the registry cannot reach — the boundary the README states.
+    // `functionConfig` is object-valued, so its `Comment` sits behind a nested
+    // path no property name reaches — registering the dotted path no-ops
+    // rather than erroring. CloudFront is covered at `functionCode` only.
     expect(() => app.synth()).not.toThrow();
   });
 

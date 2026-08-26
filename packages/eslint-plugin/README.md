@@ -31,6 +31,7 @@ File-level overrides (e.g. disabling a rule on a specific file) belong in the co
 | `composurecdk/no-cdk-api-above-floor`               | `aws-cdk-lib` APIs newer than the supported peer floor (e.g. the per-resource `isCfn<Resource>` L1 static guards) — they throw on older versions in the peer range. |
 | `composurecdk/no-cjs-incompatible-syntax`           | `import.meta` / top-level `await` in library `src/` — neither emits to CommonJS (ADR-0007).                                                                         |
 | `composurecdk/no-realm-bound-instanceof`            | `instanceof` against an imported class in library `src/` — realm-bound, so it silently returns false across the dual-package boundary (ADR-0007).                   |
+| `composurecdk/redeclared-prop-must-track-cdk-type`  | A prop re-declared out of an `Omit<CdkProps, …>` that pins a named CDK interface inside `Resolvable<…>` instead of reading CDK's own prop type (ADR-0018).          |
 
 The `recommended` preset also bans the TypeScript `private` modifier via `no-restricted-syntax` (use ECMAScript `#field` instead — TS `private` leaks through `keyof T` into emitted `.d.ts`, producing TS4094 downstream).
 

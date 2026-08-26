@@ -42,7 +42,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { packPublishablePackages } from "./cdk-floor/packages.mjs";
+import { packFloorPackages } from "./cdk-floor/packages.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGES_DIR = join(REPO_ROOT, "packages");
@@ -375,7 +375,7 @@ function establish() {
   const cacheDir = mkdtempSync(join(tmpdir(), "composurecdk-floor-tarballs-"));
   try {
     console.log("Packing publishable packages …");
-    const tarballs = packPublishablePackages(cacheDir);
+    const tarballs = packFloorPackages(cacheDir);
     const names = Object.keys(tarballs);
 
     // results[name] = ordered (high -> low) list of { version, ok, error }

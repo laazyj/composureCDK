@@ -9,11 +9,16 @@ import { fileURLToPath } from "node:url";
 const PACKAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "packages");
 
 /**
- * `npm pack`s every publishable `@composurecdk/*` package into `destination`
- * and returns `{ packageName: tarballFilename }`, so probes install the actual
- * publishable artefact rather than the in-tree source.
+ * `npm pack`s every `@composurecdk/*` package that declares an `aws-cdk-lib`
+ * peer into `destination` and returns `{ packageName: tarballFilename }`, so
+ * probes install the actual publishable artefact rather than the in-tree source.
+ *
+ * The peer declaration, not `private`, is what makes a package part of the
+ * floor: `@composurecdk/eslint-plugin` is published but has no CDK dependency,
+ * and packing it into every rig would install a lint toolchain the probe never
+ * runs and report its failures as floor failures.
  */
-export function packPublishablePackages(destination) {
+export function packFloorPackages(destination) {
   const tarballs = {};
   for (const entry of readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -23,7 +28,9 @@ export function packPublishablePackages(destination) {
     } catch {
       continue; // not a package directory
     }
-    if (!pkg.name?.startsWith("@composurecdk/") || pkg.private === true) continue;
+    if (!pkg.name?.startsWith("@composurecdk/")) continue;
+    if (pkg.private === true) continue;
+    if (pkg.peerDependencies?.["aws-cdk-lib"] === undefined) continue;
     const output = execFileSync("npm", ["pack", "--pack-destination", destination], {
       cwd: join(PACKAGES_DIR, entry.name),
       encoding: "utf8",

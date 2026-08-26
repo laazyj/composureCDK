@@ -1,6 +1,8 @@
 # @composurecdk/eslint-plugin
 
-ESLint rules that enforce the ComposureCDK builder contract at author time, so the mistakes that only surface as a synth-time error — a dropped build context, a builder that loses state on `.copy()`, an `instanceof` that is false across the dual-package boundary — are caught in the editor instead.
+ESLint rules for [ComposureCDK](../../README.md).
+
+They enforce the builder contract at author time, so the mistakes that only surface as a synth-time error — a dropped build context, a builder that loses state on `.copy()`, an `instanceof` that is false across the dual-package boundary — are caught in the editor instead.
 
 ## Install
 
@@ -12,7 +14,7 @@ Requires ESLint 10 (flat config) and Node 20+. The package ships dual ESM/CJS, s
 
 ## Usage
 
-Apply the `recommended` preset to the sources that implement builders:
+Spread the `recommended` preset into a config object scoped to the sources that implement builders. The preset registers the plugin itself, so there is no `plugins` block to get wrong:
 
 ```js
 // eslint.config.mjs
@@ -21,24 +23,12 @@ import composurecdk from "@composurecdk/eslint-plugin";
 export default [
   {
     files: ["src/**/*.ts"],
-    plugins: { composurecdk },
-    rules: composurecdk.configs.recommended.rules,
+    ...composurecdk.configs.recommended,
   },
 ];
 ```
 
-```js
-// eslint.config.cjs
-const composurecdk = require("@composurecdk/eslint-plugin");
-
-module.exports = [
-  {
-    files: ["src/**/*.ts"],
-    plugins: { composurecdk },
-    rules: composurecdk.configs.recommended.rules,
-  },
-];
-```
+In a CommonJS config the wiring is identical — `const composurecdk = require("@composurecdk/eslint-plugin")` and `module.exports = [...]`.
 
 The rules are syntactic — no type information, so no `parserOptions.project` needed. They read TypeScript syntax (private fields, type references, parameter properties), so point ESLint at a TypeScript parser such as `@typescript-eslint/parser`.
 
@@ -161,7 +151,7 @@ Turn this off if you publish ESM only.
 
 `configs.internal` is the preset ComposureCDK's own repository uses. It adds `builder-must-be-tagged`, `constraint-metadata-required` and `no-cdk-api-above-floor`, plus a `no-restricted-syntax` ban on the TypeScript `private` modifier.
 
-It is exported for transparency, not for adoption: each addition assumes something that is only true inside this repo — `taggedBuilder` from `@composurecdk/cloudformation`, the `stringConstraint(…)` catalogue mechanism ([ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md)), and a hardcoded list of `aws-cdk-lib` APIs above _this repo's_ pinned peer floor ([ADR-0008](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0008-aws-cdk-lib-version-floors.md)), which is the wrong list for a project on a different floor.
+It is exported for transparency, not for adoption: each addition assumes something that is only true inside this repo — `taggedBuilder` from `@composurecdk/cloudformation`, the `stringConstraint(…)` catalogue mechanism ([ADR-0010](../../docs/adr/0010-aws-property-constraints.md)), and a hardcoded list of `aws-cdk-lib` APIs above _this repo's_ pinned peer floor ([ADR-0008](../../docs/adr/0008-aws-cdk-lib-version-floors.md)), which is the wrong list for a project on a different floor.
 
 The `private`-modifier ban is worth copying if you write builders, and is worth copying rather than inheriting: a preset that sets a core rule replaces whatever you configured for it. TypeScript `private` members appear in `keyof T` and leak into emitted `.d.ts` files via the mapped types builders are made of, producing TS4094 downstream. Use `#field` instead.
 
@@ -171,16 +161,10 @@ Rule names, messages and default severities in `recommended` are public API, so 
 
 ## Contributing
 
-The plugin lives in the [ComposureCDK monorepo](https://github.com/laazyj/composureCDK). To add a rule:
+The plugin lives in the [ComposureCDK monorepo](../../README.md). To add a rule:
 
 1. Create `src/rules/<kebab-name>.ts` exporting a `Rule.RuleModule` as `rule`.
 2. Register it in `src/rules/index.ts`.
 3. Add it to `src/configs/internal.ts`. Add it to `src/configs/recommended.ts` only if the invariant holds outside this repo, and only in a minor release — `test/configs.test.ts` asserts the split, so the decision surfaces as a test change.
-4. Write `test/rules/<kebab-name>.test.ts` with `RuleTester`, covering at least one valid and one invalid case per `messageId`.
+4. Write `test/rules/<kebab-name>.test.ts` with `RuleTester`, covering at least one valid and one invalid case per `messageId`, and run `npx nx test eslint-plugin`. Tests run under Vitest with ESLint's `RuleTester` driving the fixtures; the shared tester (configured with the typescript-eslint parser) is in `test/rule-tester.ts`.
 5. Document it in this README under **Rules** (consumer preset) or **The `internal` preset**.
-
-```sh
-npx nx test eslint-plugin
-```
-
-Tests run under Vitest with ESLint's `RuleTester` driving the fixtures; the shared tester (configured with the typescript-eslint parser) is in `test/rule-tester.ts`.

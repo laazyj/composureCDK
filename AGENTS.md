@@ -45,6 +45,7 @@ Every publishable package ships dual ESM/CJS, built by `tshy` — see [ADR-0007]
 - Cross-realm identity checks must use a `Symbol.for(...)` brand, never `instanceof` — the ESM and CommonJS copies of a package can both load in one process. The `composurecdk/no-realm-bound-instanceof` ESLint rule enforces this, for imports from a relative path as much as a bare specifier. For a CDK construct, brand the L2 you cannot modify by reading its L1 instead (`CfnResource.isCfnResource` + `cfnResourceType`, [ADR-0011](docs/adr/0011-cross-component-relationship-guards.md)).
 - Run `npm run verify` before pushing. It chains the same gate CI runs — build, `check:exports` (`attw` + `publint`), lint, test — and a husky `pre-push` hook runs it automatically.
 - A new package must be added to `@composurecdk/module-compat`'s `DUAL_PACKAGES` list and `peerDependencies`.
+- A package published under a **new npm name** — a new package, or an existing one losing `private` — needs two one-off manual steps before the next release: a first publish of that package alone and an `npm trust` trusted-publisher registration. See [adding a new package](docs/ci.md#adding-a-new-package), and say so in the PR — `release.yml` runs one `nx release publish` for the whole workspace, so a missing trusted publisher fails the entire release job.
 
 ## Release artefacts
 

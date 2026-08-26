@@ -77,8 +77,7 @@ export default defineConfig(
   },
   {
     files: ["packages/*/src/**/*.ts"],
-    plugins: { composurecdk },
-    rules: composurecdk.configs.internal.rules,
+    ...composurecdk.configs.internal,
   },
   {
     // The examples are application entry points, not library internals: they

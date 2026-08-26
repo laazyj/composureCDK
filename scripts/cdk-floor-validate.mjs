@@ -34,7 +34,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { packPublishablePackages } from "./cdk-floor/packages.mjs";
+import { packFloorPackages } from "./cdk-floor/packages.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..");
@@ -71,7 +71,7 @@ const version = resolveVersion();
 const rig = mkdtempSync(join(tmpdir(), `composurecdk-validate-${version.replace(/\./g, "-")}-`));
 try {
   const dependencies = { "aws-cdk-lib": version, constructs: CONSTRUCTS_RANGE };
-  const tarballs = packPublishablePackages(rig);
+  const tarballs = packFloorPackages(rig);
   for (const [name, tarball] of Object.entries(tarballs)) {
     dependencies[name] = `file:./${tarball}`;
   }

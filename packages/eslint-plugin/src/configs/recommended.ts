@@ -1,20 +1,25 @@
 import type { Linter } from "eslint";
+import { NAMESPACE, plugin } from "../plugin.js";
 
 /**
  * The consumer preset — the rules that encode the `Lifecycle`/builder contract
  * itself, so they hold in any project that writes builders against
- * `@composurecdk/core`, not just this repo.
+ * `@composurecdk/core`, not just this repo. Rules that key on this repo's own
+ * conventions live in `internal` instead.
  *
- * Apply it to the sources that implement builders. Rules that key on this
- * repo's own conventions live in the {@link ./internal.js | `internal`} preset
- * instead, because their premises (a pinned CDK floor, `taggedBuilder`, the
- * constraint catalogue) do not travel.
+ * Spread into a config object that scopes it to the sources implementing
+ * builders; it registers the plugin itself, so there is no `plugins` block to
+ * get wrong:
  *
- * Rule names, messages and severities here are public API: a rule that gets
- * stricter is a breaking change, and a new rule joins this preset at a minor
- * rather than a patch. See the README's versioning section.
+ * ```js
+ * { files: ["src/**\/*.ts"], ...composurecdk.configs.recommended }
+ * ```
+ *
+ * Its membership, rule messages and severities are public API — see the
+ * README's versioning section before changing any of them.
  */
 export const recommended: Linter.Config = {
+  plugins: { [NAMESPACE]: plugin },
   rules: {
     "composurecdk/builder-must-implement-copy-state": "error",
     "composurecdk/lifecycle-build-context-required": "error",

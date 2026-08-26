@@ -33,9 +33,11 @@ consumed independently, so the floor belongs per package.
 
 ## Decision
 
-**Each publishable package declares its own measured `peerDependencies.aws-cdk-lib`
-floor. `cdk-floors.json` is the source of truth; tooling establishes, applies,
-and enforces it.** Floors are monotonic with the peer graph — a package's floor
+**Each package that peer-depends on `aws-cdk-lib` declares its own measured
+`peerDependencies.aws-cdk-lib` floor. `cdk-floors.json` is the source of truth;
+tooling establishes, applies, and enforces it.** The peer declaration is the
+predicate, not publishability: `@composurecdk/eslint-plugin` is published and
+has no floor, so the floor tooling skips it. Floors are monotonic with the peer graph — a package's floor
 is the max of its own aws-cdk-lib usage and its `@composurecdk` peers' floors,
 which holds automatically because a package can only load once its peers do.
 
@@ -83,8 +85,8 @@ at the latest CDK.
   and policies via partial-matcher assertions, so this catches both import-time
   (missing named export) and runtime (a too-new method call, e.g. the #146
   `CfnAlarm.isCfnAlarm` inside an Aspect) version-gated APIs.
-- **`establish`** — discovery tool: packs every publishable `@composurecdk/*`
-  package and probes each against a descending ladder of real aws-cdk-lib
+- **`establish`** — discovery tool: packs every `@composurecdk/*` package with
+  an aws-cdk-lib peer and probes each against a descending ladder of real aws-cdk-lib
   releases (default 13 rungs from 2.230 down to 2.1; override via
   `CDK_FLOOR_LADDER`). Records the lowest version each package loads on and the
   gating export, writing a ladder-granular draft (`cdk-floors.discovered.json`)

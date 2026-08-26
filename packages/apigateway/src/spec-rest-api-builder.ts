@@ -1,9 +1,4 @@
-import {
-  type ApiDefinition,
-  type RestApiBase,
-  SpecRestApi,
-  type SpecRestApiProps,
-} from "aws-cdk-lib/aws-apigateway";
+import { type RestApiBase, SpecRestApi, type SpecRestApiProps } from "aws-cdk-lib/aws-apigateway";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
@@ -18,14 +13,16 @@ import { createRestApiAlarms } from "./rest-api-alarms.js";
  *
  * Extends the CDK {@link SpecRestApiProps} with additional builder-specific
  * options. `apiDefinition` is widened to a {@link Resolvable} so the
- * specification can be assembled from sibling components at build time.
+ * specification can be assembled from sibling components at build time; it
+ * reads its inner type from CDK's own prop rather than naming `ApiDefinition`,
+ * so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
  */
 export interface SpecRestApiBuilderProps
   extends Omit<SpecRestApiProps, "apiDefinition">, RestApiBuilderPropsBase {
   /**
    * The OpenAPI specification that defines the API.
    *
-   * Accepts a concrete {@link ApiDefinition} or a {@link Resolvable} — a
+   * Accepts a concrete `ApiDefinition` or a {@link Resolvable} — a
    * {@link ref} or {@link combine} that produces one once its dependencies
    * have been built. A resolvable definition is how a spec whose integrations
    * name sibling resources (a Lambda ARN to invoke, the role API Gateway
@@ -50,7 +47,7 @@ export interface SpecRestApiBuilderProps
    * )
    * ```
    */
-  apiDefinition?: Resolvable<ApiDefinition>;
+  apiDefinition?: Resolvable<NonNullable<SpecRestApiProps["apiDefinition"]>>;
 }
 
 /**
@@ -150,7 +147,7 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
  * The API structure — resources, methods, and integrations — is defined
  * entirely by the OpenAPI specification passed to
  * {@link SpecRestApiBuilderProps.apiDefinition | apiDefinition}. Use CDK's
- * {@link ApiDefinition} static methods to load the spec from an inline object,
+ * `ApiDefinition` static methods to load the spec from an inline object,
  * a local file, or an S3 bucket.
  *
  * @returns A fluent builder for a spec-driven API Gateway REST API.

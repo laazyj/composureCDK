@@ -1,10 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import {
-  type ITable,
-  TableV2,
-  type TableEncryptionV2,
-  type TablePropsV2,
-} from "aws-cdk-lib/aws-dynamodb";
+import { type ITable, TableV2, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
@@ -22,7 +17,7 @@ export interface TableV2BuilderProps extends Omit<TablePropsV2, "encryption"> {
   /**
    * Server-side encryption for the table and its replicas.
    *
-   * Accepts a concrete {@link TableEncryptionV2} or a {@link Resolvable} — so
+   * Accepts a concrete `TableEncryptionV2` or a {@link Resolvable} — so
    * a customer-managed key produced by a composed `@composurecdk/kms` builder
    * can be wired in with `ref()`:
    *
@@ -32,14 +27,15 @@ export interface TableV2BuilderProps extends Omit<TablePropsV2, "encryption"> {
    * ))
    * ```
    *
-   * The `Resolvable` sits on the whole {@link TableEncryptionV2} rather than on
-   * a narrower `encryptionKey` prop, so every encryption mode — including a
+   * The `Resolvable` sits on the whole `TableEncryptionV2` rather than on a
+   * narrower `encryptionKey` prop, so every encryption mode — including a
    * customer-managed key with per-replica key ARNs — is expressed the one way
-   * CDK expresses it.
+   * CDK expresses it, and it reads that type from CDK's own prop rather than
+   * naming it (ADR-0018).
    *
    * @default TableEncryptionV2.awsManagedKey()
    */
-  encryption?: Resolvable<TableEncryptionV2>;
+  encryption?: Resolvable<NonNullable<TablePropsV2["encryption"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.

@@ -9,11 +9,12 @@ import {
   type ITable,
   StreamViewType,
   TableEncryptionV2,
+  type TablePropsV2,
 } from "aws-cdk-lib/aws-dynamodb";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createTableV2Builder } from "../src/table-v2-builder.js";
+import { createTableV2Builder, type TableV2BuilderProps } from "../src/table-v2-builder.js";
 
 const PK = { name: "pk", type: AttributeType.STRING };
 
@@ -73,6 +74,16 @@ describe("TableV2Builder", () => {
         .build(stack, "TestTable");
 
       expect(result.tableStreamArn).toBeDefined();
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own TablePropsV2 accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: TableV2BuilderProps = undefined as unknown as TablePropsV2;
+      void props;
     });
   });
 

@@ -24,35 +24,14 @@ export const clusterGrants = {
   /**
    * Connect to the cluster's data plane. Delegates to the cluster's
    * `grantConnect`, which grants the whole `neptune-db:*` action namespace on
-   * the cluster — read, write, load, and management alike. Reach for
-   * {@link clusterGrants.dataAccess} where a principal needs less than that.
+   * the cluster — read, write, load, and management alike. A principal that
+   * needs less than that wants a narrower policy of its own, scoped to the
+   * cluster's `neptune-db` ARN.
+   *
+   * @see https://docs.aws.amazon.com/neptune/latest/userguide/iam-dp-actions.html
    */
   connect: (cluster: Resolvable<IDatabaseCluster>): Grant<IGrantable> =>
     grantVia(cluster, (c, grantee: IGrantable) => {
       c.grantConnect(grantee);
-    }),
-
-  /**
-   * Perform named data-plane actions on the cluster — the least-privilege
-   * alternative to {@link clusterGrants.connect}'s `neptune-db:*`. Delegates
-   * to the cluster's `grant`, which scopes the actions to the cluster's own
-   * `neptune-db` ARN.
-   *
-   * @example
-   * ```ts
-   * role.grant(
-   *   clusterGrants.dataAccess(
-   *     ref("graph", (r: ClusterBuilderResult) => r.cluster),
-   *     "neptune-db:ReadDataViaQuery",
-   *     "neptune-db:GetEngineStatus",
-   *   ),
-   * );
-   * ```
-   *
-   * @see https://docs.aws.amazon.com/neptune/latest/userguide/iam-dp-actions.html
-   */
-  dataAccess: (cluster: Resolvable<IDatabaseCluster>, ...actions: string[]): Grant<IGrantable> =>
-    grantVia(cluster, (c, grantee: IGrantable) => {
-      c.grant(grantee, ...actions);
     }),
 };

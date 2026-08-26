@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { SecurityGroup, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
+import { SecurityGroup, SubnetType, type Vpc } from "aws-cdk-lib/aws-ec2";
 import { Key } from "aws-cdk-lib/aws-kms";
 import {
   ClusterParameterGroup,
@@ -12,18 +12,8 @@ import {
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createClusterBuilder, type IClusterBuilder } from "../src/cluster-builder.js";
+import { isolatedVpc } from "./_helpers.js";
 import { clusterParameterGroupFamily } from "../src/cluster-parameter-group-defaults.js";
-
-/** Builds a VPC with isolated subnets — Neptune is VPC-only and needs no egress. */
-function isolatedVpc(stack: Stack): Vpc {
-  return new Vpc(stack, "Vpc", {
-    maxAzs: 2,
-    natGateways: 0,
-    subnetConfiguration: [
-      { name: "isolated", subnetType: SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
-    ],
-  });
-}
 
 function buildCluster(configure?: (b: IClusterBuilder) => void) {
   const app = new App();
@@ -267,9 +257,9 @@ describe("ClusterBuilder", () => {
   });
 
   describe("allowDefaultPortFrom", () => {
-    it("opens the cluster port to the peer's security group", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
+    /** Builds a cluster whose port is opened to a peer SG, concrete or Ref-supplied. */
+    function buildWithPeer(byRef: boolean) {
+      const stack = new Stack(new App(), "TestStack");
       const vpc = isolatedVpc(stack);
       const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
 
@@ -277,10 +267,18 @@ describe("ClusterBuilder", () => {
         .vpc(vpc)
         .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
         .instanceType(InstanceType.R6G_LARGE)
-        .allowDefaultPortFrom(peerSg, "Bastion to Neptune")
-        .build(stack, "Graph");
+        .allowDefaultPortFrom(
+          byRef ? ref<{ securityGroup: SecurityGroup }>("peer").get("securityGroup") : peerSg,
+          "Bastion to Neptune",
+        )
+        .build(stack, "Graph", { peer: { securityGroup: peerSg } });
 
-      const template = Template.fromStack(stack);
+      return Template.fromStack(stack);
+    }
+
+    it("opens the cluster port to the peer's security group, and nothing else", () => {
+      const template = buildWithPeer(false);
+
       // Ingress on the cluster's port sourced from the peer SG. The port is a
       // CloudFormation token (the cluster's Port attribute), so match on the
       // protocol and the peer-SG source rather than a literal port number.
@@ -289,40 +287,15 @@ describe("ClusterBuilder", () => {
         Description: "Bastion to Neptune",
         SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
       });
-    });
-
-    it("emits no IAM policy — the data-plane grant is the consumer's to declare", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
-      const vpc = isolatedVpc(stack);
-      const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
-
-      createClusterBuilder()
-        .vpc(vpc)
-        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
-        .instanceType(InstanceType.R6G_LARGE)
-        .allowDefaultPortFrom(peerSg)
-        .build(stack, "Graph");
-
-      // The network rule is the whole of what the cluster builder writes; the
-      // matching `neptune-db:` grant now lives on the grantee (ADR-0013).
-      expect(JSON.stringify(Template.fromStack(stack).toJSON())).not.toContain("neptune-db:");
+      // The network rule is the whole of what the cluster builder writes for
+      // the peer; the matching `neptune-db:` grant now lives on the grantee
+      // (ADR-0013). The stack's only policy is the log-export plumbing's.
+      const policies = JSON.stringify(template.findResources("AWS::IAM::Policy"));
+      expect(policies).not.toContain("neptune-db:");
     });
 
     it("resolves a Ref-supplied peer against the build context", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
-      const vpc = isolatedVpc(stack);
-      const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
-
-      createClusterBuilder()
-        .vpc(vpc)
-        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
-        .instanceType(InstanceType.R6G_LARGE)
-        .allowDefaultPortFrom(ref<{ securityGroup: SecurityGroup }>("peer").get("securityGroup"))
-        .build(stack, "Graph", { peer: { securityGroup: peerSg } });
-
-      Template.fromStack(stack).hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
+      buildWithPeer(true).hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
         IpProtocol: "tcp",
         SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
       });

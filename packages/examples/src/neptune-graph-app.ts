@@ -44,13 +44,11 @@ import {
  *   `afterBuild` glue: the cluster's `allowDefaultPortFrom(bastionSg)` writes
  *   the ingress rule into its own security group, and the bastion's role
  *   carries the consumer-side `clusterGrants.connect(ref("graph"))` data-plane
- *   grant (ADR-0013). Splitting them keeps every edge pointing the way the
- *   data flows — the cluster never depends on its own consumer.
+ *   grant (ADR-0013).
  * - {@link createSecurityGroupBuilder} for the bastion's closed-egress SG.
  *   The only egress rules are the ones the cross-component wiring adds:
- *   `:8182` to Neptune (via `allowDefaultPortFrom`) and `:443` to the SSM
- *   interface endpoints (via `allowDefaultPortFrom`) — least privilege,
- *   made visible.
+ *   `:8182` to Neptune and `:443` to the SSM interface endpoints, both via
+ *   `allowDefaultPortFrom` — least privilege, made visible.
  * - Three {@link createInterfaceEndpointBuilder} components (`ssmEndpoint`,
  *   `ssmMessagesEndpoint`, `ec2MessagesEndpoint`) that give the isolated
  *   bastion SSM Session Manager reachability without a NAT gateway. Each

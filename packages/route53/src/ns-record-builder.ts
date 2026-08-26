@@ -1,4 +1,4 @@
-import { NsRecord, type NsRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
+import { NsRecord, type NsRecordProps } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -17,10 +17,14 @@ import { NS_RECORD_DEFAULTS } from "./defaults.js";
  * `values` resolvable lets a delegation record draw its name servers from a
  * child hosted zone's `hostedZoneNameServers`, which is only known at build
  * time.
+ *
+ * `zone` reads its inner type from CDK's own prop rather than naming
+ * `IHostedZone`, so it keeps tracking the installed `aws-cdk-lib` (ADR-0018);
+ * `values` stays `string[]`, a primitive with nothing to track.
  */
 export interface NsRecordBuilderProps extends Omit<NsRecordProps, "zone" | "values"> {
   /** The hosted zone in which to create the record. */
-  zone?: Resolvable<IHostedZone>;
+  zone?: Resolvable<NonNullable<NsRecordProps["zone"]>>;
   /** The fully-qualified name-server host names for the delegated subdomain. */
   values?: Resolvable<string[]>;
 }

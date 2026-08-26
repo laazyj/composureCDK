@@ -1,9 +1,8 @@
 import {
   CrossAccountZoneDelegationRecord,
   type CrossAccountZoneDelegationRecordProps,
-  type IHostedZone,
 } from "aws-cdk-lib/aws-route53";
-import { Role, type IRole } from "aws-cdk-lib/aws-iam";
+import { Role } from "aws-cdk-lib/aws-iam";
 import { type LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import {
@@ -27,6 +26,9 @@ import {
  * `delegatedZone` and `delegationRole` with {@link Resolvable}s so they can be
  * wired from composed components, and adds {@link providerLogging} for the
  * custom-resource provider's log group.
+ *
+ * Both read their inner type from CDK's own prop rather than naming an
+ * interface, so they keep tracking the installed `aws-cdk-lib` (ADR-0018).
  */
 export interface CrossAccountZoneDelegationBuilderProps extends Omit<
   CrossAccountZoneDelegationRecordProps,
@@ -41,7 +43,7 @@ export interface CrossAccountZoneDelegationBuilderProps extends Omit<
    * builder fails at build time on any of those rather than synthesising a
    * delegation with an empty NS set.
    */
-  delegatedZone?: Resolvable<IHostedZone>;
+  delegatedZone?: Resolvable<NonNullable<CrossAccountZoneDelegationRecordProps["delegatedZone"]>>;
 
   /**
    * The role in the **parent** account that this stack assumes to write the
@@ -51,10 +53,17 @@ export interface CrossAccountZoneDelegationBuilderProps extends Omit<
    * Accepts a plain role ARN, which the builder imports for you. In the case
    * this builder exists for, the role lives in another account and this stack
    * has nothing to `ref` — only an ARN — so passing the ARN removes the
-   * `Role.fromRoleArn(...)` line every call site would otherwise repeat. An
-   * `IRole` (or a `Ref` to either) covers the same-account and same-app cases.
+   * `Role.fromRoleArn(...)` line every call site would otherwise repeat. A role
+   * (or a `Ref` to either) covers the same-account and same-app cases.
+   *
+   * The role arm is read from CDK's own prop rather than named as `IRole`:
+   * CDK types this prop as `iam.IRoleRef`, which the pinned interface was
+   * already rejecting (ADR-0018). The `string` arm is the builder's own
+   * convenience and has no CDK prop to read from.
    */
-  delegationRole?: Resolvable<string | IRole>;
+  delegationRole?: Resolvable<
+    string | NonNullable<CrossAccountZoneDelegationRecordProps["delegationRole"]>
+  >;
 
   /**
    * See {@link DelegationProviderLoggingConfig}. Defaults to an auto-managed
@@ -74,10 +83,12 @@ export interface CrossAccountZoneDelegationBuilderResult {
   record: CrossAccountZoneDelegationRecord;
 
   /**
-   * The role assumed in the parent account to write the `NS` records — the
-   * `IRole` that was passed in, or the one the builder imported from the ARN.
+   * The role assumed in the parent account to write the `NS` records — the role
+   * that was passed in, or the one the builder imported from the ARN. Typed as
+   * CDK's own prop, so it reflects whatever the caller was allowed to pass;
+   * reach its name and ARN through `roleRef`.
    */
-  delegationRole: IRole;
+  delegationRole: NonNullable<CrossAccountZoneDelegationRecordProps["delegationRole"]>;
 
   /**
    * The CloudWatch log group the stack's delegation-provider Lambda logs to,

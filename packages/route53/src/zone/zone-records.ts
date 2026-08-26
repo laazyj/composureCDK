@@ -1,7 +1,7 @@
 import { Token } from "aws-cdk-lib";
 import {
   type CfnRecordSet,
-  type IHostedZone,
+  type RecordSetOptions,
   type RecordSet,
   RecordTarget,
 } from "aws-cdk-lib/aws-route53";
@@ -73,9 +73,11 @@ export interface IZoneRecordsBuilder extends Lifecycle<ZoneRecordsBuilderResult>
   /**
    * The hosted zone to attach every record to. Accepts a {@link Resolvable},
    * so a zone produced by a sibling compose component can be wired in via
-   * `ref("zone").get("hostedZone")`.
+   * `ref("zone").get("hostedZone")`. The accepted type is read from CDK's own
+   * prop rather than naming `IHostedZone`, so the DSL keeps accepting whatever
+   * the per-record builders accept (ADR-0018).
    */
-  zone(zone: Resolvable<IHostedZone>): IZoneRecordsBuilder;
+  zone(zone: Resolvable<NonNullable<RecordSetOptions["zone"]>>): IZoneRecordsBuilder;
 }
 
 /**
@@ -113,14 +115,14 @@ interface HasCommonRecordOptions<Self> {
 type BucketName = keyof ZoneRecordsBuilderResult;
 
 class ZoneRecordsBuilder implements IZoneRecordsBuilder {
-  #zone?: Resolvable<IHostedZone>;
+  #zone?: Resolvable<NonNullable<RecordSetOptions["zone"]>>;
   readonly #specs: readonly RecordSpec[];
 
   constructor(specs: readonly RecordSpec[]) {
     this.#specs = specs;
   }
 
-  zone(zone: Resolvable<IHostedZone>): this {
+  zone(zone: Resolvable<NonNullable<RecordSetOptions["zone"]>>): this {
     this.#zone = zone;
     return this;
   }
@@ -392,7 +394,7 @@ function buildA(
   scope: IConstruct,
   id: string,
   specs: ARecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): ARecordBuilderResult {
   const addresses = dedupe(specs.flatMap((s) => [...s.addresses]));
@@ -410,7 +412,7 @@ function buildAaaa(
   scope: IConstruct,
   id: string,
   specs: AaaaRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): AaaaRecordBuilderResult {
   const addresses = dedupe(specs.flatMap((s) => [...s.addresses]));
@@ -428,7 +430,7 @@ function buildCname(
   scope: IConstruct,
   id: string,
   specs: CnameRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): CnameRecordBuilderResult {
   if (specs.length > 1) {
@@ -450,7 +452,7 @@ function buildTxt(
   scope: IConstruct,
   id: string,
   specs: TxtRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): TxtRecordBuilderResult {
   const values = dedupe(specs.flatMap((s) => [...s.values]));
@@ -466,7 +468,7 @@ function buildMx(
   scope: IConstruct,
   id: string,
   specs: MxRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): MxRecordBuilderResult {
   const values = specs.flatMap((s) =>
@@ -484,7 +486,7 @@ function buildSrv(
   scope: IConstruct,
   id: string,
   specs: SrvRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): SrvRecordBuilderResult {
   const values = specs.flatMap((s) =>
@@ -507,7 +509,7 @@ function buildCaa(
   scope: IConstruct,
   id: string,
   specs: CaaRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): CaaRecordBuilderResult {
   const values = specs.flatMap((s) =>
@@ -525,7 +527,7 @@ function buildNs(
   scope: IConstruct,
   id: string,
   specs: NsRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): NsRecordBuilderResult {
   const name = sub(specs[0].name);
@@ -543,7 +545,7 @@ function buildDs(
   scope: IConstruct,
   id: string,
   specs: DsRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): DsRecordBuilderResult {
   const values = dedupe(specs.flatMap((s) => [...s.values]));
@@ -559,7 +561,7 @@ function buildHttps(
   scope: IConstruct,
   id: string,
   specs: HttpsRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): HttpsRecordBuilderResult {
   const values = specs.flatMap((s) => [...s.values]);
@@ -575,7 +577,7 @@ function buildSvcb(
   scope: IConstruct,
   id: string,
   specs: SvcbRecordSpec[],
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): SvcbRecordBuilderResult {
   const values = specs.flatMap((s) => [...s.values]);
@@ -591,7 +593,7 @@ function buildAliasA(
   scope: IConstruct,
   id: string,
   spec: AliasRecordSpec,
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): ARecordBuilderResult {
   const b = applyCommon(
@@ -606,7 +608,7 @@ function buildAliasAaaa(
   scope: IConstruct,
   id: string,
   spec: AliasRecordSpec,
-  zone: IHostedZone,
+  zone: NonNullable<RecordSetOptions["zone"]>,
   context?: Record<string, object>,
 ): AaaaRecordBuilderResult {
   const b = applyCommon(

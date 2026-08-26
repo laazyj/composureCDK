@@ -5,27 +5,51 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import {
+  type AaaaRecordProps,
+  type ARecordProps,
+  type CaaRecordProps,
   CaaTag,
+  type CnameRecordProps,
+  type DsRecordProps,
+  type HttpsRecordProps,
   HttpsRecordValue,
+  type MxRecordProps,
+  type NsRecordProps,
   PublicHostedZone,
   RecordTarget,
+  type SrvRecordProps,
+  type SvcbRecordProps,
   SvcbRecordValue,
+  type TxtRecordProps,
 } from "aws-cdk-lib/aws-route53";
+import { type ARecordBuilderProps } from "../src/a-record-builder.js";
 import { cloudfrontAliasTarget } from "../src/alias-targets.js";
-import { createAaaaRecordBuilder } from "../src/aaaa-record-builder.js";
-import { createCnameRecordBuilder } from "../src/cname-record-builder.js";
-import { createTxtRecordBuilder } from "../src/txt-record-builder.js";
-import { createMxRecordBuilder } from "../src/mx-record-builder.js";
-import { createSrvRecordBuilder } from "../src/srv-record-builder.js";
-import { createCaaRecordBuilder } from "../src/caa-record-builder.js";
-import { createNsRecordBuilder } from "../src/ns-record-builder.js";
+import {
+  createAaaaRecordBuilder,
+  type AaaaRecordBuilderProps,
+} from "../src/aaaa-record-builder.js";
+import {
+  createCnameRecordBuilder,
+  type CnameRecordBuilderProps,
+} from "../src/cname-record-builder.js";
+import { createTxtRecordBuilder, type TxtRecordBuilderProps } from "../src/txt-record-builder.js";
+import { createMxRecordBuilder, type MxRecordBuilderProps } from "../src/mx-record-builder.js";
+import { createSrvRecordBuilder, type SrvRecordBuilderProps } from "../src/srv-record-builder.js";
+import { createCaaRecordBuilder, type CaaRecordBuilderProps } from "../src/caa-record-builder.js";
+import { createNsRecordBuilder, type NsRecordBuilderProps } from "../src/ns-record-builder.js";
 import {
   createHostedZoneBuilder,
   type HostedZoneBuilderResult,
 } from "../src/hosted-zone-builder.js";
-import { createDsRecordBuilder } from "../src/ds-record-builder.js";
-import { createHttpsRecordBuilder } from "../src/https-record-builder.js";
-import { createSvcbRecordBuilder } from "../src/svcb-record-builder.js";
+import { createDsRecordBuilder, type DsRecordBuilderProps } from "../src/ds-record-builder.js";
+import {
+  createHttpsRecordBuilder,
+  type HttpsRecordBuilderProps,
+} from "../src/https-record-builder.js";
+import {
+  createSvcbRecordBuilder,
+  type SvcbRecordBuilderProps,
+} from "../src/svcb-record-builder.js";
 
 function setup(): { stack: Stack; zone: PublicHostedZone } {
   const app = new App();
@@ -33,6 +57,26 @@ function setup(): { stack: Stack; zone: PublicHostedZone } {
   const zone = new PublicHostedZone(stack, "Zone", { zoneName: "example.com" });
   return { stack, zone };
 }
+
+describe("props", () => {
+  it("accept everything CDK's own record props accept (type-level guard)", () => {
+    // A re-declared prop must accept everything CDK's own prop accepts, so a
+    // later re-declaration cannot silently narrow the builder's surface
+    // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+    const a: ARecordBuilderProps = undefined as unknown as ARecordProps;
+    const aaaa: AaaaRecordBuilderProps = undefined as unknown as AaaaRecordProps;
+    const caa: CaaRecordBuilderProps = undefined as unknown as CaaRecordProps;
+    const cname: CnameRecordBuilderProps = undefined as unknown as CnameRecordProps;
+    const ds: DsRecordBuilderProps = undefined as unknown as DsRecordProps;
+    const https: HttpsRecordBuilderProps = undefined as unknown as HttpsRecordProps;
+    const mx: MxRecordBuilderProps = undefined as unknown as MxRecordProps;
+    const ns: NsRecordBuilderProps = undefined as unknown as NsRecordProps;
+    const srv: SrvRecordBuilderProps = undefined as unknown as SrvRecordProps;
+    const svcb: SvcbRecordBuilderProps = undefined as unknown as SvcbRecordProps;
+    const txt: TxtRecordBuilderProps = undefined as unknown as TxtRecordProps;
+    void [a, aaaa, caa, cname, ds, https, mx, ns, srv, svcb, txt];
+  });
+});
 
 describe("zone requirement", () => {
   const builders: [string, () => { build: (s: Stack, id: string) => unknown }][] = [

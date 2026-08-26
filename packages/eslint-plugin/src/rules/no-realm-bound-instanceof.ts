@@ -4,20 +4,29 @@ import { chainRoot, importSourceOf, isCdkSource, unwrapWrappers } from "./lib/im
 
 /**
  * Bans `instanceof` against a class reached through an `import`, because
- * `instanceof` is realm-bound and library `src/` is published dual ESM/CJS
- * (ADR-0007).
+ * `instanceof` is realm-bound.
  *
- * When both copies of a package load in one process — the dual-package hazard —
- * each copy has its own class objects. An instance minted by one copy fails
- * `instanceof` against the other copy's class, so the check returns `false` for
- * a value that is plainly of that type. That has already shipped as two bugs:
- * #384 (a stack-singleton dedup silently skipped, colliding on a construct id)
- * and #385 (a `StatementBuilder` unrecognised, which skipped the
+ * When two copies of a module load in one process, each has its own class
+ * objects. An instance minted by one copy fails `instanceof` against the
+ * other's class, so the check returns `false` for a value that is plainly of
+ * that type. Two ways that happens: a dual-published package whose ESM and
+ * CommonJS halves both load (the dual-package hazard, ADR-0007), and a
+ * dependency duplicated or bundled twice in the graph — how it bites
+ * `aws-cdk-lib`, which is CommonJS-only (ADR-0011). It has already shipped as
+ * two bugs: #384 (a stack-singleton dedup silently skipped, colliding on a
+ * construct id) and #385 (a `StatementBuilder` unrecognised, which skipped the
  * wildcard-resource security guard).
+ *
+ * The premise is therefore the *imported* module, not what the linting project
+ * itself publishes, which is why this sits in `recommended` rather than
+ * `dualPublishing`: a single-format consumer of a dual-published package is
+ * exposed just the same.
  *
  * **Every import is in scope, relative ones included.** A relative import is
  * not a same-realm guarantee: `./statement-builder.js` resolves separately in
- * each copy of the package, which is exactly how #385 happened.
+ * each copy of the package, which is exactly how #385 happened. This is the
+ * rule's one conservative edge — a relative `instanceof` inside a project that
+ * ships a single format and one version cannot hit the hazard.
  *
  * Not flagged, because neither can be duplicated by the hazard:
  * - **Globals and intrinsics** — `x instanceof RegExp`, `instanceof Error`.
@@ -37,18 +46,20 @@ export const rule: Rule.RuleModule = {
   meta: {
     type: "problem",
     docs: {
-      description: "Ban realm-bound `instanceof` against imported classes in dual-published source",
+      description:
+        "Ban realm-bound `instanceof` against imported classes, which returns " +
+        "false when the imported module loads twice in one process",
     },
     schema: [],
     messages: {
       cdkClass:
-        "`instanceof {{name}}` is realm-bound and silently returns false across the ESM/CJS copy " +
-        "boundary (ADR-0007). Identify the construct by its L1 instead: `CfnResource.isCfnResource` " +
-        "+ `cfnResourceType === Cfn{{name}}.CFN_RESOURCE_TYPE_NAME` (ADR-0011).",
+        "`instanceof {{name}}` silently returns false when `aws-cdk-lib` is duplicated or bundled " +
+        "twice in the dependency graph, which is common. Identify the construct by its L1 instead: " +
+        "`CfnResource.isCfnResource` + `cfnResourceType === Cfn{{name}}.CFN_RESOURCE_TYPE_NAME`.",
       ownClass:
-        "`instanceof {{name}}` is realm-bound — `{{source}}` can load twice in one process " +
-        "(ADR-0007). Brand the class with `Symbol.for(...)` and test that instead, as `isRef` in " +
-        "@composurecdk/core does.",
+        "`instanceof {{name}}` is realm-bound, and `{{source}}` can load twice in one process — " +
+        "as both halves of a dual-published package, or as a duplicated dependency. Brand the " +
+        "class with `Symbol.for(...)` and test that instead, as `isRef` in @composurecdk/core does.",
     },
   },
   create(ctx) {

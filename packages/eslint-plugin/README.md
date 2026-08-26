@@ -30,17 +30,13 @@ export default [
 
 In a CommonJS config the wiring is identical — `const composurecdk = require("@composurecdk/eslint-plugin")` and `module.exports = [...]`.
 
-If you publish your builders as a dual ESM/CJS package, add the `dualPublishing` preset's rules on top:
+If you publish your own builders as a dual ESM/CJS package, add `dualPublishing` as a second entry. Flat config composes by array, so there is nothing to merge:
 
 ```js
-{
-  files: ["src/**/*.ts"],
-  ...composurecdk.configs.recommended,
-  rules: {
-    ...composurecdk.configs.recommended.rules,
-    ...composurecdk.configs.dualPublishing.rules,
-  },
-}
+export default [
+  { files: ["src/**/*.ts"], ...composurecdk.configs.recommended },
+  { files: ["src/**/*.ts"], ...composurecdk.configs.dualPublishing },
+];
 ```
 
 The rules are syntactic — no type information, so no `parserOptions.project` needed. They read TypeScript syntax (private fields, type references, parameter properties), so point ESLint at a TypeScript parser such as `@typescript-eslint/parser`.
@@ -142,21 +138,21 @@ Exempt a field with a justified marker comment — the reason after `--` is requ
 
 Only classes passed as the first argument to `Builder(…)` or `taggedBuilder(…)` are considered.
 
-### Dual-package safety — `dualPublishing`
-
-These bind a project that publishes its builders as a dual ESM/CJS package, as this library does ([ADR-0007](../../docs/adr/0007-dual-esm-cjs-publishing.md)). They are a separate preset because their premise is the packaging rather than the builder contract: to a project shipping ESM only, `import.meta` is the ordinary idiom for path resolution, and a rule that reports correct code is worse than an absent one.
-
 #### `no-realm-bound-instanceof`
 
 Bans `instanceof` against a class reached through an `import`.
 
-`instanceof` is realm-bound. When both the ESM and CommonJS copy of a package load in one process — the dual-package hazard — each copy has its own class objects, and an instance minted by one fails `instanceof` against the other. The check returns `false` for a value that is plainly of that type, which fails open: a dedup that silently skips, a security guard that never runs.
+`instanceof` is realm-bound: when two copies of a module load in one process, each has its own class objects, and an instance minted by one fails `instanceof` against the other's class. The check returns `false` for a value that is plainly of that type, which fails open — a dedup that silently skips, a security guard that never runs.
+
+Two ways a module loads twice: a dual-published package whose ESM and CommonJS halves both get pulled in, and a dependency duplicated or bundled twice in the graph — which is how it bites `aws-cdk-lib`, CommonJS-only though it is. Note that neither depends on what _your_ project publishes, which is why this rule is in `recommended`: a single-format app consuming a dual-published package is exposed just the same.
 
 Brand the class with `Symbol.for(…)` and test for the brand instead. For a CDK construct you cannot modify, identify it by its L1: `CfnResource.isCfnResource(x) && x.cfnResourceType === CfnBucket.CFN_RESOURCE_TYPE_NAME`.
 
-Relative imports are in scope too — `./my-class.js` resolves separately in each copy of the package. Globals (`instanceof Error`) and classes declared in the same module are not flagged, since neither can be duplicated.
+Globals (`instanceof Error`) and classes declared in the same module are not flagged, since neither can be duplicated. Relative imports _are_ flagged — `./my-class.js` resolves separately in each copy of a dual-published package. That is the rule's one conservative edge: if you ship a single format, a relative-import `instanceof` is sound, and turning the rule off for those files is reasonable.
 
-Worth enabling even in an ESM-only project that consumes dual-published packages: both copies still load if anything in the dependency graph reaches one by `require()`, and the brand check is correct either way.
+### Your own packaging — `dualPublishing`
+
+One rule, opt-in, whose premise is the format _your_ package publishes rather than the builder contract: it binds a package built as dual ESM/CJS, as this library is ([ADR-0007](../../docs/adr/0007-dual-esm-cjs-publishing.md)), and nothing else. It is a separate preset because to a project shipping ESM only, `import.meta` is the ordinary idiom for path resolution — and a rule that reports correct code is worse than an absent one.
 
 #### `no-cjs-incompatible-syntax`
 
@@ -182,6 +178,6 @@ The plugin lives in the [ComposureCDK monorepo](../../README.md). To add a rule:
 
 1. Create `src/rules/<kebab-name>.ts` exporting a `Rule.RuleModule` as `rule`.
 2. Register it in `src/rules/index.ts`.
-3. Add it to `src/configs/internal.ts`. Add it to a consumer preset only if the invariant holds outside this repo, and only in a minor release: `recommended` if it holds for every builder, `dual-publishing.ts` if it depends on shipping dual ESM/CJS. `test/configs.test.ts` asserts the split, so the decision surfaces as a test change.
+3. Add it to `src/configs/internal.ts`. Add it to a consumer preset only if the invariant holds outside this repo, and only in a minor release: `recommended` if it binds any builder, `dualPublishing` if it binds only a package built as dual ESM/CJS. `test/configs.test.ts` pins that membership, so the choice surfaces as a test change rather than a silent one.
 4. Write `test/rules/<kebab-name>.test.ts` with `RuleTester`, covering at least one valid and one invalid case per `messageId`, and run `npx nx test eslint-plugin`. Tests run under Vitest with ESLint's `RuleTester` driving the fixtures; the shared tester (configured with the typescript-eslint parser) is in `test/rule-tester.ts`.
 5. Document it in this README under the preset that carries it.

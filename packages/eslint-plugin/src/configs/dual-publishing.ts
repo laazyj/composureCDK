@@ -1,33 +1,22 @@
 import type { Linter } from "eslint";
-import { NAMESPACE, plugin } from "../plugin.js";
+import { preset } from "./preset.js";
 
 /**
- * The rules that hold for a project publishing its builders as a dual ESM/CJS
- * package, as this library does (ADR-0007). Separate from `recommended`
- * because their premise is the packaging, not the builder contract: to a
- * project that ships ESM only, `import.meta` is the ordinary idiom for path
- * resolution rather than a defect, and a rule that reports correct code is
- * worse than an absent one.
+ * The rules whose premise is the format the project itself publishes: they bind
+ * a package built as dual ESM/CJS, as this library is (ADR-0007), and nothing
+ * else. Separate from `recommended` because to a project shipping ESM only,
+ * `import.meta` is the ordinary idiom for path resolution rather than a defect.
  *
- * Spread alongside `recommended` when you do dual-publish:
+ * Add it as a second config entry alongside `recommended` — flat config
+ * composes by array, so neither needs merging into the other:
  *
  * ```js
- * {
- *   files: ["src/**\/*.ts"],
- *   ...composurecdk.configs.recommended,
- *   rules: {
- *     ...composurecdk.configs.recommended.rules,
- *     ...composurecdk.configs.dualPublishing.rules,
- *   },
- * }
+ * export default [
+ *   { files: ["src/**\/*.ts"], ...composurecdk.configs.recommended },
+ *   { files: ["src/**\/*.ts"], ...composurecdk.configs.dualPublishing },
+ * ];
  * ```
  *
  * Membership here is public API on the same terms as `recommended`.
  */
-export const dualPublishing: Linter.Config = {
-  plugins: { [NAMESPACE]: plugin },
-  rules: {
-    "composurecdk/no-cjs-incompatible-syntax": "error",
-    "composurecdk/no-realm-bound-instanceof": "error",
-  },
-};
+export const dualPublishing: Linter.Config = preset(["no-cjs-incompatible-syntax"]);

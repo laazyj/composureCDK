@@ -29,13 +29,11 @@ export const rule: Rule.RuleModule = {
     schema: [],
     messages: {
       importMeta:
-        "`import.meta` cannot be emitted to CommonJS, so it breaks the CommonJS build of a " +
-        "dual-published package. Reach for the value another way, or drop this rule if you " +
-        "publish ESM only.",
+        "`import.meta` cannot be emitted to CommonJS, so it breaks the CommonJS build of this " +
+        "dual-published package. Reach for the value another way.",
       topLevelAwait:
-        "Top-level `await` cannot be emitted to CommonJS, so it breaks the CommonJS build of a " +
-        "dual-published package. Move the `await` inside an async function, or drop this rule " +
-        "if you publish ESM only.",
+        "Top-level `await` cannot be emitted to CommonJS, so it breaks the CommonJS build of this " +
+        "dual-published package. Move the `await` inside an async function.",
     },
   },
   create(ctx) {

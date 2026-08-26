@@ -1,4 +1,3 @@
-import type { IKey } from "aws-cdk-lib/aws-kms";
 import type { QueueProps } from "aws-cdk-lib/aws-sqs";
 import type { Resolvable } from "@composurecdk/core";
 import type { QueueAlarmConfig } from "./queue-alarm-config.js";
@@ -42,16 +41,20 @@ export interface QueueBuilderExtensionProps {
   /**
    * The customer-managed KMS key used for server-side encryption (SSE-KMS).
    *
-   * Accepts a concrete {@link IKey} or a {@link Resolvable} — typically a
-   * {@link Ref} to a composed `@composurecdk/kms` key builder, so the key is a
-   * component of the system rather than a construct built outside it.
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
    *
    * Supplying a key implies `QueueEncryption.KMS`: the `SQS_MANAGED` default
    * is mutually exclusive with a customer key, so `build()` drops it rather
    * than making you set both (ADR-0009). Setting `encryption` explicitly
    * still wins.
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction
+   * (ADR-0018) — see the table in `@composurecdk/kms`'s README.
    */
-  encryptionMasterKey?: Resolvable<IKey>;
+  encryptionMasterKey?: Resolvable<NonNullable<QueueProps["encryptionMasterKey"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.

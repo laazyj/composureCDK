@@ -2,11 +2,12 @@ import { describe, it, expect } from "vitest";
 import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { type IQueue, Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
+import { type IQueue, Queue, QueueEncryption, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createQueueBuilder } from "../src/queue-builder.js";
+import type { QueueBuilderProps } from "../src/queue-props.js";
 import { setUntypedProp } from "./_helpers.js";
 
 function synthTemplate(
@@ -44,6 +45,16 @@ describe("QueueBuilder", () => {
 
       expect(result.alarms).toBeDefined();
       expect(typeof result.alarms).toBe("object");
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own QueueProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: QueueBuilderProps = undefined as unknown as QueueProps;
+      void props;
     });
   });
 

@@ -1,8 +1,7 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { type IKey } from "aws-cdk-lib/aws-kms";
 import { type IQueue, Queue, QueueEncryption, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { QueueBuilderExtensionProps, QueueBuilderPropsByRole } from "./queue-props.js";
@@ -143,7 +142,7 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
 }
 
 /**
- * Resolves a {@link Resolvable} master key and infers the encryption mode it
+ * Resolves a `Resolvable` master key and infers the encryption mode it
  * implies.
  *
  * The `QueueEncryption.SQS_MANAGED` default is mutually exclusive with a
@@ -153,7 +152,7 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
  * incompatible explicit pairing is left for CDK to reject.
  */
 function encryptionMasterKeyProps(
-  encryptionMasterKey: Resolvable<IKey> | undefined,
+  encryptionMasterKey: QueueBuilderExtensionProps["encryptionMasterKey"],
   userEncryption: QueueEncryption | undefined,
   context: Record<string, object> | undefined,
 ): Partial<QueueProps> {

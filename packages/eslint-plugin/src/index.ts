@@ -1,7 +1,10 @@
+import { internal } from "./configs/internal.js";
 import { recommended } from "./configs/recommended.js";
 import { rules } from "./rules/index.js";
 
-export const configs = { recommended };
-export { rules };
+const meta = { name: "@composurecdk/eslint-plugin" };
 
-export default { rules, configs };
+export const configs = { recommended, internal };
+export { meta, rules };
+
+export default { meta, rules, configs };

@@ -17,6 +17,7 @@ export const DUAL_PACKAGES = [
   { name: "@composurecdk/dynamodb", probe: "createTableBuilder" },
   { name: "@composurecdk/dynamodb", probe: "createTableV2Builder" },
   { name: "@composurecdk/ec2", probe: "createInstanceBuilder" },
+  { name: "@composurecdk/eslint-plugin", probe: "rules" },
   { name: "@composurecdk/events", probe: "createRuleBuilder" },
   { name: "@composurecdk/iam", probe: "createRoleBuilder" },
   { name: "@composurecdk/kms", probe: "createKeyBuilder" },

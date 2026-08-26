@@ -1,37 +1,56 @@
 {
   "name": "@composurecdk/eslint-plugin",
   "version": "0.9.5",
-  "description": "Internal ESLint plugin encoding ComposureCDK architectural invariants (tagged builders, lifecycle context, builder copy state).",
-  "private": true,
+  "description": "ESLint rules enforcing the ComposureCDK builder contract — lifecycle build context, builder copy state, and dual-package-safe source",
   "repository": {
     "type": "git",
     "url": "https://github.com/laazyj/composureCDK",
     "directory": "packages/eslint-plugin"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "lint": "eslint .",
-    "clean": "rm -rf dist",
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist .tshy .tshy-build",
+    "build": "tshy",
     "typecheck": "tsc --noEmit",
+    "check:exports": "attw --pack . --profile node16 && publint",
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": [],
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin",
+    "aws-cdk",
+    "composurecdk",
+    "builder",
+    "lifecycle"
+  ],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "tshy": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": "./src/index.ts"
+    }
+  },
   "peerDependencies": {
     "eslint": "^10.0.0"
   },
@@ -47,5 +66,21 @@
     "tags": [
       "scope:tooling"
     ]
-  }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    }
+  },
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "module": "./dist/esm/index.js"
 }

@@ -36,9 +36,11 @@ extends) — without it `tshy` emits no `.d.ts`.
 Packages with subpath exports keep them: `@composurecdk/core` exposes
 `./testing`, `@composurecdk/route53` exposes `./zone`.
 
-`@composurecdk/examples` and `@composurecdk/eslint-plugin` stay on plain `tsc` —
-both are `private` and never published (`examples` is a CDK app,
-`eslint-plugin` is consumed only within the workspace).
+`@composurecdk/examples` stays on plain `tsc` — it is `private` and never
+published (it is a CDK app, not a library). `@composurecdk/eslint-plugin` is
+built by `tshy` like the rest: it is published so its builder-contract rules
+reach consumer-written builders (#409), and a consumer whose `eslint.config` is
+CommonJS has to be able to `require()` it.
 
 ### Supported Node version
 

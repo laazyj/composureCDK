@@ -30,6 +30,19 @@ export default [
 
 In a CommonJS config the wiring is identical — `const composurecdk = require("@composurecdk/eslint-plugin")` and `module.exports = [...]`.
 
+If you publish your builders as a dual ESM/CJS package, add the `dualPublishing` preset's rules on top:
+
+```js
+{
+  files: ["src/**/*.ts"],
+  ...composurecdk.configs.recommended,
+  rules: {
+    ...composurecdk.configs.recommended.rules,
+    ...composurecdk.configs.dualPublishing.rules,
+  },
+}
+```
+
 The rules are syntactic — no type information, so no `parserOptions.project` needed. They read TypeScript syntax (private fields, type references, parameter properties), so point ESLint at a TypeScript parser such as `@typescript-eslint/parser`.
 
 Scope the preset to your builder sources rather than the whole project. Application entry points build at the root of an `App` or `Stack`, where there is no enclosing component and so no context to forward, and `lifecycle-build-must-forward-context` fires on every `.build(app, "…")` there. Either exclude those files or turn that rule off for them:
@@ -43,9 +56,11 @@ Scope the preset to your builder sources rather than the whole project. Applicat
 
 ## Rules
 
-Every rule is `error` in the `recommended` preset.
+### The builder contract — `recommended`
 
-### `lifecycle-build-context-required`
+These hold for anyone writing a builder, whatever the project's shape. Every one is `error` in the preset.
+
+#### `lifecycle-build-context-required`
 
 A `Lifecycle` class whose body mentions `Resolvable<…>` must declare the third `context` parameter on `build()`.
 
@@ -71,7 +86,7 @@ class MyBuilder implements Lifecycle {
 
 The rule keys on the name `Resolvable` appearing in the class body, which is what makes it cheap and syntactic — and also why it cannot see the case below.
 
-### `lifecycle-build-must-forward-context`
+#### `lifecycle-build-must-forward-context`
 
 Flags a two-argument `something.build(scope, id)` call: the sub-builder gets no context, so a `ref()` the caller passed through a `configure` callback cannot resolve.
 
@@ -101,7 +116,7 @@ stackBuilder.build(app, id);
 
 Only calls with exactly two arguments are flagged, which keeps the rule off unrelated `build()` methods with different arities and off spread forwarding (`target.build(...args)`).
 
-### `builder-must-implement-copy-state`
+#### `builder-must-implement-copy-state`
 
 A builder class with ECMAScript private fields must implement the `[COPY_STATE]` hook.
 
@@ -127,7 +142,11 @@ Exempt a field with a justified marker comment — the reason after `--` is requ
 
 Only classes passed as the first argument to `Builder(…)` or `taggedBuilder(…)` are considered.
 
-### `no-realm-bound-instanceof`
+### Dual-package safety — `dualPublishing`
+
+These bind a project that publishes its builders as a dual ESM/CJS package, as this library does ([ADR-0007](../../docs/adr/0007-dual-esm-cjs-publishing.md)). They are a separate preset because their premise is the packaging rather than the builder contract: to a project shipping ESM only, `import.meta` is the ordinary idiom for path resolution, and a rule that reports correct code is worse than an absent one.
+
+#### `no-realm-bound-instanceof`
 
 Bans `instanceof` against a class reached through an `import`.
 
@@ -137,19 +156,17 @@ Brand the class with `Symbol.for(…)` and test for the brand instead. For a CDK
 
 Relative imports are in scope too — `./my-class.js` resolves separately in each copy of the package. Globals (`instanceof Error`) and classes declared in the same module are not flagged, since neither can be duplicated.
 
-Turn this off if you do not dual-publish: in a single-format package or an application, `instanceof` is sound.
+Worth enabling even in an ESM-only project that consumes dual-published packages: both copies still load if anything in the dependency graph reaches one by `require()`, and the brand check is correct either way.
 
-### `no-cjs-incompatible-syntax`
+#### `no-cjs-incompatible-syntax`
 
 Bans `import.meta`, top-level `await`, and top-level `for await…of`.
 
 All three are valid ESM with no CommonJS equivalent, so a dual build fails on the CommonJS pass. Catching them at lint time reports in the editor rather than at the end of a build.
 
-Turn this off if you publish ESM only.
-
 ## The `internal` preset
 
-`configs.internal` is the preset ComposureCDK's own repository uses. It adds `builder-must-be-tagged`, `constraint-metadata-required` and `no-cdk-api-above-floor`, plus a `no-restricted-syntax` ban on the TypeScript `private` modifier.
+`configs.internal` is the preset ComposureCDK's own repository uses: both consumer presets — every package here dual-publishes — plus `builder-must-be-tagged`, `constraint-metadata-required` and `no-cdk-api-above-floor`, and a `no-restricted-syntax` ban on the TypeScript `private` modifier.
 
 It is exported for transparency, not for adoption: each addition assumes something that is only true inside this repo — `taggedBuilder` from `@composurecdk/cloudformation`, the `stringConstraint(…)` catalogue mechanism ([ADR-0010](../../docs/adr/0010-aws-property-constraints.md)), and a hardcoded list of `aws-cdk-lib` APIs above _this repo's_ pinned peer floor ([ADR-0008](../../docs/adr/0008-aws-cdk-lib-version-floors.md)), which is the wrong list for a project on a different floor.
 
@@ -157,7 +174,7 @@ The `private`-modifier ban is worth copying if you write builders, and is worth 
 
 ## Versioning
 
-Rule names, messages and default severities in `recommended` are public API, so a rule that starts reporting more is a breaking change, not a fix. A new rule therefore ships off by default and joins `recommended` in a minor release.
+Rule names, messages and default severities in `recommended` and `dualPublishing` are public API, so a rule that starts reporting more is a breaking change, not a fix. A new rule therefore ships off by default and joins a consumer preset in a minor release.
 
 ## Contributing
 
@@ -165,6 +182,6 @@ The plugin lives in the [ComposureCDK monorepo](../../README.md). To add a rule:
 
 1. Create `src/rules/<kebab-name>.ts` exporting a `Rule.RuleModule` as `rule`.
 2. Register it in `src/rules/index.ts`.
-3. Add it to `src/configs/internal.ts`. Add it to `src/configs/recommended.ts` only if the invariant holds outside this repo, and only in a minor release — `test/configs.test.ts` asserts the split, so the decision surfaces as a test change.
+3. Add it to `src/configs/internal.ts`. Add it to a consumer preset only if the invariant holds outside this repo, and only in a minor release: `recommended` if it holds for every builder, `dual-publishing.ts` if it depends on shipping dual ESM/CJS. `test/configs.test.ts` asserts the split, so the decision surfaces as a test change.
 4. Write `test/rules/<kebab-name>.test.ts` with `RuleTester`, covering at least one valid and one invalid case per `messageId`, and run `npx nx test eslint-plugin`. Tests run under Vitest with ESLint's `RuleTester` driving the fixtures; the shared tester (configured with the typescript-eslint parser) is in `test/rule-tester.ts`.
-5. Document it in this README under **Rules** (consumer preset) or **The `internal` preset**.
+5. Document it in this README under the preset that carries it.

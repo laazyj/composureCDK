@@ -1,16 +1,19 @@
 import type { Linter } from "eslint";
+import { dualPublishing } from "./dual-publishing.js";
 import { recommended } from "./recommended.js";
 
 /**
- * This repo's own preset: the consumer `recommended` rules plus the ones whose
- * premises hold only here. Exported so the root `eslint.config.mjs` has one
- * place to extend, not as a preset a consumer should adopt — the README says
- * why each addition does not travel.
+ * This repo's own preset: `recommended` and `dualPublishing` — every package
+ * here ships dual ESM/CJS (ADR-0007) — plus the rules whose premises hold only
+ * here. Exported so the root `eslint.config.mjs` has one place to extend, not
+ * as a preset a consumer should adopt; the README says why each addition below
+ * does not travel.
  */
 export const internal: Linter.Config = {
   ...recommended,
   rules: {
     ...recommended.rules,
+    ...dualPublishing.rules,
     // Mandates `taggedBuilder` from @composurecdk/cloudformation.
     "composurecdk/builder-must-be-tagged": "error",
     // Keys on `stringConstraint(...)`, this repo's catalogue mechanism (ADR-0010).

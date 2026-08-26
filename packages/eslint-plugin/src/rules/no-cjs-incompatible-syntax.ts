@@ -8,14 +8,16 @@ const FUNCTION_TYPES = new Set([
 ]);
 
 /**
- * Flags syntax in library `src/` that cannot be emitted to CommonJS:
- * `import.meta`, top-level `await`, and top-level `for await…of`. All are
- * valid ESM but have no CJS equivalent, so `tsc` (and tshy's CommonJS
- * dialect) errors on them.
+ * Flags syntax that cannot be emitted to CommonJS: `import.meta`, top-level
+ * `await`, and top-level `for await…of`. All are valid ESM but have no CJS
+ * equivalent, so `tsc` (and tshy's CommonJS dialect) errors on them.
  *
- * Every `@composurecdk/*` package is dual-published (ESM + CJS) — see
- * ADR-0007. Catching these at lint time gives an in-editor error before any
- * build runs, rather than waiting for the per-dialect compile to fail.
+ * Only a dual-published package pays this cost, which is why the rule sits in
+ * the `dualPublishing` preset rather than `recommended` — in an ESM-only
+ * project every one of these is the ordinary idiom. Where it does apply,
+ * linting reports in the editor before any build runs, rather than at the end
+ * of the per-dialect compile. Every `@composurecdk/*` package is dual-published
+ * (ADR-0007), so this repo enables it everywhere.
  */
 export const rule: Rule.RuleModule = {
   meta: {
@@ -27,11 +29,13 @@ export const rule: Rule.RuleModule = {
     schema: [],
     messages: {
       importMeta:
-        "`import.meta` cannot be emitted to CommonJS. Every package is dual-published (ADR-0007) — " +
-        "avoid `import.meta` in library `src/`.",
+        "`import.meta` cannot be emitted to CommonJS, so it breaks the CommonJS build of a " +
+        "dual-published package. Reach for the value another way, or drop this rule if you " +
+        "publish ESM only.",
       topLevelAwait:
-        "Top-level `await` cannot be emitted to CommonJS. Every package is dual-published (ADR-0007) — " +
-        "move the `await` inside an async function.",
+        "Top-level `await` cannot be emitted to CommonJS, so it breaks the CommonJS build of a " +
+        "dual-published package. Move the `await` inside an async function, or drop this rule " +
+        "if you publish ESM only.",
     },
   },
   create(ctx) {

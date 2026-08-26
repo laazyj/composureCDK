@@ -5,11 +5,12 @@ import {
   type IPrincipal,
   ManagedPolicy,
   PolicyStatement,
+  type RoleProps,
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
 import { compose, type Lifecycle, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createRoleBuilder } from "../src/role-builder.js";
+import { createRoleBuilder, type RoleBuilderProps } from "../src/role-builder.js";
 import { createStatementBuilder, WildcardResourceError } from "../src/statement-builder.js";
 import { asForeignRealm } from "./foreign-realm.js";
 
@@ -46,6 +47,16 @@ describe("RoleBuilder", () => {
     it("creates exactly one IAM role", () => {
       const template = synth();
       template.resourceCountIs("AWS::IAM::Role", 1);
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own RoleProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: RoleBuilderProps = undefined as unknown as RoleProps;
+      void props;
     });
   });
 

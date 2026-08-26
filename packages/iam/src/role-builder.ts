@@ -1,7 +1,5 @@
 import {
   type IGrantable,
-  type IManagedPolicy,
-  type IPrincipal,
   PolicyDocument,
   PolicyStatement,
   Role,
@@ -27,30 +25,34 @@ import { isStatementBuilder, type StatementBuilder } from "./statement-builder.j
  * cross-component wiring: `assumedBy` and `permissionsBoundary` each accept a
  * {@link Resolvable} so principals and boundary policies built by sibling
  * components can be referenced at configuration time.
+ *
+ * Each re-declared prop reads its inner type from CDK's own prop rather than
+ * naming an interface, so it keeps tracking the installed `aws-cdk-lib` as CDK
+ * moves its prop types (ADR-0018).
  */
 export interface RoleBuilderProps extends Omit<RoleProps, "assumedBy" | "permissionsBoundary"> {
   /**
    * The principal the role trusts to assume it — the role's trust policy.
    *
-   * Accepts a concrete {@link IPrincipal} or a {@link Resolvable} for
-   * cross-component wiring, so a principal derived from a provider built by a
-   * sibling component (e.g. `ref("oidc", r => r.provider)`) can be supplied at
+   * Accepts a concrete principal or a {@link Resolvable} for cross-component
+   * wiring, so a principal derived from a provider built by a sibling
+   * component (e.g. `ref("oidc", r => r.provider)`) can be supplied at
    * configuration time and resolved during {@link build}.
    *
    * @see https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_terms-and-concepts.html
    */
-  assumedBy?: Resolvable<IPrincipal>;
+  assumedBy?: Resolvable<NonNullable<RoleProps["assumedBy"]>>;
 
   /**
    * A permissions boundary that caps the maximum permissions this role
    * can ever grant, regardless of inline or managed policies attached.
    *
-   * Accepts a concrete {@link IManagedPolicy} or a {@link Resolvable} for
+   * Accepts a concrete managed policy or a {@link Resolvable} for
    * cross-component wiring (e.g. `ref("boundary", r => r.policy)`).
    *
    * @see https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html
    */
-  permissionsBoundary?: Resolvable<IManagedPolicy>;
+  permissionsBoundary?: Resolvable<NonNullable<RoleProps["permissionsBoundary"]>>;
 }
 
 /**

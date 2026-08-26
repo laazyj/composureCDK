@@ -7,7 +7,10 @@ import { LogGroup } from "aws-cdk-lib/aws-logs";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { DefinitionBody, Pass, StateMachine } from "aws-cdk-lib/aws-stepfunctions";
-import { EventBus as EventBusTarget } from "aws-cdk-lib/aws-events-targets";
+import {
+  CloudWatchLogGroup as CloudWatchLogGroupTarget,
+  EventBus as EventBusTarget,
+} from "aws-cdk-lib/aws-events-targets";
 import { isRef, ref } from "@composurecdk/core";
 import { createRuleBuilder } from "../../src/rule-builder.js";
 import { lambdaTarget } from "../../src/targets/lambda-target.js";
@@ -257,6 +260,15 @@ describe("target helpers", () => {
   });
 
   describe("cloudWatchLogGroupTarget", () => {
+    it("accepts every log group CDK's own target accepts (type-level guard)", () => {
+      // The helper reads its accepted type from CDK's own target constructor,
+      // which already takes the broader `logs.ILogGroupRef` — pinning
+      // `ILogGroup` rejected a log group CDK itself takes (ADR-0018).
+      const logGroup: Parameters<typeof cloudWatchLogGroupTarget>[0] =
+        undefined as unknown as ConstructorParameters<typeof CloudWatchLogGroupTarget>[0];
+      void logGroup;
+    });
+
     it("attaches the log group ARN as the target ARN on the rule", () => {
       const stack = newStack();
       const lg = new LogGroup(stack, "LG");

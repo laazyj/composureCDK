@@ -154,9 +154,9 @@ describe("RuleBuilder", () => {
       // once CDK widened `RuleProps.eventBus` to `IEventBusRef` in 2.235.0.
       // Asserted over the whole interface so a prop re-declared later — CDK
       // has widened `role` the same way — cannot reintroduce the narrowing.
-      // Structural assignment ignores `targets`, which the builder replaces
-      // outright, so it needs no exemption here — and a prop that is merely
-      // widened must never be given one.
+      // Structural assignment ignores `targets`, which is lifted onto
+      // `addTarget`; that setter reads its element type from `RuleProps` under
+      // the same rule (ADR-0018), so it is covered there rather than exempt.
       const props: RuleBuilderProps = undefined as unknown as RuleProps;
       void props;
     });

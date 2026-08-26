@@ -3,8 +3,6 @@ import {
   InterfaceVpcEndpoint,
   type IConnectable,
   type InterfaceVpcEndpointProps,
-  type ISecurityGroup,
-  type IVpc,
   type SecurityGroup,
 } from "aws-cdk-lib/aws-ec2";
 import { type IConstruct } from "constructs";
@@ -27,6 +25,9 @@ import { createInterfaceEndpointAlarms } from "./interface-endpoint-alarms.js";
  *   each can be a {@link Resolvable} (typically a sibling
  *   `SecurityGroupBuilder`).
  * - `open` — always `false`; ingress is explicit (see the builder docs).
+ *
+ * Both setters read their accepted type from CDK's own prop rather than naming
+ * an interface, so they keep tracking the installed `aws-cdk-lib` (ADR-0018).
  */
 export interface InterfaceEndpointBuilderProps extends Omit<
   InterfaceVpcEndpointProps,
@@ -110,28 +111,31 @@ class InterfaceEndpointBuilder implements Lifecycle<InterfaceEndpointBuilderResu
   props: Partial<InterfaceEndpointBuilderProps> = {};
   readonly #access: AccessSpec[] = [];
   readonly #customAlarms: AlarmDefinitionBuilder<InterfaceVpcEndpoint>[] = [];
-  #vpc?: Resolvable<IVpc>;
-  #securityGroups?: Resolvable<ISecurityGroup>[];
+  #vpc?: Resolvable<NonNullable<InterfaceVpcEndpointProps["vpc"]>>;
+  #securityGroups?: Resolvable<NonNullable<InterfaceVpcEndpointProps["securityGroups"]>[number]>[];
 
   /**
-   * Sets the VPC the endpoint is created in. Accepts a concrete {@link IVpc}
-   * or a {@link Ref} to a sibling {@link IVpcBuilder}.
+   * Sets the VPC the endpoint is created in. Accepts a concrete VPC or a
+   * {@link Ref} to a sibling {@link IVpcBuilder}.
+   *
    */
-  vpc(vpc: Resolvable<IVpc>): this {
+  vpc(vpc: Resolvable<NonNullable<InterfaceVpcEndpointProps["vpc"]>>): this {
     this.#vpc = vpc;
     return this;
   }
 
   /**
    * Bring-your-own security groups. Each entry is a {@link Resolvable}, so it
-   * can be a concrete {@link ISecurityGroup} or a {@link Ref} to a sibling
+   * can be a concrete security group or a {@link Ref} to a sibling
    * `SecurityGroupBuilder` — giving you full ingress/egress/port control. When
    * set, the builder creates no security group of its own and
    * {@link InterfaceEndpointBuilderResult.securityGroup} is `undefined`.
    *
    * Mutually exclusive with {@link allowDefaultPortFrom}.
    */
-  securityGroups(securityGroups: Resolvable<ISecurityGroup>[]): this {
+  securityGroups(
+    securityGroups: Resolvable<NonNullable<InterfaceVpcEndpointProps["securityGroups"]>[number]>[],
+  ): this {
     this.#securityGroups = securityGroups;
     return this;
   }
@@ -208,7 +212,7 @@ class InterfaceEndpointBuilder implements Lifecycle<InterfaceEndpointBuilderResu
     }
 
     let managedSecurityGroup: SecurityGroup | undefined;
-    let securityGroups: ISecurityGroup[];
+    let securityGroups: NonNullable<InterfaceVpcEndpointProps["securityGroups"]>;
     if (byo !== undefined) {
       securityGroups = byo.map((sg) => resolve(sg, context));
     } else {

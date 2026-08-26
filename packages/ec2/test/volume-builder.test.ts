@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, RemovalPolicy, Size, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { EbsDeviceVolumeType, type Volume, Vpc } from "aws-cdk-lib/aws-ec2";
+import { EbsDeviceVolumeType, type Volume, type VolumeProps, Vpc } from "aws-cdk-lib/aws-ec2";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createVolumeBuilder } from "../src/volume-builder.js";
+import { createVolumeBuilder, type VolumeBuilderProps } from "../src/volume-builder.js";
 import { createVpcBuilder } from "../src/vpc-builder.js";
 
 function buildVolume(configureFn?: (b: ReturnType<typeof createVolumeBuilder>) => void) {
@@ -81,6 +81,16 @@ describe("VolumeBuilder", () => {
         Encrypted: true,
         KmsKeyId: Match.anyValue(),
       });
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own VolumeProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: VolumeBuilderProps = undefined as unknown as VolumeProps;
+      void props;
     });
   });
 

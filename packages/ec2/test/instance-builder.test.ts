@@ -7,6 +7,7 @@ import {
   type IVpc,
   type Instance,
   InstanceClass,
+  type InstanceProps,
   InstanceSize,
   InstanceType,
   KeyPair,
@@ -18,7 +19,7 @@ import {
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createInstanceBuilder } from "../src/instance-builder.js";
+import { createInstanceBuilder, type InstanceBuilderProps } from "../src/instance-builder.js";
 import { createVpcBuilder } from "../src/vpc-builder.js";
 
 function buildInstance(configureFn?: (builder: ReturnType<typeof createInstanceBuilder>) => void) {
@@ -140,6 +141,16 @@ describe("InstanceBuilder", () => {
       expect(result.instance).toBeDefined();
       const template = Template.fromStack(stack);
       template.resourceCountIs("AWS::EC2::Instance", 1);
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own InstanceProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: InstanceBuilderProps = undefined as unknown as InstanceProps;
+      void props;
     });
   });
 

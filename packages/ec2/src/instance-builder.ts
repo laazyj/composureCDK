@@ -1,13 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import {
-  type CfnVolumeAttachment,
-  Instance,
-  type IKeyPair,
-  type ISecurityGroup,
-  type IVpc,
-  type InstanceProps,
-} from "aws-cdk-lib/aws-ec2";
-import { type IRole } from "aws-cdk-lib/aws-iam";
+import { type CfnVolumeAttachment, Instance, type InstanceProps } from "aws-cdk-lib/aws-ec2";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
@@ -38,6 +30,10 @@ import {
  * etc.) are passed through with their CDK types unchanged because they are
  * almost always constructed inline rather than referenced from another
  * component.
+ *
+ * Each re-declared prop reads its inner type from CDK's own prop rather than
+ * naming an interface, so it keeps tracking the installed `aws-cdk-lib` as CDK
+ * moves its prop types (ADR-0018).
  */
 export interface InstanceBuilderProps extends Omit<
   InstanceProps,
@@ -46,36 +42,36 @@ export interface InstanceBuilderProps extends Omit<
   /**
    * IAM role assumed by the instance via its instance profile.
    *
-   * Accepts a concrete {@link IRole} or a {@link Ref} that resolves to one
-   * at build time, e.g. a sibling `RoleBuilder` in the same composed system.
+   * Accepts a concrete role or a {@link Ref} that resolves to one at build
+   * time, e.g. a sibling `RoleBuilder` in the same composed system.
    *
    * @default - CDK creates a role and attaches `AmazonSSMManagedInstanceCore`,
    *   driven by the `ssmSessionPermissions: true` default in
    *   {@link INSTANCE_DEFAULTS}.
    */
-  role?: Resolvable<IRole>;
+  role?: Resolvable<NonNullable<InstanceProps["role"]>>;
 
   /**
    * Key pair to associate with the instance.
    *
-   * Accepts a concrete {@link IKeyPair} or a {@link Ref} that resolves to
-   * one at build time.
+   * Accepts a concrete key pair or a {@link Ref} that resolves to one at
+   * build time.
    *
    * @default - no key pair is associated; SSM Session Manager is the
    *   recommended access path.
    */
-  keyPair?: Resolvable<IKeyPair>;
+  keyPair?: Resolvable<NonNullable<InstanceProps["keyPair"]>>;
 
   /**
    * Primary security group for the instance.
    *
-   * Accepts a concrete {@link ISecurityGroup} or a {@link Ref} that resolves
-   * to one at build time. Additional security groups can be attached via
+   * Accepts a concrete security group or a {@link Ref} that resolves to one
+   * at build time. Additional security groups can be attached via
    * `instance.addSecurityGroup()` after build.
    *
    * @default - CDK creates a security group allowing all outbound traffic.
    */
-  securityGroup?: Resolvable<ISecurityGroup>;
+  securityGroup?: Resolvable<NonNullable<InstanceProps["securityGroup"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -168,19 +164,19 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
   props: Partial<InstanceBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Instance>[] = [];
   readonly #volumeAttachments: PendingVolumeAttachment[] = [];
-  #vpc?: Resolvable<IVpc>;
+  #vpc?: Resolvable<NonNullable<InstanceProps["vpc"]>>;
 
   /**
    * Sets the VPC the instance will be launched into.
    *
-   * Accepts a concrete {@link IVpc} or a {@link Ref} that resolves to one
-   * at build time. This is how cross-component wiring works — e.g., to a
-   * sibling {@link IVpcBuilder} in the same composed system.
+   * Accepts a concrete VPC or a {@link Ref} that resolves to one at build
+   * time. This is how cross-component wiring works — e.g., to a sibling
+   * {@link IVpcBuilder} in the same composed system.
    *
    * @param vpc - The VPC or a Ref to one.
    * @returns This builder for chaining.
    */
-  vpc(vpc: Resolvable<IVpc>): this {
+  vpc(vpc: Resolvable<NonNullable<InstanceProps["vpc"]>>): this {
     this.#vpc = vpc;
     return this;
   }

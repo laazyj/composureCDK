@@ -1,6 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
-import { type IKey } from "aws-cdk-lib/aws-kms";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
@@ -19,8 +18,8 @@ import { VOLUME_DEFAULTS } from "./volume-defaults.js";
  * - `availabilityZone` is supplied via the dedicated
  *   {@link IVolumeBuilder.availabilityZone | .availabilityZone()} method
  *   so it can be wired from a sibling `VpcBuilder`.
- * - `encryptionKey` is exposed on the builder as a `Resolvable<IKey>`
- *   setter so a sibling KMS key builder can supply a CMK.
+ * - `encryptionKey` is exposed on the builder as a `Resolvable` setter so a
+ *   sibling KMS key builder can supply a CMK.
  *
  * Other props (`size`, `volumeType`, `iops`, `throughput`, `enableMultiAttach`,
  * `autoEnableIo`, `removalPolicy`, etc.) are passed through with their CDK
@@ -34,15 +33,19 @@ export interface VolumeBuilderProps extends Omit<
   /**
    * Customer-managed KMS key (CMK) used to encrypt the volume.
    *
-   * Accepts a concrete {@link IKey} or a {@link Ref} that resolves to one
-   * at build time (e.g. a sibling key builder in the same composed system).
+   * Accepts a concrete key or a {@link Ref} that resolves to one at build
+   * time (e.g. a sibling key builder in the same composed system).
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction
+   * (ADR-0018) — see the table in `@composurecdk/kms`'s README.
    *
    * @default - the account's default EBS KMS key, applied because
    *   `encrypted: true` is set in {@link VOLUME_DEFAULTS}.
    *
    * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_data_rest_encrypt.html
    */
-  encryptionKey?: Resolvable<IKey>;
+  encryptionKey?: Resolvable<NonNullable<VolumeProps["encryptionKey"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.

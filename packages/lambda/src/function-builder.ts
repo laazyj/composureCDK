@@ -42,7 +42,8 @@ const LOGS_WRITER_POLICY_NAME = "LogsWriter";
  * Extends the CDK {@link FunctionProps} with builder-specific options. The
  * `role` and `environmentEncryption` props are widened to {@link Resolvable}
  * so a role or key built by a sibling component can be referenced via
- * `ref(...)` at configuration time.
+ * `ref(...)` at configuration time; both read their inner type from CDK's own
+ * prop so they keep tracking it (ADR-0018).
  */
 export interface FunctionBuilderProps extends Omit<
   FunctionProps,
@@ -54,13 +55,13 @@ export interface FunctionBuilderProps extends Omit<
    * policy is **not** added — the caller is fully responsible for the role's
    * permissions.
    *
-   * Accepts a concrete {@link IRole} or a {@link Resolvable} for
-   * cross-component wiring (e.g. `ref("sharedRole", r => r.role)`).
+   * Accepts a concrete role or a {@link Resolvable} for cross-component wiring
+   * (e.g. `ref("sharedRole", r => r.role)`).
    *
    * Mutually exclusive with {@link IFunctionBuilder.configureRole} and
    * {@link IFunctionBuilder.useCdkAutoRole}.
    */
-  role?: Resolvable<IRole>;
+  role?: Resolvable<NonNullable<FunctionProps["role"]>>;
 
   /**
    * The customer-managed KMS key used to encrypt the function's environment
@@ -376,7 +377,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       logGroupProps = { logGroup };
     }
 
-    let role: IRole | undefined;
+    let role: NonNullable<FunctionProps["role"]> | undefined;
     if (roleResolvable !== undefined) {
       role = resolve(roleResolvable, context);
     } else if (!this.#useCdkAutoRole) {

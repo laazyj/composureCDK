@@ -4,7 +4,7 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
-import { type ITopic } from "aws-cdk-lib/aws-sns";
+import { type ITopic, type TopicProps } from "aws-cdk-lib/aws-sns";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import {
   EmailSubscription,
@@ -13,7 +13,7 @@ import {
 } from "aws-cdk-lib/aws-sns-subscriptions";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createTopicBuilder } from "../src/topic-builder.js";
+import { createTopicBuilder, type TopicBuilderProps } from "../src/topic-builder.js";
 
 function synthTemplate(
   configureFn?: (builder: ReturnType<typeof createTopicBuilder>) => void,
@@ -248,6 +248,16 @@ describe("TopicBuilder", () => {
           subscriptions: Object.keys(r.subscriptions).sort(),
         }),
       });
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own TopicProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: TopicBuilderProps = undefined as unknown as TopicProps;
+      void props;
     });
   });
 

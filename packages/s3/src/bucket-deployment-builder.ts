@@ -1,6 +1,4 @@
 import { BucketDeployment, type BucketDeploymentProps } from "aws-cdk-lib/aws-s3-deployment";
-import { type IBucket } from "aws-cdk-lib/aws-s3";
-import { type IDistribution } from "aws-cdk-lib/aws-cloudfront";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
@@ -60,19 +58,22 @@ export type IBucketDeploymentBuilder = ITaggedBuilder<
 
 class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult> {
   props: Partial<BucketDeploymentBuilderProps> = {};
-  #destinationBucket?: Resolvable<IBucket>;
-  #distribution?: Resolvable<IDistribution>;
+  #destinationBucket?: Resolvable<NonNullable<BucketDeploymentProps["destinationBucket"]>>;
+  #distribution?: Resolvable<NonNullable<BucketDeploymentProps["distribution"]>>;
 
   /**
    * Sets the destination bucket for the deployment.
    *
-   * Accepts a concrete {@link IBucket} or a {@link Ref} that resolves to one
-   * at build time.
+   * Accepts a concrete bucket or a {@link Ref} that resolves to one at build
+   * time. The accepted type is read from CDK's own prop rather than naming
+   * `IBucket`, so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
    *
    * @param bucket - The bucket or a Ref to one.
    * @returns This builder for chaining.
    */
-  destinationBucket(bucket: Resolvable<IBucket>): this {
+  destinationBucket(
+    bucket: Resolvable<NonNullable<BucketDeploymentProps["destinationBucket"]>>,
+  ): this {
     this.#destinationBucket = bucket;
     return this;
   }
@@ -80,14 +81,18 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
   /**
    * Sets the CloudFront distribution to invalidate on deployment.
    *
-   * Accepts a concrete {@link IDistribution} or a {@link Ref} that resolves
-   * to one at build time. This is optional — deployments can target a bucket
-   * without CloudFront invalidation.
+   * Accepts a concrete distribution or a {@link Ref} that resolves to one at
+   * build time. This is optional — deployments can target a bucket without
+   * CloudFront invalidation.
+   *
+   * The accepted type is read from CDK's own prop rather than named as
+   * `IDistribution`: CDK widened this prop to `cloudfront.IDistributionRef`,
+   * which the pinned interface was already rejecting (ADR-0018).
    *
    * @param distribution - The distribution or a Ref to one.
    * @returns This builder for chaining.
    */
-  distribution(distribution: Resolvable<IDistribution>): this {
+  distribution(distribution: Resolvable<NonNullable<BucketDeploymentProps["distribution"]>>): this {
     this.#distribution = distribution;
     return this;
   }

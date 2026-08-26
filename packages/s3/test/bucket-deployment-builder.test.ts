@@ -5,10 +5,11 @@ import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
-import { Source } from "aws-cdk-lib/aws-s3-deployment";
+import { type BucketDeploymentProps, Source } from "aws-cdk-lib/aws-s3-deployment";
 import { Ref, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBucketDeploymentBuilder } from "../src/bucket-deployment-builder.js";
+import type { BucketDeploymentBuilderProps } from "../src/bucket-deployment-props.js";
 import { BUCKET_DEPLOYMENT_DEFAULTS } from "../src/bucket-deployment-defaults.js";
 
 function createStack(): Stack {
@@ -56,6 +57,16 @@ describe("BucketDeploymentBuilder", () => {
       template.hasResourceProperties("Custom::CDKBucketDeployment", {
         DestinationBucketName: { Ref: stack.getLogicalId(bucket.node.defaultChild as never) },
       });
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own BucketDeploymentProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: BucketDeploymentBuilderProps = undefined as unknown as BucketDeploymentProps;
+      void props;
     });
   });
 

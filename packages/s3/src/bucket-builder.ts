@@ -1,6 +1,5 @@
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { type IKey } from "aws-cdk-lib/aws-kms";
 import { Bucket, BucketEncryption, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
@@ -49,15 +48,19 @@ export interface BucketBuilderProps extends Omit<
   /**
    * The KMS key used for server-side encryption (SSE-KMS).
    *
-   * Accepts a concrete {@link IKey} or a {@link Resolvable} — typically a
-   * {@link Ref} to a composed `@composurecdk/kms` key builder, so the key is a
-   * component of the system rather than a construct built outside it.
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
    *
    * Supplying a key implies `BucketEncryption.KMS`: the `S3_MANAGED` default is
    * mutually exclusive with a customer key, so `build()` drops it rather than
    * making you set both (ADR-0009). Setting `encryption` explicitly still wins.
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction
+   * (ADR-0018) — see the table in `@composurecdk/kms`'s README.
    */
-  encryptionKey?: Resolvable<IKey>;
+  encryptionKey?: Resolvable<NonNullable<BucketProps["encryptionKey"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -241,7 +244,7 @@ function resolveAccessLogs(
  * incompatible explicit pairing is left for CDK to reject.
  */
 function encryptionKeyProps(
-  encryptionKey: Resolvable<IKey> | undefined,
+  encryptionKey: BucketBuilderProps["encryptionKey"],
   userEncryption: BucketEncryption | undefined,
   context: Record<string, object> | undefined,
 ): Partial<BucketProps> {

@@ -180,9 +180,9 @@ This package ships small free-function helpers that wrap the corresponding [`aws
 | `snsTarget`                | `SnsTopic`           | `ITopic`            |
 | `sfnStateMachineTarget`    | `SfnStateMachine`    | `IStateMachine`     |
 | `eventBusTarget`           | `EventBus`           | `IEventBus`         |
-| `cloudWatchLogGroupTarget` | `CloudWatchLogGroup` | `ILogGroup`         |
+| `cloudWatchLogGroupTarget` | `CloudWatchLogGroup` | `ILogGroupRef`      |
 
-`eventBusTarget` is pinned to `IEventBus`, because CDK's own `EventBus` target still is, so a bus that is only an `IEventBusRef` reaches a rule's `eventBus` but not a target.
+Each helper accepts what the CDK target it wraps accepts, read from that constructor rather than pinned to an interface name. `eventBusTarget` is therefore still `IEventBus` — CDK's own `EventBus` target has not moved — so a bus that is only an `IEventBusRef` reaches a rule's `eventBus` but not a target; `cloudWatchLogGroupTarget` already takes the broader [`logs.ILogGroupRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_logs.ILogGroupRef.html).
 
 The second argument is the matching CDK target props type (`LambdaFunctionProps`, `SqsQueueProps`, …) — refer to the CDK docs for available options. Common ones include `deadLetterQueue` (concrete `IQueue`), `retryAttempts`, `maxEventAge`, and target-specific input transforms (`event` / `input` / `message`).
 

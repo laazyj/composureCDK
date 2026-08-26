@@ -113,7 +113,7 @@ export type IRuleBuilder = IBuilder<RuleBuilderProps, RuleBuilder>;
 
 interface TargetEntry {
   key: string;
-  target: Resolvable<IRuleTarget>;
+  target: Resolvable<NonNullable<RuleProps["targets"]>[number]>;
 }
 
 class RuleBuilder implements Lifecycle<RuleBuilderResult> {
@@ -137,13 +137,16 @@ class RuleBuilder implements Lifecycle<RuleBuilderResult> {
   /**
    * Register a target to be attached to the rule at build time.
    *
-   * Accepts any concrete {@link IRuleTarget} (the lightweight helpers in
-   * `./targets/` produce these) or a {@link Resolvable} so targets that wire
-   * cross-component references can be declared at configuration time. The
-   * resolved target is exposed on {@link RuleBuilderResult.targets} under
-   * `key`.
+   * Accepts any concrete rule target (the lightweight helpers in `./targets/`
+   * produce these) or a {@link Resolvable} so targets that wire cross-component
+   * references can be declared at configuration time. The resolved target is
+   * exposed on {@link RuleBuilderResult.targets} under `key`.
+   *
+   * `targets` is lifted out of {@link RuleBuilderProps} onto this method, so
+   * the element type is read from CDK's own prop rather than named as
+   * `IRuleTarget` — the same rule the props interface follows (ADR-0018).
    */
-  addTarget(key: string, target: Resolvable<IRuleTarget>): this {
+  addTarget(key: string, target: Resolvable<NonNullable<RuleProps["targets"]>[number]>): this {
     if (this.#targets.some((t) => t.key === key)) {
       throw new Error(
         `RuleBuilder.addTarget: duplicate key "${key}". Each target must use a unique key.`,

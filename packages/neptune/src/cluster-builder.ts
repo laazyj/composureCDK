@@ -1,5 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { type IConnectable, type ISecurityGroup, type IVpc } from "aws-cdk-lib/aws-ec2";
+import { type IConnectable } from "aws-cdk-lib/aws-ec2";
 import { type IGrantable } from "aws-cdk-lib/aws-iam";
 import {
   ClusterParameterGroup,
@@ -40,24 +40,30 @@ export type ClusterAccessor = IConnectable & IGrantable;
  *
  * - `vpc` is supplied via the dedicated {@link IClusterBuilder.vpc | .vpc()}
  *   method (it is required).
- * - `securityGroups` accepts `Resolvable<ISecurityGroup>` entries.
+ * - `securityGroups` accepts `Resolvable` entries.
  * - `kmsKey` accepts a `Resolvable` key.
  *
  * It also adds builder-specific options for the auto-created cluster
  * parameter group and recommended alarms.
+ *
+ * Each re-declared prop reads its inner type from CDK's own prop rather than
+ * naming an interface, so it keeps tracking the installed `aws-cdk-lib` as CDK
+ * moves its prop types (ADR-0018).
  */
 export interface ClusterBuilderProps extends Omit<
   DatabaseClusterProps,
   "vpc" | "securityGroups" | "kmsKey"
 > {
   /**
-   * Security groups to attach to the cluster. Accepts concrete
-   * {@link ISecurityGroup}s or {@link Ref}s that resolve to them at build
-   * time (e.g. a sibling `SecurityGroupBuilder`).
+   * Security groups to attach to the cluster. Accepts concrete security
+   * groups or {@link Ref}s that resolve to them at build time (e.g. a sibling
+   * `SecurityGroupBuilder`).
    *
    * @default - CDK creates a security group for the cluster.
    */
-  securityGroups?: readonly Resolvable<ISecurityGroup>[];
+  securityGroups?: readonly Resolvable<
+    NonNullable<DatabaseClusterProps["securityGroups"]>[number]
+  >[];
 
   /**
    * The customer-managed KMS key used to encrypt the cluster's storage at
@@ -176,17 +182,17 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
   props: Partial<ClusterBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IDatabaseCluster>[] = [];
   readonly #accessors: Resolvable<ClusterAccessor>[] = [];
-  #vpc?: Resolvable<IVpc>;
+  #vpc?: Resolvable<NonNullable<DatabaseClusterProps["vpc"]>>;
 
   /**
-   * Sets the VPC the cluster runs in. Required. Accepts a concrete
-   * {@link IVpc} or a {@link Ref} that resolves to one at build time — the
-   * standard cross-component wiring path (e.g. to a sibling `VpcBuilder`).
+   * Sets the VPC the cluster runs in. Required. Accepts a concrete VPC or a
+   * {@link Ref} that resolves to one at build time — the standard
+   * cross-component wiring path (e.g. to a sibling `VpcBuilder`).
    *
    * @param vpc - The VPC or a Ref to one.
    * @returns This builder for chaining.
    */
-  vpc(vpc: Resolvable<IVpc>): this {
+  vpc(vpc: Resolvable<NonNullable<DatabaseClusterProps["vpc"]>>): this {
     this.#vpc = vpc;
     return this;
   }

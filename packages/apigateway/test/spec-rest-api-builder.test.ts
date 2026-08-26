@@ -6,12 +6,16 @@ import {
   LogGroupLogDestination,
   MethodLoggingLevel,
   type RestApiBase,
+  type SpecRestApiProps,
 } from "aws-cdk-lib/aws-apigateway";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
 import { combine, compose, type Lifecycle, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createSpecRestApiBuilder } from "../src/spec-rest-api-builder.js";
+import {
+  createSpecRestApiBuilder,
+  type SpecRestApiBuilderProps,
+} from "../src/spec-rest-api-builder.js";
 
 /** Minimal OpenAPI 3.0 spec with a single GET /pets endpoint, mock-integrated
  * unless the caller supplies an integration of its own. */
@@ -107,6 +111,16 @@ describe("SpecRestApiBuilder", () => {
       const result = builder.build(stack, "TestApi");
 
       expect(result.accessLogGroup).toBeUndefined();
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own SpecRestApiProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: SpecRestApiBuilderProps = undefined as unknown as SpecRestApiProps;
+      void props;
     });
   });
 

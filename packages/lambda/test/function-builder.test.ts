@@ -8,6 +8,7 @@ import {
   Architecture,
   Code,
   type Function as LambdaFunction,
+  type FunctionProps,
   LoggingFormat,
   Runtime,
   Tracing,
@@ -22,7 +23,7 @@ import {
   createStatementBuilder,
   type RoleBuilderResult,
 } from "@composurecdk/iam";
-import { createFunctionBuilder } from "../src/function-builder.js";
+import { createFunctionBuilder, type FunctionBuilderProps } from "../src/function-builder.js";
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createFunctionBuilder>) => void,
@@ -51,6 +52,16 @@ describe("FunctionBuilder", () => {
 
       expect(result).toBeDefined();
       expect(result.function).toBeDefined();
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own FunctionProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: FunctionBuilderProps = undefined as unknown as FunctionProps;
+      void props;
     });
   });
 

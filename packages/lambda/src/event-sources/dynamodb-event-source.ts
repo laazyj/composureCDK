@@ -1,5 +1,5 @@
 import type { ITable } from "aws-cdk-lib/aws-dynamodb";
-import type { IEventSource, IEventSourceDlq, StartingPosition } from "aws-cdk-lib/aws-lambda";
+import type { IEventSource, StartingPosition } from "aws-cdk-lib/aws-lambda";
 import {
   DynamoEventSource,
   type DynamoEventSourceProps,
@@ -41,15 +41,23 @@ export interface DynamoStreamEventSourceProps extends Omit<
   /**
    * Destination for records that exhaust `retryAttempts` or exceed
    * `maxRecordAge`. Pass an {@link IQueue} (wrapped in {@link SqsDlq}
-   * automatically), a concrete {@link IEventSourceDlq}, or a `ref()` to a
-   * sibling that produces either.
+   * automatically), a concrete destination, or a `ref()` to a sibling that
+   * produces either.
+   *
+   * The destination arm is read from CDK's own prop rather than named as
+   * `IEventSourceDlq`, so it keeps tracking that type as CDK moves it
+   * (ADR-0018). The `IQueue` arm is the builder's own convenience and has no
+   * CDK prop to read from.
+   *
    * @see https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html#services-ddb-errors
    */
-  onFailure?: Resolvable<IQueue | IEventSourceDlq>;
+  onFailure?: Resolvable<IQueue | NonNullable<DynamoEventSourceProps["onFailure"]>>;
 }
 
 /** Wraps a raw queue in an {@link SqsDlq}; passes an existing destination through. */
-function toDlq(destination: IQueue | IEventSourceDlq): IEventSourceDlq {
+function toDlq(
+  destination: IQueue | NonNullable<DynamoEventSourceProps["onFailure"]>,
+): NonNullable<DynamoEventSourceProps["onFailure"]> {
   // Duck-type the queue rather than `instanceof` — the ESM and CommonJS copies
   // of a package can both load in one process (ADR-0007).
   return "queueArn" in destination ? new SqsDlq(destination) : destination;

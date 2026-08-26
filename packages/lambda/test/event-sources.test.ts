@@ -11,6 +11,7 @@ import {
 } from "aws-cdk-lib/aws-lambda";
 import {
   DynamoEventSource,
+  type DynamoEventSourceProps,
   S3OnFailureDestination,
   SqsDlq,
   SqsEventSource,
@@ -26,6 +27,7 @@ import {
 } from "../src/event-sources/sqs-event-source.js";
 import {
   DEFAULT_DYNAMO_EVENT_SOURCE_PROPS,
+  type DynamoStreamEventSourceProps,
   dynamoEventSource,
 } from "../src/event-sources/dynamodb-event-source.js";
 
@@ -656,6 +658,16 @@ function dynamoStreamsAcceptS3OnFailure(): boolean {
     return false;
   }
 }
+
+describe("DynamoStreamEventSourceProps", () => {
+  it("accept everything CDK's own DynamoEventSourceProps accepts (type-level guard)", () => {
+    // A re-declared prop must accept everything CDK's own prop accepts, so a
+    // later re-declaration cannot silently narrow the builder's surface
+    // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+    const props: DynamoStreamEventSourceProps = undefined as unknown as DynamoEventSourceProps;
+    void props;
+  });
+});
 
 describe("dynamoEventSource onFailure DLQ", () => {
   it("wraps a bare queue as an SqsDlq destination on the mapping", () => {

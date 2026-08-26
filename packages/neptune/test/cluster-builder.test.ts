@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { SecurityGroup, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
-import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import {
   ClusterParameterGroup,
@@ -267,23 +266,18 @@ describe("ClusterBuilder", () => {
     });
   });
 
-  describe("allowAccessFrom", () => {
-    it("opens the cluster port to the peer and grants IAM connect", () => {
+  describe("allowDefaultPortFrom", () => {
+    it("opens the cluster port to the peer's security group", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const vpc = isolatedVpc(stack);
       const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
-      const peerRole = new Role(stack, "PeerRole", {
-        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
-      });
-      // A minimal IConnectable & IGrantable peer.
-      const peer = { connections: peerSg.connections, grantPrincipal: peerRole.grantPrincipal };
 
       createClusterBuilder()
         .vpc(vpc)
         .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
         .instanceType(InstanceType.R6G_LARGE)
-        .allowAccessFrom(peer)
+        .allowDefaultPortFrom(peerSg, "Bastion to Neptune")
         .build(stack, "Graph");
 
       const template = Template.fromStack(stack);
@@ -292,51 +286,46 @@ describe("ClusterBuilder", () => {
       // protocol and the peer-SG source rather than a literal port number.
       template.hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
         IpProtocol: "tcp",
+        Description: "Bastion to Neptune",
         SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
-      });
-      // IAM connect grant on the peer role (the alpha L2 grants the neptune-db
-      // data-plane action namespace).
-      template.hasResourceProperties("AWS::IAM::Policy", {
-        PolicyDocument: Match.objectLike({
-          Statement: Match.arrayWith([
-            Match.objectLike({ Action: Match.stringLikeRegexp("^neptune-db:") }),
-          ]),
-        }),
       });
     });
 
-    it("opens only the network path (no IAM connect grant) when IAM auth is disabled", () => {
+    it("emits no IAM policy — the data-plane grant is the consumer's to declare", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const vpc = isolatedVpc(stack);
       const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
-      const peerRole = new Role(stack, "PeerRole", {
-        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
-      });
-      const peer = { connections: peerSg.connections, grantPrincipal: peerRole.grantPrincipal };
 
       createClusterBuilder()
         .vpc(vpc)
         .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
         .instanceType(InstanceType.R6G_LARGE)
-        .iamAuthentication(false)
-        .allowAccessFrom(peer)
+        .allowDefaultPortFrom(peerSg)
         .build(stack, "Graph");
 
-      const template = Template.fromStack(stack);
-      // Network path is still opened.
-      template.hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
+      // The network rule is the whole of what the cluster builder writes; the
+      // matching `neptune-db:` grant now lives on the grantee (ADR-0013).
+      expect(JSON.stringify(Template.fromStack(stack).toJSON())).not.toContain("neptune-db:");
+    });
+
+    it("resolves a Ref-supplied peer against the build context", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = isolatedVpc(stack);
+      const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
+
+      createClusterBuilder()
+        .vpc(vpc)
+        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+        .instanceType(InstanceType.R6G_LARGE)
+        .allowDefaultPortFrom(ref<{ securityGroup: SecurityGroup }>("peer").get("securityGroup"))
+        .build(stack, "Graph", { peer: { securityGroup: peerSg } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
         IpProtocol: "tcp",
         SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
       });
-      // But no neptune-db connect grant is emitted — it would be inert.
-      const policies = Object.values(template.findResources("AWS::IAM::Policy"));
-      const hasConnectGrant = policies.some((p) => {
-        const doc = (p as { Properties?: { PolicyDocument?: { Statement?: unknown } } }).Properties
-          ?.PolicyDocument?.Statement;
-        return JSON.stringify(doc ?? []).includes("neptune-db:");
-      });
-      expect(hasConnectGrant).toBe(false);
     });
   });
 

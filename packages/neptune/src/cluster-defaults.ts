@@ -29,8 +29,9 @@ export const CLUSTER_DEFAULTS: Partial<DatabaseClusterProps> = {
 
   /**
    * Require IAM authentication for data-plane connections, removing the
-   * need for long-lived static credentials. Pair with `.allowAccessFrom()`
-   * (or `cluster.grantConnect()`) to authorise principals.
+   * need for long-lived static credentials. Authorise a principal with
+   * `clusterGrants.connect(...)` on that principal's builder, and open the
+   * network path with `.allowDefaultPortFrom()`.
    * @see https://docs.aws.amazon.com/wellarchitected/latest/framework/sec-03.html
    * @see https://docs.aws.amazon.com/neptune/latest/userguide/iam-auth.html
    */

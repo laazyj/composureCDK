@@ -6,13 +6,18 @@ import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import {
   ClusterParameterGroup,
+  type DatabaseClusterProps,
   EngineVersion,
   InstanceType,
   ParameterGroupFamily,
 } from "@aws-cdk/aws-neptune-alpha";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createClusterBuilder, type IClusterBuilder } from "../src/cluster-builder.js";
+import {
+  type ClusterBuilderProps,
+  createClusterBuilder,
+  type IClusterBuilder,
+} from "../src/cluster-builder.js";
 import { clusterParameterGroupFamily } from "../src/cluster-parameter-group-defaults.js";
 
 /** Builds a VPC with isolated subnets — Neptune is VPC-only and needs no egress. */
@@ -99,6 +104,16 @@ describe("ClusterBuilder", () => {
       const builder = createClusterBuilder().vpc(vpc);
 
       expect(() => builder.build(stack, "Graph")).toThrow(/requires an instance type/);
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own DatabaseClusterProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: ClusterBuilderProps = undefined as unknown as DatabaseClusterProps;
+      void props;
     });
   });
 

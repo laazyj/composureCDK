@@ -227,7 +227,7 @@ const deploy = createBucketDeploymentBuilder()
   .build(stack, "Deploy");
 ```
 
-The `destinationBucket` and `distribution` methods accept `Ref` values for cross-component wiring:
+The `destinationBucket` and `distribution` methods accept `Ref` values for cross-component wiring. Each reads what it accepts from CDK's own `BucketDeploymentProps` rather than pinning an interface, so it accepts whatever your installed `aws-cdk-lib` accepts — `distribution` is already the broader [`cloudfront.IDistributionRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudfront.IDistributionRef.html) there.
 
 ```ts
 import { compose, ref } from "@composurecdk/core";

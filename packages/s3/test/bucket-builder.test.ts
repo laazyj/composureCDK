@@ -3,10 +3,10 @@ import { App, Duration, RemovalPolicy, Stack, Tags } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Key } from "aws-cdk-lib/aws-kms";
-import { Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
+import { Bucket, BucketEncryption, type BucketProps } from "aws-cdk-lib/aws-s3";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createBucketBuilder } from "../src/bucket-builder.js";
+import { createBucketBuilder, type BucketBuilderProps } from "../src/bucket-builder.js";
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createBucketBuilder>) => void,
@@ -106,6 +106,16 @@ describe("BucketBuilder", () => {
       const result = builder.build(stack, "TestBucket");
 
       expect(result.accessLogsBucket).toBeUndefined();
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own BucketProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: BucketBuilderProps = undefined as unknown as BucketProps;
+      void props;
     });
   });
 

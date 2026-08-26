@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { App, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { Key } from "aws-cdk-lib/aws-kms";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { type LogGroupProps, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { ref } from "@composurecdk/core";
-import { createLogGroupBuilder } from "../src/log-group-builder.js";
+import { createLogGroupBuilder, type LogGroupBuilderProps } from "../src/log-group-builder.js";
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createLogGroupBuilder>) => void,
@@ -28,6 +28,17 @@ describe("LogGroupBuilder", () => {
 
       expect(result).toBeDefined();
       expect(result.logGroup).toBeDefined();
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own LogGroupProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018) — CDK has already widened `encryptionKey` to `kms.IKeyRef`
+      // here. A `tsc`-only assertion — vitest does not typecheck.
+      const props: LogGroupBuilderProps = undefined as unknown as LogGroupProps;
+      void props;
     });
   });
 

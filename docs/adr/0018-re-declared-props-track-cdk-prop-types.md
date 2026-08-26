@@ -61,9 +61,22 @@ either direction, at every floor — because it _is_ that type. `NonNullable`
 strips the optionality CDK's own `?` carries, so the re-declaration re-states
 it rather than nesting `undefined` inside the `Resolvable`.
 
-This applies wherever the builder re-declares a lifted CDK prop — in the props
-interface, or in the hand-written setter that stands in for a prop lifted out
-of the interface entirely (`.vpc()`, `.destinationBucket()`).
+This applies wherever the builder re-states a type the wrapped CDK API owns:
+
+- **the props interface**, which is the case above;
+- **a hand-written setter** standing in for a prop lifted out of the interface
+  entirely — `.vpc()`, `.destinationBucket()`, `.addTarget()` — where the
+  element form is `NonNullable<RuleProps["targets"]>[number]`;
+- **a helper that wraps a CDK constructor**, which reads
+  `ConstructorParameters<typeof CloudWatchLogGroup>[0]`;
+- **the internal field and local the resolved value flows through**, so the
+  spelling does not have to be fixed twice when CDK moves the prop.
+
+A build result that echoes a widened prop back to the caller widens with it —
+`CrossAccountZoneDelegationBuilderResult.delegationRole` is CDK's
+`iam.IRoleRef`, so its name and ARN are reached through `roleRef`. That is a
+real cost, and the alternative is worse: the builder would have to refuse the
+values CDK told the caller to pass.
 
 ### The indexed access must stay inline
 
@@ -117,8 +130,9 @@ const props: TopicBuilderProps = undefined as unknown as TopicProps;
 
 Structural assignment ignores the props the builder replaces outright, so those
 need no exemption — and a prop that is merely widened must never be given one.
-The guard is checked by `tsc`, not by vitest, so it belongs to `typecheck`
-rather than `test`.
+The guard is checked by `tsc`, not by vitest, so `npm run verify` now chains
+`typecheck` alongside `lint` and `test`: `build` is `tshy`, which compiles
+`src` only, so without it the pre-push gate never reads the guards at all.
 
 ## Consequences
 
@@ -140,6 +154,9 @@ rather than `test`.
   warning is now a lint rule and an ADR; the notes stay as version-specific
   context but are no longer the only thing standing between the codebase and a
   regression.
+- **`npm run verify` is slower by a `typecheck` pass**, which it should have
+  been running regardless: it is the step CI runs and the gate `AGENTS.md`
+  describes as "the same gate CI runs".
 - **Type-level assertions per package (#388) are not needed.** They would detect
   the drift and fail `typecheck`, but leave the pinned type in place — turning a
   silent bug into a build failure plus a manual fix. Tracking the prop removes

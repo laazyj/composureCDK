@@ -1,4 +1,4 @@
-import { type IReceiptRuleAction, type ReceiptRuleOptions } from "aws-cdk-lib/aws-ses";
+import { type ReceiptRuleOptions } from "aws-cdk-lib/aws-ses";
 import { Builder, COPY_STATE, type IBuilder, resolve, type Resolvable } from "@composurecdk/core";
 import { DEFAULT_RECEIPT_RULE } from "./defaults.js";
 
@@ -11,7 +11,7 @@ export type ReceiptRuleBuilderProps = Omit<ReceiptRuleOptions, "actions" | "afte
 
 interface ActionEntry {
   key: string;
-  action: Resolvable<IReceiptRuleAction>;
+  action: Resolvable<NonNullable<ReceiptRuleOptions["actions"]>[number]>;
 }
 
 class ReceiptRuleBuilder {
@@ -22,8 +22,16 @@ class ReceiptRuleBuilder {
    * Register an action to run on matching mail, in declaration order. Accepts a
    * concrete action or a {@link Resolvable} — the action helpers (`s3Action`,
    * `lambdaAction`, …) produce these, wiring sibling components via `ref()`.
+   *
+   * `actions` is lifted out of {@link ReceiptRuleBuilderProps} onto this
+   * method, so the element type is read from CDK's own prop rather than named
+   * as `IReceiptRuleAction` — the same rule the props interface follows
+   * (ADR-0018).
    */
-  addAction(key: string, action: Resolvable<IReceiptRuleAction>): this {
+  addAction(
+    key: string,
+    action: Resolvable<NonNullable<ReceiptRuleOptions["actions"]>[number]>,
+  ): this {
     if (this.#actions.some((a) => a.key === key)) {
       throw new Error(
         `ReceiptRuleBuilder.addAction: duplicate key "${key}". Each action must use a unique key.`,

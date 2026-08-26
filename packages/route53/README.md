@@ -149,7 +149,7 @@ compose(
 
 At deploy time a Lambda-backed custom resource assumes the delegation role and `UPSERT`s the child zone's four name servers into the parent zone.
 
-**`delegationRole` takes an ARN.** The role lives in the parent account, so the child stack has nothing to `ref` — passing the ARN saves the `Role.fromRoleArn(...)` line every call site would otherwise repeat. The builder imports it as immutable: this stack assumes the role, it never attaches policies to it. An `IRole`, or a `ref` to either, works for the same-account and same-app cases.
+**`delegationRole` takes an ARN.** The role lives in the parent account, so the child stack has nothing to `ref` — passing the ARN saves the `Role.fromRoleArn(...)` line every call site would otherwise repeat. The builder imports it as immutable: this stack assumes the role, it never attaches policies to it. A role, or a `ref` to either, works for the same-account and same-app cases — the role arm is read from CDK's own `CrossAccountZoneDelegationRecordProps.delegationRole`, which is the broader [`iam.IRoleRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_iam.IRoleRef.html), so it accepts whatever your installed `aws-cdk-lib` accepts. The build result echoes that type: reach the role's name and ARN through `result.delegationRole.roleRef`.
 
 **Name the parent zone, or its id — not both.** `parentHostedZoneName` is the usual choice; reach for `parentHostedZoneId` when the parent account holds several zones with the same name. Setting both, or neither, fails at build time naming both setters.
 

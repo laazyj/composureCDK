@@ -1,9 +1,4 @@
-import {
-  HttpsRecord,
-  type HttpsRecordProps,
-  type IHostedZone,
-  type RecordTarget,
-} from "aws-cdk-lib/aws-route53";
+import { HttpsRecord, type HttpsRecordProps } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -20,12 +15,16 @@ import { HTTPS_RECORD_DEFAULTS } from "./defaults.js";
  * Extends the CDK {@link HttpsRecordProps} but replaces `zone` and `target`
  * with {@link Resolvable} variants so they can be wired from composed
  * components (e.g. a CloudFront distribution used as an alias target).
+ *
+ * Both read their inner type from CDK's own prop rather than naming
+ * `IHostedZone` / `RecordTarget`, so they keep tracking the installed
+ * `aws-cdk-lib` (ADR-0018).
  */
 export interface HttpsRecordBuilderProps extends Omit<HttpsRecordProps, "zone" | "target"> {
   /** The hosted zone in which to create the record. */
-  zone?: Resolvable<IHostedZone>;
+  zone?: Resolvable<NonNullable<HttpsRecordProps["zone"]>>;
   /** The record target — mutually exclusive with `values`. */
-  target?: Resolvable<RecordTarget>;
+  target?: Resolvable<NonNullable<HttpsRecordProps["target"]>>;
 }
 
 /**

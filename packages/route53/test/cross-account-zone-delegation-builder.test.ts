@@ -6,9 +6,16 @@ import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { CfnLogGroup, LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import type { ILogGroupBuilder } from "@composurecdk/logs";
-import { HostedZone, PublicHostedZone } from "aws-cdk-lib/aws-route53";
+import {
+  type CrossAccountZoneDelegationRecordProps,
+  HostedZone,
+  PublicHostedZone,
+} from "aws-cdk-lib/aws-route53";
 import { ref } from "@composurecdk/core";
-import { createCrossAccountZoneDelegationBuilder } from "../src/cross-account-zone-delegation-builder.js";
+import {
+  type CrossAccountZoneDelegationBuilderProps,
+  createCrossAccountZoneDelegationBuilder,
+} from "../src/cross-account-zone-delegation-builder.js";
 import {
   applyDelegationProviderLogging,
   DELEGATION_PROVIDER_LOG_GROUP_ID,
@@ -89,6 +96,17 @@ describe("createCrossAccountZoneDelegationBuilder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own CrossAccountZoneDelegationRecordProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const props: CrossAccountZoneDelegationBuilderProps =
+        undefined as unknown as CrossAccountZoneDelegationRecordProps;
+      void props;
+    });
+  });
+
   describe("defaults", () => {
     it("applies a two-day TTL and a DESTROY removal policy", () => {
       const { stack, childZone } = setup();
@@ -125,7 +143,7 @@ describe("createCrossAccountZoneDelegationBuilder", () => {
 
       const result = minimal().delegatedZone(childZone).build(stack, "ParentDelegation");
 
-      expect(result.delegationRole.roleArn).toBe(PARENT_ROLE_ARN);
+      expect(result.delegationRole.roleRef.roleArn).toBe(PARENT_ROLE_ARN);
       // The provider may assume precisely that role and nothing else.
       Template.fromStack(stack).hasResourceProperties("AWS::IAM::Policy", {
         PolicyDocument: Match.objectLike({
@@ -163,7 +181,7 @@ describe("createCrossAccountZoneDelegationBuilder", () => {
         .delegationRole(ref<{ arn: string }, string>("parent", (r) => r.arn))
         .build(stack, "ParentDelegation", { parent: { arn: PARENT_ROLE_ARN } });
 
-      expect(result.delegationRole.roleArn).toBe(PARENT_ROLE_ARN);
+      expect(result.delegationRole.roleRef.roleArn).toBe(PARENT_ROLE_ARN);
     });
   });
 

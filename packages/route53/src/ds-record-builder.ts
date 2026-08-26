@@ -1,4 +1,4 @@
-import { DsRecord, type DsRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
+import { DsRecord, type DsRecordProps } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -14,10 +14,13 @@ import { DS_RECORD_DEFAULTS } from "./defaults.js";
  *
  * Extends the CDK {@link DsRecordProps} but replaces `zone` with a
  * {@link Resolvable} so it can be wired from composed components.
+ *
+ * `zone` reads its inner type from CDK's own prop rather than naming
+ * `IHostedZone`, so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
  */
 export interface DsRecordBuilderProps extends Omit<DsRecordProps, "zone"> {
   /** The hosted zone in which to create the record. */
-  zone?: Resolvable<IHostedZone>;
+  zone?: Resolvable<NonNullable<DsRecordProps["zone"]>>;
 }
 
 /**

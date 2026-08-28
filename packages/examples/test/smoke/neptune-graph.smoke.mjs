@@ -11,7 +11,8 @@ const STACK = "ComposureCDK-NeptuneGraphStack";
  * (`RETURN 1 AS health`) against the IAM-authenticated cluster endpoint. A
  * passing result exercises the whole path the example wires up — SSM
  * reachability via the interface endpoints, the bastion's closed-egress SG,
- * the `allowAccessFrom` network + IAM grant, and the running graph engine.
+ * the cluster's `allowDefaultPortFrom` ingress rule, the bastion role's
+ * consumer-side `clusterGrants.connect` grant, and the running graph engine.
  *
  * The request is SigV4-signed with the Python standard library rather than
  * reusing `awscurl`. This is a deliberate trade-off, not reinvention: the

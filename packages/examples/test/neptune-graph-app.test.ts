@@ -39,11 +39,13 @@ describe("neptune-graph-app", () => {
     });
   });
 
-  it("wires the bastion access grant: cluster SG ingress + IAM connect", () => {
+  it("wires the bastion access grant: cluster SG ingress + consumer-side IAM connect", () => {
     template.hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
       IpProtocol: "tcp",
+      Description: "Neptune bastion to graph",
       SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
     });
+    // The data-plane grant lands on the bastion's own role (ADR-0013).
     template.hasResourceProperties("AWS::IAM::Policy", {
       PolicyDocument: Match.objectLike({
         Statement: Match.arrayWith([

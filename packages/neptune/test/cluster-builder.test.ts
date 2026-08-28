@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { SecurityGroup, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
-import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { SecurityGroup, SubnetType, type Vpc } from "aws-cdk-lib/aws-ec2";
 import { Key } from "aws-cdk-lib/aws-kms";
 import {
   ClusterParameterGroup,
@@ -13,18 +12,8 @@ import {
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createClusterBuilder, type IClusterBuilder } from "../src/cluster-builder.js";
+import { isolatedVpc } from "./_helpers.js";
 import { clusterParameterGroupFamily } from "../src/cluster-parameter-group-defaults.js";
-
-/** Builds a VPC with isolated subnets — Neptune is VPC-only and needs no egress. */
-function isolatedVpc(stack: Stack): Vpc {
-  return new Vpc(stack, "Vpc", {
-    maxAzs: 2,
-    natGateways: 0,
-    subnetConfiguration: [
-      { name: "isolated", subnetType: SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
-    ],
-  });
-}
 
 function buildCluster(configure?: (b: IClusterBuilder) => void) {
   const app = new App();
@@ -267,76 +256,49 @@ describe("ClusterBuilder", () => {
     });
   });
 
-  describe("allowAccessFrom", () => {
-    it("opens the cluster port to the peer and grants IAM connect", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
+  describe("allowDefaultPortFrom", () => {
+    /** Builds a cluster whose port is opened to a peer SG, concrete or Ref-supplied. */
+    function buildWithPeer(byRef: boolean) {
+      const stack = new Stack(new App(), "TestStack");
       const vpc = isolatedVpc(stack);
       const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
-      const peerRole = new Role(stack, "PeerRole", {
-        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
-      });
-      // A minimal IConnectable & IGrantable peer.
-      const peer = { connections: peerSg.connections, grantPrincipal: peerRole.grantPrincipal };
 
       createClusterBuilder()
         .vpc(vpc)
         .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
         .instanceType(InstanceType.R6G_LARGE)
-        .allowAccessFrom(peer)
-        .build(stack, "Graph");
+        .allowDefaultPortFrom(
+          byRef ? ref<{ securityGroup: SecurityGroup }>("peer").get("securityGroup") : peerSg,
+          "Bastion to Neptune",
+        )
+        .build(stack, "Graph", { peer: { securityGroup: peerSg } });
 
-      const template = Template.fromStack(stack);
+      return Template.fromStack(stack);
+    }
+
+    it("opens the cluster port to the peer's security group, and nothing else", () => {
+      const template = buildWithPeer(false);
+
       // Ingress on the cluster's port sourced from the peer SG. The port is a
       // CloudFormation token (the cluster's Port attribute), so match on the
       // protocol and the peer-SG source rather than a literal port number.
       template.hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
         IpProtocol: "tcp",
+        Description: "Bastion to Neptune",
         SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
       });
-      // IAM connect grant on the peer role (the alpha L2 grants the neptune-db
-      // data-plane action namespace).
-      template.hasResourceProperties("AWS::IAM::Policy", {
-        PolicyDocument: Match.objectLike({
-          Statement: Match.arrayWith([
-            Match.objectLike({ Action: Match.stringLikeRegexp("^neptune-db:") }),
-          ]),
-        }),
-      });
+      // The network rule is the whole of what the cluster builder writes for
+      // the peer; the matching `neptune-db:` grant now lives on the grantee
+      // (ADR-0013). The stack's only policy is the log-export plumbing's.
+      const policies = JSON.stringify(template.findResources("AWS::IAM::Policy"));
+      expect(policies).not.toContain("neptune-db:");
     });
 
-    it("opens only the network path (no IAM connect grant) when IAM auth is disabled", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
-      const vpc = isolatedVpc(stack);
-      const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
-      const peerRole = new Role(stack, "PeerRole", {
-        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
-      });
-      const peer = { connections: peerSg.connections, grantPrincipal: peerRole.grantPrincipal };
-
-      createClusterBuilder()
-        .vpc(vpc)
-        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
-        .instanceType(InstanceType.R6G_LARGE)
-        .iamAuthentication(false)
-        .allowAccessFrom(peer)
-        .build(stack, "Graph");
-
-      const template = Template.fromStack(stack);
-      // Network path is still opened.
-      template.hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
+    it("resolves a Ref-supplied peer against the build context", () => {
+      buildWithPeer(true).hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
         IpProtocol: "tcp",
         SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
       });
-      // But no neptune-db connect grant is emitted — it would be inert.
-      const policies = Object.values(template.findResources("AWS::IAM::Policy"));
-      const hasConnectGrant = policies.some((p) => {
-        const doc = (p as { Properties?: { PolicyDocument?: { Statement?: unknown } } }).Properties
-          ?.PolicyDocument?.Statement;
-        return JSON.stringify(doc ?? []).includes("neptune-db:");
-      });
-      expect(hasConnectGrant).toBe(false);
     });
   });
 

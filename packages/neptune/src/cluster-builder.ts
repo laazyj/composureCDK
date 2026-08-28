@@ -1,6 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IConnectable, type ISecurityGroup, type IVpc } from "aws-cdk-lib/aws-ec2";
-import { type IGrantable } from "aws-cdk-lib/aws-iam";
 import {
   ClusterParameterGroup,
   DatabaseCluster,
@@ -20,15 +19,6 @@ import {
 } from "./cluster-parameter-group-defaults.js";
 import type { NeptuneClusterAlarmConfig } from "./cluster-alarm-config.js";
 import { createClusterAlarms } from "./cluster-alarms.js";
-
-/**
- * A principal that can be granted access to a Neptune cluster via
- * {@link IClusterBuilder.allowAccessFrom}. Must be both an {@link IConnectable}
- * (so its security group can be opened to the cluster's port) and an
- * {@link IGrantable} (so it can be granted IAM `connect`). EC2 instances,
- * Lambda functions, and Fargate tasks all satisfy this.
- */
-export type ClusterAccessor = IConnectable & IGrantable;
 
 /**
  * Configuration properties for the Neptune cluster builder.
@@ -138,6 +128,11 @@ export interface ClusterBuilderResult {
   alarms: Record<string, Alarm>;
 }
 
+interface AccessSpec {
+  readonly peer: Resolvable<IConnectable>;
+  readonly description?: string;
+}
+
 /**
  * A fluent builder for configuring and creating an Amazon Neptune cluster.
  *
@@ -175,7 +170,7 @@ export type IClusterBuilder = ITaggedBuilder<ClusterBuilderProps, ClusterBuilder
 class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
   props: Partial<ClusterBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IDatabaseCluster>[] = [];
-  readonly #accessors: Resolvable<ClusterAccessor>[] = [];
+  readonly #access: AccessSpec[] = [];
   #vpc?: Resolvable<IVpc>;
 
   /**
@@ -192,22 +187,27 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
   }
 
   /**
-   * Grants a principal both network and IAM access to the cluster in a single
-   * declaration. At build time this applies
-   * `cluster.connections.allowDefaultPortFrom(peer)` (opening the cluster's
-   * port to the peer's security group) and `cluster.grantConnect(peer)`
-   * (granting the IAM `connect` action required by the cluster's
-   * IAM-authentication default).
+   * Opens the cluster's port to `peer` via CDK's
+   * `cluster.connections.allowDefaultPortFrom(peer)` — ingress on the
+   * cluster's security group from the peer's, and the matching egress back on
+   * the peer's.
    *
-   * Accepts a concrete {@link ClusterAccessor} or a {@link Ref} to one, so the
-   * grant can be declared inside `compose()` rather than wired up in an
-   * `afterBuild` hook.
+   * This is the **network** half of reaching the cluster. Because IAM
+   * authentication is on by default, the peer's principal also needs the
+   * data-plane grant, declared on that principal's own builder:
+   * `role.grant(clusterGrants.connect(ref("graph", (r) => r.cluster)))` — the
+   * consumer-side shape every grant in the library follows (ADR-0013).
    *
-   * @param peer - The principal to grant access to, or a Ref to one.
+   * Accepts a concrete {@link IConnectable} (a `SecurityGroup`, an `Instance`,
+   * a `Function` in a VPC, …) or a {@link Ref} to one, so the rule can be
+   * declared inside `compose()` rather than wired up in an `afterBuild` hook.
+   *
+   * @param peer - The connectable to open the port to, or a Ref to one.
+   * @param description - Optional description recorded on the ingress rule.
    * @returns This builder for chaining.
    */
-  allowAccessFrom(peer: Resolvable<ClusterAccessor>): this {
-    this.#accessors.push(peer);
+  allowDefaultPortFrom(peer: Resolvable<IConnectable>, description?: string): this {
+    this.#access.push({ peer, description });
     return this;
   }
 
@@ -234,7 +234,7 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
   [COPY_STATE](target: ClusterBuilder): void {
     target.#vpc = this.#vpc;
     target.#customAlarms.push(...this.#customAlarms);
-    target.#accessors.push(...this.#accessors);
+    target.#access.push(...this.#access);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): ClusterBuilderResult {
@@ -290,15 +290,8 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
 
     const cluster = new DatabaseCluster(scope, id, mergedProps);
 
-    for (const resolvable of this.#accessors) {
-      const peer = resolve(resolvable, context);
-      cluster.connections.allowDefaultPortFrom(peer);
-      // The IAM `connect` grant is only meaningful when IAM authentication is
-      // enabled (the default). If a user has turned it off, opening the
-      // network path is the whole grant — a grantConnect policy would be inert.
-      if (mergedProps.iamAuthentication !== false) {
-        cluster.grantConnect(peer);
-      }
+    for (const rule of this.#access) {
+      cluster.connections.allowDefaultPortFrom(resolve(rule.peer, context), rule.description);
     }
 
     const alarms = createClusterAlarms(
@@ -321,7 +314,7 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
  * This is the entry point for defining a Neptune component. The returned
  * builder exposes every {@link ClusterBuilderProps} property as a fluent
  * setter/getter, plus {@link IClusterBuilder.vpc | .vpc()} and
- * {@link IClusterBuilder.allowAccessFrom | .allowAccessFrom()} for
+ * {@link IClusterBuilder.allowDefaultPortFrom | .allowDefaultPortFrom()} for
  * cross-component wiring with Ref support. It implements {@link Lifecycle}
  * for use with {@link compose}.
  *

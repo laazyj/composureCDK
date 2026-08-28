@@ -103,30 +103,48 @@ Both the key and the encryption setting are fixed at creation: Neptune cannot en
 
 Audit log _export_ only emits data once audit logging is _enabled_ in the cluster parameter group. So the builder auto-creates a cluster parameter group with `neptune_enable_audit_log = "1"` (parallel to how `createVpcBuilder` auto-creates a flow-log group), with the family derived from the configured engine version. Add or override parameters with `.clusterParameters({...})`, or supply your own group with `.clusterParameterGroup(myGroup)` (mutually exclusive with `.clusterParameters()`).
 
-## Granting access — `allowAccessFrom`
+## Granting access
 
-Because IAM authentication is on by default, a principal needs both a network path (security-group ingress) and an IAM `connect` grant to reach the cluster. `allowAccessFrom(peer)` does both in one declaration, and accepts a `Ref` so the grant lives inside `compose()` rather than in post-build glue:
+Because IAM authentication is on by default, a principal needs two things to reach the cluster, and each is declared where its dependency already points ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). The **network path** is a rule in the cluster's own security group, so it stays on the cluster — `allowDefaultPortFrom(peer)`, the same method `createInterfaceEndpointBuilder` exposes. The **IAM grant** lands on the consumer's principal, so it is declared on the grantee builder, pointing back at the cluster via a `ref`:
 
 ```ts
-import { createInstanceBuilder, type InstanceBuilderResult } from "@composurecdk/ec2";
+import { clusterGrants, type ClusterBuilderResult } from "@composurecdk/neptune";
 
-const system = compose(
+compose(
   {
-    network: createVpcBuilder().maxAzs(2),
-    bastion: createInstanceBuilder().vpc(ref("network").get("vpc")).instanceType(/* ... */),
     graph: createClusterBuilder()
-      .vpc(ref("network").get("vpc"))
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
       .instanceType(InstanceType.SERVERLESS)
       .serverlessScalingConfiguration({ minCapacity: 1, maxCapacity: 8 })
-      .allowAccessFrom(ref<InstanceBuilderResult>("bastion").get("instance")),
+      .allowDefaultPortFrom(
+        ref<SecurityGroupBuilderResult>("bastionSg").get("securityGroup"),
+        "Bastion to Neptune",
+      ),
+
+    // The role the bastion assumes — pass it to the instance with `.role(...)`.
+    bastionRole: createServiceRoleBuilder("ec2.amazonaws.com").grant(
+      clusterGrants.connect(ref<ClusterBuilderResult>("graph").get("cluster")),
+    ),
   },
-  { network: [], bastion: ["network"], graph: ["network", "bastion"] },
+  {
+    graph: ["network", "bastionSg"], // cluster → the SG its ingress rule names
+    bastionRole: ["graph"], // consumer → resource; no reverse edge, no cycle
+    // ... network, bastionSg, bastion
+  },
 );
 ```
 
-The `peer` is any `IConnectable & IGrantable` (an EC2 instance, a Lambda function, a Fargate task, …). At build time the builder applies `cluster.connections.allowDefaultPortFrom(peer)` and `cluster.grantConnect(peer)`.
+`clusterGrants.connect(cluster)` delegates to the cluster's native `grantConnect`, which grants the whole `neptune-db:*` namespace on the cluster's ARN. A principal that needs less wants a narrower policy of its own over the [data-plane actions](https://docs.aws.amazon.com/neptune/latest/userguide/iam-dp-actions.html).
 
-If you disable IAM authentication (`.iamAuthentication(false)`), `allowAccessFrom` adapts: it opens only the network path and skips the `grantConnect` IAM policy, which would be inert without IAM auth. Authentication then falls to whatever mechanism you've configured on the cluster.
+`allowDefaultPortFrom(peer)` takes any `IConnectable` — a security group, an EC2 instance, a VPC-attached Lambda function — and applies `cluster.connections.allowDefaultPortFrom(peer, description)`, opening ingress on the cluster's SG and the matching egress on the peer's. Prefer the peer's _security group_ over the peer itself: naming a compute component makes the cluster depend on it, the reverse edge consumer-side grants exist to avoid.
+
+If you disable IAM authentication (`.iamAuthentication(false)`), the network path is the whole grant — the alpha L2 then rejects a data-plane grant at synth rather than emitting an inert policy, so drop the `clusterGrants` call along with IAM auth.
+
+For a worked example, see the [Neptune graph stack](../examples/src/neptune-graph-app.ts).
+
+### Migrating from `allowAccessFrom`
+
+`allowAccessFrom(peer)` did both halves in one call, and is replaced by the two above: `allowDefaultPortFrom(peer)` on the cluster and `clusterGrants.connect(ref(...))` on the grantee. The grantee must be a builder that accepts grants — a `createRoleBuilder` role or a `createFunctionBuilder` function — so where the old call granted a construct that owns a role (an EC2 instance), give that construct an explicit role component and put the grant there. `ClusterAccessor` (`IConnectable & IGrantable`) is removed with it; `allowDefaultPortFrom` takes a plain `IConnectable`.
 
 ## Recommended Alarms
 

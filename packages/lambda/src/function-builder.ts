@@ -5,7 +5,7 @@ import {
   type FunctionProps,
   type IEventSource,
 } from "aws-cdk-lib/aws-lambda";
-import type { ILogGroup, LogGroup } from "aws-cdk-lib/aws-logs";
+import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import {
   COPY_STATE,
@@ -35,6 +35,35 @@ import {
 import { EVENT_SOURCE_RELATIONSHIP_GUARDS } from "./event-sources/event-source-relationship-guards.js";
 
 const LOGS_WRITER_POLICY_NAME = "LogsWriter";
+
+/**
+ * The log group's ARN, wherever the installed `aws-cdk-lib` keeps it.
+ *
+ * `FunctionProps.logGroup` is `logs.ILogGroup` at this package's floor and
+ * `logs.ILogGroupRef` on current CDK, and the ARN sits somewhere different on
+ * each: `logGroupArn` on the L2 interface, `logGroupRef.logGroupArn` on the
+ * reference interface. Neither member compiles against both ends of the
+ * supported range, and narrowing the prop to the one we can read is what
+ * ADR-0018 forbids — so the value is read structurally, the same duck-typing
+ * ADR-0007 requires of cross-realm checks.
+ *
+ * Reading it through a cast to `ILogGroup` instead produced
+ * `Resource: ["undefined:log-stream:*"]` for a log group that only exposes the
+ * reference form: a policy that grants the function nothing, and that
+ * CloudFormation rejects as a malformed ARN.
+ */
+function logGroupArnOf(logGroup: NonNullable<FunctionProps["logGroup"]>, id: string): string {
+  const shape = logGroup as { logGroupArn?: string; logGroupRef?: { logGroupArn?: string } };
+  const arn = shape.logGroupArn ?? shape.logGroupRef?.logGroupArn;
+  if (arn === undefined) {
+    throw new Error(
+      `FunctionBuilder "${id}": the supplied logGroup exposes no ARN, so the default ` +
+        `execution role's ${LOGS_WRITER_POLICY_NAME} policy cannot be scoped to it. ` +
+        `Supply a log group that does, or bring your own role with .role() / .useCdkAutoRole().`,
+    );
+  }
+  return arn;
+}
 
 /**
  * Configuration properties for the Lambda function builder.
@@ -381,12 +410,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     if (roleResolvable !== undefined) {
       role = resolve(roleResolvable, context);
     } else if (!this.#useCdkAutoRole) {
-      role = this.#buildDefaultRole(
-        scope,
-        id,
-        context,
-        (logGroup ?? this.props.logGroup) as ILogGroup | undefined,
-      );
+      role = this.#buildDefaultRole(scope, id, context, logGroup ?? this.props.logGroup);
     }
 
     const mergedProps = {
@@ -458,14 +482,14 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     scope: IConstruct,
     id: string,
     context: Record<string, object>,
-    logGroup: ILogGroup | undefined,
+    logGroup: FunctionProps["logGroup"],
   ): IRole {
     if (!logGroup) {
       throw new Error(
         `FunctionBuilder "${id}": cannot build the default execution role without a log group.`,
       );
     }
-    const logGroupArn = logGroup.logGroupArn;
+    const logGroupArn = logGroupArnOf(logGroup, id);
     const roleBuilder = createServiceRoleBuilder("lambda.amazonaws.com").addInlinePolicyStatements(
       LOGS_WRITER_POLICY_NAME,
       [

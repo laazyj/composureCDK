@@ -78,6 +78,8 @@ By default, `createFunctionBuilder` creates an explicit IAM execution role with 
 - No `logs:CreateLogGroup` (the builder pre-creates the group).
 - No `AWSLambdaBasicExecutionRole` managed policy — that policy grants the same actions on `*`, allowing a compromised function to write to any log group in the account.
 
+Supplying your own `logGroup` keeps that scoping: the ARN is read from wherever the `aws-cdk-lib` you have installed keeps it, so a log group in either the L2 or the reference form works. One that exposes no ARN at all fails the build by name rather than emitting an unscoped or malformed policy — reach for `.role()` or `.useCdkAutoRole()` if you need the builder to stay out of the role entirely.
+
 The role is exposed on the build result:
 
 ```ts

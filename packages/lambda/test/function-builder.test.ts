@@ -16,7 +16,6 @@ import {
 import { Key } from "aws-cdk-lib/aws-kms";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
-import { Construct } from "constructs";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import {
@@ -31,25 +30,19 @@ const IMPORTED_LOG_GROUP_ARN = "arn:aws:logs:eu-west-2:111122223333:log-group:/a
 /**
  * A log group that exposes only the CDK reference form — `logGroupRef` rather
  * than the L2's `logGroupArn` — which is what `FunctionProps.logGroup` is typed
- * as on current `aws-cdk-lib`. Declared structurally rather than as an
+ * as on current `aws-cdk-lib`. Written structurally rather than as an
  * `ILogGroupRef`: that interface does not exist at this package's floor, and
- * the suite has to compile at both ends of the supported range.
+ * the suite has to compile at both ends of the supported range. `addStream` and
+ * `grant` are the two members CDK's own `toILogGroup` guard looks for.
  */
-class RefOnlyLogGroup extends Construct {
-  readonly logGroupRef = {
-    logGroupName: "/aws/lambda/imported",
-    logGroupArn: IMPORTED_LOG_GROUP_ARN,
-  };
-}
+const refOnlyLogGroup = {
+  logGroupRef: { logGroupName: "/aws/lambda/imported", logGroupArn: IMPORTED_LOG_GROUP_ARN },
+  addStream: () => ({}),
+  grant: () => ({}),
+} as unknown as NonNullable<FunctionProps["logGroup"]>;
 
-/**
- * Casts a stand-in log group to the prop's type. `RefOnlyLogGroup` is a shape
- * current CDK's prop admits; the bare `Construct` below is not, and stands in
- * for an untyped (JavaScript) caller reaching the build-time guard.
- */
-function asLogGroup(value: Construct): NonNullable<FunctionProps["logGroup"]> {
-  return value as unknown as NonNullable<FunctionProps["logGroup"]>;
-}
+/** A log group exposing no ARN at all — an untyped caller reaching the guard. */
+const arnlessLogGroup = {} as NonNullable<FunctionProps["logGroup"]>;
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createFunctionBuilder>) => void,
@@ -471,24 +464,15 @@ describe("FunctionBuilder", () => {
       // lives under `logGroupRef` rather than on the L2's `logGroupArn`. Read
       // through the wrong member it came out `undefined`, and the policy
       // resource with it: `Resource: ["undefined:log-stream:*"]`.
-      const stack = new Stack(new App(), "TestStack");
-      const logGroup = asLogGroup(new RefOnlyLogGroup(stack, "Imported"));
-
-      try {
-        createFunctionBuilder()
+      const template = synthTemplate((b) =>
+        b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}"))
-          .logGroup(logGroup)
-          .build(stack, "TestFunction");
-      } catch {
-        // CDK's own Function still rejects a reference-form log group even
-        // though its prop type admits one, and whether it does varies across
-        // the range this package supports. The execution role is built before
-        // that check runs, and the role is what this test is about.
-      }
+          .logGroup(refOnlyLogGroup),
+      );
 
-      Template.fromStack(stack).hasResourceProperties("AWS::IAM::Role", {
+      template.hasResourceProperties("AWS::IAM::Role", {
         Policies: Match.arrayWith([
           Match.objectLike({
             PolicyName: "LogsWriter",
@@ -506,14 +490,13 @@ describe("FunctionBuilder", () => {
 
     it("fails with a named error when the log group exposes no ARN at all", () => {
       const stack = new Stack(new App(), "TestStack");
-      const logGroup = asLogGroup(new Construct(stack, "Opaque"));
 
       expect(() =>
         createFunctionBuilder()
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
           .code(Code.fromInline("exports.handler = async () => {}"))
-          .logGroup(logGroup)
+          .logGroup(arnlessLogGroup)
           .build(stack, "TestFunction"),
       ).toThrow(/exposes no ARN/);
     });

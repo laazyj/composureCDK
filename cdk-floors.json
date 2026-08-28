@@ -59,7 +59,7 @@
     },
     "lambda": {
       "floor": "2.168.0",
-      "gatedBy": "aws-lambda.MetricType (introduced 2.168.0). Note FunctionBuilderProps.environmentEncryption deliberately re-declares the prop as Resolvable<NonNullable<FunctionProps[\"environmentEncryption\"]>> rather than naming a key interface: CDK widened this prop from kms.IKey to kms.IKeyRef in 2.215.0, so IKey narrows what a consumer above that release can pass and IKeyRef does not exist at this floor. Do not 'simplify' it to either interface without raising the floor — `enforce` runs the unit suite, which does not typecheck, so nothing catches it here."
+      "gatedBy": "aws-lambda.MetricType (introduced 2.168.0). Note also that the default execution role reads the log group's ARN structurally (logGroupArnOf): CDK widened FunctionProps.logGroup to logs.ILogGroupRef in 2.235.0, which keeps the ARN under logGroupRef, while at this floor it is ILogGroup with logGroupArn. Neither member compiles at both ends, so do not 'simplify' it to a direct read or an ILogGroup cast — the cast is what built the LogsWriter policy from an undefined ARN (#436). Note FunctionBuilderProps.environmentEncryption deliberately re-declares the prop as Resolvable<NonNullable<FunctionProps[\"environmentEncryption\"]>> rather than naming a key interface: CDK widened this prop from kms.IKey to kms.IKeyRef in 2.215.0, so IKey narrows what a consumer above that release can pass and IKeyRef does not exist at this floor. Do not 'simplify' it to either interface without raising the floor — `enforce` runs the unit suite, which does not typecheck, so nothing catches it here."
     },
     "dynamodb": {
       "floor": "2.178.0",

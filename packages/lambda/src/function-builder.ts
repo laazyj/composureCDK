@@ -44,12 +44,7 @@ const LOGS_WRITER_POLICY_NAME = "LogsWriter";
  * each: `logGroupArn` on the L2 interface, `logGroupRef.logGroupArn` on the
  * reference interface. Neither member compiles against both ends of the
  * supported range, and narrowing the prop to the one we can read is what
- * ADR-0018 forbids — so the value is read structurally, the same duck-typing
- * ADR-0007 requires of cross-realm checks. `toDlq` in the DynamoDB event
- * source does that with a bare `in`, which does not transfer here: it
- * discriminates a union of two known types, whereas this is one type whose
- * shape differs by CDK version, so `in` narrows the missing member to
- * `unknown` rather than `string`. Hence the shape cast.
+ * ADR-0018 forbids, so the value is read structurally instead.
  *
  * Reading it through a cast to `ILogGroup` instead produced
  * `Resource: ["undefined:log-stream:*"]` for a log group that only exposes the

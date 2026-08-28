@@ -42,7 +42,11 @@ class RefOnlyLogGroup extends Construct {
   };
 }
 
-/** The fakes above stand in for values the prop admits on some CDK version. */
+/**
+ * Casts a stand-in log group to the prop's type. `RefOnlyLogGroup` is a shape
+ * current CDK's prop admits; the bare `Construct` below is not, and stands in
+ * for an untyped (JavaScript) caller reaching the build-time guard.
+ */
 function asLogGroup(value: Construct): NonNullable<FunctionProps["logGroup"]> {
   return value as unknown as NonNullable<FunctionProps["logGroup"]>;
 }

@@ -171,18 +171,18 @@ const system = compose(
 
 ## Target Helpers
 
-This package ships small free-function helpers that wrap the corresponding [`aws-events-targets`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_events_targets-readme.html) constructs and accept a `Resolvable<I*>` for the underlying resource. Use them inside `addTarget` instead of constructing the CDK target classes directly — they make cross-component wiring with `ref(...)` work without an `afterBuild` hook.
+This package ships small free-function helpers that wrap the corresponding [`aws-events-targets`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_events_targets-readme.html) constructs and accept a `Resolvable` of the underlying resource. Use them inside `addTarget` instead of constructing the CDK target classes directly — they make cross-component wiring with `ref(...)` work without an `afterBuild` hook.
 
-| Helper                     | Wraps                | Underlying resource |
-| -------------------------- | -------------------- | ------------------- |
-| `lambdaTarget`             | `LambdaFunction`     | `IFunction`         |
-| `sqsTarget`                | `SqsQueue`           | `IQueue`            |
-| `snsTarget`                | `SnsTopic`           | `ITopic`            |
-| `sfnStateMachineTarget`    | `SfnStateMachine`    | `IStateMachine`     |
-| `eventBusTarget`           | `EventBus`           | `IEventBus`         |
-| `cloudWatchLogGroupTarget` | `CloudWatchLogGroup` | `ILogGroupRef`      |
+| Helper                     | Wraps                | Underlying resource          |
+| -------------------------- | -------------------- | ---------------------------- |
+| `lambdaTarget`             | `LambdaFunction`     | Lambda function              |
+| `sqsTarget`                | `SqsQueue`           | SQS queue                    |
+| `snsTarget`                | `SnsTopic`           | SNS topic                    |
+| `sfnStateMachineTarget`    | `SfnStateMachine`    | Step Functions state machine |
+| `eventBusTarget`           | `EventBus`           | EventBridge bus              |
+| `cloudWatchLogGroupTarget` | `CloudWatchLogGroup` | CloudWatch log group         |
 
-Each helper accepts what the CDK target it wraps accepts, read from that constructor rather than pinned to an interface name. `eventBusTarget` is therefore still `IEventBus` — CDK's own `EventBus` target has not moved — so a bus that is only an `IEventBusRef` reaches a rule's `eventBus` but not a target; `cloudWatchLogGroupTarget` already takes the broader [`logs.ILogGroupRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_logs.ILogGroupRef.html).
+The resource parameter is not spelled out per helper on purpose: each one is read from the constructor of the CDK target it wraps, so it accepts exactly what that target accepts on the `aws-cdk-lib` you have installed. CDK is migrating those constructors to the broader `*Ref` interfaces one target at a time, so where a target has not moved yet, a resource that is only a `*Ref` reaches the matching builder prop but not the target. The CDK target's own signature is the answer for the version you are on.
 
 The second argument is the matching CDK target props type (`LambdaFunctionProps`, `SqsQueueProps`, …) — refer to the CDK docs for available options. Common ones include `deadLetterQueue` (concrete `IQueue`), `retryAttempts`, `maxEventAge`, and target-specific input transforms (`event` / `input` / `message`).
 

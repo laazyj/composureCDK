@@ -16,6 +16,7 @@ import {
 import { Key } from "aws-cdk-lib/aws-kms";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
+import { Construct } from "constructs";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import {
@@ -24,6 +25,27 @@ import {
   type RoleBuilderResult,
 } from "@composurecdk/iam";
 import { createFunctionBuilder, type FunctionBuilderProps } from "../src/function-builder.js";
+
+const IMPORTED_LOG_GROUP_ARN = "arn:aws:logs:eu-west-2:111122223333:log-group:/aws/lambda/imported";
+
+/**
+ * A log group that exposes only the CDK reference form — `logGroupRef` rather
+ * than the L2's `logGroupArn` — which is what `FunctionProps.logGroup` is typed
+ * as on current `aws-cdk-lib`. Declared structurally rather than as an
+ * `ILogGroupRef`: that interface does not exist at this package's floor, and
+ * the suite has to compile at both ends of the supported range.
+ */
+class RefOnlyLogGroup extends Construct {
+  readonly logGroupRef = {
+    logGroupName: "/aws/lambda/imported",
+    logGroupArn: IMPORTED_LOG_GROUP_ARN,
+  };
+}
+
+/** The fakes above stand in for values the prop admits on some CDK version. */
+function asLogGroup(value: Construct): NonNullable<FunctionProps["logGroup"]> {
+  return value as unknown as NonNullable<FunctionProps["logGroup"]>;
+}
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createFunctionBuilder>) => void,
@@ -438,6 +460,58 @@ describe("FunctionBuilder", () => {
           }),
         ]),
       });
+    });
+
+    it("scopes the LogsWriter policy to a log group that only exposes the CDK reference form", () => {
+      // CDK types FunctionProps.logGroup as logs.ILogGroupRef, where the ARN
+      // lives under `logGroupRef` rather than on the L2's `logGroupArn`. Read
+      // through the wrong member it came out `undefined`, and the policy
+      // resource with it: `Resource: ["undefined:log-stream:*"]`.
+      const stack = new Stack(new App(), "TestStack");
+      const logGroup = asLogGroup(new RefOnlyLogGroup(stack, "Imported"));
+
+      try {
+        createFunctionBuilder()
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}"))
+          .logGroup(logGroup)
+          .build(stack, "TestFunction");
+      } catch {
+        // CDK's own Function still rejects a reference-form log group even
+        // though its prop type admits one, and whether it does varies across
+        // the range this package supports. The execution role is built before
+        // that check runs, and the role is what this test is about.
+      }
+
+      Template.fromStack(stack).hasResourceProperties("AWS::IAM::Role", {
+        Policies: Match.arrayWith([
+          Match.objectLike({
+            PolicyName: "LogsWriter",
+            PolicyDocument: Match.objectLike({
+              Statement: Match.arrayWith([
+                Match.objectLike({
+                  Resource: [IMPORTED_LOG_GROUP_ARN, `${IMPORTED_LOG_GROUP_ARN}:log-stream:*`],
+                }),
+              ]),
+            }),
+          }),
+        ]),
+      });
+    });
+
+    it("fails with a named error when the log group exposes no ARN at all", () => {
+      const stack = new Stack(new App(), "TestStack");
+      const logGroup = asLogGroup(new Construct(stack, "Opaque"));
+
+      expect(() =>
+        createFunctionBuilder()
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}"))
+          .logGroup(logGroup)
+          .build(stack, "TestFunction"),
+      ).toThrow(/exposes no ARN/);
     });
 
     it("does not attach the AWSLambdaBasicExecutionRole managed policy by default", () => {

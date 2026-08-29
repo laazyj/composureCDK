@@ -400,6 +400,101 @@ today (the queue often arrives as an unresolved `ref()`); they are tracked in
 `kinesisEventSource` is still deferred — see
 [#120](https://github.com/laazyj/composureCDK/issues/120).
 
+## Deploy-time invocation: `.invokeOnDeploy()`
+
+Some work has to happen _as part of shipping the stack_, and its outcome has to
+gate the deployment: registering the release with an external service, calling
+the system you just deployed to prove it answers, seeding reference data through
+a service API. `.invokeOnDeploy()` invokes the function once during deployment
+and **fails the deployment if the function fails** — the stack rolls back and
+the handler's error message lands in the CloudFormation events.
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createFunctionBuilder } from "@composurecdk/lambda";
+
+compose(
+  {
+    register: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("register"))
+      .timeout(Duration.seconds(30))
+      .environment({ API_URL: "https://releases.example.com/v1/register" })
+      .invokeOnDeploy({ after: [ref("api", (r: RestApiBuilderResult) => r.api)] }),
+
+    api: createRestApiBuilder().restApiName("Orders"),
+  },
+  { api: [], register: ["api"] },
+).build(stack, "Release");
+```
+
+It is a domain action on the function builder ([ADR-0016](../../docs/adr/0016-domain-action-custom-resource.md)),
+backed by the CDK [`Trigger`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.triggers-readme.html)
+construct. The custom resource is exposed on the build result as
+`deploymentTrigger`, so a sibling can be ordered against the call itself
+(`deploymentTrigger.executeBefore(...)`).
+
+### The handler must throw
+
+**A handler that returns an error rather than throwing does not fail the
+deployment.** Lambda considers an invocation that returns successful no matter
+what the payload says, so an HTTP-shaped `{ statusCode: 500 }` — or a caught
+error folded into the response — deploys green:
+
+```ts
+export const handler = async () => {
+  const response = await fetch(process.env.API_URL, { method: "POST" });
+  if (!response.ok) {
+    // Throw. Returning `{ statusCode: response.status }` here would deploy green.
+    throw new Error(`Registration failed: ${response.status} ${await response.text()}`);
+  }
+};
+```
+
+### Ordering
+
+The function's own execution role is always waited for, so policies attached by
+`.grant()` and `.configureRole()` exist before the handler runs — CloudFormation
+does not otherwise sequence those ahead of a custom resource, and the handler
+would race them. Everything else the call depends on goes in `after`, as
+concrete constructs or `ref(...)` references to sibling components.
+
+### Defaults
+
+| Option                   | Default                          | Rationale                                                                                                                                                                                |
+| ------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| invocation type          | `RequestResponse` (not settable) | The deployment waits for the result. An asynchronous invocation returns before the work happens, reporting success whatever the handler did — the opposite of the point.                 |
+| `timeout`                | function `timeout` + 30s         | The deployment outlives the handler, so a handler that runs to its limit reports _its_ error ("Task timed out after …") instead of the deployment abandoning the call. Capped at 15 min. |
+| `executeOnHandlerChange` | `true`                           | Re-invokes when the handler's code or configuration changes; a no-op on unrelated stack updates.                                                                                         |
+
+The derivation values are exported as `DEPLOYMENT_INVOKE_DEFAULTS`. With no
+function `timeout` set (or a token one), the wait falls back to 2 minutes,
+matching CDK's own `Trigger` default.
+
+Whenever the wait ends up at or below the function's own timeout, a suppressible
+warning fires under `DEPLOY_INVOKE_TIMEOUT_WARNING_ID` — the deployment would
+stop waiting while the handler is still running, so a slow call fails the stack
+as an abandoned invocation rather than reporting the handler's error. That
+covers an explicit `timeout` set too low, and also a function at Lambda's
+15-minute maximum, where the 15-minute cap leaves no margin to add.
+
+### What it does not do
+
+- **It does not invoke on every deployment.** With `executeOnHandlerChange: true`
+  the invocation re-runs when the handler changes; with `false` it runs only on
+  the stack's first deployment. CDK's `Trigger` offers no "always" mode.
+- **It does not invoke on stack deletion.** For teardown-time work, use
+  [`@composurecdk/custom-resources`](../custom-resources/README.md), which has
+  create/update/**delete** semantics.
+- **It creates no alarms.** The custom resource runs once per deployment, not
+  continuously; there is no steady-state signal to alarm on. Failures surface as
+  a failed deployment.
+- **It is not a general SDK-call escape hatch.** A call that has no
+  CloudFormation resource but needs no handler of yours belongs in
+  `createAwsCustomResourceBuilder()` — that builder invokes an AWS API directly,
+  no Lambda of yours involved.
+
 ## Examples
 
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with recommended alarms, custom alarms, and SNS alarm actions

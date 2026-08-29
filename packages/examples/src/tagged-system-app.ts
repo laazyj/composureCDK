@@ -1,4 +1,4 @@
-import { App, Stack } from "aws-cdk-lib";
+import { Stack } from "aws-cdk-lib";
 import {
   InstanceClass,
   InstanceSize,
@@ -10,6 +10,7 @@ import { compose, ref } from "@composurecdk/core";
 import { tags } from "@composurecdk/cloudformation";
 import { createInstanceBuilder, createVpcBuilder, type VpcBuilderResult } from "@composurecdk/ec2";
 import { createBucketBuilder } from "@composurecdk/s3";
+import { exampleApp } from "./app-context.js";
 
 /**
  * A two-component system that demonstrates both layers of the tagging API.
@@ -30,7 +31,7 @@ import { createBucketBuilder } from "@composurecdk/s3";
  * `.tag("Owner", "...")` and the instance's tag will take precedence over
  * the system-wide value while siblings still get the system value.
  */
-export function createTaggedSystemApp(app = new App()) {
+export function createTaggedSystemApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-TaggedSystemStack");
 
   compose(

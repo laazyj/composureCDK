@@ -1,4 +1,4 @@
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { SqsSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
@@ -7,6 +7,7 @@ import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
 import { createFunctionBuilder, sqsEventSource } from "@composurecdk/lambda";
 import { createTopicBuilder } from "@composurecdk/sns";
 import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
+import { exampleApp } from "./app-context.js";
 
 /**
  * Order intake fanned out through SNS to an SQS work queue, which feeds a
@@ -41,7 +42,7 @@ import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
  * - Composing the queues alongside `createTopicBuilder` and routing all
  *   alarm actions through `alarmActionsPolicy`
  */
-export function createOrderProcessorApp(app = new App()) {
+export function createOrderProcessorApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-OrderProcessorStack");
 
   const { alerts } = compose(

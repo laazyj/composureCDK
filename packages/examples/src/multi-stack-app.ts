@@ -1,10 +1,11 @@
-import { App, Duration } from "aws-cdk-lib";
+import { Duration } from "aws-cdk-lib";
 import { LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, ref } from "@composurecdk/core";
 import { createRestApiBuilder } from "@composurecdk/apigateway";
 import { createStackBuilder } from "@composurecdk/cloudformation";
 import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
+import { exampleApp } from "./app-context.js";
 
 /**
  * A REST API and its backing Lambda, split across two stacks using the
@@ -12,11 +13,13 @@ import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk
  *
  * Demonstrates:
  * - Routing components to different stacks via {@link ComposedSystem.withStacks}
- * - Cross-stack references resolved automatically by CDK
+ * - Cross-stack references resolved automatically by CDK — weakly, via
+ *   `Fn::GetStackOutput`, because the app's context sets
+ *   `@aws-cdk/core:defaultCrossStackReferences` (see `app-context.ts`)
  * - Components without a stack mapping fall back to the default scope
  * - `.copy()` for deriving stack variants from a shared base configuration
  */
-export function createMultiStackApp(app = new App()) {
+export function createMultiStackApp(app = exampleApp()) {
   const baseStack = createStackBuilder().tag("project", "multi-stack-example");
 
   const { stack: serviceStack } = baseStack

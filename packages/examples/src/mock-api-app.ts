@@ -1,4 +1,3 @@
-import { App } from "aws-cdk-lib";
 import {
   type Integration,
   type MethodOptions,
@@ -8,6 +7,7 @@ import {
 import { compose } from "@composurecdk/core";
 import { createRestApiBuilder } from "@composurecdk/apigateway";
 import { createStackBuilder } from "@composurecdk/cloudformation";
+import { exampleApp } from "./app-context.js";
 
 function jsonMock(statusCode: string, body: Record<string, unknown>): [Integration, MethodOptions] {
   return [
@@ -49,7 +49,7 @@ function jsonMock(statusCode: string, body: Record<string, unknown>): [Integrati
  *         └── DELETE  → { "id": "123", "deleted": true }
  * ```
  */
-export function createMockApiApp(app = new App()) {
+export function createMockApiApp(app = exampleApp()) {
   const { stack } = createStackBuilder()
     .description("A mock CRUD API for demonstration")
     .build(app, "ComposureCDK-MockApiStack");

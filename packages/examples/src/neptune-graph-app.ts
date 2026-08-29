@@ -1,4 +1,4 @@
-import { App, Stack } from "aws-cdk-lib";
+import { Stack } from "aws-cdk-lib";
 import {
   InstanceClass,
   InstanceSize,
@@ -22,6 +22,7 @@ import {
 } from "@composurecdk/ec2";
 import { createClusterBuilder } from "@composurecdk/neptune";
 import { InstanceType as NeptuneInstanceType } from "@aws-cdk/aws-neptune-alpha";
+import { exampleApp } from "./app-context.js";
 
 /**
  * A VPC + a serverless Amazon Neptune cluster + an SSM-managed bastion that
@@ -56,7 +57,7 @@ import { InstanceType as NeptuneInstanceType } from "@aws-cdk/aws-neptune-alpha"
  * this is a real-system exemplar. The CI deploy/destroy cycle flips those to
  * allow teardown via `cleanDeskPolicy`, applied at the app level.
  */
-export function createNeptuneGraphApp(app = new App()) {
+export function createNeptuneGraphApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-NeptuneGraphStack");
 
   const ssmEndpointBase = createInterfaceEndpointBuilder()

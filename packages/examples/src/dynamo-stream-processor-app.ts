@@ -1,10 +1,11 @@
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { AttributeType, StreamViewType } from "aws-cdk-lib/aws-dynamodb";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, ref } from "@composurecdk/core";
 import { createTableV2Builder, type TableV2BuilderResult } from "@composurecdk/dynamodb";
 import { createFunctionBuilder, dynamoEventSource } from "@composurecdk/lambda";
 import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
+import { exampleApp } from "./app-context.js";
 
 /**
  * A DynamoDB table streaming change events to a Lambda processor, with a
@@ -25,7 +26,7 @@ import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
  *   alarms (`IteratorAge`, failed-invocation, dropped-event) once the source is
  *   attached, and least-privilege `grantStreamRead` on the table's stream.
  */
-export function createDynamoStreamProcessorApp(app = new App()) {
+export function createDynamoStreamProcessorApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-DynamoStreamProcessorStack");
 
   compose(

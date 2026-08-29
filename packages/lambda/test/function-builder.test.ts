@@ -16,6 +16,7 @@ import {
 import { Key } from "aws-cdk-lib/aws-kms";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
+import { fake } from "ts-fake";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import {
@@ -28,21 +29,40 @@ import { createFunctionBuilder, type FunctionBuilderProps } from "../src/functio
 const IMPORTED_LOG_GROUP_ARN = "arn:aws:logs:eu-west-2:111122223333:log-group:/aws/lambda/imported";
 
 /**
- * A log group that exposes only the CDK reference form — `logGroupRef` rather
- * than the L2's `logGroupArn` — which is what `FunctionProps.logGroup` is typed
- * as on current `aws-cdk-lib`. Written structurally rather than as an
- * `ILogGroupRef`: that interface does not exist at this package's floor, and
- * the suite has to compile at both ends of the supported range. `addStream` and
- * `grant` are the two members CDK's own `toILogGroup` guard looks for.
+ * What CDK's own code reads off `FunctionProps.logGroup` at runtime: the
+ * reference form the builder takes its ARN from, plus the two functions
+ * `toILogGroup` checks for before the `Function` construct will accept it.
+ *
+ * Declared here rather than taken from the prop, because the prop's member set
+ * is precisely what moves between CDK versions — `logGroupArn` at this
+ * package's floor, `logGroupRef` on current CDK — and neither end declares all
+ * three. Naming either end would tie the suite to it, which is the drift this
+ * fix exists to absorb.
  */
-const refOnlyLogGroup = {
+interface LogGroupRuntimeShape {
+  logGroupRef: { logGroupName: string; logGroupArn: string };
+  addStream: () => unknown;
+  grant: () => unknown;
+}
+
+/**
+ * A log group exposing only the reference form, as an imported one does on
+ * current CDK. This is the shape that, read through the L2's `logGroupArn`,
+ * yielded `undefined` and put it in the policy.
+ */
+const refOnlyLogGroup = fake<LogGroupRuntimeShape>({
   logGroupRef: { logGroupName: "/aws/lambda/imported", logGroupArn: IMPORTED_LOG_GROUP_ARN },
   addStream: () => ({}),
   grant: () => ({}),
-} as unknown as NonNullable<FunctionProps["logGroup"]>;
+}) as unknown as NonNullable<FunctionProps["logGroup"]>;
 
-/** A log group exposing no ARN at all — an untyped caller reaching the guard. */
-const arnlessLogGroup = {} as NonNullable<FunctionProps["logGroup"]>;
+/**
+ * A log group exposing no ARN in either form. No CDK version's prop type admits
+ * this, so it stands in for an untyped (JavaScript) caller — the only way to
+ * reach the builder's guard, and the reason that guard exists rather than the
+ * builder trusting the type.
+ */
+const arnlessLogGroup = fake<NonNullable<FunctionProps["logGroup"]>>();
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createFunctionBuilder>) => void,

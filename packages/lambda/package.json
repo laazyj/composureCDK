@@ -58,11 +58,11 @@
   },
   "devDependencies": {
     "@composurecdk/iam": "^0.9.0",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.4.1",
     "aws-cdk-lib": "^2.264.0",
-    "constructs": "^10.6.0",
+    "constructs": "^10.8.1",
     "ts-fake": "^1.2.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.8"
   },
   "exports": {

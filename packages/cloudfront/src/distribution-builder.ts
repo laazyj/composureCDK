@@ -23,6 +23,7 @@ import {
 } from "@composurecdk/s3";
 import type { DistributionAlarmConfig, FunctionAlarmConfig } from "./alarm-config.js";
 import { DISTRIBUTION_DEFAULTS } from "./defaults.js";
+import { guardOriginObjectExpiration } from "./origin-expiration-guard.js";
 import { resolveBehaviors } from "./resolve-behaviors.js";
 import { pathPatternSlug } from "./behavior-function-alarms.js";
 import { buildCloudFrontAlarms } from "./cloudfront-alarm-builder.js";
@@ -484,6 +485,8 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
     if (accessLogsBucket) {
       distribution.node.addDependency(accessLogsBucket);
     }
+
+    guardOriginObjectExpiration(distribution, id);
 
     const alarms = buildCloudFrontAlarms(
       scope,

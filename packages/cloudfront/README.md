@@ -119,6 +119,47 @@ The config object replaces the default wholesale rather than merging with it. Fo
 
 The auto-created logging bucket uses `DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES` from `@composurecdk/s3`: incomplete multipart uploads are aborted after 7 days and access log objects expire after 2 years (matching the default `LogGroup` retention so the audit window is consistent across log destinations). CloudFront never deletes its own logs, so this lifecycle is the only thing that bounds the bucket's growth.
 
+### Origin object-expiration guard
+
+An S3 lifecycle rule that expires **current** object versions deletes the very
+content the distribution serves. Nothing triggers it — no deployment, no drift —
+so the site keeps working until the objects reach the configured age and then
+starts returning 404s.
+
+The builder registers a suppressible synth-time warning
+(`ORIGIN_OBJECT_EXPIRATION_WARNING_ID`) when a bucket it takes as an origin
+carries such a rule:
+
+```ts
+createBucketBuilder().lifecycleRules([{ expiration: Duration.days(90) }]);
+// DistributionBuilder "cdn": origin bucket "Site/Site/Resource" has lifecycle
+// rule "…", which expires current object versions across the whole bucket …
+```
+
+The check is deliberately narrow, so it fires only on the unambiguous case:
+
+- **Warns** on an enabled rule with `expiration` or `expirationDate` and no
+  `prefix`, `tagFilters`, or object-size filter.
+- **Stays quiet** for a rule scoped to a prefix, tag, or size — that is a
+  considered act on a known subset, and the guard cannot tell whether the subset
+  is served. Scoping an expiry to a prefix that CloudFront does not serve is the
+  supported way to age content out of an origin bucket.
+- **Stays quiet** for `noncurrentVersionExpiration`, which only ever acts on
+  versions already superseded by a newer PUT or a delete marker and so can never
+  reach live content. This is what the `@composurecdk/s3` bucket defaults use.
+- **Stays quiet** when the relationship is unknowable: an imported origin
+  bucket, a bucket in another stack, or a non-S3 origin.
+
+Silence it with
+`Annotations.of(stack).acknowledgeWarning(ORIGIN_OBJECT_EXPIRATION_WARNING_ID)`.
+The acknowledgement must sit on an **ancestor** of the distribution — the stack
+is the natural place — because CDK matches acknowledgements against a node's
+ancestor paths, never its own.
+
+L1 property overrides are invisible to the guard:
+`cfnBucket.addPropertyOverride("LifecycleConfiguration.Rules", …)` is merged
+after Aspects run, so an expiry introduced that way is not seen.
+
 ## Recommended Alarms
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

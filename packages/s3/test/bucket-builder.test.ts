@@ -7,6 +7,7 @@ import { Bucket, BucketEncryption, type BucketProps } from "aws-cdk-lib/aws-s3";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBucketBuilder, type BucketBuilderProps } from "../src/bucket-builder.js";
+import { DEFAULT_BUCKET_LIFECYCLE_RULES } from "../src/defaults.js";
 
 function synthTemplate(
   configureFn: (builder: ReturnType<typeof createBucketBuilder>) => void,
@@ -39,6 +40,16 @@ function alarmsAreTaggable(): boolean {
     Template.fromStack(probe).findResources("AWS::CloudWatch::Alarm"),
   )[0] as { Properties?: { Tags?: unknown } } | undefined;
   return probed?.Properties?.Tags !== undefined;
+}
+
+/** A resource, or one of its lifecycle rules, as rendered into a synthesised template. */
+type Synthesised = Record<string, unknown>;
+
+/** Lifecycle rules on a synthesised bucket, or `[]` when it declares none. */
+function lifecycleRulesOf(bucket: { Properties: Synthesised }): Synthesised[] {
+  const lifecycle = bucket.Properties.LifecycleConfiguration as
+    { Rules?: Synthesised[] } | undefined;
+  return lifecycle?.Rules ?? [];
 }
 
 /** Disables access logging so tests that don't need it get a single-bucket template. */
@@ -238,6 +249,34 @@ describe("BucketBuilder", () => {
       });
     });
 
+    /**
+     * Regression guard for #440. `noncurrentVersionExpiration` acts only on versions
+     * already superseded by a newer PUT or a delete marker, so it can never remove
+     * live content. A current-version `expiration` rule can: on a bucket serving a
+     * CloudFront origin it would delete the objects still being served, needing no
+     * deployment to fire. The two assertions above use `Match.arrayWith`, which
+     * tolerates extra rules — only asserting absence catches one being added here.
+     */
+    it("adds no current-version expiration rule by default", () => {
+      const template = synthTemplate((b) => withoutLogging(b));
+      const bucket = Object.values(template.findResources("AWS::S3::Bucket"))[0] as {
+        Properties: Synthesised;
+      };
+
+      for (const rule of lifecycleRulesOf(bucket)) {
+        expect(rule.ExpirationInDays).toBeUndefined();
+        expect(rule.ExpirationDate).toBeUndefined();
+      }
+    });
+
+    /** Pins the same intent at the source, so it survives the synth assertion being relaxed. */
+    it("declares no current-version expiration in DEFAULT_BUCKET_LIFECYCLE_RULES", () => {
+      for (const rule of DEFAULT_BUCKET_LIFECYCLE_RULES) {
+        expect(rule.expiration).toBeUndefined();
+        expect(rule.expirationDate).toBeUndefined();
+      }
+    });
+
     it("allows the user to replace the default lifecycle rules", () => {
       const template = synthTemplate((b) =>
         withoutLogging(b).lifecycleRules([{ id: "CustomExpire", expiration: Duration.days(30) }]),
@@ -323,7 +362,13 @@ describe("BucketBuilder", () => {
       });
     });
 
-    it("disables versioning on the auto-created logging bucket", () => {
+    /**
+     * Load-bearing for the 2-year expiry below, not merely a cost preference: the
+     * access-log rule set carries no `noncurrentVersionExpiration`, so on a versioned
+     * bucket `ExpirationInDays` would write delete markers instead of deleting, and
+     * every log object would be retained indefinitely.
+     */
+    it("leaves the auto-created logging bucket unversioned, so its expiry deletes", () => {
       const template = synthTemplate((b) => b.bucketName("main"));
 
       const logBucket = findLogBucket(template);
@@ -363,10 +408,8 @@ describe("BucketBuilder", () => {
           LoggingConfiguration: Match.absent(),
         },
       });
-      const logBucket = Object.values(buckets)[0] as {
-        Properties: { LifecycleConfiguration?: { Rules: Record<string, unknown>[] } };
-      };
-      const rules = logBucket.Properties.LifecycleConfiguration?.Rules ?? [];
+      const logBucket = Object.values(buckets)[0] as { Properties: Synthesised };
+      const rules = lifecycleRulesOf(logBucket);
 
       const expirationRule = rules.find((r) => r.ExpirationInDays !== undefined);
       expect(expirationRule).toBeDefined();
@@ -408,9 +451,7 @@ describe("BucketBuilder", () => {
       );
 
       const logBucket = findLogBucket(template);
-      const lifecycle = logBucket.Properties.LifecycleConfiguration as
-        { Rules: Record<string, unknown>[] } | undefined;
-      const rules = lifecycle?.Rules ?? [];
+      const rules = lifecycleRulesOf(logBucket);
       expect(rules).toHaveLength(1);
       expect(rules[0]).toMatchObject({ Id: "ShortLogs", ExpirationInDays: 30 });
     });

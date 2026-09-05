@@ -59,7 +59,7 @@
   "devDependencies": {
     "@composurecdk/iam": "^0.9.0",
     "@types/node": "^25.9.3",
-    "aws-cdk-lib": "^2.264.0",
+    "aws-cdk-lib": "^2.267.0",
     "constructs": "^10.6.0",
     "ts-fake": "^1.2.0",
     "typescript": "^6.0.3",

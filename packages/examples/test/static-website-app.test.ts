@@ -1,6 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { App, Duration, Stack } from "aws-cdk-lib";
+import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { Bucket } from "aws-cdk-lib/aws-s3";
+import {
+  createDistributionBuilder,
+  ORIGIN_OBJECT_EXPIRATION_WARNING_ID,
+} from "@composurecdk/cloudfront";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
+
+const originExpirationWarnings = (stack: Stack): unknown[] =>
+  Annotations.fromStack(stack).findWarning(
+    "*",
+    Match.stringLikeRegexp(ORIGIN_OBJECT_EXPIRATION_WARNING_ID),
+  );
 
 function synthTemplate(): Template {
   const { stack } = createStaticWebsiteApp();
@@ -209,6 +222,37 @@ describe("static-website-app", () => {
           SigningProtocol: "sigv4",
         }),
       });
+    });
+
+    /**
+     * These two are the only coverage of the origin object-expiration guard
+     * against a real `withOriginAccessControl` wiring. `S3BucketOrigin` is above
+     * `@composurecdk/cloudfront`'s aws-cdk-lib floor, so that package's own suite
+     * stands in an `HttpOrigin` on the same domain name; here the installed CDK
+     * is not floor-pinned, so the genuine OAC path runs.
+     *
+     * The positive case is what keeps the negative one honest — a silence
+     * assertion passes just as well when the guard never ran — and it pins the
+     * rendering contract the guard depends on: that `S3BucketOrigin` resolves an
+     * origin's `domainName` to an `Fn::GetAtt` naming the bucket.
+     */
+    it("warns when an OAC-wired origin bucket expires current versions", () => {
+      const stack = new Stack(new App(), "OacGuard");
+      const bucket = new Bucket(stack, "Site", {
+        lifecycleRules: [{ id: "Nightly", expiration: Duration.days(90) }],
+      });
+      createDistributionBuilder()
+        .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+        .build(stack, "Cdn");
+
+      expect(originExpirationWarnings(stack)).not.toEqual([]);
+    });
+
+    /** A guard that cried wolf on the library's own example would be acknowledged away. */
+    it("draws no such warning on this example, whose bucket uses the safe defaults", () => {
+      const { stack } = createStaticWebsiteApp();
+
+      expect(originExpirationWarnings(stack)).toEqual([]);
     });
   });
 

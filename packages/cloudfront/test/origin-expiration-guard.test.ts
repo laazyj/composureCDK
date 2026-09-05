@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Annotations as CdkAnnotations, App, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { Bucket, type LifecycleRule } from "aws-cdk-lib/aws-s3";
-import { HttpOrigin, S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
 import { ORIGIN_OBJECT_EXPIRATION_WARNING_ID } from "../src/origin-expiration-guard.js";
 
@@ -21,12 +21,22 @@ const expectWarns = (stack: Stack, message: string): void => {
   Annotations.fromStack(stack).hasWarning("*", Match.stringLikeRegexp(message));
 };
 
-/** Builds a distribution over an OAC-backed bucket carrying `rules`. */
+/**
+ * Builds a distribution over a bucket carrying `rules`.
+ *
+ * The origin is wired as an `HttpOrigin` on the bucket's regional domain name
+ * rather than through `S3BucketOrigin`, which is above this package's
+ * aws-cdk-lib floor of 2.124.0. Nothing is lost: the guard correlates on the
+ * rendered `Fn::GetAtt` that `domainName` resolves to, never on the origin
+ * class, and both wirings render that reference identically. The static-website
+ * example's suite covers the real `withOriginAccessControl` path, where the
+ * installed CDK is not floor-pinned.
+ */
 function synthWithOriginRules(rules: LifecycleRule[]): Stack {
   const stack = new Stack(new App(), "TestStack");
   const bucket = new Bucket(stack, "Site", { versioned: true, lifecycleRules: rules });
   createDistributionBuilder()
-    .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+    .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
     .build(stack, "Cdn");
   return stack;
 }
@@ -58,23 +68,6 @@ describe("origin object-expiration relationship guard", () => {
 
       expectWarns(stack, "TestStack/Site");
     });
-
-    /**
-     * The origin need not be wired through `S3BucketOrigin`: a bucket reached as
-     * a custom origin still renders `Fn::GetAtt` on its domain name, and its
-     * content is just as reachable by the expiry rule.
-     */
-    it("when the bucket is wired as a custom origin rather than through OAC", () => {
-      const stack = new Stack(new App(), "TestStack");
-      const bucket = new Bucket(stack, "Site", {
-        lifecycleRules: [{ id: "Nightly", expiration: Duration.days(90) }],
-      });
-      createDistributionBuilder()
-        .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
-        .build(stack, "Cdn");
-
-      expectWarns(stack, "Nightly");
-    });
   });
 
   describe("stays silent", () => {
@@ -88,7 +81,7 @@ describe("origin object-expiration relationship guard", () => {
       const stack = new Stack(new App(), "TestStack");
       const bucket = new Bucket(stack, "Site");
       createDistributionBuilder()
-        .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+        .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
         .build(stack, "Cdn");
 
       expectSilent(stack);
@@ -136,7 +129,7 @@ describe("origin object-expiration relationship guard", () => {
       const stack = new Stack(new App(), "TestStack");
       const bucket = Bucket.fromBucketName(stack, "Site", "already-exists");
       createDistributionBuilder()
-        .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+        .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
         .build(stack, "Cdn");
 
       expectSilent(stack);
@@ -160,7 +153,7 @@ describe("origin object-expiration relationship guard", () => {
         lifecycleRules: [{ id: "Nightly", expiration: Duration.days(90) }],
       });
       createDistributionBuilder()
-        .origin(S3BucketOrigin.withOriginAccessControl(origin))
+        .origin(new HttpOrigin(origin.bucketRegionalDomainName))
         .build(stack, "Cdn");
 
       expectSilent(stack);
@@ -181,7 +174,7 @@ describe("origin object-expiration relationship guard", () => {
     });
     CdkAnnotations.of(stack).acknowledgeWarning(ORIGIN_OBJECT_EXPIRATION_WARNING_ID);
     createDistributionBuilder()
-      .origin(S3BucketOrigin.withOriginAccessControl(bucket))
+      .origin(new HttpOrigin(bucket.bucketRegionalDomainName))
       .build(stack, "Cdn");
 
     expectSilent(stack);

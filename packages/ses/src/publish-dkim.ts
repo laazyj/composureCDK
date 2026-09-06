@@ -1,4 +1,4 @@
-import { type IHostedZone } from "aws-cdk-lib/aws-route53";
+import { type RecordSetOptions } from "aws-cdk-lib/aws-route53";
 import { type EmailIdentity } from "aws-cdk-lib/aws-ses";
 import { type IConstruct } from "constructs";
 import { type Resolvable } from "@composurecdk/core";
@@ -36,7 +36,7 @@ export function publishDkimRecords(
   id: string,
   identity: EmailIdentity,
   spec: PublishDkimSpec,
-  zone: Resolvable<IHostedZone>,
+  zone: Resolvable<NonNullable<RecordSetOptions["zone"]>>,
   context: Record<string, object>,
 ): ZoneRecordsBuilderResult {
   const specs =

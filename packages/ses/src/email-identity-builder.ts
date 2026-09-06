@@ -1,4 +1,4 @@
-import { type IHostedZone, type IPublicHostedZone } from "aws-cdk-lib/aws-route53";
+import { type RecordSetOptions } from "aws-cdk-lib/aws-route53";
 import {
   type ByoDkimOptions,
   type DkimRecord,
@@ -68,7 +68,10 @@ export type IEmailIdentityBuilder = IBuilder<EmailIdentityBuilderProps, EmailIde
  */
 type IdentitySource =
   | { readonly kind: "domain" | "email"; readonly identity: Identity }
-  | { readonly kind: "zone"; readonly zone: Resolvable<IPublicHostedZone> };
+  | {
+      readonly kind: "zone";
+      readonly zone: Resolvable<Parameters<typeof Identity.publicHostedZone>[0]>;
+    };
 
 class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
   props: Partial<EmailIdentityBuilderProps> = {};
@@ -76,7 +79,7 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
   #dkim: DkimIdentity = DkimIdentity.easyDkim();
   /** Set when BYODKIM is selected; `undefined` means Easy DKIM. */
   #byoDkim?: { readonly selector: string; readonly publicKey?: string };
-  #publishZone?: Resolvable<IHostedZone>;
+  #publishZone?: Resolvable<NonNullable<RecordSetOptions["zone"]>>;
 
   /** Verify a whole domain (or subdomain). Publish DKIM with `.publishDkim()`. */
   domain(domain: string): this {
@@ -95,8 +98,12 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
    * MAIL FROM records) into the zone — use this for the "I own the whole zone"
    * case. For a subdomain whose apex lives elsewhere, use `.domain()` +
    * `.publishDkim()`.
+   *
+   * `zone` reads its inner type from CDK's own `Identity.publicHostedZone`
+   * parameter rather than naming `IPublicHostedZone`, so it keeps tracking the
+   * installed `aws-cdk-lib` (ADR-0018).
    */
-  publicHostedZone(zone: Resolvable<IPublicHostedZone>): this {
+  publicHostedZone(zone: Resolvable<Parameters<typeof Identity.publicHostedZone>[0]>): this {
     this.#source = { kind: "zone", zone };
     return this;
   }
@@ -119,8 +126,13 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
    * Publish the identity's DKIM DNS records into `zone` — three CNAMEs for Easy
    * DKIM, one TXT for BYODKIM. Requires a `.domain()` identity; throws for an
    * email identity or a `.publicHostedZone()` (which already auto-publishes).
+   *
+   * `zone` reads its inner type from CDK's own `RecordSetOptions["zone"]`
+   * rather than naming `IHostedZone` — the zone is handed to
+   * `@composurecdk/route53`'s `zoneRecords().zone()`, which tracks that same
+   * prop, so pinning here would reject a zone that builder accepts (ADR-0018).
    */
-  publishDkim(zone: Resolvable<IHostedZone>): this {
+  publishDkim(zone: Resolvable<NonNullable<RecordSetOptions["zone"]>>): this {
     this.#publishZone = zone;
     return this;
   }

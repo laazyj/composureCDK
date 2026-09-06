@@ -31,11 +31,10 @@ export function cloudfrontAliasTarget(
 
 /**
  * Builds an alias {@link RecordTarget} for an API Gateway REST API that has a
- * custom domain name configured via {@link RestApiBase}. Accepts a
+ * custom domain name configured via `RestApiBase`. Accepts a
  * {@link Resolvable}.
  *
- * `api` reads its type from CDK's own alias-target constructor rather than
- * naming `RestApiBase`, so it keeps tracking the installed `aws-cdk-lib`
+ * `api` reads its type from CDK's own alias-target constructor, as above
  * (ADR-0018).
  */
 export function apiGatewayAliasTarget(
@@ -52,8 +51,7 @@ export function apiGatewayAliasTarget(
  * separately from the REST API (e.g. to share a custom domain across multiple
  * APIs). Accepts a {@link Resolvable}.
  *
- * `domain` reads its type from CDK's own alias-target constructor rather than
- * naming `IDomainName`, so it keeps tracking the installed `aws-cdk-lib`
+ * `domain` reads its type from CDK's own alias-target constructor, as above
  * (ADR-0018).
  */
 export function apiGatewayDomainAliasTarget(

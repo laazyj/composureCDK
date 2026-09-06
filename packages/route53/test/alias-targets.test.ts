@@ -15,12 +15,36 @@ import {
   cloudfrontAliasTarget,
 } from "../src/alias-targets.js";
 
+import {
+  ApiGateway as ApiGatewayAliasTargetClass,
+  ApiGatewayDomain as ApiGatewayDomainAliasTargetClass,
+  CloudFrontTarget,
+} from "aws-cdk-lib/aws-route53-targets";
+
 function testScope() {
   const app = new App();
   const stack = new Stack(app, "TestStack");
   const zone = new PublicHostedZone(stack, "Zone", { zoneName: "example.com" });
   return { stack, zone };
 }
+
+describe("alias target resource types", () => {
+  it("accept everything CDK's own alias-target constructors accept (type-level guard)", () => {
+    // Each helper reads its accepted type from the CDK alias-target
+    // constructor it wraps, so these hold at whatever `aws-cdk-lib` is
+    // installed — and fail if a parameter is ever re-pinned to the interface
+    // that happened to be current, which is the narrowing CDK's `*Ref`
+    // migration lands on a pinned wrapper (ADR-0018).
+    // A `tsc`-only assertion — vitest does not typecheck.
+    const distribution: Parameters<typeof cloudfrontAliasTarget>[0] =
+      undefined as unknown as ConstructorParameters<typeof CloudFrontTarget>[0];
+    const api: Parameters<typeof apiGatewayAliasTarget>[0] =
+      undefined as unknown as ConstructorParameters<typeof ApiGatewayAliasTargetClass>[0];
+    const domain: Parameters<typeof apiGatewayDomainAliasTarget>[0] =
+      undefined as unknown as ConstructorParameters<typeof ApiGatewayDomainAliasTargetClass>[0];
+    void [distribution, api, domain];
+  });
+});
 
 describe("cloudfrontAliasTarget", () => {
   it("returns a Ref-based target for a Ref<IDistribution> and synths the record", () => {

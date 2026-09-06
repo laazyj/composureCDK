@@ -236,11 +236,13 @@ For AWS-service records, prefer A/AAAA alias records over CNAMEs. Alias records:
 
 Use `createCnameRecordBuilder` only when the target is not an AWS resource (or the AWS resource does not expose an alias target), and never at the zone apex.
 
-| Helper                                | Points at                                        |
-| ------------------------------------- | ------------------------------------------------ |
-| `cloudfrontAliasTarget(distribution)` | A `cloudfront.IDistribution`                     |
-| `apiGatewayAliasTarget(api)`          | An `apigateway.RestApiBase` with a custom domain |
-| `apiGatewayDomainAliasTarget(domain)` | A shared `apigateway.DomainName`                 |
+| Helper                                | Points at                        | CDK alias target   |
+| ------------------------------------- | -------------------------------- | ------------------ |
+| `cloudfrontAliasTarget(distribution)` | A CloudFront distribution        | `CloudFrontTarget` |
+| `apiGatewayAliasTarget(api)`          | A REST API with a custom domain  | `ApiGateway`       |
+| `apiGatewayDomainAliasTarget(domain)` | A shared API Gateway domain name | `ApiGatewayDomain` |
+
+The resource parameter is not spelled out per helper on purpose: each one is read from the constructor of the CDK alias target it wraps, so it accepts exactly what that target accepts on the `aws-cdk-lib` you have installed. CDK is migrating those constructors to the broader `*Ref` interfaces one at a time, so the CDK target's own signature is the answer for the version you are on.
 
 Each helper accepts a `Resolvable`, so targets produced by other composed components (e.g. `@composurecdk/cloudfront`) can be wired in via `ref()`.
 

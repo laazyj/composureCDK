@@ -17,10 +17,9 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  *   ));
  * ```
  *
- * The accepted type is read from CDK's own alias-target constructor rather
- * than named as `IDistribution`, so it keeps tracking the installed
- * `aws-cdk-lib` as CDK migrates its constructors to the broader `*Ref`
- * interfaces (ADR-0018).
+ * `distribution` reads its type from CDK's own alias-target constructor rather
+ * than naming `IDistribution`, so it keeps tracking the installed
+ * `aws-cdk-lib` (ADR-0018).
  */
 export function cloudfrontAliasTarget(
   distribution: Resolvable<ConstructorParameters<typeof CloudFrontTarget>[0]>,
@@ -35,8 +34,9 @@ export function cloudfrontAliasTarget(
  * custom domain name configured via {@link RestApiBase}. Accepts a
  * {@link Resolvable}.
  *
- * The accepted type is read from CDK's own alias-target constructor rather
- * than named as `RestApiBase` (ADR-0018).
+ * `api` reads its type from CDK's own alias-target constructor rather than
+ * naming `RestApiBase`, so it keeps tracking the installed `aws-cdk-lib`
+ * (ADR-0018).
  */
 export function apiGatewayAliasTarget(
   api: Resolvable<ConstructorParameters<typeof ApiGateway>[0]>,
@@ -52,8 +52,9 @@ export function apiGatewayAliasTarget(
  * separately from the REST API (e.g. to share a custom domain across multiple
  * APIs). Accepts a {@link Resolvable}.
  *
- * The accepted type is read from CDK's own alias-target constructor rather
- * than named as `IDomainName` (ADR-0018).
+ * `domain` reads its type from CDK's own alias-target constructor rather than
+ * naming `IDomainName`, so it keeps tracking the installed `aws-cdk-lib`
+ * (ADR-0018).
  */
 export function apiGatewayDomainAliasTarget(
   domain: Resolvable<ConstructorParameters<typeof ApiGatewayDomain>[0]>,

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { fake } from "ts-fake";
 import { Builder, COPY_STATE, type IBuilder } from "../src/builder.js";
 import { assertCopyPreservesState } from "../src/testing.js";
 
@@ -133,17 +134,15 @@ describe("assertCopyPreservesState", () => {
   });
 
   it("fails with a clear error when the builder lacks .copy()", () => {
-    const noCopyBuilder = {
-      props: {} as Partial<Props>,
-      add() {
-        return this;
-      },
-      items: () => [] as readonly string[],
-    };
+    // Only `items()` is spelled out — `build` reads it. The point of the fake
+    // is the member it lacks: `.copy()`.
+    const noCopyBuilder = fake<IBuilder<Props, WithAccumulator>>({
+      items: () => [],
+    });
 
     expect(() => {
       assertCopyPreservesState({
-        factory: () => noCopyBuilder as unknown as IBuilder<Props, WithAccumulator>,
+        factory: () => noCopyBuilder,
         configure: () => {
           /* no-op */
         },

@@ -57,16 +57,16 @@
     }
   },
   "peerDependencies": {
-    "constructs": "^10.6.0"
+    "constructs": "^10.8.1"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.4.1",
     "ts-fake": "^1.2.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.8"
   },
   "dependencies": {
-    "@dagrejs/graphlib": "^4.0.1"
+    "@dagrejs/graphlib": "^4.0.5"
   },
   "exports": {
     "./package.json": "./package.json",

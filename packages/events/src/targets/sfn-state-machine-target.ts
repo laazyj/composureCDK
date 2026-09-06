@@ -12,9 +12,8 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * transformation, an explicit `role` (otherwise CDK creates one), plus the
  * inherited DLQ/retry options.
  *
- * The accepted type is read from CDK's own target constructor rather than
- * named as `IStateMachine`, so it keeps tracking the installed `aws-cdk-lib` as CDK
- * migrates its target constructors to the broader `*Ref` interfaces
+ * `stateMachine` reads its type from CDK's own target constructor rather than
+ * naming `IStateMachine`, so it keeps tracking the installed `aws-cdk-lib`
  * (ADR-0018).
  */
 export function sfnStateMachineTarget(

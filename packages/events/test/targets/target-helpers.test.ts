@@ -40,9 +40,12 @@ describe("target helpers", () => {
   describe("lambdaTarget", () => {
     it("accepts every function CDK's own LambdaFunction target accepts (type-level guard)", () => {
       // The helper reads its accepted type from CDK's own target constructor,
-      // so this holds at whatever `aws-cdk-lib` is installed — and fails if
-      // the parameter is ever re-pinned to `IFunction`, which is the narrowing
-      // CDK's `*Ref` migration lands on a pinned target (ADR-0018).
+      // so this holds at whatever `aws-cdk-lib` is installed. It fails if the
+      // parameter is re-pinned to a named interface after CDK widens the
+      // constructor — the narrowing CDK's `*Ref` migration lands on a pinned
+      // target, and what issue #401 was about (ADR-0018). Re-pinning before
+      // CDK moves still compiles, which is why the rule is the ADR's, not
+      // this guard's, to enforce.
       const fn: Parameters<typeof lambdaTarget>[0] = undefined as unknown as ConstructorParameters<
         typeof LambdaFunctionTarget
       >[0];
@@ -106,10 +109,7 @@ describe("target helpers", () => {
 
   describe("sqsTarget", () => {
     it("accepts every queue CDK's own SqsQueue target accepts (type-level guard)", () => {
-      // The helper reads its accepted type from CDK's own target constructor,
-      // so this holds at whatever `aws-cdk-lib` is installed — and fails if
-      // the parameter is ever re-pinned to `IQueue`, which is the narrowing
-      // CDK's `*Ref` migration lands on a pinned target (ADR-0018).
+      // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
       const queue: Parameters<typeof sqsTarget>[0] = undefined as unknown as ConstructorParameters<
         typeof SqsQueueTarget
       >[0];
@@ -161,10 +161,7 @@ describe("target helpers", () => {
 
   describe("snsTarget", () => {
     it("accepts every topic CDK's own SnsTopic target accepts (type-level guard)", () => {
-      // The helper reads its accepted type from CDK's own target constructor,
-      // so this holds at whatever `aws-cdk-lib` is installed — and fails if
-      // the parameter is ever re-pinned to `ITopic`, which is the narrowing
-      // CDK's `*Ref` migration lands on a pinned target (ADR-0018).
+      // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
       const topic: Parameters<typeof snsTarget>[0] = undefined as unknown as ConstructorParameters<
         typeof SnsTopicTarget
       >[0];
@@ -216,10 +213,7 @@ describe("target helpers", () => {
 
   describe("sfnStateMachineTarget", () => {
     it("accepts every state machine CDK's own SfnStateMachine target accepts (type-level guard)", () => {
-      // The helper reads its accepted type from CDK's own target constructor,
-      // so this holds at whatever `aws-cdk-lib` is installed — and fails if
-      // the parameter is ever re-pinned to `IStateMachine`, which is the narrowing
-      // CDK's `*Ref` migration lands on a pinned target (ADR-0018).
+      // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
       const stateMachine: Parameters<typeof sfnStateMachineTarget>[0] =
         undefined as unknown as ConstructorParameters<typeof SfnStateMachineTarget>[0];
       void stateMachine;
@@ -263,6 +257,13 @@ describe("target helpers", () => {
   });
 
   describe("eventBusTarget", () => {
+    it("accepts every bus CDK's own EventBus target accepts (type-level guard)", () => {
+      // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
+      const bus: Parameters<typeof eventBusTarget>[0] =
+        undefined as unknown as ConstructorParameters<typeof EventBusTarget>[0];
+      void bus;
+    });
+
     it("attaches another bus and grants events:PutEvents", () => {
       const stack = newStack();
       const downstream = new EventBus(stack, "Downstream");
@@ -277,16 +278,6 @@ describe("target helpers", () => {
           Statement: Match.arrayWith([Match.objectLike({ Action: "events:PutEvents" })]),
         }),
       });
-    });
-
-    it("accepts every bus CDK's own EventBus target accepts (type-level guard)", () => {
-      // The helper reads its accepted type from CDK's own target constructor,
-      // so this holds at whatever `aws-cdk-lib` is installed. It fails if the
-      // parameter is ever re-pinned to `IEventBus` after CDK widens the
-      // constructor — the narrowing issue #401 was about (ADR-0018).
-      const bus: Parameters<typeof eventBusTarget>[0] =
-        undefined as unknown as ConstructorParameters<typeof EventBusTarget>[0];
-      void bus;
     });
 
     it("returns a Ref<IRuleTarget> for a Ref<IEventBus> and synths the rule", () => {
@@ -307,7 +298,7 @@ describe("target helpers", () => {
   });
 
   describe("cloudWatchLogGroupTarget", () => {
-    it("accepts every log group CDK's own target accepts (type-level guard)", () => {
+    it("accepts every log group CDK's own CloudWatchLogGroup target accepts (type-level guard)", () => {
       // The helper reads its accepted type from CDK's own target constructor,
       // which already takes the broader `logs.ILogGroupRef` — pinning
       // `ILogGroup` rejected a log group CDK itself takes (ADR-0018).

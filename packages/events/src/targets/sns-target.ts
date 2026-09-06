@@ -13,9 +13,8 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * Note: SNS targets do not accept a per-target DLQ
  * ({@link SnsTopicProps} does not extend the retry/DLQ base type).
  *
- * The accepted type is read from CDK's own target constructor rather than
- * named as `ITopic`, so it keeps tracking the installed `aws-cdk-lib` as CDK
- * migrates its target constructors to the broader `*Ref` interfaces
+ * `topic` reads its type from CDK's own target constructor rather than
+ * naming `ITopic`, so it keeps tracking the installed `aws-cdk-lib`
  * (ADR-0018).
  */
 export function snsTarget(

@@ -13,9 +13,8 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * configuration, per CDK's {@link EventBusProps} (it intentionally does not
  * extend the retry base).
  *
- * The accepted type is read from CDK's own target constructor rather than
- * named as `IEventBus`, so it keeps tracking the installed `aws-cdk-lib` as CDK
- * migrates its target constructors to the broader `*Ref` interfaces
+ * `bus` reads its type from CDK's own target constructor rather than
+ * naming `IEventBus`, so it keeps tracking the installed `aws-cdk-lib`
  * (ADR-0018).
  */
 export function eventBusTarget(

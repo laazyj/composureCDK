@@ -25,12 +25,10 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * )
  * ```
  *
- * @see https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-dlq.html
+ * `fn` reads its type from CDK's own target constructor rather than naming
+ * `IFunction`, so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
  *
- * The accepted type is read from CDK's own target constructor rather than
- * named as `IFunction`, so it keeps tracking the installed `aws-cdk-lib` as CDK
- * migrates its target constructors to the broader `*Ref` interfaces
- * (ADR-0018).
+ * @see https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-dlq.html
  */
 export function lambdaTarget(
   fn: Resolvable<ConstructorParameters<typeof LambdaFunction>[0]>,

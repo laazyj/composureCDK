@@ -12,9 +12,8 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * `deadLetterQueue` / `maxEventAge` / `retryAttempts` reliability options
  * from the inherited base.
  *
- * The accepted type is read from CDK's own target constructor rather than
- * named as `IQueue`, so it keeps tracking the installed `aws-cdk-lib` as CDK
- * migrates its target constructors to the broader `*Ref` interfaces
+ * `queue` reads its type from CDK's own target constructor rather than
+ * naming `IQueue`, so it keeps tracking the installed `aws-cdk-lib`
  * (ADR-0018).
  */
 export function sqsTarget(

@@ -1,6 +1,5 @@
 import type { IRuleTarget } from "aws-cdk-lib/aws-events";
 import { LambdaFunction, type LambdaFunctionProps } from "aws-cdk-lib/aws-events-targets";
-import type { IFunction } from "aws-cdk-lib/aws-lambda";
 import { isRef, type Resolvable } from "@composurecdk/core";
 
 /**
@@ -27,9 +26,14 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * ```
  *
  * @see https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-dlq.html
+ *
+ * The accepted type is read from CDK's own target constructor rather than
+ * named as `IFunction`, so it keeps tracking the installed `aws-cdk-lib` as CDK
+ * migrates its target constructors to the broader `*Ref` interfaces
+ * (ADR-0018).
  */
 export function lambdaTarget(
-  fn: Resolvable<IFunction>,
+  fn: Resolvable<ConstructorParameters<typeof LambdaFunction>[0]>,
   props?: LambdaFunctionProps,
 ): Resolvable<IRuleTarget> {
   if (isRef(fn)) return fn.map((resolved) => new LambdaFunction(resolved, props));

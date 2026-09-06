@@ -1,6 +1,5 @@
 import type { IRuleTarget } from "aws-cdk-lib/aws-events";
 import { SqsQueue, type SqsQueueProps } from "aws-cdk-lib/aws-events-targets";
-import type { IQueue } from "aws-cdk-lib/aws-sqs";
 import { isRef, type Resolvable } from "@composurecdk/core";
 
 /**
@@ -12,9 +11,14 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * {@link SqsQueueProps.messageGroupId} (required for FIFO targets), plus the
  * `deadLetterQueue` / `maxEventAge` / `retryAttempts` reliability options
  * from the inherited base.
+ *
+ * The accepted type is read from CDK's own target constructor rather than
+ * named as `IQueue`, so it keeps tracking the installed `aws-cdk-lib` as CDK
+ * migrates its target constructors to the broader `*Ref` interfaces
+ * (ADR-0018).
  */
 export function sqsTarget(
-  queue: Resolvable<IQueue>,
+  queue: Resolvable<ConstructorParameters<typeof SqsQueue>[0]>,
   props?: SqsQueueProps,
 ): Resolvable<IRuleTarget> {
   if (isRef(queue)) return queue.map((resolved) => new SqsQueue(resolved, props));

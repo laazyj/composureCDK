@@ -17,14 +17,14 @@ export function withCoverage(
   return mergeConfig(
     defineConfig({
       test: {
+        // nx runs three packages at once and each vitest sizes its own fork
+        // pool to the CPU count, so a 4-vCPU CI runner oversubscribes badly:
+        // 20ms tests have timed out at vitest's 5s default on a green tree.
+        testTimeout: 20_000,
         env: {
-          // aws-cdk-lib >= 2.262.0 validates every synth() against a default
-          // CloudFormation ruleset: ~600ms per synth against ~15ms without. On
-          // a 4-vCPU CI runner that pushes ordinary tests past vitest's 5s
-          // testTimeout. These suites assert on synthesised output directly, so
-          // the pass adds nothing here — it stays on for real `cdk synth`.
-          // CDK_VALIDATION is the only off switch; the feature flag named in
-          // the warning text only promotes findings to errors.
+          // aws-cdk-lib >= 2.262.0 validates every synth against a default
+          // ruleset: ~600ms vs ~15ms, and these suites assert on synth output
+          // directly. Only off switch — the flag in the warning just escalates.
           CDK_VALIDATION: "false",
         },
         coverage: {

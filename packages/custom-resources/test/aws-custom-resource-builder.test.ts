@@ -3,10 +3,15 @@ import { App, Stack, type CfnResource } from "aws-cdk-lib";
 import { Template, Match } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Topic } from "aws-cdk-lib/aws-sns";
-import { AwsCustomResourcePolicy, PhysicalResourceId } from "aws-cdk-lib/custom-resources";
+import {
+  type AwsSdkCall,
+  AwsCustomResourcePolicy,
+  PhysicalResourceId,
+} from "aws-cdk-lib/custom-resources";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createAwsCustomResourceBuilder } from "../src/aws-custom-resource-builder.js";
+import { type SdkCallConfig } from "../src/calls.js";
 
 function newStack(): Stack {
   return new Stack(new App(), "TestStack");
@@ -82,6 +87,25 @@ describe("AwsCustomResourceBuilder", () => {
           ]),
         },
       });
+    });
+  });
+
+  describe("SdkCallConfig", () => {
+    it("accepts every call CDK's own AwsSdkCall accepts (type-level guard)", () => {
+      // `SdkCallConfig` is a hand-written mirror rather than an
+      // `Omit`-and-re-declare, so neither ADR-0018's tracking rule nor the
+      // `redeclared-prop-must-track-cdk-type` lint rule reaches it: there is
+      // no `Omit<…>` to key on, and `parameters` is `any` upstream, so
+      // tracking it would collapse to `Resolvable<any>` and destroy the type
+      // safety the mirror exists to add. That leaves the mirror as the one
+      // place a narrowing can land unseen, which is what this guard is for.
+      //
+      // When CDK gives `parameters` a real type this stops compiling. Widen
+      // the mirrored prop to whatever CDK now declares if it is a type worth
+      // tracking; keep the narrowing and re-state it here if it is not.
+      // A `tsc`-only assertion — vitest does not typecheck.
+      const call: SdkCallConfig = undefined as unknown as AwsSdkCall;
+      void call;
     });
   });
 

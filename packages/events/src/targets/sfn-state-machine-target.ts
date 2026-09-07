@@ -1,6 +1,5 @@
 import type { IRuleTarget } from "aws-cdk-lib/aws-events";
 import { SfnStateMachine, type SfnStateMachineProps } from "aws-cdk-lib/aws-events-targets";
-import type { IStateMachine } from "aws-cdk-lib/aws-stepfunctions";
 import { isRef, type Resolvable } from "@composurecdk/core";
 
 /**
@@ -12,9 +11,13 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * `props` accepts {@link SfnStateMachineProps.input} for input
  * transformation, an explicit `role` (otherwise CDK creates one), plus the
  * inherited DLQ/retry options.
+ *
+ * `stateMachine` reads its type from CDK's own target constructor rather than
+ * naming `IStateMachine`, so it keeps tracking the installed `aws-cdk-lib`
+ * (ADR-0018).
  */
 export function sfnStateMachineTarget(
-  stateMachine: Resolvable<IStateMachine>,
+  stateMachine: Resolvable<ConstructorParameters<typeof SfnStateMachine>[0]>,
   props?: SfnStateMachineProps,
 ): Resolvable<IRuleTarget> {
   if (isRef(stateMachine)) {

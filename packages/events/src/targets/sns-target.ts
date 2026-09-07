@@ -1,6 +1,5 @@
 import type { IRuleTarget } from "aws-cdk-lib/aws-events";
 import { SnsTopic, type SnsTopicProps } from "aws-cdk-lib/aws-events-targets";
-import type { ITopic } from "aws-cdk-lib/aws-sns";
 import { isRef, type Resolvable } from "@composurecdk/core";
 
 /**
@@ -13,9 +12,13 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  *
  * Note: SNS targets do not accept a per-target DLQ
  * ({@link SnsTopicProps} does not extend the retry/DLQ base type).
+ *
+ * `topic` reads its type from CDK's own target constructor rather than
+ * naming `ITopic`, so it keeps tracking the installed `aws-cdk-lib`
+ * (ADR-0018).
  */
 export function snsTarget(
-  topic: Resolvable<ITopic>,
+  topic: Resolvable<ConstructorParameters<typeof SnsTopic>[0]>,
   props?: SnsTopicProps,
 ): Resolvable<IRuleTarget> {
   if (isRef(topic)) return topic.map((resolved) => new SnsTopic(resolved, props));

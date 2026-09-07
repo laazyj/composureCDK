@@ -3,10 +3,15 @@ import { App, Stack, type CfnResource } from "aws-cdk-lib";
 import { Template, Match } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Topic } from "aws-cdk-lib/aws-sns";
-import { AwsCustomResourcePolicy, PhysicalResourceId } from "aws-cdk-lib/custom-resources";
+import {
+  AwsCustomResourcePolicy,
+  type AwsSdkCall,
+  PhysicalResourceId,
+} from "aws-cdk-lib/custom-resources";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createAwsCustomResourceBuilder } from "../src/aws-custom-resource-builder.js";
+import { type SdkCallConfig } from "../src/calls.js";
 
 function newStack(): Stack {
   return new Stack(new App(), "TestStack");
@@ -82,6 +87,20 @@ describe("AwsCustomResourceBuilder", () => {
           ]),
         },
       });
+    });
+  });
+
+  describe("SdkCallConfig", () => {
+    it("accepts every call CDK's own AwsSdkCall accepts (type-level guard)", () => {
+      // `SdkCallConfig` mirrors CDK's `AwsSdkCall` by hand rather than by
+      // `Omit`-and-re-declare, so `redeclared-prop-must-track-cdk-type`
+      // (ADR-0018) has no `Omit<…>` to key on and cannot reach it — leaving
+      // the mirror the one place a narrowing can land unseen. `parameters` is
+      // `any` upstream, so it accepts whatever the mirror declares; this bites
+      // when CDK gives it — or any other mirrored prop — a type the mirror
+      // would reject. A `tsc`-only assertion — vitest does not typecheck.
+      const call: SdkCallConfig = undefined as unknown as AwsSdkCall;
+      void call;
     });
   });
 

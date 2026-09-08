@@ -7,6 +7,11 @@ import { DomainName, EndpointType, LambdaIntegration, RestApi } from "aws-cdk-li
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
 import { Certificate } from "aws-cdk-lib/aws-certificatemanager";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
+import {
+  ApiGateway as ApiGatewayTarget,
+  ApiGatewayDomain as ApiGatewayDomainTarget,
+  CloudFrontTarget,
+} from "aws-cdk-lib/aws-route53-targets";
 import { isRef, ref } from "@composurecdk/core";
 import { createARecordBuilder } from "../src/a-record-builder.js";
 import {
@@ -21,6 +26,23 @@ function testScope() {
   const zone = new PublicHostedZone(stack, "Zone", { zoneName: "example.com" });
   return { stack, zone };
 }
+
+describe("alias target resource types", () => {
+  it("accept everything CDK's own alias-target constructors accept (type-level guard)", () => {
+    // Each helper reads its accepted type from the CDK alias-target
+    // constructor it wraps, so these hold at whatever `aws-cdk-lib` is
+    // installed — and fail if a parameter is re-pinned to a named interface
+    // after CDK widens the constructor, which is the narrowing ADR-0018 is
+    // about. A `tsc`-only assertion — vitest does not typecheck.
+    const distribution: Parameters<typeof cloudfrontAliasTarget>[0] =
+      undefined as unknown as ConstructorParameters<typeof CloudFrontTarget>[0];
+    const api: Parameters<typeof apiGatewayAliasTarget>[0] =
+      undefined as unknown as ConstructorParameters<typeof ApiGatewayTarget>[0];
+    const domain: Parameters<typeof apiGatewayDomainAliasTarget>[0] =
+      undefined as unknown as ConstructorParameters<typeof ApiGatewayDomainTarget>[0];
+    void [distribution, api, domain];
+  });
+});
 
 describe("cloudfrontAliasTarget", () => {
   it("returns a Ref-based target for a Ref<IDistribution> and synths the record", () => {

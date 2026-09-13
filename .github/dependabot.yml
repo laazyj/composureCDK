@@ -22,6 +22,14 @@ updates:
         patterns:
           - "nx"
           - "@nx/*"
+      # vitest and its companion packages (@vitest/coverage-v8, @vitest/ui, …)
+      # declare peer dependencies on each other, so a split bump leaves the tree
+      # holding two majors at once: coverage-v8@4 pinned a nested vitest@4 beside
+      # every package's vitest@5. Group them so the majors always move together.
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
       npm-dependencies:
         patterns:
           - "*"
@@ -31,3 +39,5 @@ updates:
           - "@aws-cdk/*"
           - "nx"
           - "@nx/*"
+          - "vitest"
+          - "@vitest/*"

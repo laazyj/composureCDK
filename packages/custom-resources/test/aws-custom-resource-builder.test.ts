@@ -99,8 +99,7 @@ describe("AwsCustomResourceBuilder", () => {
       // `any` upstream, so it accepts whatever the mirror declares; this bites
       // when CDK gives it — or any other mirrored prop — a type the mirror
       // would reject. A `tsc`-only assertion — vitest does not typecheck.
-      const call: SdkCallConfig = undefined as unknown as AwsSdkCall;
-      void call;
+      const _call: SdkCallConfig = undefined as unknown as AwsSdkCall;
     });
   });
 

@@ -46,10 +46,9 @@ describe("target helpers", () => {
       // target, and what issue #401 was about (ADR-0018). Re-pinning before
       // CDK moves still compiles, which is why the rule is the ADR's, not
       // this guard's, to enforce.
-      const fn: Parameters<typeof lambdaTarget>[0] = undefined as unknown as ConstructorParameters<
+      const _fn: Parameters<typeof lambdaTarget>[0] = undefined as unknown as ConstructorParameters<
         typeof LambdaFunctionTarget
       >[0];
-      void fn;
     });
 
     it("returns a concrete IRuleTarget for a concrete function", () => {
@@ -110,10 +109,9 @@ describe("target helpers", () => {
   describe("sqsTarget", () => {
     it("accepts every queue CDK's own SqsQueue target accepts (type-level guard)", () => {
       // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
-      const queue: Parameters<typeof sqsTarget>[0] = undefined as unknown as ConstructorParameters<
+      const _queue: Parameters<typeof sqsTarget>[0] = undefined as unknown as ConstructorParameters<
         typeof SqsQueueTarget
       >[0];
-      void queue;
     });
 
     it("attaches an SQS queue and grants SendMessage", () => {
@@ -162,10 +160,9 @@ describe("target helpers", () => {
   describe("snsTarget", () => {
     it("accepts every topic CDK's own SnsTopic target accepts (type-level guard)", () => {
       // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
-      const topic: Parameters<typeof snsTarget>[0] = undefined as unknown as ConstructorParameters<
+      const _topic: Parameters<typeof snsTarget>[0] = undefined as unknown as ConstructorParameters<
         typeof SnsTopicTarget
       >[0];
-      void topic;
     });
 
     it("attaches an SNS topic", () => {
@@ -214,9 +211,8 @@ describe("target helpers", () => {
   describe("sfnStateMachineTarget", () => {
     it("accepts every state machine CDK's own SfnStateMachine target accepts (type-level guard)", () => {
       // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
-      const stateMachine: Parameters<typeof sfnStateMachineTarget>[0] =
+      const _stateMachine: Parameters<typeof sfnStateMachineTarget>[0] =
         undefined as unknown as ConstructorParameters<typeof SfnStateMachineTarget>[0];
-      void stateMachine;
     });
 
     it("attaches a state machine with an invoke role", () => {
@@ -259,9 +255,8 @@ describe("target helpers", () => {
   describe("eventBusTarget", () => {
     it("accepts every bus CDK's own EventBus target accepts (type-level guard)", () => {
       // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
-      const bus: Parameters<typeof eventBusTarget>[0] =
+      const _bus: Parameters<typeof eventBusTarget>[0] =
         undefined as unknown as ConstructorParameters<typeof EventBusTarget>[0];
-      void bus;
     });
 
     it("attaches another bus and grants events:PutEvents", () => {
@@ -302,9 +297,8 @@ describe("target helpers", () => {
       // The helper reads its accepted type from CDK's own target constructor,
       // which already takes the broader `logs.ILogGroupRef` — pinning
       // `ILogGroup` rejected a log group CDK itself takes (ADR-0018).
-      const logGroup: Parameters<typeof cloudWatchLogGroupTarget>[0] =
+      const _logGroup: Parameters<typeof cloudWatchLogGroupTarget>[0] =
         undefined as unknown as ConstructorParameters<typeof CloudWatchLogGroupTarget>[0];
-      void logGroup;
     });
 
     it("attaches the log group ARN as the target ARN on the rule", () => {

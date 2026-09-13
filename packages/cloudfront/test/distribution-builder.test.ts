@@ -50,14 +50,12 @@ describe("DistributionBuilder", () => {
       // assignment ignores the props the builder replaces outright, so they
       // need no exemption here — and a prop that is merely widened must never
       // be given one.
-      const props: DistributionBuilderProps = undefined as unknown as DistributionProps;
-      void props;
+      const _props: DistributionBuilderProps = undefined as unknown as DistributionProps;
     });
 
     it("accept every key-value store CDK's own FunctionProps accepts (type-level guard)", () => {
-      const keyValueStore: NonNullable<InlineFunctionDefinition["keyValueStore"]> =
+      const _keyValueStore: NonNullable<InlineFunctionDefinition["keyValueStore"]> =
         undefined as unknown as NonNullable<FunctionProps["keyValueStore"]>;
-      void keyValueStore;
     });
   });
 

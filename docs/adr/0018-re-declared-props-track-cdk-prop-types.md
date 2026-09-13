@@ -125,8 +125,12 @@ Each swept package also carries a whole-interface assignability guard in its
 unit suite:
 
 ```ts
-const props: TopicBuilderProps = undefined as unknown as TopicProps;
+const _props: TopicBuilderProps = undefined as unknown as TopicProps;
 ```
+
+The declaration _is_ the assertion — the annotation forces the assignability
+check and the value is never read, so it carries the `_` prefix that
+`eslint.config.mjs` exempts from `no-unused-vars` for test files.
 
 Structural assignment ignores the props the builder replaces outright, so those
 need no exemption — and a prop that is merely widened must never be given one.

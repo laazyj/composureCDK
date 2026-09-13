@@ -53,9 +53,8 @@ describe("s3Action", () => {
     // A re-declared prop must accept everything CDK's own prop accepts, so a
     // later re-declaration cannot silently narrow the helper's surface
     // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
-    const options: S3ActionOptions = undefined as unknown as S3Props;
-    const bucket: Parameters<typeof s3Action>[0] = undefined as unknown as S3Props["bucket"];
-    void [options, bucket];
+    const _options: S3ActionOptions = undefined as unknown as S3Props;
+    const _bucket: Parameters<typeof s3Action>[0] = undefined as unknown as S3Props["bucket"];
   });
 
   it("stores to a bucket with prefix, KMS key, and topic — granting the key", () => {
@@ -98,9 +97,8 @@ describe("s3Action", () => {
 
 describe("lambdaAction", () => {
   it("accepts everything CDK's own Lambda action accepts (type-level guard)", () => {
-    const options: LambdaActionOptions = undefined as unknown as LambdaProps;
-    const fn: Parameters<typeof lambdaAction>[0] = undefined as unknown as LambdaProps["function"];
-    void [options, fn];
+    const _options: LambdaActionOptions = undefined as unknown as LambdaProps;
+    const _fn: Parameters<typeof lambdaAction>[0] = undefined as unknown as LambdaProps["function"];
   });
 
   it("invokes a concrete function", () => {
@@ -124,9 +122,8 @@ describe("lambdaAction", () => {
 
 describe("snsAction", () => {
   it("accepts everything CDK's own Sns action accepts (type-level guard)", () => {
-    const options: SnsActionOptions = undefined as unknown as SnsProps;
-    const topic: Parameters<typeof snsAction>[0] = undefined as unknown as SnsProps["topic"];
-    void [options, topic];
+    const _options: SnsActionOptions = undefined as unknown as SnsProps;
+    const _topic: Parameters<typeof snsAction>[0] = undefined as unknown as SnsProps["topic"];
   });
 
   it("publishes to a concrete topic", () => {
@@ -147,8 +144,7 @@ describe("snsAction", () => {
 
 describe("bounceAction", () => {
   it("accepts everything CDK's own Bounce action accepts (type-level guard)", () => {
-    const options: BounceActionOptions = undefined as unknown as BounceProps;
-    void options;
+    const _options: BounceActionOptions = undefined as unknown as BounceProps;
   });
 
   it("bounces with a template and sender", () => {
@@ -185,9 +181,8 @@ describe("bounceAction", () => {
 
 describe("stopAction", () => {
   it("accepts every topic CDK's own Stop action accepts (type-level guard)", () => {
-    const topic: NonNullable<Parameters<typeof stopAction>[0]> =
+    const _topic: NonNullable<Parameters<typeof stopAction>[0]> =
       undefined as unknown as NonNullable<StopProps["topic"]>;
-    void topic;
   });
 
   it("stops with no topic", () => {

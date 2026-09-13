@@ -65,8 +65,7 @@ describe("BucketDeploymentBuilder", () => {
       // A re-declared prop must accept everything CDK's own prop accepts, so a
       // later re-declaration cannot silently narrow the builder's surface
       // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
-      const props: BucketDeploymentBuilderProps = undefined as unknown as BucketDeploymentProps;
-      void props;
+      const _props: BucketDeploymentBuilderProps = undefined as unknown as BucketDeploymentProps;
     });
   });
 

@@ -82,8 +82,7 @@ describe("TableV2Builder", () => {
       // A re-declared prop must accept everything CDK's own prop accepts, so a
       // later re-declaration cannot silently narrow the builder's surface
       // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
-      const props: TableV2BuilderProps = undefined as unknown as TablePropsV2;
-      void props;
+      const _props: TableV2BuilderProps = undefined as unknown as TablePropsV2;
     });
   });
 

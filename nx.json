@@ -34,7 +34,7 @@
         "^default",
         "{workspaceRoot}/eslint.config.mjs",
         "{workspaceRoot}/packages/eslint-plugin/src/**/*",
-        { "externalDependencies": ["eslint"] }
+        { "externalDependencies": ["eslint", "typescript-eslint", "@typescript-eslint/parser"] }
       ]
     },
     "test:update": {

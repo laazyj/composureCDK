@@ -37,8 +37,7 @@ describe("LogGroupBuilder", () => {
       // later re-declaration cannot silently narrow the builder's surface
       // (ADR-0018) — CDK has already widened `encryptionKey` to `kms.IKeyRef`
       // here. A `tsc`-only assertion — vitest does not typecheck.
-      const props: LogGroupBuilderProps = undefined as unknown as LogGroupProps;
-      void props;
+      const _props: LogGroupBuilderProps = undefined as unknown as LogGroupProps;
     });
   });
 

@@ -157,8 +157,7 @@ describe("RuleBuilder", () => {
       // Structural assignment ignores `targets`, which is lifted onto
       // `addTarget`; that setter reads its element type from `RuleProps` under
       // the same rule (ADR-0018), so it is covered there rather than exempt.
-      const props: RuleBuilderProps = undefined as unknown as RuleProps;
-      void props;
+      const _props: RuleBuilderProps = undefined as unknown as RuleProps;
     });
   });
 

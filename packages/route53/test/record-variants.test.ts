@@ -63,18 +63,17 @@ describe("props", () => {
     // A re-declared prop must accept everything CDK's own prop accepts, so a
     // later re-declaration cannot silently narrow the builder's surface
     // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
-    const a: ARecordBuilderProps = undefined as unknown as ARecordProps;
-    const aaaa: AaaaRecordBuilderProps = undefined as unknown as AaaaRecordProps;
-    const caa: CaaRecordBuilderProps = undefined as unknown as CaaRecordProps;
-    const cname: CnameRecordBuilderProps = undefined as unknown as CnameRecordProps;
-    const ds: DsRecordBuilderProps = undefined as unknown as DsRecordProps;
-    const https: HttpsRecordBuilderProps = undefined as unknown as HttpsRecordProps;
-    const mx: MxRecordBuilderProps = undefined as unknown as MxRecordProps;
-    const ns: NsRecordBuilderProps = undefined as unknown as NsRecordProps;
-    const srv: SrvRecordBuilderProps = undefined as unknown as SrvRecordProps;
-    const svcb: SvcbRecordBuilderProps = undefined as unknown as SvcbRecordProps;
-    const txt: TxtRecordBuilderProps = undefined as unknown as TxtRecordProps;
-    void [a, aaaa, caa, cname, ds, https, mx, ns, srv, svcb, txt];
+    const _a: ARecordBuilderProps = undefined as unknown as ARecordProps;
+    const _aaaa: AaaaRecordBuilderProps = undefined as unknown as AaaaRecordProps;
+    const _caa: CaaRecordBuilderProps = undefined as unknown as CaaRecordProps;
+    const _cname: CnameRecordBuilderProps = undefined as unknown as CnameRecordProps;
+    const _ds: DsRecordBuilderProps = undefined as unknown as DsRecordProps;
+    const _https: HttpsRecordBuilderProps = undefined as unknown as HttpsRecordProps;
+    const _mx: MxRecordBuilderProps = undefined as unknown as MxRecordProps;
+    const _ns: NsRecordBuilderProps = undefined as unknown as NsRecordProps;
+    const _srv: SrvRecordBuilderProps = undefined as unknown as SrvRecordProps;
+    const _svcb: SvcbRecordBuilderProps = undefined as unknown as SvcbRecordProps;
+    const _txt: TxtRecordBuilderProps = undefined as unknown as TxtRecordProps;
   });
 });
 

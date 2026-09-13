@@ -215,8 +215,7 @@ describe("BudgetBuilder", () => {
       // If this line ever stops being a type error, the branded-Email
       // constraint has regressed and runtime is the only remaining net.
       // @ts-expect-error — bare string is not assignable to Email.
-      const subscribers: NotifySubscribers = { emails: ["bare@example.com"] };
-      void subscribers;
+      const _subscribers: NotifySubscribers = { emails: ["bare@example.com"] };
     });
   });
 

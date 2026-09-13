@@ -81,6 +81,18 @@ export default defineConfig(
     rules: composurecdk.configs.recommended.rules,
   },
   {
+    // The ADR-0018 type-level guards declare a `const` purely so its type
+    // annotation forces an assignability check — the value is never read, and
+    // the declaration IS the assertion. Allow the conventional `_` prefix to
+    // mark that, rather than 33 disable comments or a `void` statement (which
+    // typescript-eslint 8.70 now reports as meaningless, correctly: `void` is
+    // for discarding a call's return value).
+    files: ["packages/*/test/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["error", { varsIgnorePattern: "^_" }],
+    },
+  },
+  {
     // The examples are application entry points, not library internals: they
     // build at the root of an App or Stack, where there is no enclosing
     // component and so no context to forward. Every `.build(app, "…")` there

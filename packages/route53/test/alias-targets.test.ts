@@ -34,13 +34,12 @@ describe("alias target resource types", () => {
     // installed — and fail if a parameter is re-pinned to a named interface
     // after CDK widens the constructor, which is the narrowing ADR-0018 is
     // about. A `tsc`-only assertion — vitest does not typecheck.
-    const distribution: Parameters<typeof cloudfrontAliasTarget>[0] =
+    const _distribution: Parameters<typeof cloudfrontAliasTarget>[0] =
       undefined as unknown as ConstructorParameters<typeof CloudFrontTarget>[0];
-    const api: Parameters<typeof apiGatewayAliasTarget>[0] =
+    const _api: Parameters<typeof apiGatewayAliasTarget>[0] =
       undefined as unknown as ConstructorParameters<typeof ApiGatewayTarget>[0];
-    const domain: Parameters<typeof apiGatewayDomainAliasTarget>[0] =
+    const _domain: Parameters<typeof apiGatewayDomainAliasTarget>[0] =
       undefined as unknown as ConstructorParameters<typeof ApiGatewayDomainTarget>[0];
-    void [distribution, api, domain];
   });
 });
 

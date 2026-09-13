@@ -256,7 +256,14 @@ function enforce() {
       // installs the locked (latest) version regardless of the override.
       rmSync(NODE_MODULES, { recursive: true, force: true });
       rmSync(LOCK, { force: true });
-      execFileSync("npm", ["install", "--no-audit", "--no-fund", "--legacy-peer-deps"], {
+      // No --legacy-peer-deps: the `overrides` above already force the floor
+      // past every package's declared peer range, and the flag additionally
+      // suppresses *peer installation* — which silently drops any dependency
+      // that declares its runtime requirements as peers. vitest >= 5 moved
+      // `vite` from a dependency to a peer, so under the flag every suite here
+      // died at startup with "Cannot find package 'vite'". The pin is asserted
+      // by the hard gate below, so nothing is lost by letting peers resolve.
+      execFileSync("npm", ["install", "--no-audit", "--no-fund"], {
         cwd: REPO_ROOT,
         stdio: "inherit",
       });

@@ -36,8 +36,8 @@
     "eslint": "^10.0.0"
   },
   "devDependencies": {
-    "@types/estree": "^1.0.6",
-    "@types/node": "^25.9.3",
+    "@types/estree": "^1.0.9",
+    "@types/node": "^26.5.1",
     "@typescript-eslint/parser": "^8.70.0",
     "eslint": "^10.10.0",
     "typescript": "^6.0.3",

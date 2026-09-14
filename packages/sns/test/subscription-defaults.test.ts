@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { SubscriptionProtocol, Topic, type TopicSubscriptionConfig } from "aws-cdk-lib/aws-sns";
 import {
@@ -10,6 +10,7 @@ import {
 } from "aws-cdk-lib/aws-sns-subscriptions";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
 import { Queue } from "aws-cdk-lib/aws-sqs";
+import { newStack } from "@composurecdk/cdk-testing";
 import { SUBSCRIPTION_DEFAULTS, applySubscriptionDefaults } from "../src/subscription-defaults.js";
 import { createSubscriptionBuilder } from "../src/subscription-builder.js";
 import { createTopicBuilder } from "../src/topic-builder.js";
@@ -20,11 +21,6 @@ function makeHandler(stack: Stack, id = "Handler") {
     handler: "index.handler",
     code: Code.fromInline("exports.handler = async () => {};"),
   });
-}
-
-function newStack() {
-  const app = new App();
-  return new Stack(app, "TestStack");
 }
 
 describe("SUBSCRIPTION_DEFAULTS", () => {

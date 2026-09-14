@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { Stack } from "aws-cdk-lib";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
 import { Bucket, type IBucket } from "aws-cdk-lib/aws-s3";
@@ -22,6 +22,7 @@ import {
   Stop,
   type StopProps,
 } from "aws-cdk-lib/aws-ses-actions";
+import { newStack } from "@composurecdk/cdk-testing";
 import { ref, resolve } from "@composurecdk/core";
 import {
   addHeaderAction,
@@ -35,10 +36,6 @@ import {
   type SnsActionOptions,
   type BounceActionOptions,
 } from "../src/actions/index.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
 
 function newFn(stack: Stack, id = "Fn"): LambdaFn {
   return new LambdaFn(stack, id, {

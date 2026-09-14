@@ -1,15 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { newStack } from "@composurecdk/cdk-testing";
 import { createRuleBuilder } from "../src/rule-builder.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
 
 function makeFn(stack: Stack): LambdaFn {
   return new LambdaFn(stack, "Handler", {

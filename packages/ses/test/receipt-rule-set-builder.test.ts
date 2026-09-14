@@ -1,17 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import { s3Action } from "../src/actions/index.js";
 import { createReceiptRuleSetBuilder } from "../src/receipt-rule-set-builder.js";
 
-function newStack(region = "us-east-1"): Stack {
-  return new Stack(new App(), "TestStack", { env: { account: "111111111111", region } });
-}
-
 describe("ReceiptRuleSetBuilder", () => {
   it("creates a rule set with a rule, secure defaults, and an S3 action", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const bucket = new Bucket(stack, "Bucket");
     const { ruleSet, rules } = createReceiptRuleSetBuilder()
       .rule("inbound", (r) =>
@@ -36,7 +32,7 @@ describe("ReceiptRuleSetBuilder", () => {
   });
 
   it("activates the rule set by default", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { activation } = createReceiptRuleSetBuilder()
       .rule("inbound", (r) => r.recipients(["info@example.com"]))
       .build(stack, "MailRuleSet");
@@ -57,7 +53,7 @@ describe("ReceiptRuleSetBuilder", () => {
   });
 
   it("opts out of activation with .activate(false)", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { activation } = createReceiptRuleSetBuilder()
       .rule("inbound", (r) => r.recipients(["info@example.com"]))
       .activate(false)
@@ -68,7 +64,7 @@ describe("ReceiptRuleSetBuilder", () => {
   });
 
   it("preserves declaration order across rules", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { rules } = createReceiptRuleSetBuilder()
       .rule("first", (r) => r.recipients(["a@example.com"]))
       .rule("second", (r) => r.recipients(["b@example.com"]))
@@ -80,7 +76,7 @@ describe("ReceiptRuleSetBuilder", () => {
   });
 
   it("passes through receiptRuleSetName and dropSpam", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createReceiptRuleSetBuilder()
       .receiptRuleSetName("my-rules")
       .dropSpam(true)
@@ -94,7 +90,7 @@ describe("ReceiptRuleSetBuilder", () => {
   });
 
   it("warns when built in a region without receiving support", () => {
-    const stack = newStack("af-south-1");
+    const stack = newStack({ env: testEnv("af-south-1") });
     createReceiptRuleSetBuilder().activate(false).build(stack, "MailRuleSet");
     // Presence of the annotation is asserted in region-support.test.ts; here we
     // just exercise the builder's call path in an unsupported region.
@@ -110,7 +106,7 @@ describe("ReceiptRuleSetBuilder", () => {
   });
 
   it("copies configured rules and activation flag independently", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const base = createReceiptRuleSetBuilder()
       .rule("inbound", (r) => r.recipients(["a@example.com"]))
       .activate(false);

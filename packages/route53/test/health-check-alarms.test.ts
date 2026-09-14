@@ -1,16 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import { createHealthCheckBuilder } from "../src/health-check-builder.js";
 import { resolveHealthCheckAlarmDefinitions } from "../src/health-check-alarms.js";
 
-const ENV_US_EAST_1 = { account: "123456789012", region: "us-east-1" };
-
 function buildResult(configureFn?: (builder: ReturnType<typeof createHealthCheckBuilder>) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack", { env: ENV_US_EAST_1 });
+  const stack = newStack({ env: testEnv("us-east-1") });
   const builder = createHealthCheckBuilder().type(HealthCheckType.HTTPS).fqdn("api.example.com");
   configureFn?.(builder);
   const result = builder.build(stack, "ApiHealthCheck");

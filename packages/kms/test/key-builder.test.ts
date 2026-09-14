@@ -1,15 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type IKey, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
+import { newStack } from "@composurecdk/cdk-testing";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createKeyBuilder } from "../src/key-builder.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
 
 /** A minimal, fully-configured custom alarm on the key's own expiry metric. */
 function expiryAlarm(

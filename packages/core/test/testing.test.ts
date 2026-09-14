@@ -39,11 +39,11 @@ class WithoutCopyState {
   }
 }
 
-interface BuildResult {
+interface ItemsSnapshot {
   items: readonly string[];
 }
 
-function buildResult(b: IBuilder<Props, WithAccumulator | WithoutCopyState>): BuildResult {
+function snapshotItems(b: IBuilder<Props, WithAccumulator | WithoutCopyState>): ItemsSnapshot {
   return { items: [...b.items()] };
 }
 
@@ -58,7 +58,7 @@ describe("assertCopyPreservesState", () => {
         mutate: (b) => {
           b.add("after-copy");
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).not.toThrow();
@@ -74,7 +74,7 @@ describe("assertCopyPreservesState", () => {
         mutate: (b) => {
           b.add("after-copy");
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).toThrow(/COPY_STATE/);
@@ -90,7 +90,7 @@ describe("assertCopyPreservesState", () => {
         mutate: () => {
           /* no-op */
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).toThrow(/mutate.*did not change/);
@@ -107,7 +107,7 @@ describe("assertCopyPreservesState", () => {
         mutate: (b) => {
           b.name("changed");
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).toThrow(/mutate.*did not change/);
@@ -125,7 +125,7 @@ describe("assertCopyPreservesState", () => {
       },
       build: (b) => {
         seen.push(b);
-        return buildResult(b);
+        return snapshotItems(b);
       },
       inspect: (r) => r.items,
     });
@@ -149,7 +149,7 @@ describe("assertCopyPreservesState", () => {
         mutate: () => {
           /* no-op */
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).toThrow(/no `\.copy\(\)` method/);
@@ -168,7 +168,7 @@ describe("assertCopyPreservesState", () => {
         mutate: () => {
           /* no-op — forces the "did not change" failure path */
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: () => circular,
       });
     }).toThrow(/\[object Object\]/);
@@ -192,7 +192,7 @@ describe("assertCopyPreservesState", () => {
         mutate: (b) => {
           b.add("after-copy");
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: () => states[call++],
       });
     }).not.toThrow();

@@ -1,20 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+
 import { Template } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Queue } from "aws-cdk-lib/aws-sqs";
+import { newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { queueGrants } from "../src/grants.js";
 
 function setup() {
-  const app = new App();
-  const stack = new Stack(app, "S");
+  const stack = newStack();
   const queue = new Queue(stack, "Queue");
   const role = new Role(stack, "Role", { assumedBy: new ServicePrincipal("lambda.amazonaws.com") });
   return { stack, queue, role };
 }
-
-const policyJson = (stack: Stack) => JSON.stringify(Template.fromStack(stack).toJSON());
 
 describe("queueGrants", () => {
   it.each([

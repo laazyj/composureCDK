@@ -1,21 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { ReceiptFilterPolicy } from "aws-cdk-lib/aws-ses";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import {
   createAllowListReceiptFilterBuilder,
   createReceiptFilterBuilder,
 } from "../src/receipt-filter-builder.js";
 
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack", {
-    env: { account: "111111111111", region: "us-east-1" },
-  });
-}
-
 describe("ReceiptFilterBuilder", () => {
   it("blocks an IP range", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { receiptFilter } = createReceiptFilterBuilder()
       .ip("10.0.0.0/24")
       .policy(ReceiptFilterPolicy.BLOCK)
@@ -31,7 +25,7 @@ describe("ReceiptFilterBuilder", () => {
 
 describe("AllowListReceiptFilterBuilder", () => {
   it("blocks all but the allowed IPs", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { allowList } = createAllowListReceiptFilterBuilder()
       .ips(["10.0.0.1/32"])
       .build(stack, "Allowlist");
@@ -41,7 +35,7 @@ describe("AllowListReceiptFilterBuilder", () => {
   });
 
   it("throws when no IPs are supplied", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     expect(() => createAllowListReceiptFilterBuilder().build(stack, "Allowlist")).toThrow(
       /call \.ips\(\[\.\.\.\]\)/,
     );

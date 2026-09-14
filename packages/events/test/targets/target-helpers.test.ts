@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { EventBus, Schedule } from "aws-cdk-lib/aws-events";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
@@ -15,6 +15,7 @@ import {
   SnsTopic as SnsTopicTarget,
   SqsQueue as SqsQueueTarget,
 } from "aws-cdk-lib/aws-events-targets";
+import { newStack } from "@composurecdk/cdk-testing";
 import { isRef, ref } from "@composurecdk/core";
 import { createRuleBuilder } from "../../src/rule-builder.js";
 import { lambdaTarget } from "../../src/targets/lambda-target.js";
@@ -23,10 +24,6 @@ import { snsTarget } from "../../src/targets/sns-target.js";
 import { sfnStateMachineTarget } from "../../src/targets/sfn-state-machine-target.js";
 import { eventBusTarget } from "../../src/targets/event-bus-target.js";
 import { cloudWatchLogGroupTarget } from "../../src/targets/cloud-watch-log-group-target.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
 
 function makeFn(stack: Stack, id = "Handler"): LambdaFn {
   return new LambdaFn(stack, id, {

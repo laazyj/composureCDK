@@ -3,6 +3,7 @@ import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
@@ -12,10 +13,6 @@ import {
   type HealthCheckAlarmBuilderResult,
 } from "../src/health-check-alarm-builder.js";
 import type { HealthCheckBuilderResult } from "../src/health-check-builder.js";
-
-const ACCOUNT = "123456789012";
-const ENV_US_EAST_1 = { account: ACCOUNT, region: "us-east-1" };
-const ENV_EU_WEST_2 = { account: ACCOUNT, region: "eu-west-2" };
 
 function connectionTimeAlarm(a: AlarmDefinitionBuilder<IHealthCheck>) {
   return a
@@ -33,8 +30,10 @@ function connectionTimeAlarm(a: AlarmDefinitionBuilder<IHealthCheck>) {
 }
 
 function buildHealthCheck() {
+  // Raw construction: the multi-stack cases below put a second stack in this
+  // same App, which `newStack` deliberately does not support.
   const app = new App();
-  const stack = new Stack(app, "TestStack", { env: ENV_US_EAST_1 });
+  const stack = new Stack(app, "TestStack", { env: testEnv("us-east-1") });
   const result = createHealthCheckBuilder()
     .type(HealthCheckType.HTTPS)
     .fqdn("api.example.com")
@@ -91,8 +90,7 @@ describe("createHealthCheckAlarmBuilder", () => {
     });
 
     it("throws when healthCheck() was never called", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack", { env: ENV_US_EAST_1 });
+      const stack = newStack({ env: testEnv("us-east-1") });
       const builder = createHealthCheckAlarmBuilder();
       expect(() => builder.build(stack, "Alarms")).toThrow(/requires a health check/);
     });
@@ -102,7 +100,9 @@ describe("createHealthCheckAlarmBuilder", () => {
     function buildAlarmsInRegion(region: string | undefined): Stack {
       const app = new App();
       const hcStackProps =
-        region === undefined ? undefined : { env: ENV_EU_WEST_2, crossRegionReferences: true };
+        region === undefined
+          ? undefined
+          : { env: testEnv("eu-west-2"), crossRegionReferences: true };
       const hcStack = new Stack(app, "HcStack", hcStackProps);
       const result = createHealthCheckBuilder()
         .type(HealthCheckType.HTTPS)
@@ -114,7 +114,7 @@ describe("createHealthCheckAlarmBuilder", () => {
         region === undefined
           ? new Stack(app, "AlarmStack")
           : new Stack(app, "AlarmStack", {
-              env: { account: ACCOUNT, region },
+              env: testEnv(region),
               crossRegionReferences: true,
             });
       createHealthCheckAlarmBuilder().healthCheck(result).build(alarmStack, "Alarms");
@@ -151,8 +151,7 @@ describe("createHealthCheckAlarmBuilder", () => {
 
   describe("with a Ref<HealthCheckBuilderResult> through compose", () => {
     it("resolves the health check and creates the same alarm surface", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack", { env: ENV_US_EAST_1 });
+      const stack = newStack({ env: testEnv("us-east-1") });
 
       const system = compose(
         {
@@ -184,11 +183,11 @@ describe("createHealthCheckAlarmBuilder", () => {
     it("routes alarms into a separate stack when withStacks() points apiAlarms elsewhere", () => {
       const app = new App();
       const appStack = new Stack(app, "AppStack", {
-        env: ENV_EU_WEST_2,
+        env: testEnv("eu-west-2"),
         crossRegionReferences: true,
       });
       const alarmStack = new Stack(app, "AlarmStack", {
-        env: ENV_US_EAST_1,
+        env: testEnv("us-east-1"),
         crossRegionReferences: true,
       });
 
@@ -254,7 +253,8 @@ describe("createHealthCheckAlarmBuilder", () => {
               .lessThan(),
           );
         },
-        build: (b) => b.build(new Stack(new App(), "AlarmStack", { env: ENV_US_EAST_1 }), "Alarms"),
+        build: (b) =>
+          b.build(new Stack(new App(), "AlarmStack", { env: testEnv("us-east-1") }), "Alarms"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });

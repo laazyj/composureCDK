@@ -1,18 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Topic } from "aws-cdk-lib/aws-sns";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBudgetBuilder } from "../src/budget-builder.js";
 import { email } from "../src/email.js";
 import type { NotifySubscribers } from "../src/notifications.js";
-
-function newStack(): Stack {
-  const app = new App();
-  return new Stack(app, "TestStack");
-}
 
 describe("BudgetBuilder", () => {
   describe("build", () => {
@@ -429,11 +425,7 @@ describe("BudgetBuilder", () => {
             alarm.metric(billingMetric).threshold(800).greaterThan(),
           );
         },
-        build: (b) =>
-          b.build(
-            new Stack(new App(), "S", { env: { account: "123456789012", region: "us-east-1" } }),
-            "Budget",
-          ),
+        build: (b) => b.build(newStack({ env: testEnv("us-east-1") }, "S"), "Budget"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });

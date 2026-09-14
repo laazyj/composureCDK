@@ -1,23 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+
 import { Template } from "aws-cdk-lib/assertions";
 import { RestApi } from "aws-cdk-lib/aws-apigateway";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { restApiGrants } from "../src/grants.js";
 
 function setup() {
-  const app = new App();
-  const stack = new Stack(app, "S");
+  const stack = newStack();
   const api = new RestApi(stack, "Api");
   api.root.addMethod("GET");
   const role = new Role(stack, "Role", { assumedBy: new ServicePrincipal("lambda.amazonaws.com") });
   return { stack, api, role };
 }
-
-// The granted action lands on the role's policy; asserting on the rendered
-// template keeps us decoupled from CDK's exact statement shape.
-const policyJson = (stack: Stack) => JSON.stringify(Template.fromStack(stack).toJSON());
 
 describe("restApiGrants", () => {
   it("invoke grants execute-api:Invoke across the whole API by default", () => {

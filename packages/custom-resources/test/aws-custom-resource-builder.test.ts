@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack, type CfnResource } from "aws-cdk-lib";
+import { Stack, type CfnResource } from "aws-cdk-lib";
 import { Template, Match } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Topic } from "aws-cdk-lib/aws-sns";
@@ -8,14 +8,11 @@ import {
   type AwsSdkCall,
   PhysicalResourceId,
 } from "aws-cdk-lib/custom-resources";
+import { newStack } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createAwsCustomResourceBuilder } from "../src/aws-custom-resource-builder.js";
 import { type SdkCallConfig } from "../src/calls.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
 
 function onlyCustomResource(stack: Stack): {
   Properties: Record<string, unknown>;

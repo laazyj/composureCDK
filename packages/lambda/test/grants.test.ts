@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+
 import { Template } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
+import { newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { functionGrants } from "../src/grants.js";
 
 function setup() {
-  const app = new App();
-  const stack = new Stack(app, "S");
+  const stack = newStack();
   const fn = new LambdaFunction(stack, "Fn", {
     runtime: Runtime.NODEJS_22_X,
     handler: "index.handler",
@@ -19,8 +19,6 @@ function setup() {
   });
   return { stack, fn, role };
 }
-
-const policyJson = (stack: Stack) => JSON.stringify(Template.fromStack(stack).toJSON());
 
 describe("functionGrants", () => {
   it.each([

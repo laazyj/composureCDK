@@ -1,14 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Topic } from "aws-cdk-lib/aws-sns";
+import { newStack } from "@composurecdk/cdk-testing";
 import { createBudgetsTopicPolicies } from "../src/topic-policy.js";
-
-function newStack(): Stack {
-  const app = new App();
-  return new Stack(app, "TestStack");
-}
 
 describe("createBudgetsTopicPolicies", () => {
   it("returns an empty record when no topics are provided", () => {

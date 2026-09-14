@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import {
   CertificateValidation,
@@ -8,15 +8,11 @@ import {
 } from "aws-cdk-lib/aws-certificatemanager";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
+import { newStack } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createCertificateBuilder } from "../src/certificate-builder.js";
 import { CERTIFICATE_DEFAULTS } from "../src/defaults.js";
-
-function newStack(): Stack {
-  const app = new App();
-  return new Stack(app, "TestStack");
-}
 
 function buildWithZone(
   configureFn?: (builder: ReturnType<typeof createCertificateBuilder>) => void,

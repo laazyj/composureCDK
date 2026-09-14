@@ -3,21 +3,15 @@ import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type CfnBudget } from "aws-cdk-lib/aws-budgets";
+import { testEnv, type TestEnvironment } from "@composurecdk/cdk-testing";
 import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createBudgetBuilder } from "../src/budget-builder.js";
 
-const ENV_US_EAST_1 = { account: "123456789012", region: "us-east-1" };
-const ENV_EU_WEST_1 = { account: "123456789012", region: "eu-west-1" };
-
-interface Env {
-  account: string;
-  region: string;
-}
 const ENV_AGNOSTIC = "agnostic" as const;
 
 function buildResult(
   configureFn?: (builder: ReturnType<typeof createBudgetBuilder>) => void,
-  env: Env | typeof ENV_AGNOSTIC = ENV_US_EAST_1,
+  env: TestEnvironment | typeof ENV_AGNOSTIC = testEnv("us-east-1"),
 ) {
   const app = new App();
   const stack = new Stack(app, "TestStack", env === ENV_AGNOSTIC ? undefined : { env });
@@ -189,7 +183,7 @@ describe("recommended alarms", () => {
     it("emits a warning when alarms would be created outside us-east-1", () => {
       const { stack } = buildResult(
         (b) => b.recommendedAlarms({ estimatedCharges: { threshold: 50 } }),
-        ENV_EU_WEST_1,
+        testEnv("eu-west-1"),
       );
 
       const warnings = Annotations.fromStack(stack).findWarning(
@@ -225,7 +219,7 @@ describe("recommended alarms", () => {
     });
 
     it("emits no warning when no alarms are created (alarms disabled, no custom alarms)", () => {
-      const { stack } = buildResult(undefined, ENV_EU_WEST_1);
+      const { stack } = buildResult(undefined, testEnv("eu-west-1"));
 
       const warnings = Annotations.fromStack(stack).findWarning(
         "*",
@@ -237,7 +231,7 @@ describe("recommended alarms", () => {
     it("warns on the custom-alarm-only path outside us-east-1", () => {
       const { stack } = buildResult(
         (b) => b.recommendedAlarms(false).addAlarm("ec2EstimatedCharges", customCpuAlarm),
-        ENV_EU_WEST_1,
+        testEnv("eu-west-1"),
       );
 
       const warnings = Annotations.fromStack(stack).findWarning(

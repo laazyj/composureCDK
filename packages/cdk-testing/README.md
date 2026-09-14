@@ -39,7 +39,8 @@ const stack = newStack({ env: testEnv("us-east-1") });
 | export                               | what it does                                                                                   |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------- |
 | `newStack(props?)`                   | A `Stack` in a fresh `App`. Pass `props.env` for an environment-specific stack.                |
-| `testEnv(region)`                    | An `Environment` for that region on `TEST_ACCOUNT`.                                            |
+| `testEnv(region)`                    | A `TestEnvironment` for that region on `TEST_ACCOUNT`.                                         |
+| `TestEnvironment`                    | CDK's `Environment` with `account` and `region` required, which `testEnv` always supplies.     |
 | `TEST_ACCOUNT`                       | The fictitious account those environments name.                                                |
 | `policyJson(stack)`                  | The synthesised template as a JSON string, for substring assertions over IAM policy documents. |
 | `assertAssignable<Target, Source>()` | A compile-time assignability assertion — how the ADR-0018 type-level prop guards are written.  |

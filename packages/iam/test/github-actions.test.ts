@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { TEST_ACCOUNT, newStack, testEnv } from "@composurecdk/cdk-testing";
 import { createRoleBuilder } from "../src/role-builder.js";
 import * as githubActions from "../src/github-actions.js";
 
 const OIDC_RESOURCE = "Custom::AWSCDKOpenIdConnectProvider";
 const ISSUER_HOST = "token.actions.githubusercontent.com";
-const ENV = { account: "123456789012", region: "us-east-1" };
 
 describe("githubActions.Subject", () => {
   const forRepo = "acme/app";
@@ -26,8 +26,7 @@ describe("githubActions.Subject", () => {
 
 describe("githubActions.provider", () => {
   it("presets the GitHub issuer URL and audience", () => {
-    const app = new App();
-    const stack = new Stack(app, "TestStack");
+    const stack = newStack();
     githubActions.provider().build(stack, "GithubOidcProvider");
 
     Template.fromStack(stack).hasResourceProperties(
@@ -40,8 +39,7 @@ describe("githubActions.provider", () => {
   });
 
   it("keeps preset values overridable", () => {
-    const app = new App();
-    const stack = new Stack(app, "TestStack");
+    const stack = newStack();
     githubActions.provider().clientIds(["sts.amazonaws.com", "other"]).build(stack, "P");
 
     Template.fromStack(stack).hasResourceProperties(
@@ -55,8 +53,7 @@ describe("githubActions.principal", () => {
   function roleTrustPolicy(
     subjects: Parameters<typeof githubActions.principal>[0]["subjects"],
   ): Template {
-    const app = new App();
-    const stack = new Stack(app, "TestStack", { env: ENV });
+    const stack = newStack({ env: testEnv("us-east-1") });
     const provider = githubActions.importProvider(stack, "Provider");
     createRoleBuilder()
       .assumedBy(githubActions.principal({ owner: "acme", repo: "app", provider, subjects }))
@@ -95,8 +92,7 @@ describe("githubActions.principal", () => {
   });
 
   it("throws when owner or repo is empty or contains a slash", () => {
-    const app = new App();
-    const stack = new Stack(app, "TestStack", { env: ENV });
+    const stack = newStack({ env: testEnv("us-east-1") });
     const provider = githubActions.importProvider(stack, "Provider");
 
     expect(() =>
@@ -121,8 +117,7 @@ describe("githubActions.principal", () => {
 
 describe("githubActions.importProvider", () => {
   it("references the account-singleton provider by its conventional ARN", () => {
-    const app = new App();
-    const stack = new Stack(app, "TestStack", { env: ENV });
+    const stack = newStack({ env: testEnv("us-east-1") });
     const provider = githubActions.importProvider(stack, "Provider");
 
     createRoleBuilder()
@@ -141,7 +136,7 @@ describe("githubActions.importProvider", () => {
         Statement: Match.arrayWith([
           Match.objectLike({
             Principal: {
-              Federated: `arn:aws:iam::${ENV.account}:oidc-provider/${ISSUER_HOST}`,
+              Federated: `arn:aws:iam::${TEST_ACCOUNT}:oidc-provider/${ISSUER_HOST}`,
             },
           }),
         ]),

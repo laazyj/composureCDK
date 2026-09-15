@@ -1,39 +1,27 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 
-import { Template } from "aws-cdk-lib/assertions";
-import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Topic } from "aws-cdk-lib/aws-sns";
-import { newStack, policyJson } from "@composurecdk/cdk-testing";
+import { describeGrants, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { topicGrants } from "../src/grants.js";
 
-function setup() {
-  const stack = newStack();
-  const topic = new Topic(stack, "Topic");
-  const role = new Role(stack, "Role", { assumedBy: new ServicePrincipal("lambda.amazonaws.com") });
-  return { stack, topic, role };
-}
+describeGrants({
+  name: "topicGrants",
+  grants: topicGrants,
+  makeResource: (stack) => new Topic(stack, "Topic"),
+  cases: [
+    { capability: "publish", grants: ["sns:Publish"] },
+    { capability: "subscribe", grants: ["sns:Subscribe"] },
+  ],
+  extra: (setup) => {
+    it("resolves a Resolvable topic from the build context before granting", () => {
+      const { stack, resource: topic, role } = setup();
 
-describe("topicGrants", () => {
-  it.each([
-    ["publish", "sns:Publish"],
-    ["subscribe", "sns:Subscribe"],
-  ] as const)("%s delegates to the matching native grant method", (capability, action) => {
-    const { stack, topic, role } = setup();
+      topicGrants
+        .publish(ref<{ topic: Topic }, Topic>("store", (r) => r.topic))
+        .applyTo(role, { store: { topic } });
 
-    topicGrants[capability](topic).applyTo(role, {});
-
-    expect(policyJson(stack)).toContain(action);
-    Template.fromStack(stack).resourceCountIs("AWS::IAM::Policy", 1);
-  });
-
-  it("resolves a Resolvable topic from the build context before granting", () => {
-    const { stack, topic, role } = setup();
-
-    topicGrants
-      .publish(ref<{ topic: Topic }, Topic>("store", (r) => r.topic))
-      .applyTo(role, { store: { topic } });
-
-    expect(policyJson(stack)).toContain("sns:Publish");
-  });
+      expect(policyJson(stack)).toContain("sns:Publish");
+    });
+  },
 });

@@ -1,43 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 
-import { Template } from "aws-cdk-lib/assertions";
-import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { newStack, policyJson } from "@composurecdk/cdk-testing";
+import { describeGrants, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { bucketGrants } from "../src/grants.js";
 
-function setup() {
-  const stack = newStack();
-  const bucket = new Bucket(stack, "Bucket");
-  const role = new Role(stack, "Role", { assumedBy: new ServicePrincipal("lambda.amazonaws.com") });
-  return { stack, bucket, role };
-}
+describeGrants({
+  name: "bucketGrants",
+  grants: bucketGrants,
+  makeResource: (stack) => new Bucket(stack, "Bucket"),
+  cases: [
+    { capability: "read", grants: ["s3:GetObject"] },
+    { capability: "write", grants: ["s3:PutObject"] },
+    { capability: "readWrite", grants: ["s3:GetObject", "s3:PutObject"] },
+    { capability: "put", grants: ["s3:PutObject"] },
+    { capability: "delete", grants: ["s3:DeleteObject"] },
+  ],
+  extra: (setup) => {
+    it("resolves a Resolvable bucket from the build context before granting", () => {
+      const { stack, resource: bucket, role } = setup();
 
-describe("bucketGrants", () => {
-  it.each([
-    ["read", ["s3:GetObject"]],
-    ["write", ["s3:PutObject"]],
-    ["readWrite", ["s3:GetObject", "s3:PutObject"]],
-    ["put", ["s3:PutObject"]],
-    ["delete", ["s3:DeleteObject"]],
-  ] as const)("%s delegates to the matching native grant method", (capability, actions) => {
-    const { stack, bucket, role } = setup();
+      bucketGrants
+        .write(ref<{ bucket: Bucket }, Bucket>("store", (r) => r.bucket))
+        .applyTo(role, { store: { bucket } });
 
-    bucketGrants[capability](bucket).applyTo(role, {});
-
-    const json = policyJson(stack);
-    for (const action of actions) expect(json).toContain(action);
-    Template.fromStack(stack).resourceCountIs("AWS::IAM::Policy", 1);
-  });
-
-  it("resolves a Resolvable bucket from the build context before granting", () => {
-    const { stack, bucket, role } = setup();
-
-    bucketGrants
-      .write(ref<{ bucket: Bucket }, Bucket>("store", (r) => r.bucket))
-      .applyTo(role, { store: { bucket } });
-
-    expect(policyJson(stack)).toContain("s3:PutObject");
-  });
+      expect(policyJson(stack)).toContain("s3:PutObject");
+    });
+  },
 });

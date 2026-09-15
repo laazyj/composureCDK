@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { DeduplicationScope, FifoThroughputLimit, Queue } from "aws-cdk-lib/aws-sqs";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { createQueueBuilder } from "../src/queue-builder.js";
 import {
-  buildQueueStack,
   expectCopyPreservesCustomAlarms,
   expectSharedSecureDefaults,
   setUntypedProp,
@@ -12,26 +12,24 @@ import {
 
 const createFifoBuilder = () => createQueueBuilder("fifo");
 
-function buildResult(configureFn?: (builder: ReturnType<typeof createFifoBuilder>) => void) {
-  return buildQueueStack(createFifoBuilder, "OrderEvents", configureFn);
-}
+const buildAndSynth = buildFixture(createFifoBuilder, "OrderEvents");
 
 describe('createQueueBuilder("fifo")', () => {
   describe("build", () => {
     it("always creates a FIFO queue", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SQS::Queue", { FifoQueue: true });
     });
 
     it("builds without a queueName — CloudFormation generates a valid one", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SQS::Queue", { QueueName: Match.absent() });
     });
 
     it("creates a queue with the specified .fifo queue name", () => {
-      const { template } = buildResult((b) => b.queueName("order-events.fifo"));
+      const { template } = buildAndSynth((b) => b.queueName("order-events.fifo"));
 
       template.hasResourceProperties("AWS::SQS::Queue", {
         FifoQueue: true,
@@ -40,7 +38,7 @@ describe('createQueueBuilder("fifo")', () => {
     });
 
     it("forwards FIFO-specific props to the underlying CDK construct", () => {
-      const { template } = buildResult((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .contentBasedDeduplication(true)
           .deduplicationScope(DeduplicationScope.MESSAGE_GROUP)
@@ -55,13 +53,13 @@ describe('createQueueBuilder("fifo")', () => {
     });
 
     it("forwards shared QueueProps to the underlying CDK construct", () => {
-      const { template } = buildResult((b) => b.visibilityTimeout(Duration.seconds(120)));
+      const { template } = buildAndSynth((b) => b.visibilityTimeout(Duration.seconds(120)));
 
       template.hasResourceProperties("AWS::SQS::Queue", { VisibilityTimeout: 120 });
     });
 
     it("applies the shared secure defaults", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       expectSharedSecureDefaults(template);
     });
@@ -70,7 +68,7 @@ describe('createQueueBuilder("fifo")', () => {
   describe("validation", () => {
     it("throws when queueName does not end in .fifo", () => {
       expect(() =>
-        buildResult((b) => {
+        buildAndSynth((b) => {
           setUntypedProp(b, "queueName", "order-events");
         }),
       ).toThrow(/QueueBuilder "OrderEvents": FIFO queues require a queueName ending in ".fifo"/);
@@ -78,13 +76,13 @@ describe('createQueueBuilder("fifo")', () => {
 
     it("throws when high-throughput mode is missing the message-group dedup scope", () => {
       expect(() =>
-        buildResult((b) => b.fifoThroughputLimit(FifoThroughputLimit.PER_MESSAGE_GROUP_ID)),
+        buildAndSynth((b) => b.fifoThroughputLimit(FifoThroughputLimit.PER_MESSAGE_GROUP_ID)),
       ).toThrow(/requires deduplicationScope=MESSAGE_GROUP/);
     });
 
     it("accepts high-throughput mode with deduplicationScope MESSAGE_GROUP", () => {
       expect(() =>
-        buildResult((b) =>
+        buildAndSynth((b) =>
           b
             .fifoThroughputLimit(FifoThroughputLimit.PER_MESSAGE_GROUP_ID)
             .deduplicationScope(DeduplicationScope.MESSAGE_GROUP),
@@ -125,7 +123,7 @@ describe('createQueueBuilder("fifo")', () => {
 
   describe("recommended alarms", () => {
     it("creates the primary-queue alarm set with the shared thresholds", () => {
-      const { result, template } = buildResult();
+      const { result, template } = buildAndSynth();
 
       expect(result.alarms.approximateAgeOfOldestMessage).toBeDefined();
       expect(result.alarms.approximateNumberOfMessagesNotVisible).toBeDefined();
@@ -138,7 +136,7 @@ describe('createQueueBuilder("fifo")', () => {
     });
 
     it("allows tuning an individual alarm", () => {
-      const { template } = buildResult((b) =>
+      const { template } = buildAndSynth((b) =>
         b.recommendedAlarms({ approximateAgeOfOldestMessage: { threshold: 60 } }),
       );
 
@@ -155,7 +153,7 @@ describe('createQueueBuilder("fifo")', () => {
     });
 
     it("preserves the role across .copy() — the role is props, not hidden state", () => {
-      const { template } = buildQueueStack(() => createQueueBuilder("fifo").copy(), "OrderEvents");
+      const { template } = buildFixture(() => createQueueBuilder("fifo").copy(), "OrderEvents")();
 
       template.hasResourceProperties("AWS::SQS::Queue", { FifoQueue: true });
     });

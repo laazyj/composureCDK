@@ -55,13 +55,40 @@ describe("buildFixture", () => {
     template.resourceCountIs("AWS::SNS::Topic", 1);
   });
 
-  it("passes the stack to the factory, for a builder seeded from a construct in it", () => {
-    const seeded = buildFixture((stack) => {
-      new Topic(stack, "Seed");
+  it("calls the factory with no arguments, so an optional first param keeps its default", () => {
+    // Regression guard. Several `create*Builder` functions take an optional
+    // first parameter — `createQueueBuilder(role)` — so a factory called with
+    // the stack would silently receive it as that argument. TypeScript cannot
+    // catch it, because a one-parameter function is assignable to a
+    // zero-parameter signature; only the runtime shows it.
+    const seen: unknown[] = [];
+    const recording = buildFixture((...args: unknown[]) => {
+      seen.push(...args);
       return createFakeBuilder();
     }, "TestBucket");
 
-    seeded().template.resourceCountIs("AWS::SNS::Topic", 1);
+    recording();
+
+    expect(seen).toEqual([]);
+  });
+
+  it("runs `seed` before `configure`, for suite-wide setup that needs the stack", () => {
+    const order: string[] = [];
+    const seeded = buildFixture(createFakeBuilder, "TestBucket", {
+      seed: (b, stack) => {
+        order.push("seed");
+        new Topic(stack, "Seed");
+        b.versioned(true);
+      },
+    });
+
+    const { template } = seeded(() => order.push("configure"));
+
+    expect(order).toEqual(["seed", "configure"]);
+    template.resourceCountIs("AWS::SNS::Topic", 1);
+    template.hasResourceProperties("AWS::S3::Bucket", {
+      VersioningConfiguration: { Status: "Enabled" },
+    });
   });
 
   it("forwards context as build's third argument", () => {

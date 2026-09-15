@@ -11,20 +11,12 @@ import {
   LambdaSubscription,
   SqsSubscription,
 } from "aws-cdk-lib/aws-sns-subscriptions";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createTopicBuilder, type TopicBuilderProps } from "../src/topic-builder.js";
 
-function synthTemplate(
-  configureFn?: (builder: ReturnType<typeof createTopicBuilder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createTopicBuilder();
-  configureFn?.(builder);
-  builder.build(stack, "TestTopic");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(createTopicBuilder, "TestTopic");
 
 describe("TopicBuilder", () => {
   describe("build", () => {
@@ -40,7 +32,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates exactly one SNS topic", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::SNS::Topic", 1);
     });
@@ -48,7 +40,7 @@ describe("TopicBuilder", () => {
 
   describe("synthesised output", () => {
     it("creates a topic with the specified display name", () => {
-      const template = synthTemplate((b) => b.displayName("My Topic"));
+      const { template } = buildAndSynth((b) => b.displayName("My Topic"));
 
       template.hasResourceProperties("AWS::SNS::Topic", {
         DisplayName: "My Topic",
@@ -56,7 +48,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates a topic with the specified topic name", () => {
-      const template = synthTemplate((b) => b.topicName("my-topic"));
+      const { template } = buildAndSynth((b) => b.topicName("my-topic"));
 
       template.hasResourceProperties("AWS::SNS::Topic", {
         TopicName: "my-topic",
@@ -64,7 +56,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates a FIFO topic when configured", () => {
-      const template = synthTemplate((b) => b.fifo(true).topicName("my-topic.fifo"));
+      const { template } = buildAndSynth((b) => b.fifo(true).topicName("my-topic.fifo"));
 
       template.hasResourceProperties("AWS::SNS::Topic", {
         FifoTopic: true,
@@ -73,7 +65,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates a topic with content-based deduplication", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.fifo(true).contentBasedDeduplication(true).topicName("my-topic.fifo"),
       );
 
@@ -94,7 +86,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates a Subscription resource for an EmailSubscription", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.addSubscription("ops", new EmailSubscription("ops@example.com")),
       );
 
@@ -194,7 +186,7 @@ describe("TopicBuilder", () => {
 
   describe("secure defaults", () => {
     it("enforces SSL by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SNS::TopicPolicy", {
         PolicyDocument: {
@@ -211,7 +203,7 @@ describe("TopicBuilder", () => {
     });
 
     it("allows the user to disable SSL enforcement", () => {
-      const template = synthTemplate((b) => b.enforceSSL(false));
+      const { template } = buildAndSynth((b) => b.enforceSSL(false));
 
       template.resourceCountIs("AWS::SNS::TopicPolicy", 0);
     });
@@ -262,13 +254,13 @@ describe("TopicBuilder", () => {
 
   describe("masterKey", () => {
     it("leaves the topic unencrypted at rest when no key is supplied", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SNS::Topic", { KmsMasterKeyId: Match.absent() });
     });
 
     it("passes a concrete key through to the topic", () => {
-      const stack = new Stack(new App(), "TestStack");
+      const stack = newStack();
       const key = new Key(stack, "Key");
 
       createTopicBuilder().masterKey(key).build(stack, "TestTopic");
@@ -279,7 +271,7 @@ describe("TopicBuilder", () => {
     });
 
     it("resolves a Resolvable key from the build context", () => {
-      const stack = new Stack(new App(), "TestStack");
+      const stack = newStack();
       const key = new Key(stack, "Key");
 
       createTopicBuilder()

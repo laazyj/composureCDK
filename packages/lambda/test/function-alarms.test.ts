@@ -1,20 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
-import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { alarmName } from "@composurecdk/cloudwatch";
 import type { FunctionAlarmConfig } from "../src/alarm-config.js";
 import { createFunctionBuilder } from "../src/function-builder.js";
 
-function buildResult(configureFn: (builder: ReturnType<typeof createFunctionBuilder>) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createFunctionBuilder();
-  configureFn(builder);
-  const result = builder.build(stack, "TestFunction");
-  return { result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(createFunctionBuilder, "TestFunction");
 
 function minimalFunction(builder: ReturnType<typeof createFunctionBuilder>) {
   builder
@@ -26,7 +20,7 @@ function minimalFunction(builder: ReturnType<typeof createFunctionBuilder>) {
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates errors and throttles alarms by default", () => {
-      const { result, template } = buildResult(minimalFunction);
+      const { result, template } = buildAndSynth(minimalFunction);
 
       expect(result.alarms.errors).toBeDefined();
       expect(result.alarms.throttles).toBeDefined();
@@ -34,19 +28,19 @@ describe("recommended alarms", () => {
     });
 
     it("does not create duration alarm without timeout", () => {
-      const { result } = buildResult(minimalFunction);
+      const { result } = buildAndSynth(minimalFunction);
 
       expect(result.alarms.duration).toBeUndefined();
     });
 
     it("does not create concurrentExecutions alarm without reservedConcurrentExecutions", () => {
-      const { result } = buildResult(minimalFunction);
+      const { result } = buildAndSynth(minimalFunction);
 
       expect(result.alarms.concurrentExecutions).toBeUndefined();
     });
 
     it("creates errors alarm with threshold > 0", () => {
-      const { template } = buildResult(minimalFunction);
+      const { template } = buildAndSynth(minimalFunction);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "Errors",
@@ -61,7 +55,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates throttles alarm with threshold > 0", () => {
-      const { template } = buildResult(minimalFunction);
+      const { template } = buildAndSynth(minimalFunction);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "Throttles",
@@ -76,7 +70,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes threshold justification in alarm descriptions", () => {
-      const { template } = buildResult(minimalFunction);
+      const { template } = buildAndSynth(minimalFunction);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "Errors",
@@ -87,7 +81,7 @@ describe("recommended alarms", () => {
 
   describe("contextual alarms", () => {
     it("creates duration alarm when timeout is configured", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.timeout(Duration.seconds(30));
       });
@@ -105,7 +99,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates concurrentExecutions alarm when reservedConcurrentExecutions is set", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.reservedConcurrentExecutions(100);
       });
@@ -121,7 +115,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates all four alarms when both timeout and reservedConcurrentExecutions are set", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.timeout(Duration.seconds(30)).reservedConcurrentExecutions(100);
       });
@@ -219,7 +213,7 @@ describe("recommended alarms", () => {
 
   describe("customization", () => {
     it("allows customizing errors alarm threshold", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.recommendedAlarms({ errors: { threshold: 5 } });
       });
@@ -231,7 +225,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing evaluation periods", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.recommendedAlarms({ throttles: { evaluationPeriods: 5, datapointsToAlarm: 3 } });
       });
@@ -244,7 +238,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows overriding alarmName on a recommended alarm", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.recommendedAlarms({ errors: { alarmName: alarmName("checkout-fn-errors") } });
       });
@@ -256,7 +250,7 @@ describe("recommended alarms", () => {
     });
 
     it("derives a default AlarmName when not overridden", () => {
-      const { template } = buildResult(minimalFunction);
+      const { template } = buildAndSynth(minimalFunction);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "Errors",
@@ -265,7 +259,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing treat missing data", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.recommendedAlarms({ errors: { treatMissingData: TreatMissingData.BREACHING } });
       });
@@ -277,7 +271,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows overriding the duration alarm threshold percent", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.timeout(Duration.seconds(30)).recommendedAlarms({
           duration: { thresholdPercent: 0.75 },
@@ -293,7 +287,7 @@ describe("recommended alarms", () => {
 
   describe("disabling alarms", () => {
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.timeout(Duration.seconds(30)).reservedConcurrentExecutions(100).recommendedAlarms(false);
       });
@@ -303,7 +297,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when enabled is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.recommendedAlarms({ enabled: false });
       });
@@ -313,7 +307,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables individual alarms when set to false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.recommendedAlarms({ errors: false });
       });
@@ -324,7 +318,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables multiple individual alarms", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.timeout(Duration.seconds(30)).recommendedAlarms({
           errors: false,
@@ -342,7 +336,7 @@ describe("recommended alarms", () => {
   describe("validation", () => {
     it("throws when thresholdPercent is 0", () => {
       expect(() =>
-        buildResult((b) => {
+        buildAndSynth((b) => {
           minimalFunction(b);
           b.timeout(Duration.seconds(30)).recommendedAlarms({
             duration: { thresholdPercent: 0 },
@@ -353,7 +347,7 @@ describe("recommended alarms", () => {
 
     it("throws when thresholdPercent is negative", () => {
       expect(() =>
-        buildResult((b) => {
+        buildAndSynth((b) => {
           minimalFunction(b);
           b.timeout(Duration.seconds(30)).recommendedAlarms({
             duration: { thresholdPercent: -0.5 },
@@ -364,7 +358,7 @@ describe("recommended alarms", () => {
 
     it("throws when thresholdPercent exceeds 1", () => {
       expect(() =>
-        buildResult((b) => {
+        buildAndSynth((b) => {
           minimalFunction(b);
           b.timeout(Duration.seconds(30)).recommendedAlarms({
             duration: { thresholdPercent: 1.5 },
@@ -374,7 +368,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows thresholdPercent of exactly 1", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         minimalFunction(b);
         b.timeout(Duration.seconds(30)).recommendedAlarms({
           duration: { thresholdPercent: 1 },
@@ -390,7 +384,7 @@ describe("recommended alarms", () => {
 
   describe("no default actions", () => {
     it("creates alarms with no alarm actions", () => {
-      const { template } = buildResult(minimalFunction);
+      const { template } = buildAndSynth(minimalFunction);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "Errors",
@@ -402,7 +396,7 @@ describe("recommended alarms", () => {
 
 describe("addAlarm", () => {
   it("creates a custom alarm alongside recommended alarms", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       minimalFunction(b);
       b.addAlarm("invocations", (alarm) =>
         alarm
@@ -426,7 +420,7 @@ describe("addAlarm", () => {
   });
 
   it("creates a custom alarm with all builder options", () => {
-    const { template } = buildResult((b) => {
+    const { template } = buildAndSynth((b) => {
       minimalFunction(b);
       b.addAlarm("customMetric", (alarm) =>
         alarm
@@ -451,7 +445,7 @@ describe("addAlarm", () => {
   });
 
   it("supports multiple custom alarms", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       minimalFunction(b);
       b.addAlarm("highInvocations", (alarm) =>
         alarm
@@ -474,7 +468,7 @@ describe("addAlarm", () => {
   });
 
   it("propagates alarmName from .addAlarm to the rendered alarm", () => {
-    const { template } = buildResult((b) => {
+    const { template } = buildAndSynth((b) => {
       minimalFunction(b);
       b.addAlarm("invocations", (alarm) =>
         alarm
@@ -491,7 +485,7 @@ describe("addAlarm", () => {
 
   it("throws on duplicate key with recommended alarm", () => {
     expect(() =>
-      buildResult((b) => {
+      buildAndSynth((b) => {
         minimalFunction(b);
         b.addAlarm("errors", (alarm) =>
           alarm
@@ -516,7 +510,7 @@ describe("addAlarm", () => {
   }
 
   it("keeps a custom alarm when recommendedAlarms is false", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       b.recommendedAlarms(false);
       customAlarm(b);
     });
@@ -527,7 +521,7 @@ describe("addAlarm", () => {
   });
 
   it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       b.recommendedAlarms({ enabled: false });
       customAlarm(b);
     });

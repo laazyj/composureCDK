@@ -1,31 +1,31 @@
 import { describe, it, expect } from "vitest";
 import { Duration } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Match } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
-import { newStack, testEnv } from "@composurecdk/cdk-testing";
+import { buildFixture, testEnv } from "@composurecdk/cdk-testing";
 import { createHealthCheckBuilder } from "../src/health-check-builder.js";
 import { resolveHealthCheckAlarmDefinitions } from "../src/health-check-alarms.js";
 
-function buildResult(configureFn?: (builder: ReturnType<typeof createHealthCheckBuilder>) => void) {
-  const stack = newStack({ env: testEnv("us-east-1") });
-  const builder = createHealthCheckBuilder().type(HealthCheckType.HTTPS).fqdn("api.example.com");
-  configureFn?.(builder);
-  const result = builder.build(stack, "ApiHealthCheck");
-  return { result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(
+  () => createHealthCheckBuilder().type(HealthCheckType.HTTPS).fqdn("api.example.com"),
+  "ApiHealthCheck",
+  {
+    stackProps: { env: testEnv("us-east-1") },
+  },
+);
 
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates the healthCheckStatus alarm by default", () => {
-      const { result, template } = buildResult();
+      const { result, template } = buildAndSynth();
 
       expect(result.alarms.healthCheckStatus).toBeDefined();
       template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
     });
 
     it("creates healthCheckStatus with AWS-recommended threshold and metric shape", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "HealthCheckStatus",
@@ -42,7 +42,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes threshold and period in the alarm description", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "HealthCheckStatus",
@@ -53,7 +53,7 @@ describe("recommended alarms", () => {
 
   describe("customisation", () => {
     it("honours a custom threshold", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ healthCheckStatus: { threshold: 0.5 } });
       });
 
@@ -64,7 +64,7 @@ describe("recommended alarms", () => {
     });
 
     it("honours a custom evaluation window", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({
           healthCheckStatus: { evaluationPeriods: 3, datapointsToAlarm: 2 },
         });
@@ -78,7 +78,7 @@ describe("recommended alarms", () => {
     });
 
     it("preserves unspecified fields when threshold is overridden", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ healthCheckStatus: { threshold: 0.5 } });
       });
 
@@ -90,7 +90,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables the healthCheckStatus alarm when set to false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ healthCheckStatus: false });
       });
 
@@ -99,7 +99,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms(false);
       });
 
@@ -108,7 +108,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when enabled is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ enabled: false });
       });
 
@@ -119,7 +119,7 @@ describe("recommended alarms", () => {
 
   describe("custom alarms", () => {
     it("creates a custom alarm alongside the recommended alarm", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.addAlarm("connectionTime", (alarm) =>
           alarm
             .metric(
@@ -145,7 +145,7 @@ describe("recommended alarms", () => {
 
     it("rejects a custom alarm that collides with a recommended alarm key", () => {
       expect(() =>
-        buildResult((b) => {
+        buildAndSynth((b) => {
           b.addAlarm("healthCheckStatus", (alarm) =>
             alarm
               .metric(
@@ -182,7 +182,7 @@ describe("recommended alarms", () => {
 
   describe("treatMissingData semantics", () => {
     it("uses BREACHING by default so missing data flags the health check unhealthy", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "HealthCheckStatus",
         TreatMissingData: "breaching",

@@ -1,19 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Duration } from "aws-cdk-lib";
+import { Match } from "aws-cdk-lib/assertions";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { createBucketBuilder } from "../src/bucket-builder.js";
 import { resolveBucketAlarmDefinitions } from "../src/bucket-alarms.js";
 
-function buildResult(configureFn: (builder: ReturnType<typeof createBucketBuilder>) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createBucketBuilder();
-  configureFn(builder);
-  const result = builder.build(stack, "TestBucket");
-  return { result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(createBucketBuilder, "TestBucket");
 
 function withAlarms(builder: ReturnType<typeof createBucketBuilder>) {
   builder.serverAccessLogs(false).metrics([{ id: "EntireBucket" }]);
@@ -22,7 +16,7 @@ function withAlarms(builder: ReturnType<typeof createBucketBuilder>) {
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates no alarms without metrics configured", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.serverAccessLogs(false);
       });
 
@@ -31,7 +25,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates serverErrors and clientErrors alarms when metrics are configured", () => {
-      const { result, template } = buildResult(withAlarms);
+      const { result, template } = buildAndSynth(withAlarms);
 
       expect(result.alarms["serverErrors:EntireBucket"]).toBeDefined();
       expect(result.alarms["clientErrors:EntireBucket"]).toBeDefined();
@@ -39,7 +33,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates alarms for each metrics configuration", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.serverAccessLogs(false).metrics([
           { id: "EntireBucket" },
           { id: "UploadsOnly", prefix: "uploads/" },
@@ -54,7 +48,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates serverErrors alarm with threshold > 0", () => {
-      const { template } = buildResult(withAlarms);
+      const { template } = buildAndSynth(withAlarms);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "5xxErrors",
@@ -70,7 +64,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates clientErrors alarm with threshold > 0", () => {
-      const { template } = buildResult(withAlarms);
+      const { template } = buildAndSynth(withAlarms);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "4xxErrors",
@@ -86,7 +80,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes FilterId dimension from metrics configuration", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.serverAccessLogs(false).metrics([{ id: "MyFilter" }]);
       });
 
@@ -97,7 +91,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes threshold justification in alarm descriptions", () => {
-      const { template } = buildResult(withAlarms);
+      const { template } = buildAndSynth(withAlarms);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "5xxErrors",
@@ -108,7 +102,7 @@ describe("recommended alarms", () => {
 
   describe("customization", () => {
     it("allows customizing serverErrors alarm threshold", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
@@ -123,7 +117,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing evaluation periods", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
@@ -139,7 +133,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing treat missing data", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
@@ -156,7 +150,7 @@ describe("recommended alarms", () => {
 
   describe("disabling alarms", () => {
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms(false);
@@ -167,7 +161,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when enabled is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
@@ -180,7 +174,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables individual alarms when set to false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
@@ -194,7 +188,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables multiple individual alarms", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .recommendedAlarms({
@@ -210,7 +204,7 @@ describe("recommended alarms", () => {
 
   describe("no default actions", () => {
     it("creates alarms with no alarm actions", () => {
-      const { template } = buildResult(withAlarms);
+      const { template } = buildAndSynth(withAlarms);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "5xxErrors",
@@ -222,7 +216,7 @@ describe("recommended alarms", () => {
 
 describe("addAlarm", () => {
   it("creates a custom alarm alongside recommended alarms", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       b.serverAccessLogs(false)
         .metrics([{ id: "EntireBucket" }])
         .addAlarm("totalRequests", (alarm) =>
@@ -253,7 +247,7 @@ describe("addAlarm", () => {
 
   it("throws on duplicate key with recommended alarm", () => {
     expect(() =>
-      buildResult((b) => {
+      buildAndSynth((b) => {
         b.serverAccessLogs(false)
           .metrics([{ id: "EntireBucket" }])
           .addAlarm("serverErrors:EntireBucket", (alarm) =>
@@ -297,7 +291,7 @@ describe("addAlarm", () => {
   }
 
   it("keeps a custom alarm when recommendedAlarms is false", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       customAlarm(b.recommendedAlarms(false).metrics([{ id: "EntireBucket" }]));
     });
 
@@ -307,7 +301,7 @@ describe("addAlarm", () => {
   });
 
   it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       customAlarm(b.recommendedAlarms({ enabled: false }).metrics([{ id: "EntireBucket" }]));
     });
 
@@ -319,7 +313,7 @@ describe("addAlarm", () => {
 
 describe("resolveBucketAlarmDefinitions", () => {
   it("returns no definitions when explicitly disabled", () => {
-    const stack = new Stack(new App(), "TestStack");
+    const stack = newStack();
     const bucket = new Bucket(stack, "Bucket");
 
     expect(

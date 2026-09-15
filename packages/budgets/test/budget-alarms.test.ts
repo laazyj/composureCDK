@@ -1,25 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
-import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+
+import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type CfnBudget } from "aws-cdk-lib/aws-budgets";
-import { testEnv, type TestEnvironment } from "@composurecdk/cdk-testing";
+import { buildFixture, testEnv } from "@composurecdk/cdk-testing";
 import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createBudgetBuilder } from "../src/budget-builder.js";
 
-const ENV_AGNOSTIC = "agnostic" as const;
-
-function buildResult(
-  configureFn?: (builder: ReturnType<typeof createBudgetBuilder>) => void,
-  env: TestEnvironment | typeof ENV_AGNOSTIC = testEnv("us-east-1"),
-) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack", env === ENV_AGNOSTIC ? undefined : { env });
-  const builder = createBudgetBuilder().budgetName("Account").limit({ amount: 1000 });
-  configureFn?.(builder);
-  const result = builder.build(stack, "AccountBudget");
-  return { app, stack, result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(
+  () => createBudgetBuilder().budgetName("Account").limit({ amount: 1000 }),
+  "AccountBudget",
+  { stackProps: { env: testEnv("us-east-1") } },
+);
 
 function customCpuAlarm(a: AlarmDefinitionBuilder<CfnBudget>) {
   return a
@@ -40,14 +32,14 @@ function customCpuAlarm(a: AlarmDefinitionBuilder<CfnBudget>) {
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates no alarms when recommendedAlarms is not configured", () => {
-      const { result, template } = buildResult();
+      const { result, template } = buildAndSynth();
 
       expect(result.alarms).toEqual({});
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
     it("creates the EstimatedCharges alarm when opted in", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ estimatedCharges: { threshold: 50 } });
       });
 
@@ -56,7 +48,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates EstimatedCharges with AWS-recommended metric shape", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ estimatedCharges: { threshold: 50 } });
       });
 
@@ -74,7 +66,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes threshold and currency in the alarm description", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ estimatedCharges: { threshold: 50, currency: "GBP" } });
       });
 
@@ -86,7 +78,7 @@ describe("recommended alarms", () => {
 
   describe("customisation", () => {
     it("honours a custom currency dimension", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ estimatedCharges: { threshold: 25, currency: "GBP" } });
       });
 
@@ -97,14 +89,14 @@ describe("recommended alarms", () => {
 
     it("rejects an unknown ISO 4217 currency", () => {
       expect(() =>
-        buildResult((b) => {
+        buildAndSynth((b) => {
           b.recommendedAlarms({ estimatedCharges: { threshold: 25, currency: "ZZZ" } });
         }),
       ).toThrow(/not a recognised AWS Budgets currency/);
     });
 
     it("honours custom evaluation/datapoints overrides", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({
           estimatedCharges: { threshold: 100, evaluationPeriods: 3, datapointsToAlarm: 2 },
         });
@@ -119,7 +111,7 @@ describe("recommended alarms", () => {
 
   describe("disabling", () => {
     it("recommendedAlarms(false) suppresses the recommended alarm", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms(false);
       });
 
@@ -128,7 +120,7 @@ describe("recommended alarms", () => {
     });
 
     it("recommendedAlarms({ enabled: false }) suppresses the recommended alarm", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({
           enabled: false,
           estimatedCharges: { threshold: 50 },
@@ -140,7 +132,7 @@ describe("recommended alarms", () => {
     });
 
     it("estimatedCharges: false suppresses just the recommended alarm", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ enabled: true, estimatedCharges: false });
       });
 
@@ -151,7 +143,7 @@ describe("recommended alarms", () => {
 
   describe("custom alarms via addAlarm", () => {
     it("creates a custom alarm even when recommended alarms are disabled", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms(false).addAlarm("ec2EstimatedCharges", customCpuAlarm);
       });
 
@@ -166,7 +158,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates custom alarms alongside recommended alarms", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ estimatedCharges: { threshold: 1000 } }).addAlarm(
           "ec2EstimatedCharges",
           customCpuAlarm,
@@ -181,9 +173,9 @@ describe("recommended alarms", () => {
 
   describe("region warning", () => {
     it("emits a warning when alarms would be created outside us-east-1", () => {
-      const { stack } = buildResult(
+      const { stack } = buildAndSynth(
         (b) => b.recommendedAlarms({ estimatedCharges: { threshold: 50 } }),
-        testEnv("eu-west-1"),
+        { stackProps: { env: testEnv("eu-west-1") } },
       );
 
       const warnings = Annotations.fromStack(stack).findWarning(
@@ -194,7 +186,7 @@ describe("recommended alarms", () => {
     });
 
     it("emits no warning in us-east-1", () => {
-      const { stack } = buildResult((b) =>
+      const { stack } = buildAndSynth((b) =>
         b.recommendedAlarms({ estimatedCharges: { threshold: 50 } }),
       );
 
@@ -206,9 +198,9 @@ describe("recommended alarms", () => {
     });
 
     it("emits no warning when the stack region is an unresolved token", () => {
-      const { stack } = buildResult(
+      const { stack } = buildAndSynth(
         (b) => b.recommendedAlarms({ estimatedCharges: { threshold: 50 } }),
-        ENV_AGNOSTIC,
+        { stackProps: {} },
       );
 
       const warnings = Annotations.fromStack(stack).findWarning(
@@ -219,7 +211,7 @@ describe("recommended alarms", () => {
     });
 
     it("emits no warning when no alarms are created (alarms disabled, no custom alarms)", () => {
-      const { stack } = buildResult(undefined, testEnv("eu-west-1"));
+      const { stack } = buildAndSynth(undefined, { stackProps: { env: testEnv("eu-west-1") } });
 
       const warnings = Annotations.fromStack(stack).findWarning(
         "*",
@@ -229,9 +221,9 @@ describe("recommended alarms", () => {
     });
 
     it("warns on the custom-alarm-only path outside us-east-1", () => {
-      const { stack } = buildResult(
+      const { stack } = buildAndSynth(
         (b) => b.recommendedAlarms(false).addAlarm("ec2EstimatedCharges", customCpuAlarm),
-        testEnv("eu-west-1"),
+        { stackProps: { env: testEnv("eu-west-1") } },
       );
 
       const warnings = Annotations.fromStack(stack).findWarning(

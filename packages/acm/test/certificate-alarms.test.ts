@@ -1,33 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Duration } from "aws-cdk-lib";
+import { Match } from "aws-cdk-lib/assertions";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Certificate, type ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { createCertificateBuilder } from "../src/certificate-builder.js";
 import { resolveCertificateAlarmDefinitions } from "../src/certificate-alarms.js";
 
-function buildResult(configureFn?: (builder: ReturnType<typeof createCertificateBuilder>) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const zone = new PublicHostedZone(stack, "Zone", { zoneName: "example.com" });
-  const builder = createCertificateBuilder().domainName("example.com").validationZone(zone);
-  configureFn?.(builder);
-  const result = builder.build(stack, "TestCertificate");
-  return { result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(createCertificateBuilder, "TestCertificate", {
+  seed: (b, stack) =>
+    void b
+      .domainName("example.com")
+      .validationZone(new PublicHostedZone(stack, "Zone", { zoneName: "example.com" })),
+});
 
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates the daysToExpiry alarm by default", () => {
-      const { result, template } = buildResult();
+      const { result, template } = buildAndSynth();
 
       expect(result.alarms.daysToExpiry).toBeDefined();
       template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
     });
 
     it("creates daysToExpiry with AWS-recommended 45-day threshold", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "DaysToExpiry",
@@ -44,7 +42,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes threshold justification in the alarm description", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "DaysToExpiry",
@@ -55,7 +53,7 @@ describe("recommended alarms", () => {
 
   describe("customisation", () => {
     it("honours a custom threshold", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ daysToExpiry: { threshold: 30 } });
       });
 
@@ -66,7 +64,7 @@ describe("recommended alarms", () => {
     });
 
     it("preserves unspecified fields when threshold is overridden", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ daysToExpiry: { threshold: 30 } });
       });
 
@@ -78,7 +76,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables the daysToExpiry alarm when set to false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ daysToExpiry: false });
       });
 
@@ -87,7 +85,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms(false);
       });
 
@@ -96,7 +94,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when enabled is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ enabled: false });
       });
 
@@ -107,7 +105,7 @@ describe("recommended alarms", () => {
 
   describe("custom alarms", () => {
     it("creates a custom alarm alongside the recommended alarms", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.addAlarm("custom", (alarm) =>
           alarm
             .metric(
@@ -133,7 +131,7 @@ describe("recommended alarms", () => {
 
     it("rejects a custom alarm that collides with a recommended alarm key", () => {
       expect(() =>
-        buildResult((b) => {
+        buildAndSynth((b) => {
           b.addAlarm("daysToExpiry", (alarm) =>
             alarm
               .metric(
@@ -156,7 +154,7 @@ describe("recommended alarms", () => {
 
   describe("treatMissingData semantics", () => {
     it("uses NOT_BREACHING by default so expired certs do not stay alarmed", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "DaysToExpiry",
         TreatMissingData: "notBreaching",
@@ -190,7 +188,7 @@ describe("recommended alarms", () => {
     }
 
     it("keeps a custom alarm when recommendedAlarms is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         customAlarm(b.recommendedAlarms(false));
       });
 
@@ -200,7 +198,7 @@ describe("recommended alarms", () => {
     });
 
     it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         customAlarm(b.recommendedAlarms({ enabled: false }));
       });
 
@@ -213,7 +211,7 @@ describe("recommended alarms", () => {
 
 describe("resolveCertificateAlarmDefinitions", () => {
   it("returns no definitions when explicitly disabled", () => {
-    const stack = new Stack(new App(), "TestStack");
+    const stack = newStack();
     const certificate = new Certificate(stack, "Certificate", { domainName: "example.com" });
 
     expect(resolveCertificateAlarmDefinitions(certificate, { enabled: false })).toEqual([]);

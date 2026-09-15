@@ -17,6 +17,7 @@ import { Key } from "aws-cdk-lib/aws-kms";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
 import { fake } from "ts-fake";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import {
@@ -25,6 +26,8 @@ import {
   type RoleBuilderResult,
 } from "@composurecdk/iam";
 import { createFunctionBuilder, type FunctionBuilderProps } from "../src/function-builder.js";
+
+const buildAndSynth = buildFixture(createFunctionBuilder, "TestFunction");
 
 const IMPORTED_LOG_GROUP_ARN = "arn:aws:logs:eu-west-2:111122223333:log-group:/aws/lambda/imported";
 
@@ -64,17 +67,6 @@ const refOnlyLogGroup = fake<LogGroupRuntimeShape>({
  */
 const arnlessLogGroup = fake<NonNullable<FunctionProps["logGroup"]>>();
 
-function synthTemplate(
-  configureFn: (builder: ReturnType<typeof createFunctionBuilder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createFunctionBuilder();
-  configureFn(builder);
-  builder.build(stack, "TestFunction");
-  return Template.fromStack(stack);
-}
-
 describe("FunctionBuilder", () => {
   describe("build", () => {
     it("returns a FunctionBuilderResult with a function property", () => {
@@ -105,7 +97,7 @@ describe("FunctionBuilder", () => {
 
   describe("synthesised output", () => {
     it("creates a Lambda function with the specified runtime", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -119,7 +111,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with custom memory size", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -133,7 +125,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with custom timeout", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -147,7 +139,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with tracing enabled", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -161,7 +153,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with ARM64 architecture", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -175,7 +167,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with environment variables", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -194,7 +186,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with description", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -208,7 +200,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates exactly one Lambda function, one IAM role, and one LogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -221,7 +213,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates an execution role with the Lambda service principal", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -242,7 +234,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with multiple configurations combined", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -272,7 +264,7 @@ describe("FunctionBuilder", () => {
 
   describe("secure defaults", () => {
     it("enables X-Ray active tracing by default", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -285,7 +277,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("enables JSON structured logging by default", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -298,7 +290,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("allows the user to override tracing", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -312,7 +304,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("allows the user to override logging format", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -328,7 +320,7 @@ describe("FunctionBuilder", () => {
 
   describe("logging", () => {
     it("creates a managed LogGroup by default", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -351,7 +343,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("applies RETAIN removal policy on the auto-created LogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -365,7 +357,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("applies TWO_YEARS retention on the auto-created LogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -378,7 +370,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("configures the Lambda function to use the auto-created LogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -451,7 +443,7 @@ describe("FunctionBuilder", () => {
 
   describe("execution role", () => {
     it("attaches an inline LogsWriter policy scoped to the auto-created log group", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -483,7 +475,7 @@ describe("FunctionBuilder", () => {
       // lives under `logGroupRef` rather than on the L2's `logGroupArn`. Read
       // through the wrong member it came out `undefined`, and the policy
       // resource with it: `Resource: ["undefined:log-stream:*"]`.
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -508,7 +500,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("fails with a named error when the log group exposes no ARN at all", () => {
-      const stack = new Stack(new App(), "TestStack");
+      const stack = newStack();
 
       expect(() =>
         createFunctionBuilder()
@@ -521,7 +513,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("does not attach the AWSLambdaBasicExecutionRole managed policy by default", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -537,7 +529,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("does not grant logs:CreateLogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -563,7 +555,7 @@ describe("FunctionBuilder", () => {
     });
 
     it(".configureRole adds inline statements alongside LogsWriter", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -735,7 +727,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("CDK still wires X-Ray permissions onto the explicit role when tracing is active", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -773,7 +765,7 @@ describe("FunctionBuilder", () => {
     const KMS_KEY_ARN = { "Fn::GetAtt": ["Key961B73FD", "Arn"] };
 
     it("passes a concrete key through to the function", () => {
-      const stack = new Stack(new App(), "TestStack");
+      const stack = newStack();
       const key = new Key(stack, "Key");
 
       createFunctionBuilder()
@@ -789,7 +781,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("resolves a Resolvable key from the build context", () => {
-      const stack = new Stack(new App(), "TestStack");
+      const stack = newStack();
       const key = new Key(stack, "Key");
 
       createFunctionBuilder()

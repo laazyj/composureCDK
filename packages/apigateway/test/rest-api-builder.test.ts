@@ -10,8 +10,11 @@ import {
 } from "aws-cdk-lib/aws-apigateway";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createRestApiBuilder } from "../src/rest-api-builder.js";
+
+const buildAndSynth = buildFixture(createRestApiBuilder, "TestApi");
 
 function mockIntegration(body: Record<string, unknown>) {
   return new MockIntegration({
@@ -28,17 +31,6 @@ function mockIntegration(body: Record<string, unknown>) {
 
 const stubIntegration = mockIntegration({ ok: true });
 const methodResponse200 = { methodResponses: [{ statusCode: "200" }] };
-
-function synthTemplate(
-  configureFn: (builder: ReturnType<typeof createRestApiBuilder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createRestApiBuilder();
-  configureFn(builder);
-  builder.build(stack, "TestApi");
-  return Template.fromStack(stack);
-}
 
 /** Adds a minimal root method so the API passes CDK validation. */
 function withStubMethod(builder: ReturnType<typeof createRestApiBuilder>) {
@@ -104,7 +96,7 @@ describe("RestApiBuilder", () => {
 
   describe("synthesised output", () => {
     it("creates a REST API with the specified name", () => {
-      const template = synthTemplate((b) => withStubMethod(b.restApiName("My Service")));
+      const { template } = buildAndSynth((b) => withStubMethod(b.restApiName("My Service")));
 
       template.hasResourceProperties("AWS::ApiGateway::RestApi", {
         Name: "My Service",
@@ -112,7 +104,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("creates a REST API with a description", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubMethod(b.restApiName("My Service").description("A test API")),
       );
 
@@ -123,7 +115,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("creates a single top-level resource", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubMethod(b.restApiName("My Service")).addResource("users"),
       );
 
@@ -136,7 +128,7 @@ describe("RestApiBuilder", () => {
     it("creates a method on the root resource", () => {
       const integration = mockIntegration({ message: "hello" });
 
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.restApiName("My Service").addMethod("GET", integration, methodResponse200),
       );
 
@@ -150,7 +142,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("creates a method with no explicit integration", () => {
-      const template = synthTemplate((b) => b.restApiName("My Service").addMethod("GET"));
+      const { template } = buildAndSynth((b) => b.restApiName("My Service").addMethod("GET"));
 
       template.hasResourceProperties("AWS::ApiGateway::Method", {
         HttpMethod: "GET",
@@ -158,7 +150,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("creates nested resources", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubMethod(b.restApiName("My Service")).addResource("users", (users) =>
           users.addResource("{id}"),
         ),
@@ -176,7 +168,7 @@ describe("RestApiBuilder", () => {
     it("creates methods on child resources", () => {
       const integration = mockIntegration({ users: [] });
 
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .restApiName("My Service")
           .addResource("users", (users) => users.addMethod("GET", integration, methodResponse200)),
@@ -192,7 +184,7 @@ describe("RestApiBuilder", () => {
       const listIntegration = mockIntegration({ users: [] });
       const createIntegration = mockIntegration({ id: "new-user" });
 
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .restApiName("My Service")
           .addResource("users", (users) =>
@@ -211,7 +203,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("creates multiple sibling resources", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubMethod(b.restApiName("My Service")).addResource("users").addResource("orders"),
       );
 
@@ -225,7 +217,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("creates a deeply nested resource tree", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubMethod(b.restApiName("My Service")).addResource("v1", (v1) =>
           v1.addResource("users", (users) =>
             users.addResource("{id}", (user) => user.addResource("orders")),
@@ -241,14 +233,14 @@ describe("RestApiBuilder", () => {
     });
 
     it("creates a deployment and stage by default", () => {
-      const template = synthTemplate((b) => withStubMethod(b.restApiName("My Service")));
+      const { template } = buildAndSynth((b) => withStubMethod(b.restApiName("My Service")));
 
       template.resourceCountIs("AWS::ApiGateway::Deployment", 1);
       template.resourceCountIs("AWS::ApiGateway::Stage", 1);
     });
 
     it("creates exactly one REST API", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .restApiName("My Service")
           .addResource("users", (users) =>
@@ -266,7 +258,7 @@ describe("RestApiBuilder", () => {
 
   describe("secure defaults", () => {
     it("enables X-Ray tracing on the stage by default", () => {
-      const template = synthTemplate((b) => withStubMethod(b));
+      const { template } = buildAndSynth((b) => withStubMethod(b));
 
       template.hasResourceProperties("AWS::ApiGateway::Stage", {
         TracingEnabled: true,
@@ -274,7 +266,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("enables CloudWatch execution logging by default", () => {
-      const template = synthTemplate((b) => withStubMethod(b));
+      const { template } = buildAndSynth((b) => withStubMethod(b));
 
       template.hasResourceProperties("AWS::ApiGateway::Stage", {
         MethodSettings: Match.arrayWith([Match.objectLike({ LoggingLevel: "INFO" })]),
@@ -282,7 +274,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("creates an access log group by default", () => {
-      const template = synthTemplate((b) => withStubMethod(b));
+      const { template } = buildAndSynth((b) => withStubMethod(b));
 
       template.resourceCountIs("AWS::Logs::LogGroup", 1);
       template.hasResourceProperties("AWS::Logs::LogGroup", {
@@ -291,7 +283,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("configures access log destination on the stage by default", () => {
-      const template = synthTemplate((b) => withStubMethod(b));
+      const { template } = buildAndSynth((b) => withStubMethod(b));
 
       template.hasResourceProperties("AWS::ApiGateway::Stage", {
         AccessLogSetting: {
@@ -301,7 +293,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("allows the user to override tracing", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubMethod(b.deployOptions({ tracingEnabled: false })),
       );
 
@@ -311,7 +303,7 @@ describe("RestApiBuilder", () => {
     });
 
     it("allows the user to override logging level", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubMethod(b.deployOptions({ loggingLevel: MethodLoggingLevel.ERROR })),
       );
 
@@ -338,13 +330,15 @@ describe("RestApiBuilder", () => {
     });
 
     it("creates no log group when access logging is disabled", () => {
-      const template = synthTemplate((b) => withStubMethod(b.accessLogging(false)));
+      const { template } = buildAndSynth((b) => withStubMethod(b.accessLogging(false)));
 
       template.resourceCountIs("AWS::Logs::LogGroup", 0);
     });
 
     it("preserves user deployOptions while applying defaults for missing fields", () => {
-      const template = synthTemplate((b) => withStubMethod(b.deployOptions({ stageName: "live" })));
+      const { template } = buildAndSynth((b) =>
+        withStubMethod(b.deployOptions({ stageName: "live" })),
+      );
 
       template.hasResourceProperties("AWS::ApiGateway::Stage", {
         StageName: "live",

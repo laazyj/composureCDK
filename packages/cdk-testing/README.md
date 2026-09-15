@@ -36,20 +36,34 @@ const stack = newStack({ env: testEnv("us-east-1") });
 
 ## What's here
 
-| export                               | what it does                                                                                   |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `newStack(props?)`                   | A `Stack` in a fresh `App`. Pass `props.env` for an environment-specific stack.                |
-| `testEnv(region)`                    | A `TestEnvironment` for that region on `TEST_ACCOUNT`.                                         |
-| `TestEnvironment`                    | CDK's `Environment` with `account` and `region` required, which `testEnv` always supplies.     |
-| `TEST_ACCOUNT`                       | The fictitious account those environments name.                                                |
-| `policyJson(stack)`                  | The synthesised template as a JSON string, for substring assertions over IAM policy documents. |
-| `assertAssignable<Target, Source>()` | A compile-time assignability assertion — how the ADR-0018 type-level prop guards are written.  |
+| export                                 | what it does                                                                                   |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `newStack(props?)`                     | A `Stack` in a fresh `App`. Pass `props.env` for an environment-specific stack.                |
+| `testEnv(region)`                      | A `TestEnvironment` for that region on `TEST_ACCOUNT`.                                         |
+| `TestEnvironment`                      | CDK's `Environment` with `account` and `region` required, which `testEnv` always supplies.     |
+| `TEST_ACCOUNT`                         | The fictitious account those environments name.                                                |
+| `buildFixture(factory, id, defaults?)` | Binds a builder factory and construct id into a build-and-synthesise fixture.                  |
+| `policyJson(stack)`                    | The synthesised template as a JSON string, for substring assertions over IAM policy documents. |
+| `assertAssignable<Target, Source>()`   | A compile-time assignability assertion — how the ADR-0018 type-level prop guards are written.  |
 
 ### Why `assertAssignable` and not vitest's `assertType`
 
 vitest's `assertType<T>(value: T)` makes the same assignability check, and is not gated on `--typecheck` (its runtime implementation is an empty function). It is weaker on two counts: it takes a value, so each site carries an `undefined as unknown as CdkProps` cast to supply one; and dropping its type argument infers `T` from that argument and passes vacuously, where dropping one here is `error TS2558: Expected 2 type arguments, but got 1`.
 
 `expectTypeOf(...).toExtend()` is a different check — a conditional-type `extends`, which distributes over unions where assignability does not.
+
+### Using `buildFixture`
+
+Bind it once per suite, naming the local `buildAndSynth`:
+
+```ts
+const buildAndSynth = buildFixture(createQueueBuilder, "TestQueue");
+
+const { template } = buildAndSynth((b) => b.fifo(true));
+const { result } = buildAndSynth((b) => b.recommendedAlarms(true));
+```
+
+It is curried because the factory and id are fixed per suite while the configure callback varies per test, so binding keeps each call site to its one meaningful argument. `defaults` and the optional second argument to a bound fixture carry `stackProps` and `context`; a call's `stackProps` replaces the fixture's rather than merging, so `{}` gives an environment-agnostic stack where the fixture supplies an `env`.
 
 ## Why `aws-cdk-lib` is a devDependency, and not in `cdk-floors.json`
 

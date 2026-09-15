@@ -65,6 +65,27 @@ const { result } = buildAndSynth((b) => b.recommendedAlarms(true));
 
 It is curried because the factory and id are fixed per suite while the configure callback varies per test, so binding keeps each call site to its one meaningful argument. `defaults` and the optional second argument to a bound fixture carry `stackProps` and `context`; a call's `stackProps` replaces the fixture's rather than merging, so `{}` gives an environment-agnostic stack where the fixture supplies an `env`.
 
+### Using `describeGrants`
+
+```ts
+describeGrants({
+  name: "topicGrants",
+  grants: topicGrants,
+  makeResource: (stack) => new Topic(stack, "Topic"),
+  cases: [
+    { capability: "publish", grants: ["sns:Publish"] },
+    { capability: "subscribe", grants: ["sns:Subscribe"] },
+  ],
+  extra: (setup) => {
+    /* tests specific to this resource, sharing the same fixture */
+  },
+});
+```
+
+Each row asserts that the capability puts its actions on the grantee's policy, and on exactly one policy; `denies` adds a second test for actions it must withhold. One generated test pins `cases` against the keys of `grants`, so a capability added without a row fails rather than going untested.
+
+It suits a suite with a real capability table. A resource with one capability and several bespoke assertions — `route53`'s zone delegation, `apigateway`'s ARN narrowing — reads better hand-written, and both are left that way; forcing them through the table meant `grants` holding IAM condition keys and ARN fragments rather than actions.
+
 ## Why `aws-cdk-lib` is a devDependency, and not in `cdk-floors.json`
 
 A devDependency, because the package needs `aws-cdk-lib` to build and test itself, and because `@nx/enforce-module-boundaries`' `banTransitiveDependencies` would otherwise flag the import as phantom. Not a peer: peers declare what an installing consumer's host must provide, and a private package has no installing consumers. Not a regular dependency: npm could resolve a nested copy the floor override does not reach, giving two `aws-cdk-lib` realms in one process (see [ADR-0007](../../docs/adr/0007-dual-esm-cjs-publishing.md)).

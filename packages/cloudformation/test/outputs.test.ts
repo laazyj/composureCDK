@@ -1,13 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
+import { newStack } from "@composurecdk/cdk-testing";
 import { compose, Ref, type Lifecycle } from "@composurecdk/core";
 import { outputs } from "../src/outputs.js";
 import { groupedStacks } from "../src/strategies.js";
-
-function createStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
 
 function stubComponent<T extends object>(result: T): Lifecycle<T> {
   return { build: () => result };
@@ -15,7 +12,7 @@ function stubComponent<T extends object>(result: T): Lifecycle<T> {
 
 describe("outputs", () => {
   it("creates CfnOutput constructs for each output definition", () => {
-    const stack = createStack();
+    const stack = newStack();
 
     compose({ site: stubComponent({ url: "https://example.com" }) }, { site: [] })
       .afterBuild(
@@ -34,7 +31,7 @@ describe("outputs", () => {
   });
 
   it("resolves Ref values against the build results", () => {
-    const stack = createStack();
+    const stack = newStack();
 
     compose(
       {
@@ -73,7 +70,7 @@ describe("outputs", () => {
   });
 
   it("supports concrete string values (not Refs)", () => {
-    const stack = createStack();
+    const stack = newStack();
 
     compose({ x: stubComponent({}) }, { x: [] })
       .afterBuild(
@@ -93,7 +90,7 @@ describe("outputs", () => {
   });
 
   it("includes description when provided", () => {
-    const stack = createStack();
+    const stack = newStack();
 
     compose({ x: stubComponent({}) }, { x: [] })
       .afterBuild(
@@ -113,7 +110,7 @@ describe("outputs", () => {
   });
 
   it("omits description when not provided", () => {
-    const stack = createStack();
+    const stack = newStack();
 
     compose({ x: stubComponent({}) }, { x: [] })
       .afterBuild(
@@ -130,7 +127,7 @@ describe("outputs", () => {
   });
 
   it("includes exportName when provided", () => {
-    const stack = createStack();
+    const stack = newStack();
 
     compose({ x: stubComponent({}) }, { x: [] })
       .afterBuild(
@@ -150,7 +147,7 @@ describe("outputs", () => {
   });
 
   it("works with Ref.map for transformed values", () => {
-    const stack = createStack();
+    const stack = newStack();
 
     compose({ cdn: stubComponent({ domain: "d123.cloudfront.net" }) }, { cdn: [] })
       .afterBuild(
@@ -170,7 +167,7 @@ describe("outputs", () => {
   });
 
   it("creates no outputs when the definitions record is empty", () => {
-    const stack = createStack();
+    const stack = newStack();
 
     compose({ x: stubComponent({}) }, { x: [] })
       .afterBuild(outputs({}))

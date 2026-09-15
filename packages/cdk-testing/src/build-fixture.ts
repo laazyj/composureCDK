@@ -29,6 +29,19 @@ export interface BuildAndSynthOptions {
   readonly context?: Record<string, object>;
 }
 
+/** What a fixture fixes for every call it makes. */
+export interface FixtureOptions<B> {
+  /** Applied to every call, unless the call passes its own. */
+  readonly stackProps?: StackProps;
+  /**
+   * Applied to every builder before `configure`, for setup the whole suite
+   * shares. Use it where that setup needs the stack — a hosted zone to
+   * validate a certificate against, say. Where it does not, seed inside
+   * `factory` instead.
+   */
+  readonly seed?: (builder: B, stack: Stack) => void;
+}
+
 /**
  * Binds a builder factory and construct id into a reusable
  * build-and-synthesise fixture — the shape nine packages had each written for
@@ -42,11 +55,17 @@ export interface BuildAndSynthOptions {
  * configure callback varies per test — so binding once keeps ~400 call sites
  * to their single meaningful argument.
  *
- * @param factory - Makes the builder under test. Receives the stack, for a
- *   suite that must seed the builder with a construct in it (a hosted zone to
- *   validate against, say).
+ * @param factory - Makes the builder under test. Called with **no arguments**,
+ *   deliberately: several `create*Builder` functions take an optional first
+ *   parameter (`createQueueBuilder(role)`), and a factory that received the
+ *   stack would silently pass it as that argument. TypeScript cannot catch
+ *   that — a one-parameter function is assignable to a zero-parameter
+ *   signature — so the call site must stay zero-argument. Seed the builder
+ *   inline (`() => createTableBuilder().partitionKey(PK)`), or with `seed`
+ *   where the stack is needed.
  * @param id - The construct id to build under.
- * @param defaults - Applied to every call, unless a call overrides them.
+ * @param fixture - Applied to every call. A call can pass its own
+ *   `stackProps`, which replaces the fixture's.
  *
  * @example
  * ```ts
@@ -57,17 +76,18 @@ export interface BuildAndSynthOptions {
  * ```
  */
 export function buildFixture<B extends Buildable>(
-  factory: (stack: Stack) => B,
+  factory: () => B,
   id: string,
-  defaults: BuildAndSynthOptions = {},
+  fixture: FixtureOptions<B> = {},
 ): (
   configure?: (builder: B, stack: Stack) => void,
   options?: BuildAndSynthOptions,
 ) => BuildAndSynth<B> {
   return (configure, options = {}) => {
-    const { stackProps = defaults.stackProps, context = defaults.context } = options;
+    const { stackProps = fixture.stackProps, context } = options;
     const stack = newStack(stackProps);
-    const builder = factory(stack);
+    const builder = factory();
+    fixture.seed?.(builder, stack);
     configure?.(builder, stack);
     const result = builder.build(stack, id, context) as ReturnType<B["build"]>;
     return { result, template: Template.fromStack(stack), stack };

@@ -19,19 +19,6 @@ export function setUntypedProp(builder: unknown, key: string, value: unknown): v
   (builder as Record<string, (value: unknown) => unknown>)[key](value);
 }
 
-/** Builds a queue builder into a fresh stack and returns the synth artefacts. */
-export function buildQueueStack<B extends BuildableQueue>(
-  factory: () => B,
-  id: string,
-  configureFn?: (builder: B) => void,
-): { stack: Stack; result: QueueBuilderResult; template: Template } {
-  const stack = newStack();
-  const builder = factory();
-  configureFn?.(builder);
-  const result = builder.build(stack, id);
-  return { stack, result, template: Template.fromStack(stack) };
-}
-
 /**
  * Asserts the secure defaults shared by every queue builder in this
  * package: SSE-SQS encryption, long polling, and the enforceSSL

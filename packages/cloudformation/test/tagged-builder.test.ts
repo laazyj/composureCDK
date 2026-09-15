@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { App, Stack, Tags } from "aws-cdk-lib";
+import { Stack, Tags } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
+import { newStack } from "@composurecdk/cdk-testing";
 import { type Lifecycle } from "@composurecdk/core";
 import { taggedBuilder } from "../src/tagged-builder.js";
 
@@ -51,10 +52,6 @@ function tagsOnResource(resource: CfnResourceWithTags): CfnTagEntry[] {
   return resource.Properties?.Tags ?? [];
 }
 
-function freshStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
-
 describe("taggedBuilder", () => {
   describe("type augmentation", () => {
     it("returns an object with .tag() and .tags() methods that chain", () => {
@@ -76,7 +73,7 @@ describe("taggedBuilder", () => {
 
   describe("applies tags to result constructs", () => {
     it("tags the primary construct and all sibling constructs", () => {
-      const stack = freshStack();
+      const stack = newStack();
       const result = taggedBuilder<SyntheticProps, SyntheticBuilder>(SyntheticBuilder)
         .tag("Project", "claude-rig")
         .tag("Owner", "platform")
@@ -113,7 +110,7 @@ describe("taggedBuilder", () => {
     });
 
     it("tags entries inside Record<string, IConstruct> result fields", () => {
-      const stack = freshStack();
+      const stack = newStack();
       taggedBuilder<SyntheticProps, SyntheticBuilder>(SyntheticBuilder)
         .tag("CostCenter", "1234")
         .build(stack, "Synth");
@@ -131,7 +128,7 @@ describe("taggedBuilder", () => {
     });
 
     it("does nothing when no tags are accumulated", () => {
-      const stack = freshStack();
+      const stack = newStack();
       taggedBuilder<SyntheticProps, SyntheticBuilder>(SyntheticBuilder).build(stack, "Synth");
 
       const template = Template.fromStack(stack);
@@ -145,7 +142,7 @@ describe("taggedBuilder", () => {
     });
 
     it("applies all tags supplied via .tags({...})", () => {
-      const stack = freshStack();
+      const stack = newStack();
       taggedBuilder<SyntheticProps, SyntheticBuilder>(SyntheticBuilder)
         .tags({ Owner: "platform", Environment: "prod" })
         .build(stack, "Synth");
@@ -192,7 +189,7 @@ describe("taggedBuilder", () => {
         warnings.push(typeof warning === "string" ? warning : warning.message);
       });
 
-      const stack = freshStack();
+      const stack = newStack();
       taggedBuilder<SyntheticProps, SyntheticBuilder>(SyntheticBuilder)
         .tag("Owner", "first")
         .tag("Owner", "second")
@@ -228,7 +225,7 @@ describe("taggedBuilder", () => {
       const chained = clone.tag("Project", "rig");
       expect(chained).toBe(clone);
 
-      const stack = freshStack();
+      const stack = newStack();
       clone.build(stack, "Synth");
       const template = Template.fromStack(stack);
       const buckets = template.findResources("AWS::S3::Bucket") as Record<
@@ -256,7 +253,7 @@ describe("taggedBuilder", () => {
       const clone = original.copy();
       original.tag("Owner", "later");
 
-      const stack = freshStack();
+      const stack = newStack();
       clone.build(stack, "Synth");
       const template = Template.fromStack(stack);
       const buckets = template.findResources("AWS::S3::Bucket") as Record<
@@ -275,7 +272,7 @@ describe("taggedBuilder", () => {
       const clone = original.copy();
       clone.tag("Project", "rig");
 
-      const stack = freshStack();
+      const stack = newStack();
       original.build(stack, "Synth");
       const template = Template.fromStack(stack);
       const buckets = template.findResources("AWS::S3::Bucket") as Record<
@@ -299,12 +296,12 @@ describe("taggedBuilder", () => {
 
   describe("Tags.of equivalence", () => {
     it("matches the behaviour of calling Tags.of(...).add(...) on each construct", () => {
-      const stackA = freshStack();
+      const stackA = newStack();
       taggedBuilder<SyntheticProps, SyntheticBuilder>(SyntheticBuilder)
         .tag("Owner", "platform")
         .build(stackA, "Synth");
 
-      const stackB = freshStack();
+      const stackB = newStack();
       const direct = new SyntheticBuilder().build(stackB, "Synth");
       Tags.of(direct.primary).add("Owner", "platform");
       Tags.of(direct.secondary).add("Owner", "platform");

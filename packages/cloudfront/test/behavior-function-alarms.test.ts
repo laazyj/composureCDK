@@ -1,28 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
-import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+import { Stack } from "aws-cdk-lib";
+import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { FunctionCode, FunctionEventType } from "aws-cdk-lib/aws-cloudfront";
+import { buildFixture, testEnv } from "@composurecdk/cdk-testing";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
+
+const buildAndSynth = buildFixture(createDistributionBuilder, "TestDistribution");
 
 const INLINE_CODE = `
   async function handler(event) {
     return event.request;
   }
 `;
-
-function buildResult(
-  configureFn: (builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) => void,
-) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createDistributionBuilder();
-  configureFn(builder, stack);
-  const result = builder.build(stack, "TestDistribution");
-  return { result, template: Template.fromStack(stack) };
-}
 
 function withOrigin(builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) {
   const bucket = new Bucket(stack, "TestBucket");
@@ -37,7 +29,7 @@ function withOrigin(builder: ReturnType<typeof createDistributionBuilder>, stack
 
 describe("function alarms on default behavior", () => {
   it("creates execution/validation/throttles alarms by default", () => {
-    const { result, template } = buildResult((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -56,7 +48,7 @@ describe("function alarms on default behavior", () => {
   });
 
   it("creates execution-errors alarm with the correct shape", () => {
-    const { template } = buildResult((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -80,7 +72,7 @@ describe("function alarms on default behavior", () => {
   });
 
   it("includes FunctionName and Region=Global dimensions", () => {
-    const { template } = buildResult((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -102,7 +94,7 @@ describe("function alarms on default behavior", () => {
   });
 
   it("scopes alarm descriptions to the default behavior and event type", () => {
-    const { template } = buildResult((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -125,7 +117,7 @@ describe("function alarms on default behavior", () => {
 
 describe("function alarms on additional behaviors", () => {
   it("scopes alarm keys to the path pattern and event type", () => {
-    const { result } = buildResult((b, stack) => {
+    const { result } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.behavior("/api/*", {
         origin: new HttpOrigin("api.example.com"),
@@ -145,7 +137,7 @@ describe("function alarms on additional behaviors", () => {
   });
 
   it("includes the path pattern in alarm descriptions", () => {
-    const { template } = buildResult((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.behavior("/api/*", {
         origin: new HttpOrigin("api.example.com"),
@@ -165,7 +157,7 @@ describe("function alarms on additional behaviors", () => {
   });
 
   it("emits independent alarms for the same event type across different behaviors", () => {
-    const { result, template } = buildResult((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -194,7 +186,7 @@ describe("function alarms on additional behaviors", () => {
 
 describe("customization", () => {
   it("allows per-function threshold overrides", () => {
-    const { template } = buildResult((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -214,7 +206,7 @@ describe("customization", () => {
   });
 
   it("allows per-function treatMissingData overrides", () => {
-    const { template } = buildResult((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -238,7 +230,7 @@ describe("customization", () => {
 
 describe("disabling", () => {
   it("disables all three alarms for a function when recommendedAlarms is false", () => {
-    const { result, template } = buildResult((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -256,7 +248,7 @@ describe("disabling", () => {
   });
 
   it("disables all three alarms when enabled: false", () => {
-    const { result, template } = buildResult((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -274,7 +266,7 @@ describe("disabling", () => {
   });
 
   it("disables a single alarm while keeping the others", () => {
-    const { result, template } = buildResult((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -295,33 +287,21 @@ describe("disabling", () => {
 });
 
 describe("region signposting", () => {
-  function buildInRegion(
-    region: string | undefined,
-    configureFn: (b: ReturnType<typeof createDistributionBuilder>, stack: Stack) => void,
-  ) {
-    const app = new App();
-    const stack =
-      region === undefined
-        ? new Stack(app, "TestStack")
-        : new Stack(app, "TestStack", { env: { region, account: "123456789012" } });
-    const builder = createDistributionBuilder();
-    configureFn(builder, stack);
-    builder.build(stack, "TestDistribution");
-    return stack;
-  }
-
   it("emits no warning when the stack is in us-east-1", () => {
-    const stack = buildInRegion("us-east-1", (b, stack) => {
-      withOrigin(b, stack);
-      b.defaultBehavior({
-        functions: [
-          {
-            eventType: FunctionEventType.VIEWER_REQUEST,
-            code: FunctionCode.fromInline(INLINE_CODE),
-          },
-        ],
-      });
-    });
+    const { stack } = buildAndSynth(
+      (b, stack) => {
+        withOrigin(b, stack);
+        b.defaultBehavior({
+          functions: [
+            {
+              eventType: FunctionEventType.VIEWER_REQUEST,
+              code: FunctionCode.fromInline(INLINE_CODE),
+            },
+          ],
+        });
+      },
+      { stackProps: { env: testEnv("us-east-1") } },
+    );
 
     const warnings = Annotations.fromStack(stack).findWarning(
       "*",
@@ -331,17 +311,20 @@ describe("region signposting", () => {
   });
 
   it("emits a synth-time warning when the stack is outside us-east-1 and alarms are created", () => {
-    const stack = buildInRegion("us-west-2", (b, stack) => {
-      withOrigin(b, stack);
-      b.defaultBehavior({
-        functions: [
-          {
-            eventType: FunctionEventType.VIEWER_REQUEST,
-            code: FunctionCode.fromInline(INLINE_CODE),
-          },
-        ],
-      });
-    });
+    const { stack } = buildAndSynth(
+      (b, stack) => {
+        withOrigin(b, stack);
+        b.defaultBehavior({
+          functions: [
+            {
+              eventType: FunctionEventType.VIEWER_REQUEST,
+              code: FunctionCode.fromInline(INLINE_CODE),
+            },
+          ],
+        });
+      },
+      { stackProps: { env: testEnv("us-west-2") } },
+    );
 
     const warnings = Annotations.fromStack(stack).findWarning(
       "*",
@@ -351,12 +334,15 @@ describe("region signposting", () => {
   });
 
   it("emits no warning when no alarms are created, regardless of region", () => {
-    const stack = buildInRegion("us-west-2", (b, stack) => {
-      const bucket = new Bucket(stack, "TestBucket");
-      b.origin(new HttpOrigin(bucket.bucketRegionalDomainName))
-        .accessLogs(false)
-        .recommendedAlarms(false);
-    });
+    const { stack } = buildAndSynth(
+      (b, stack) => {
+        const bucket = new Bucket(stack, "TestBucket");
+        b.origin(new HttpOrigin(bucket.bucketRegionalDomainName))
+          .accessLogs(false)
+          .recommendedAlarms(false);
+      },
+      { stackProps: { env: testEnv("us-west-2") } },
+    );
 
     const warnings = Annotations.fromStack(stack).findWarning(
       "*",
@@ -366,17 +352,20 @@ describe("region signposting", () => {
   });
 
   it("emits no warning when the stack region is an unresolved token (env-agnostic)", () => {
-    const stack = buildInRegion(undefined, (b, stack) => {
-      withOrigin(b, stack);
-      b.defaultBehavior({
-        functions: [
-          {
-            eventType: FunctionEventType.VIEWER_REQUEST,
-            code: FunctionCode.fromInline(INLINE_CODE),
-          },
-        ],
-      });
-    });
+    const { stack } = buildAndSynth(
+      (b, stack) => {
+        withOrigin(b, stack);
+        b.defaultBehavior({
+          functions: [
+            {
+              eventType: FunctionEventType.VIEWER_REQUEST,
+              code: FunctionCode.fromInline(INLINE_CODE),
+            },
+          ],
+        });
+      },
+      { stackProps: {} },
+    );
 
     const warnings = Annotations.fromStack(stack).findWarning(
       "*",
@@ -388,7 +377,7 @@ describe("region signposting", () => {
 
 describe("interactions with other alarm sources", () => {
   it("emits custom addAlarm() alarms alongside function alarms without key collisions", () => {
-    const { result, template } = buildResult((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.defaultBehavior({
         functions: [
@@ -421,7 +410,7 @@ describe("interactions with other alarm sources", () => {
   });
 
   it("emits distinct alarm keys for path patterns that would otherwise collide on slug", () => {
-    const { result } = buildResult((b, stack) => {
+    const { result } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.behavior("/api/*", {
         origin: new HttpOrigin("api.example.com"),

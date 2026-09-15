@@ -11,9 +11,12 @@ import {
   FunctionRuntime,
   KeyValueStore,
 } from "aws-cdk-lib/aws-cloudfront";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { type BucketBuilderResult } from "@composurecdk/s3";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
+
+const buildAndSynth = buildFixture(createDistributionBuilder, "TestDistribution");
 
 const INLINE_CODE = `
   async function handler(event) {
@@ -26,20 +29,9 @@ function withBucketOrigin(stack: Stack) {
   return new HttpOrigin(bucket.bucketRegionalDomainName);
 }
 
-function synthTemplate(
-  configureFn: (builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) => void,
-) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createDistributionBuilder();
-  configureFn(builder, stack);
-  const result = builder.build(stack, "TestDistribution");
-  return { result, template: Template.fromStack(stack) };
-}
-
 describe("default behavior inline functions", () => {
   it("creates a CloudFront Function for an inline function on the default behavior", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -57,7 +49,7 @@ describe("default behavior inline functions", () => {
   });
 
   it("wires the function into the default behavior's FunctionAssociations", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -86,7 +78,7 @@ describe("default behavior inline functions", () => {
   });
 
   it("returns the CfFunction in the build result under the behavior+event key", () => {
-    const { result } = synthTemplate((b, stack) => {
+    const { result } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -104,7 +96,7 @@ describe("default behavior inline functions", () => {
   });
 
   it("defaults the runtime to cloudfront-js-2.0", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -126,7 +118,7 @@ describe("default behavior inline functions", () => {
   });
 
   it("honours a user-provided runtime", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -149,7 +141,7 @@ describe("default behavior inline functions", () => {
   });
 
   it("applies a provided comment to the Function", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -202,7 +194,7 @@ describe("default behavior inline functions", () => {
   });
 
   it("supports functions on both viewer-request and viewer-response", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -235,7 +227,7 @@ describe("default behavior inline functions", () => {
 
   it("throws when two functions share the same eventType on the default behavior", () => {
     expect(() =>
-      synthTemplate((b, stack) => {
+      buildAndSynth((b, stack) => {
         b.origin(withBucketOrigin(stack))
           .accessLogs(false)
           .recommendedAlarms(false)
@@ -256,7 +248,7 @@ describe("default behavior inline functions", () => {
   });
 
   it("creates no function resources when functions is omitted or empty", () => {
-    const { result, template } = synthTemplate((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -268,7 +260,7 @@ describe("default behavior inline functions", () => {
   });
 
   it("emits no FunctionAssociations on the default behavior when functions is omitted", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack)).accessLogs(false).recommendedAlarms(false);
     });
 
@@ -283,7 +275,7 @@ describe("default behavior inline functions", () => {
 
   it("throws when keyValueStore is used with a non-JS_2_0 runtime", () => {
     expect(() =>
-      synthTemplate((b, stack) => {
+      buildAndSynth((b, stack) => {
         const kvs = new KeyValueStore(stack, "Kvs", {});
         b.origin(withBucketOrigin(stack))
           .accessLogs(false)
@@ -305,7 +297,7 @@ describe("default behavior inline functions", () => {
 
 describe("additional path-pattern behaviors", () => {
   it("creates an additional cache behavior with its own origin", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -327,7 +319,7 @@ describe("additional path-pattern behaviors", () => {
   });
 
   it("creates an inline function on an additional behavior", () => {
-    const { result, template } = synthTemplate((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -359,7 +351,7 @@ describe("additional path-pattern behaviors", () => {
   });
 
   it("supports multiple additional behaviors with independent functions", () => {
-    const { result, template } = synthTemplate((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -419,7 +411,7 @@ describe("additional path-pattern behaviors", () => {
   });
 
   it("applies an explicit functionName when provided", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)
@@ -441,7 +433,7 @@ describe("additional path-pattern behaviors", () => {
 
   it("throws when two functions on the same additional behavior share an eventType", () => {
     expect(() =>
-      synthTemplate((b, stack) => {
+      buildAndSynth((b, stack) => {
         b.origin(withBucketOrigin(stack))
           .accessLogs(false)
           .recommendedAlarms(false)
@@ -490,7 +482,7 @@ describe("additional path-pattern behaviors", () => {
   });
 
   it("creates no CacheBehaviors when no additional behaviors are added", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack)).accessLogs(false).recommendedAlarms(false);
     });
 
@@ -522,7 +514,7 @@ function cloudFrontFunctionsAreTaggable(): boolean {
 
 describe("builder-level tags reach inline CloudFront Functions", () => {
   it("applies .tag()/.tags() to every CloudFront Function created by the builder", () => {
-    const { template } = synthTemplate((b, stack) => {
+    const { template } = buildAndSynth((b, stack) => {
       b.origin(withBucketOrigin(stack))
         .accessLogs(false)
         .recommendedAlarms(false)

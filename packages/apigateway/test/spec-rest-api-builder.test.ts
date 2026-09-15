@@ -10,12 +10,15 @@ import {
 } from "aws-cdk-lib/aws-apigateway";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { combine, compose, type Lifecycle, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import {
   createSpecRestApiBuilder,
   type SpecRestApiBuilderProps,
 } from "../src/spec-rest-api-builder.js";
+
+const buildAndSynth = buildFixture(createSpecRestApiBuilder, "TestApi");
 
 /** Minimal OpenAPI 3.0 spec with a single GET /pets endpoint, mock-integrated
  * unless the caller supplies an integration of its own. */
@@ -38,18 +41,6 @@ function minimalOpenApiSpec(
       },
     },
   };
-}
-
-function synthTemplate(
-  configureFn: (builder: ReturnType<typeof createSpecRestApiBuilder>) => void,
-  context?: Record<string, object>,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createSpecRestApiBuilder();
-  configureFn(builder);
-  builder.build(stack, "TestApi", context);
-  return Template.fromStack(stack);
 }
 
 /** Adds a minimal apiDefinition so the API passes CDK validation. */
@@ -125,7 +116,7 @@ describe("SpecRestApiBuilder", () => {
 
   describe("synthesised output", () => {
     it("creates a REST API with the specified name", () => {
-      const template = synthTemplate((b) => withStubDefinition(b.restApiName("My Service")));
+      const { template } = buildAndSynth((b) => withStubDefinition(b.restApiName("My Service")));
 
       template.hasResourceProperties("AWS::ApiGateway::RestApi", {
         Name: "My Service",
@@ -133,7 +124,7 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("creates a REST API from an inline OpenAPI definition", () => {
-      const template = synthTemplate((b) => withStubDefinition(b.restApiName("My Service")));
+      const { template } = buildAndSynth((b) => withStubDefinition(b.restApiName("My Service")));
 
       template.hasResourceProperties("AWS::ApiGateway::RestApi", {
         Body: Match.objectLike({
@@ -144,14 +135,14 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("creates a deployment and stage by default", () => {
-      const template = synthTemplate((b) => withStubDefinition(b.restApiName("My Service")));
+      const { template } = buildAndSynth((b) => withStubDefinition(b.restApiName("My Service")));
 
       template.resourceCountIs("AWS::ApiGateway::Deployment", 1);
       template.resourceCountIs("AWS::ApiGateway::Stage", 1);
     });
 
     it("creates exactly one REST API", () => {
-      const template = synthTemplate((b) => withStubDefinition(b.restApiName("My Service")));
+      const { template } = buildAndSynth((b) => withStubDefinition(b.restApiName("My Service")));
 
       template.resourceCountIs("AWS::ApiGateway::RestApi", 1);
     });
@@ -175,7 +166,7 @@ describe("SpecRestApiBuilder", () => {
     }
 
     it("resolves a ref against the build context", () => {
-      const template = synthTemplate(
+      const { template } = buildAndSynth(
         (b) =>
           b
             .restApiName("My Service")
@@ -186,14 +177,14 @@ describe("SpecRestApiBuilder", () => {
                 ),
               ),
             ),
-        { handler: { functionArn: HANDLER_ARN } },
+        { context: { handler: { functionArn: HANDLER_ARN } } },
       );
 
       expectIntegration(template, { uri: HANDLER_ARN });
     });
 
     it("resolves a combine of several siblings into one definition", () => {
-      const template = synthTemplate(
+      const { template } = buildAndSynth(
         (b) =>
           b.restApiName("My Service").apiDefinition(
             combine(
@@ -212,8 +203,10 @@ describe("SpecRestApiBuilder", () => {
             ),
           ),
         {
-          handler: { functionArn: HANDLER_ARN },
-          gatewayRole: { roleArn: ROLE_ARN },
+          context: {
+            handler: { functionArn: HANDLER_ARN },
+            gatewayRole: { roleArn: ROLE_ARN },
+          },
         },
       );
 
@@ -221,7 +214,7 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("carries a CDK token from a sibling into the synthesised body", () => {
-      const stack = new Stack(new App(), "TestStack");
+      const stack = newStack();
       const sibling = new LogGroup(stack, "SiblingLogGroup");
       const builder = createSpecRestApiBuilder()
         .restApiName("My Service")
@@ -241,7 +234,7 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("throws when a ref names a component that is not a dependency", () => {
-      const stack = new Stack(new App(), "TestStack");
+      const stack = newStack();
       const builder = createSpecRestApiBuilder()
         .restApiName("My Service")
         .apiDefinition(
@@ -256,14 +249,14 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("throws a descriptive error when no apiDefinition is set", () => {
-      const stack = new Stack(new App(), "TestStack");
+      const stack = newStack();
       const builder = createSpecRestApiBuilder().restApiName("My Service");
 
       expect(() => builder.build(stack, "TestApi")).toThrow(/requires an apiDefinition/);
     });
 
     it("resolves against a sibling built by compose", () => {
-      const stack = new Stack(new App(), "TestStack");
+      const stack = newStack();
       const handler: Lifecycle<{ functionArn: string }> = {
         build: () => ({ functionArn: HANDLER_ARN }),
       };
@@ -290,7 +283,7 @@ describe("SpecRestApiBuilder", () => {
 
   describe("secure defaults", () => {
     it("enables X-Ray tracing on the stage by default", () => {
-      const template = synthTemplate((b) => withStubDefinition(b));
+      const { template } = buildAndSynth((b) => withStubDefinition(b));
 
       template.hasResourceProperties("AWS::ApiGateway::Stage", {
         TracingEnabled: true,
@@ -298,7 +291,7 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("enables CloudWatch execution logging by default", () => {
-      const template = synthTemplate((b) => withStubDefinition(b));
+      const { template } = buildAndSynth((b) => withStubDefinition(b));
 
       template.hasResourceProperties("AWS::ApiGateway::Stage", {
         MethodSettings: Match.arrayWith([Match.objectLike({ LoggingLevel: "INFO" })]),
@@ -306,7 +299,7 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("creates an access log group by default", () => {
-      const template = synthTemplate((b) => withStubDefinition(b));
+      const { template } = buildAndSynth((b) => withStubDefinition(b));
 
       template.resourceCountIs("AWS::Logs::LogGroup", 1);
       template.hasResourceProperties("AWS::Logs::LogGroup", {
@@ -315,7 +308,7 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("configures access log destination on the stage by default", () => {
-      const template = synthTemplate((b) => withStubDefinition(b));
+      const { template } = buildAndSynth((b) => withStubDefinition(b));
 
       template.hasResourceProperties("AWS::ApiGateway::Stage", {
         AccessLogSetting: {
@@ -325,7 +318,7 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("allows the user to override tracing", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubDefinition(b.deployOptions({ tracingEnabled: false })),
       );
 
@@ -335,7 +328,7 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("allows the user to override logging level", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubDefinition(b.deployOptions({ loggingLevel: MethodLoggingLevel.ERROR })),
       );
 
@@ -362,13 +355,13 @@ describe("SpecRestApiBuilder", () => {
     });
 
     it("creates no log group when access logging is disabled", () => {
-      const template = synthTemplate((b) => withStubDefinition(b.accessLogging(false)));
+      const { template } = buildAndSynth((b) => withStubDefinition(b.accessLogging(false)));
 
       template.resourceCountIs("AWS::Logs::LogGroup", 0);
     });
 
     it("preserves user deployOptions while applying defaults for missing fields", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withStubDefinition(b.deployOptions({ stageName: "live" })),
       );
 

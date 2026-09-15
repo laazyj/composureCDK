@@ -8,9 +8,12 @@ import {
   RestApi,
 } from "aws-cdk-lib/aws-apigateway";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { createRestApiBuilder } from "../src/rest-api-builder.js";
 import { createSpecRestApiBuilder } from "../src/spec-rest-api-builder.js";
 import { resolveRestApiAlarmDefinitions } from "../src/rest-api-alarms.js";
+
+const buildAndSynth = buildFixture(createRestApiBuilder, "TestApi");
 
 function mockIntegration() {
   return new MockIntegration({
@@ -29,15 +32,6 @@ const methodResponse200 = { methodResponses: [{ statusCode: "200" }] };
 
 const ALARM_KEYS = ["clientError", "serverError", "latency"] as const;
 
-function buildResult(configureFn: (builder: ReturnType<typeof createRestApiBuilder>) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createRestApiBuilder();
-  configureFn(builder);
-  const result = builder.build(stack, "TestApi");
-  return { result, template: Template.fromStack(stack) };
-}
-
 function withStubMethod(builder: ReturnType<typeof createRestApiBuilder>) {
   builder.addMethod("GET", mockIntegration(), methodResponse200);
 }
@@ -45,7 +39,7 @@ function withStubMethod(builder: ReturnType<typeof createRestApiBuilder>) {
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates clientError, serverError, and latency alarms by default", () => {
-      const { result, template } = buildResult(withStubMethod);
+      const { result, template } = buildAndSynth(withStubMethod);
 
       expect(result.alarms.clientError).toBeDefined();
       expect(result.alarms.serverError).toBeDefined();
@@ -54,7 +48,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates clientError alarm with threshold > 0.05", () => {
-      const { template } = buildResult(withStubMethod);
+      const { template } = buildAndSynth(withStubMethod);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "4XXError",
@@ -70,7 +64,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates serverError alarm with threshold > 0.05", () => {
-      const { template } = buildResult(withStubMethod);
+      const { template } = buildAndSynth(withStubMethod);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "5XXError",
@@ -86,7 +80,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates latency alarm with threshold >= 2500ms", () => {
-      const { template } = buildResult(withStubMethod);
+      const { template } = buildAndSynth(withStubMethod);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "Latency",
@@ -102,7 +96,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes ApiName and Stage dimensions", () => {
-      const { template } = buildResult(withStubMethod);
+      const { template } = buildAndSynth(withStubMethod);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "4XXError",
@@ -114,7 +108,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes threshold justification in alarm descriptions", () => {
-      const { template } = buildResult(withStubMethod);
+      const { template } = buildAndSynth(withStubMethod);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "5XXError",
@@ -125,7 +119,7 @@ describe("recommended alarms", () => {
 
   describe("customization", () => {
     it("allows customizing clientError alarm threshold", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         withStubMethod(b);
         b.recommendedAlarms({ clientError: { threshold: 0.1 } });
       });
@@ -137,7 +131,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing latency threshold", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         withStubMethod(b);
         b.recommendedAlarms({ latency: { threshold: 1000 } });
       });
@@ -149,7 +143,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing evaluation periods", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         withStubMethod(b);
         b.recommendedAlarms({
           serverError: { evaluationPeriods: 5, datapointsToAlarm: 3 },
@@ -164,7 +158,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing treat missing data", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         withStubMethod(b);
         b.recommendedAlarms({
           clientError: { treatMissingData: TreatMissingData.BREACHING },
@@ -180,7 +174,7 @@ describe("recommended alarms", () => {
 
   describe("disabling alarms", () => {
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         withStubMethod(b);
         b.recommendedAlarms(false);
       });
@@ -190,7 +184,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when enabled is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         withStubMethod(b);
         b.recommendedAlarms({ enabled: false });
       });
@@ -202,7 +196,7 @@ describe("recommended alarms", () => {
     it.each(
       ALARM_KEYS.map((key) => ({ key, others: ALARM_KEYS.filter((other) => other !== key) })),
     )("disables only the $key alarm when set to false", ({ key, others }) => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         withStubMethod(b);
         b.recommendedAlarms({ [key]: false });
       });
@@ -215,7 +209,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables multiple individual alarms", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         withStubMethod(b);
         b.recommendedAlarms({ clientError: false, serverError: false });
       });
@@ -229,7 +223,7 @@ describe("recommended alarms", () => {
 
   describe("no default actions", () => {
     it("creates alarms with no alarm actions", () => {
-      const { template } = buildResult(withStubMethod);
+      const { template } = buildAndSynth(withStubMethod);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "4XXError",
@@ -241,7 +235,7 @@ describe("recommended alarms", () => {
 
 describe("resolveRestApiAlarmDefinitions", () => {
   it("returns no definitions when explicitly disabled", () => {
-    const stack = new Stack(new App(), "TestStack");
+    const stack = newStack();
     const api = new RestApi(stack, "TestApi");
 
     expect(resolveRestApiAlarmDefinitions(api, { enabled: false })).toEqual([]);
@@ -250,7 +244,7 @@ describe("resolveRestApiAlarmDefinitions", () => {
 
 describe("addAlarm", () => {
   it("creates a custom alarm alongside recommended alarms", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       withStubMethod(b);
       b.addAlarm("integrationLatency", (alarm) =>
         alarm
@@ -282,7 +276,7 @@ describe("addAlarm", () => {
 
   it("throws on duplicate key with recommended alarm", () => {
     expect(() =>
-      buildResult((b) => {
+      buildAndSynth((b) => {
         withStubMethod(b);
         b.addAlarm("serverError", (alarm) =>
           alarm
@@ -327,7 +321,7 @@ describe("addAlarm", () => {
   }
 
   it("keeps a custom alarm when recommendedAlarms is false", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       b.recommendedAlarms(false);
       withCustomAlarm(b);
     });
@@ -338,7 +332,7 @@ describe("addAlarm", () => {
   });
 
   it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       b.recommendedAlarms({ enabled: false });
       withCustomAlarm(b);
     });

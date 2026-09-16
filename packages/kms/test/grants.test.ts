@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Template } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
-import { newStack, policyJson } from "@composurecdk/cdk-testing";
+import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { keyGrants } from "../src/grants.js";
 
@@ -14,18 +14,24 @@ function setup() {
   return { stack, key, role };
 }
 
+const CAPABILITIES = [
+  ["encrypt", "kms:Encrypt"],
+  ["decrypt", "kms:Decrypt"],
+  ["encryptDecrypt", "kms:GenerateDataKey*"],
+  ["sign", "kms:Sign"],
+  ["verify", "kms:Verify"],
+  ["signVerify", "kms:Sign"],
+  ["generateMac", "kms:GenerateMac"],
+  ["verifyMac", "kms:VerifyMac"],
+  ["admin", "kms:ScheduleKeyDeletion"],
+] as const;
+
 describe("keyGrants", () => {
-  it.each([
-    ["encrypt", "kms:Encrypt"],
-    ["decrypt", "kms:Decrypt"],
-    ["encryptDecrypt", "kms:GenerateDataKey*"],
-    ["sign", "kms:Sign"],
-    ["verify", "kms:Verify"],
-    ["signVerify", "kms:Sign"],
-    ["generateMac", "kms:GenerateMac"],
-    ["verifyMac", "kms:VerifyMac"],
-    ["admin", "kms:ScheduleKeyDeletion"],
-  ] as const)("%s grants the matching action", (capability, action) => {
+  it("covers every capability keyGrants exposes", () => {
+    assertCapabilitiesCovered(keyGrants, CAPABILITIES);
+  });
+
+  it.each(CAPABILITIES)("%s grants the matching action", (capability, action) => {
     const { stack, key, role } = setup();
 
     keyGrants[capability](key).applyTo(role, {});

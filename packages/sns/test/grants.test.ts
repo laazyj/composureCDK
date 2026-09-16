@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Template } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Topic } from "aws-cdk-lib/aws-sns";
-import { newStack, policyJson } from "@composurecdk/cdk-testing";
+import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { topicGrants } from "../src/grants.js";
 
@@ -14,11 +14,17 @@ function setup() {
   return { stack, topic, role };
 }
 
+const CAPABILITIES = [
+  ["publish", "sns:Publish"],
+  ["subscribe", "sns:Subscribe"],
+] as const;
+
 describe("topicGrants", () => {
-  it.each([
-    ["publish", "sns:Publish"],
-    ["subscribe", "sns:Subscribe"],
-  ] as const)("%s delegates to the matching native grant method", (capability, action) => {
+  it("covers every capability topicGrants exposes", () => {
+    assertCapabilitiesCovered(topicGrants, CAPABILITIES);
+  });
+
+  it.each(CAPABILITIES)("%s delegates to the native grant method", (capability, action) => {
     const { stack, topic, role } = setup();
 
     topicGrants[capability](topic).applyTo(role, {});

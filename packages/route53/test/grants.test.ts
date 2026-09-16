@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Template } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
-import { newStack, policyJson } from "@composurecdk/cdk-testing";
+import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { hostedZoneGrants } from "../src/grants.js";
 
@@ -15,6 +15,10 @@ function setup() {
 }
 
 describe("hostedZoneGrants", () => {
+  it("covers every capability hostedZoneGrants exposes", () => {
+    assertCapabilitiesCovered(hostedZoneGrants, ["delegation"]);
+  });
+
   it("delegation delegates to the zone's native grantDelegation", () => {
     const { stack, hostedZone, role } = setup();
 

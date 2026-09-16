@@ -1,4 +1,5 @@
 export { assertAssignable } from "./assert-assignable.js";
+export { assertCapabilitiesCovered } from "./assert-capabilities-covered.js";
 export {
   buildFixture,
   type BuildAndSynth,

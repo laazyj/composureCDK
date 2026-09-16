@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Template } from "aws-cdk-lib/assertions";
 import { RestApi } from "aws-cdk-lib/aws-apigateway";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { newStack, policyJson } from "@composurecdk/cdk-testing";
+import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { restApiGrants } from "../src/grants.js";
 
@@ -16,6 +16,10 @@ function setup() {
 }
 
 describe("restApiGrants", () => {
+  it("covers every capability restApiGrants exposes", () => {
+    assertCapabilitiesCovered(restApiGrants, ["invoke"]);
+  });
+
   it("invoke grants execute-api:Invoke across the whole API by default", () => {
     const { stack, api, role } = setup();
 

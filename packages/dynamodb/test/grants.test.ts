@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Template } from "aws-cdk-lib/assertions";
 import { AttributeType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { newStack, policyJson } from "@composurecdk/cdk-testing";
+import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { tableGrants } from "../src/grants.js";
 
@@ -16,13 +16,19 @@ function setup() {
   return { stack, table, role };
 }
 
+const CAPABILITIES = [
+  ["read", ["dynamodb:GetItem"]],
+  ["write", ["dynamodb:PutItem"]],
+  ["readWrite", ["dynamodb:GetItem", "dynamodb:PutItem"]],
+  ["fullAccess", ["dynamodb:*"]],
+] as const;
+
 describe("tableGrants", () => {
-  it.each([
-    ["read", ["dynamodb:GetItem"]],
-    ["write", ["dynamodb:PutItem"]],
-    ["readWrite", ["dynamodb:GetItem", "dynamodb:PutItem"]],
-    ["fullAccess", ["dynamodb:*"]],
-  ] as const)("%s delegates to the matching native grant method", (capability, actions) => {
+  it("covers every capability tableGrants exposes", () => {
+    assertCapabilitiesCovered(tableGrants, CAPABILITIES);
+  });
+
+  it.each(CAPABILITIES)("%s delegates to the native grant method", (capability, actions) => {
     const { stack, table, role } = setup();
 
     tableGrants[capability](table).applyTo(role, {});

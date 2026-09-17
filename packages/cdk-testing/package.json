@@ -33,6 +33,7 @@
   "license": "MIT",
   "type": "module",
   "devDependencies": {
+    "@composurecdk/core": "*",
     "@types/node": "^26.5.1",
     "aws-cdk-lib": "^2.268.0",
     "constructs": "^10.8.1",
@@ -41,7 +42,7 @@
   },
   "nx": {
     "tags": [
-      "scope:tooling"
+      "scope:testing"
     ]
   }
 }

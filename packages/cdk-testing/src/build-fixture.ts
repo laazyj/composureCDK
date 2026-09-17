@@ -1,15 +1,10 @@
-import type { IConstruct } from "constructs";
 import { type Stack, type StackProps } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
+import type { Lifecycle } from "@composurecdk/core";
 import { newStack } from "./stack.js";
 
-/** The slice of a builder's surface this fixture uses. */
-interface Buildable {
-  build(scope: IConstruct, id: string, context?: Record<string, object>): unknown;
-}
-
 /** What a bound fixture returns. */
-export interface BuildAndSynth<B extends Buildable> {
+export interface BuildAndSynth<B extends Lifecycle> {
   /** The builder's own result — alarms, refs, the construct it created. */
   readonly result: ReturnType<B["build"]>;
   /** The synthesised template, for `hasResourceProperties` and friends. */
@@ -75,7 +70,7 @@ export interface FixtureOptions<B> {
  * const { result } = buildAndSynth((b) => b.recommendedAlarms(true));
  * ```
  */
-export function buildFixture<B extends Buildable>(
+export function buildFixture<B extends Lifecycle>(
   factory: () => B,
   id: string,
   fixture: FixtureOptions<B> = {},

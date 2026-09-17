@@ -66,6 +66,14 @@ const { result } = buildAndSynth((b) => b.recommendedAlarms(true));
 
 It is curried because the factory and id are fixed per suite while the configure callback varies per test, so binding keeps each call site to its one meaningful argument. `defaults` and the optional second argument to a bound fixture carry `stackProps` and `context`; a call's `stackProps` replaces the fixture's rather than merging, so `{}` gives an environment-agnostic stack where the fixture supplies an `env`.
 
+## What this package may depend on
+
+It is tagged `scope:testing`, which `eslint.config.mjs` allows to depend on `scope:core` and nothing else. So `@composurecdk/core` is a devDependency and its contracts — `Lifecycle`, `Grant` — are imported rather than restated structurally.
+
+A `scope:lib` package is out of bounds: every library's tests depend on these helpers, so the helpers must sit below all of them. In practice the cycle detector already catches that today, since every library reaches back here; the tag is what holds when a new one does not yet.
+
+`@composurecdk/eslint-plugin` keeps `scope:tooling` ("depends on nothing"), which it genuinely needs — every package's `lint` target depends on its `build`, and the root flat config imports its compiled output.
+
 ## Why `aws-cdk-lib` is a devDependency, and not in `cdk-floors.json`
 
 A devDependency, because the package needs `aws-cdk-lib` to build and test itself, and because `@nx/enforce-module-boundaries`' `banTransitiveDependencies` would otherwise flag the import as phantom. Not a peer: peers declare what an installing consumer's host must provide, and a private package has no installing consumers. Not a regular dependency: npm could resolve a nested copy the floor override does not reach, giving two `aws-cdk-lib` realms in one process (see [ADR-0007](../../docs/adr/0007-dual-esm-cjs-publishing.md)).

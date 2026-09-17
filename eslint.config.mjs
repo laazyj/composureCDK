@@ -176,8 +176,23 @@ export default defineConfig(
               onlyDependOnLibsWithTags: ["scope:core", "scope:lib", "scope:aggregate"],
             },
             {
+              // The linter itself. "Depends on nothing" is forced rather than
+              // stylistic: nx.json makes every package's `lint` depend on this
+              // package's `build`, and the root flat config imports its
+              // compiled output — so a plugin that depended on a package would
+              // mean linting that package required building it first.
               sourceTag: "scope:tooling",
               onlyDependOnLibsWithTags: [],
+            },
+            {
+              // Shared test helpers. They may reach for `scope:core`'s
+              // contracts — `Lifecycle`, `Grant` — rather than restating them
+              // structurally, which is what they did while sharing
+              // `scope:tooling`'s stricter rule. They must not depend on a
+              // `scope:lib` package: every library's tests depend on these
+              // helpers, so the helpers have to sit below all of them.
+              sourceTag: "scope:testing",
+              onlyDependOnLibsWithTags: ["scope:core"],
             },
           ],
         },

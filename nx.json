@@ -1,19 +1,32 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "namedInputs": {
+    "sharedGlobals": [],
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "production": [
+      "default",
+      "!{projectRoot}/test/**/*",
+      "!{projectRoot}/README.md",
+      "!{projectRoot}/vitest.config.ts"
+    ]
+  },
   "targetDefaults": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["{projectRoot}/dist"],
-      "cache": true
+      "cache": true,
+      "inputs": ["production", "^production"]
     },
     "typecheck": {
       "dependsOn": ["^build", "build"],
-      "cache": true
+      "cache": true,
+      "inputs": ["default", "^production"]
     },
     "test": {
       "dependsOn": ["^build", "typecheck"],
       "outputs": ["{projectRoot}/coverage"],
-      "cache": true
+      "cache": true,
+      "inputs": ["default", "^production"]
     },
     "check:exports": {
       "dependsOn": ["build"],
@@ -31,7 +44,7 @@
       "cache": true,
       "inputs": [
         "default",
-        "^default",
+        "^production",
         "{workspaceRoot}/eslint.config.mjs",
         "{workspaceRoot}/packages/eslint-plugin/src/**/*",
         { "externalDependencies": ["eslint", "typescript-eslint", "@typescript-eslint/parser"] }

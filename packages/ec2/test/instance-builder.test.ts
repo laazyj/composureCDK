@@ -19,26 +19,14 @@ import {
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
+import { buildInstance as buildAndSynth } from "./_helpers.js";
 import { createInstanceBuilder, type InstanceBuilderProps } from "../src/instance-builder.js";
 import { createVpcBuilder } from "../src/vpc-builder.js";
-
-function buildInstance(configureFn?: (builder: ReturnType<typeof createInstanceBuilder>) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const vpc = new Vpc(stack, "TestVpc", { maxAzs: 2, natGateways: 0 });
-  const builder = createInstanceBuilder()
-    .vpc(vpc)
-    .instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO))
-    .machineImage(MachineImage.latestAmazonLinux2023());
-  configureFn?.(builder);
-  const result = builder.build(stack, "TestInstance");
-  return { stack, vpc, result, template: Template.fromStack(stack) };
-}
 
 describe("InstanceBuilder", () => {
   describe("build", () => {
     it("returns an InstanceBuilderResult with an instance property", () => {
-      const { result } = buildInstance();
+      const { result } = buildAndSynth();
 
       expect(result).toBeDefined();
       expect(result.instance).toBeDefined();
@@ -46,13 +34,13 @@ describe("InstanceBuilder", () => {
     });
 
     it("creates exactly one EC2 instance", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::EC2::Instance", 1);
     });
 
     it("passes through instanceType", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::EC2::Instance", {
         InstanceType: "t3.micro",
@@ -155,7 +143,7 @@ describe("InstanceBuilder", () => {
 
   describe("secure defaults", () => {
     it("requires IMDSv2", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResource("AWS::EC2::LaunchTemplate", {
         Properties: Match.objectLike({
@@ -169,7 +157,7 @@ describe("InstanceBuilder", () => {
     });
 
     it("enables detailed (1-minute) CloudWatch monitoring", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::EC2::Instance", {
         Monitoring: true,
@@ -177,7 +165,7 @@ describe("InstanceBuilder", () => {
     });
 
     it("enables EBS-optimized networking", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::EC2::Instance", {
         EbsOptimized: true,
@@ -185,7 +173,7 @@ describe("InstanceBuilder", () => {
     });
 
     it("encrypts the root EBS volume with GP3", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::EC2::Instance", {
         BlockDeviceMappings: Match.arrayWith([
@@ -201,7 +189,7 @@ describe("InstanceBuilder", () => {
     });
 
     it("attaches the AmazonSSMManagedInstanceCore managed policy by default", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::IAM::Role", {
         ManagedPolicyArns: Match.arrayWith([

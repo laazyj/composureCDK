@@ -3,10 +3,12 @@ import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type IKey, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
-import { newStack } from "@composurecdk/cdk-testing";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createKeyBuilder } from "../src/key-builder.js";
+
+const buildAndSynth = buildFixture(createKeyBuilder, "TestKey");
 
 /** A minimal, fully-configured custom alarm on the key's own expiry metric. */
 function expiryAlarm(
@@ -29,14 +31,6 @@ function expiryAlarm(
     .description("Key material about to expire");
 }
 
-function build(configureFn?: (builder: ReturnType<typeof createKeyBuilder>) => void): Template {
-  const stack = newStack();
-  const builder = createKeyBuilder();
-  configureFn?.(builder);
-  builder.build(stack, "TestKey");
-  return Template.fromStack(stack);
-}
-
 describe("KeyBuilder", () => {
   describe("build", () => {
     it("returns a KeyBuilderResult carrying the key", () => {
@@ -48,13 +42,13 @@ describe("KeyBuilder", () => {
     });
 
     it("creates an AWS::KMS::Key", () => {
-      const template = build();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::KMS::Key", 1);
     });
 
     it("passes configured props through to the key", () => {
-      const template = build((b) => b.description("Encrypts the orders table."));
+      const { template } = buildAndSynth((b) => b.description("Encrypts the orders table."));
 
       template.hasResourceProperties("AWS::KMS::Key", {
         Description: "Encrypts the orders table.",
@@ -64,19 +58,19 @@ describe("KeyBuilder", () => {
 
   describe("defaults", () => {
     it("enables key rotation", () => {
-      const template = build();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::KMS::Key", { EnableKeyRotation: true });
     });
 
     it("uses the maximum 30-day pending deletion window", () => {
-      const template = build();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::KMS::Key", { PendingWindowInDays: 30 });
     });
 
     it("retains the key on stack deletion", () => {
-      const template = build();
+      const { template } = buildAndSynth();
 
       template.hasResource("AWS::KMS::Key", { DeletionPolicy: "Retain" });
     });
@@ -93,7 +87,7 @@ describe("KeyBuilder", () => {
         { PendingWindowInDays: 7 },
       ],
     ] as const)("lets the user override the %s default", (_name, configure, expected) => {
-      const template = build((b) => {
+      const { template } = buildAndSynth((b) => {
         configure(b);
       });
 
@@ -101,13 +95,15 @@ describe("KeyBuilder", () => {
     });
 
     it("lets the user override the removalPolicy default", () => {
-      const template = build((b) => b.removalPolicy(RemovalPolicy.DESTROY));
+      const { template } = buildAndSynth((b) => b.removalPolicy(RemovalPolicy.DESTROY));
 
       template.hasResource("AWS::KMS::Key", { DeletionPolicy: "Delete" });
     });
 
     it("drops the rotation default for a key spec that cannot rotate", () => {
-      const template = build((b) => b.keySpec(KeySpec.RSA_4096).keyUsage(KeyUsage.SIGN_VERIFY));
+      const { template } = buildAndSynth((b) =>
+        b.keySpec(KeySpec.RSA_4096).keyUsage(KeyUsage.SIGN_VERIFY),
+      );
 
       template.hasResourceProperties("AWS::KMS::Key", {
         KeySpec: "RSA_4096",
@@ -116,7 +112,7 @@ describe("KeyBuilder", () => {
     });
 
     it("keeps the rotation default when the key spec is explicitly symmetric", () => {
-      const template = build((b) => b.keySpec(KeySpec.SYMMETRIC_DEFAULT));
+      const { template } = buildAndSynth((b) => b.keySpec(KeySpec.SYMMETRIC_DEFAULT));
 
       template.hasResourceProperties("AWS::KMS::Key", { EnableKeyRotation: true });
     });
@@ -146,7 +142,7 @@ describe("KeyBuilder", () => {
 
   describe("tags", () => {
     it("applies builder tags to the key", () => {
-      const template = build((b) => b.tag("owner", "platform"));
+      const { template } = buildAndSynth((b) => b.tag("owner", "platform"));
 
       template.hasResourceProperties("AWS::KMS::Key", {
         Tags: Match.arrayWith([{ Key: "owner", Value: "platform" }]),
@@ -156,13 +152,15 @@ describe("KeyBuilder", () => {
 
   describe("alarms", () => {
     it("creates no alarms by default", () => {
-      const template = build();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
     it("creates the key material expiration alarm when opted in", () => {
-      const template = build((b) => b.recommendedAlarms({ keyMaterialExpiration: true }));
+      const { template } = buildAndSynth((b) =>
+        b.recommendedAlarms({ keyMaterialExpiration: true }),
+      );
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         Namespace: "AWS/KMS",
@@ -184,7 +182,7 @@ describe("KeyBuilder", () => {
     });
 
     it("applies threshold overrides", () => {
-      const template = build((b) =>
+      const { template } = buildAndSynth((b) =>
         b.recommendedAlarms({ keyMaterialExpiration: { threshold: 604800 } }),
       );
 
@@ -195,19 +193,21 @@ describe("KeyBuilder", () => {
       ["the alarm set is disabled wholesale", { enabled: false, keyMaterialExpiration: true }],
       ["the individual alarm is disabled", { keyMaterialExpiration: false }],
     ] as const)("creates no recommended alarm when %s", (_name, config) => {
-      const template = build((b) => b.recommendedAlarms(config));
+      const { template } = buildAndSynth((b) => b.recommendedAlarms(config));
 
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
     it("creates no recommended alarm when recommendedAlarms is false", () => {
-      const template = build((b) => b.recommendedAlarms(false));
+      const { template } = buildAndSynth((b) => b.recommendedAlarms(false));
 
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
     it("creates custom alarms added via addAlarm", () => {
-      const template = build((b) => b.addAlarm("urgentExpiry", (alarm) => expiryAlarm(alarm, 1)));
+      const { template } = buildAndSynth((b) =>
+        b.addAlarm("urgentExpiry", (alarm) => expiryAlarm(alarm, 1)),
+      );
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         AlarmDescription: "Key material about to expire",

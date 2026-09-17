@@ -11,14 +11,19 @@ import {
   InstanceType,
   ParameterGroupFamily,
 } from "@aws-cdk/aws-neptune-alpha";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import {
-  type ClusterBuilderProps,
-  createClusterBuilder,
-  type IClusterBuilder,
-} from "../src/cluster-builder.js";
+import { type ClusterBuilderProps, createClusterBuilder } from "../src/cluster-builder.js";
 import { clusterParameterGroupFamily } from "../src/cluster-parameter-group-defaults.js";
+
+const buildAndSynth = buildFixture(createClusterBuilder, "Graph", {
+  seed: (b, stack) =>
+    void b
+      .vpc(isolatedVpc(stack))
+      .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+      .instanceType(InstanceType.R6G_LARGE),
+});
 
 /** Builds a VPC with isolated subnets — Neptune is VPC-only and needs no egress. */
 function isolatedVpc(stack: Stack): Vpc {
@@ -31,23 +36,10 @@ function isolatedVpc(stack: Stack): Vpc {
   });
 }
 
-function buildCluster(configure?: (b: IClusterBuilder) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const vpc = isolatedVpc(stack);
-  const builder = createClusterBuilder()
-    .vpc(vpc)
-    .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
-    .instanceType(InstanceType.R6G_LARGE);
-  configure?.(builder);
-  const result = builder.build(stack, "Graph");
-  return { app, stack, vpc, result, template: Template.fromStack(stack) };
-}
-
 describe("ClusterBuilder", () => {
   describe("build", () => {
     it("returns a result exposing every construct it creates", () => {
-      const { result } = buildCluster();
+      const { result } = buildAndSynth();
 
       expect(result.cluster).toBeDefined();
       expect(result.subnetGroup).toBeDefined();
@@ -56,13 +48,13 @@ describe("ClusterBuilder", () => {
     });
 
     it("creates exactly one Neptune cluster", () => {
-      const { template } = buildCluster();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::Neptune::DBCluster", 1);
     });
 
     it("applies well-architected defaults", () => {
-      const { template } = buildCluster();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::Neptune::DBCluster", {
         StorageEncrypted: true,
@@ -75,7 +67,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("retains the cluster on deletion by default", () => {
-      const { template } = buildCluster();
+      const { template } = buildAndSynth();
 
       template.hasResource("AWS::Neptune::DBCluster", {
         DeletionPolicy: "Retain",
@@ -84,7 +76,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("lets the user override a default", () => {
-      const { template } = buildCluster((b) => b.backupRetention(Duration.days(30)));
+      const { template } = buildAndSynth((b) => b.backupRetention(Duration.days(30)));
 
       template.hasResourceProperties("AWS::Neptune::DBCluster", {
         BackupRetentionPeriod: 30,
@@ -118,7 +110,7 @@ describe("ClusterBuilder", () => {
 
   describe("cluster parameter group", () => {
     it("auto-creates an audit-log-enabled cluster parameter group", () => {
-      const { template } = buildCluster();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::Neptune::DBClusterParameterGroup", {
         Parameters: { neptune_enable_audit_log: "1" },
@@ -126,7 +118,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("merges user parameters onto the audit-log default", () => {
-      const { template } = buildCluster((b) =>
+      const { template } = buildAndSynth((b) =>
         b.clusterParameters({ neptune_query_timeout: "120000" }),
       );
 
@@ -194,7 +186,7 @@ describe("ClusterBuilder", () => {
 
   describe("recommended alarms", () => {
     it("creates the provisioned alarm set by default (no serverless capacity alarm)", () => {
-      const { result } = buildCluster();
+      const { result } = buildAndSynth();
 
       expect(Object.keys(result.alarms).sort()).toEqual([
         "bufferCacheHitRatio",
@@ -205,7 +197,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("adds the serverless capacity alarm at 90% of maxCapacity for a serverless cluster", () => {
-      const { result, template } = buildCluster((b) =>
+      const { result, template } = buildAndSynth((b) =>
         b
           .instanceType(InstanceType.SERVERLESS)
           .serverlessScalingConfiguration({ minCapacity: 1, maxCapacity: 8 }),
@@ -219,14 +211,14 @@ describe("ClusterBuilder", () => {
     });
 
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildCluster((b) => b.recommendedAlarms(false));
+      const { result, template } = buildAndSynth((b) => b.recommendedAlarms(false));
 
       expect(result.alarms).toEqual({});
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
     it("lets a single alarm be tuned and another disabled", () => {
-      const { result, template } = buildCluster((b) =>
+      const { result, template } = buildAndSynth((b) =>
         b.recommendedAlarms({ cpuUtilization: { threshold: 90 }, bufferCacheHitRatio: false }),
       );
 
@@ -238,7 +230,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("supports custom alarms via addAlarm", () => {
-      const { result } = buildCluster((b) =>
+      const { result } = buildAndSynth((b) =>
         b.addAlarm("gremlinErrors", (a) =>
           a
             .metric((cluster) => cluster.metric("NumGremlinErrorsPerSec"))
@@ -253,7 +245,7 @@ describe("ClusterBuilder", () => {
     // Regression: disabling the recommended alarms must not drop custom alarms
     // added via addAlarm() — see issue #305.
     it("keeps a custom alarm when recommendedAlarms is false", () => {
-      const { result, template } = buildCluster((b) =>
+      const { result, template } = buildAndSynth((b) =>
         b.recommendedAlarms(false).addAlarm("gremlinErrors", (a) =>
           a
             .metric((cluster) => cluster.metric("NumGremlinErrorsPerSec"))
@@ -267,7 +259,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
-      const { result, template } = buildCluster((b) =>
+      const { result, template } = buildAndSynth((b) =>
         b.recommendedAlarms({ enabled: false }).addAlarm("gremlinErrors", (a) =>
           a
             .metric((cluster) => cluster.metric("NumGremlinErrorsPerSec"))

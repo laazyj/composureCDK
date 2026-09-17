@@ -4,37 +4,34 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { EbsDeviceVolumeType, type Volume, type VolumeProps, Vpc } from "aws-cdk-lib/aws-ec2";
 import { Key } from "aws-cdk-lib/aws-kms";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createVolumeBuilder, type VolumeBuilderProps } from "../src/volume-builder.js";
 import { createVpcBuilder } from "../src/vpc-builder.js";
 
-function buildVolume(configureFn?: (b: ReturnType<typeof createVolumeBuilder>) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createVolumeBuilder().availabilityZone("us-east-1a").size(Size.gibibytes(50));
-  configureFn?.(builder);
-  const result = builder.build(stack, "TestVolume");
-  return { stack, result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(
+  () => createVolumeBuilder().availabilityZone("us-east-1a").size(Size.gibibytes(50)),
+  "TestVolume",
+);
 
 describe("VolumeBuilder", () => {
   describe("build", () => {
     it("returns a VolumeBuilderResult with volume + alarms", () => {
-      const { result } = buildVolume();
+      const { result } = buildAndSynth();
 
       expect(result.volume).toBeDefined();
       expect(result.alarms).toBeDefined();
     });
 
     it("creates exactly one EBS volume", () => {
-      const { template } = buildVolume();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::EC2::Volume", 1);
     });
 
     it("passes through size and availability zone", () => {
-      const { template } = buildVolume();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::EC2::Volume", {
         Size: 50,
@@ -95,7 +92,7 @@ describe("VolumeBuilder", () => {
 
   describe("secure defaults", () => {
     it("defaults to GP3", () => {
-      const { template } = buildVolume();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::EC2::Volume", {
         VolumeType: "gp3",
@@ -103,7 +100,7 @@ describe("VolumeBuilder", () => {
     });
 
     it("encrypts at rest with the account default KMS key", () => {
-      const { template } = buildVolume();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::EC2::Volume", {
         Encrypted: true,
@@ -112,7 +109,7 @@ describe("VolumeBuilder", () => {
     });
 
     it("enables autoEnableIo so the instance can boot unattended", () => {
-      const { template } = buildVolume();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::EC2::Volume", {
         AutoEnableIO: true,
@@ -120,7 +117,7 @@ describe("VolumeBuilder", () => {
     });
 
     it("retains the volume on stack deletion", () => {
-      const { template } = buildVolume();
+      const { template } = buildAndSynth();
 
       template.hasResource("AWS::EC2::Volume", {
         DeletionPolicy: "Retain",
@@ -131,7 +128,7 @@ describe("VolumeBuilder", () => {
 
   describe("user overrides", () => {
     it("allows flipping removalPolicy to DESTROY", () => {
-      const { template } = buildVolume((b) => {
+      const { template } = buildAndSynth((b) => {
         b.removalPolicy(RemovalPolicy.DESTROY);
       });
 
@@ -142,7 +139,7 @@ describe("VolumeBuilder", () => {
     });
 
     it("allows overriding the volumeType to gp2", () => {
-      const { template } = buildVolume((b) => {
+      const { template } = buildAndSynth((b) => {
         b.volumeType(EbsDeviceVolumeType.GP2);
       });
 
@@ -152,7 +149,7 @@ describe("VolumeBuilder", () => {
     });
 
     it("allows opting into Multi-Attach", () => {
-      const { template } = buildVolume((b) => {
+      const { template } = buildAndSynth((b) => {
         b.volumeType(EbsDeviceVolumeType.IO2).iops(3000).enableMultiAttach(true);
       });
 

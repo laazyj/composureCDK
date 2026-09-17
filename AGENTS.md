@@ -37,6 +37,15 @@ Lint is an nx target too: `npm run lint` runs `nx run-many -t lint`, which cache
 - **The custom rules** in `@composurecdk/eslint-plugin` drive every package's lint result, so `targetDefaults.lint` in [`nx.json`](nx.json) both depends on that package's `build` (the flat config imports its compiled output) and lists its `src/**` as a lint input, so a rule change busts the dependent lint caches.
 - **Not the `@nx/eslint` inference plugin.** It would auto-create the `lint` targets, but it evaluates the root flat config during graph construction (to skip projects with no lintable files). That imports `@composurecdk/eslint-plugin` before it is built, so every nx command fails on a fresh checkout. Per-package scripts avoid loading the config until lint actually runs — by which point `dependsOn` has built the plugin.
 
+**What counts as an input** is set by `namedInputs` in [`nx.json`](nx.json). `production` is `default` minus `test/**`, `README.md` and `vitest.config.ts` — the files that cannot change a package's `dist/`. `build` takes `["production", "^production"]`; `typecheck`, `test` and `lint` take `["default", "^production"]`, because a package's own tests do affect its typecheck and test run while a _dependency's_ never do.
+
+Without that split, `default` falls back to nx's built-in `{projectRoot}/**/*` and a one-line edit to any test file re-runs `build`, `typecheck` and `lint` for every dependent — measured at 71 of 75 tasks for a comment appended to `packages/core/test/testing.test.ts`.
+
+Two things to know if you change it:
+
+- **`sharedGlobals` must stay declared.** nx provides it built-in, but defining your own `default` that references it makes it your responsibility; drop it and every nx command fails with `"sharedGlobals" is an invalid fileset`.
+- **The exclusion list is short because the tree is tidy.** `dist`, `coverage`, `.tshy` and `cdk.out` are gitignored and nx only hashes tracked files, so they are already out. `package.json` must stay in `production` — tshy reads its build config from there.
+
 ## Publishing & module format
 
 Every publishable package ships dual ESM/CJS, built by `tshy` — see [ADR-0007](docs/adr/0007-dual-esm-cjs-publishing.md). When touching a builder package:

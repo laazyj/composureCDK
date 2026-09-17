@@ -1,26 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
-import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
-import { newStack, testEnv } from "@composurecdk/cdk-testing";
+import { buildFixture, newStack, testEnv } from "@composurecdk/cdk-testing";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createHealthCheckBuilder } from "../src/health-check-builder.js";
 
-function buildInUsEast1(
-  configureFn?: (builder: ReturnType<typeof createHealthCheckBuilder>) => void,
-) {
-  const stack = newStack({ env: testEnv("us-east-1") });
-  const builder = createHealthCheckBuilder().type(HealthCheckType.HTTPS).fqdn("api.example.com");
-  configureFn?.(builder);
-  const result = builder.build(stack, "ApiHealthCheck");
-  return { stack, result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(
+  () => createHealthCheckBuilder().type(HealthCheckType.HTTPS).fqdn("api.example.com"),
+  "ApiHealthCheck",
+  { stackProps: { env: testEnv("us-east-1") } },
+);
 
 describe("createHealthCheckBuilder", () => {
   describe("defaults", () => {
     it("creates a Route 53 health check with merged AWS-recommended defaults", () => {
-      const { result, template } = buildInUsEast1();
+      const { result, template } = buildAndSynth();
 
       expect(result.healthCheck).toBeDefined();
       template.hasResourceProperties("AWS::Route53::HealthCheck", {
@@ -41,7 +37,7 @@ describe("createHealthCheckBuilder", () => {
     });
 
     it("user overrides take precedence over defaults", () => {
-      const { template } = buildInUsEast1((b) => {
+      const { template } = buildAndSynth((b) => {
         b.failureThreshold(5).measureLatency(false);
       });
 
@@ -55,18 +51,12 @@ describe("createHealthCheckBuilder", () => {
   });
 
   describe("region warning", () => {
-    function buildInRegion(
+    // `stackProps: {}` replaces the fixture's default env rather than merging,
+    // which is how an environment-agnostic stack is spelled.
+    const buildInRegion = (
       region: string | undefined,
       configureFn?: (builder: ReturnType<typeof createHealthCheckBuilder>) => void,
-    ) {
-      const stack = region === undefined ? newStack() : newStack({ env: testEnv(region) });
-      const builder = createHealthCheckBuilder()
-        .type(HealthCheckType.HTTPS)
-        .fqdn("api.example.com");
-      configureFn?.(builder);
-      builder.build(stack, "ApiHealthCheck");
-      return stack;
-    }
+    ) => buildAndSynth(configureFn, { stackProps: region ? { env: testEnv(region) } : {} }).stack;
 
     it("emits a warning when the stack is outside us-east-1", () => {
       const stack = buildInRegion("eu-west-1");

@@ -2,23 +2,17 @@ import { describe, expect, it } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createManagedPolicyBuilder } from "../src/managed-policy-builder.js";
 import { createStatementBuilder, WildcardResourceError } from "../src/statement-builder.js";
 import { asForeignRealm } from "./foreign-realm.js";
 
-function synth(configureFn: (b: ReturnType<typeof createManagedPolicyBuilder>) => void): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createManagedPolicyBuilder();
-  configureFn(builder);
-  builder.build(stack, "TestPolicy");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(createManagedPolicyBuilder, "TestPolicy");
 
 describe("ManagedPolicyBuilder", () => {
   it("creates a customer-managed policy with the supplied statements", () => {
-    const template = synth((b) =>
+    const { template } = buildAndSynth((b) =>
       b.managedPolicyName("ops-boundary").statements([
         new PolicyStatement({
           actions: ["s3:GetObject"],
@@ -43,7 +37,7 @@ describe("ManagedPolicyBuilder", () => {
   });
 
   it("appends statements added via addStatements to those from props", () => {
-    const template = synth((b) =>
+    const { template } = buildAndSynth((b) =>
       b
         .statements([
           new PolicyStatement({
@@ -73,7 +67,7 @@ describe("ManagedPolicyBuilder", () => {
   // consumer calls with builders it constructed itself, so the ESM/CJS realm
   // boundary (ADR-0007) can sit across this call.
   it("builds StatementBuilders that came from another realm, guard included", () => {
-    const template = synth((b) =>
+    const { template } = buildAndSynth((b) =>
       b.addStatements([
         asForeignRealm(
           createStatementBuilder()
@@ -91,7 +85,7 @@ describe("ManagedPolicyBuilder", () => {
     });
 
     expect(() =>
-      synth((b) =>
+      buildAndSynth((b) =>
         b.addStatements([
           asForeignRealm(
             createStatementBuilder().allow().actions(["ec2:DescribeInstances"]).resources(["*"]),

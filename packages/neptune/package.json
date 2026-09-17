@@ -58,6 +58,7 @@
   },
   "devDependencies": {
     "@aws-cdk/aws-neptune-alpha": "2.257.0-alpha.0",
+    "@composurecdk/cdk-testing": "*",
     "@types/node": "^26.5.1",
     "aws-cdk-lib": "^2.268.0",
     "constructs": "^10.8.1",

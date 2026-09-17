@@ -3,7 +3,7 @@ import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { CfnResourcePolicy, ResourcePolicy, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
-import { TEST_ACCOUNT, newStack, testEnv } from "@composurecdk/cdk-testing";
+import { TEST_ACCOUNT, buildFixture, newStack, testEnv } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { createHostedZoneBuilder } from "../src/hosted-zone-builder.js";
 import {
@@ -14,15 +14,9 @@ import {
 
 const USER_OWNED_ARN = `arn:aws:logs:us-east-1:${TEST_ACCOUNT}:log-group:/custom/zone-logs`;
 
-function synthInUsEast1(
-  configure: (b: ReturnType<typeof createHostedZoneBuilder>) => void,
-): Template {
-  const stack = newStack({ env: testEnv("us-east-1") });
-  const builder = createHostedZoneBuilder();
-  configure(builder);
-  builder.build(stack, "TestZone");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(createHostedZoneBuilder, "TestZone", {
+  stackProps: { env: testEnv("us-east-1") },
+});
 
 describe("HostedZoneBuilder", () => {
   it("throws when zoneName is not set", () => {
@@ -37,7 +31,7 @@ describe("HostedZoneBuilder", () => {
   });
 
   it("synthesises a Route53 hosted zone with the provided zone name", () => {
-    const template = synthInUsEast1((b) => b.zoneName("example.com"));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com"));
     template.resourceCountIs("AWS::Route53::HostedZone", 1);
     template.hasResourceProperties("AWS::Route53::HostedZone", {
       Name: "example.com.",
@@ -45,7 +39,7 @@ describe("HostedZoneBuilder", () => {
   });
 
   it("forwards the comment property", () => {
-    const template = synthInUsEast1((b) => {
+    const { template } = buildAndSynth((b) => {
       b.zoneName("example.com");
       b.comment("primary customer domain");
     });
@@ -57,7 +51,7 @@ describe("HostedZoneBuilder", () => {
 
 describe("HostedZoneBuilder query logging", () => {
   it("auto-creates a log group with secure defaults when queryLogging is left at its default", () => {
-    const template = synthInUsEast1((b) => b.zoneName("example.com"));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com"));
 
     template.resourceCountIs("AWS::Logs::LogGroup", 1);
     template.hasResourceProperties("AWS::Logs::LogGroup", {
@@ -68,7 +62,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("wires the auto-created log group ARN into the hosted zone via Fn::GetAtt", () => {
-    const template = synthInUsEast1((b) => b.zoneName("example.com"));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com"));
 
     template.hasResourceProperties("AWS::Route53::HostedZone", {
       QueryLoggingConfig: {
@@ -155,7 +149,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("configure callback can override retention without breaking the shared policy", () => {
-    const template = synthInUsEast1((b) =>
+    const { template } = buildAndSynth((b) =>
       b
         .zoneName("example.com")
         .queryLogging({ configure: (lg) => lg.retention(RetentionDays.ONE_YEAR) }),
@@ -280,7 +274,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("strips the trailing dot from a fully-qualified zoneName when forming the log-group name", () => {
-    const template = synthInUsEast1((b) => b.zoneName("example.com."));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com."));
     template.hasResourceProperties("AWS::Logs::LogGroup", {
       LogGroupName: `${QUERY_LOGGING_LOG_GROUP_NAME_PREFIX}/example.com`,
     });

@@ -1,22 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Match } from "aws-cdk-lib/assertions";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { createOpenIdConnectProviderBuilder } from "../src/open-id-connect-provider-builder.js";
 
 const OIDC_RESOURCE = "Custom::AWSCDKOpenIdConnectProvider";
 
-function build(
-  configureFn?: (b: ReturnType<typeof createOpenIdConnectProviderBuilder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createOpenIdConnectProviderBuilder().url(
-    "https://token.actions.githubusercontent.com",
-  );
-  configureFn?.(builder);
-  builder.build(stack, "TestProvider");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(
+  () => createOpenIdConnectProviderBuilder().url("https://token.actions.githubusercontent.com"),
+  "TestProvider",
+);
 
 describe("OpenIdConnectProviderBuilder", () => {
   describe("build", () => {
@@ -32,12 +25,12 @@ describe("OpenIdConnectProviderBuilder", () => {
     });
 
     it("creates exactly one OIDC provider", () => {
-      const template = build();
+      const { template } = buildAndSynth();
       template.resourceCountIs(OIDC_RESOURCE, 1);
     });
 
     it("passes url and clientIds through to the provider", () => {
-      const template = build((b) => b.clientIds(["sts.amazonaws.com"]));
+      const { template } = buildAndSynth((b) => b.clientIds(["sts.amazonaws.com"]));
       template.hasResourceProperties(
         OIDC_RESOURCE,
         Match.objectLike({

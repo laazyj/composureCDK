@@ -5,29 +5,23 @@ import { FlowLogDestination } from "aws-cdk-lib/aws-ec2";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { createVpcBuilder } from "../src/vpc-builder.js";
 
-function buildVpc(configureFn?: (builder: ReturnType<typeof createVpcBuilder>) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createVpcBuilder();
-  configureFn?.(builder);
-  const result = builder.build(stack, "Network");
-  return { result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(createVpcBuilder, "Network");
 
 describe("VpcBuilder", () => {
   describe("build", () => {
     it("returns a VpcBuilderResult with a vpc property", () => {
-      const { result } = buildVpc();
+      const { result } = buildAndSynth();
 
       expect(result).toBeDefined();
       expect(result.vpc).toBeDefined();
     });
 
     it("creates exactly one VPC", () => {
-      const { template } = buildVpc();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::EC2::VPC", 1);
     });
@@ -35,20 +29,20 @@ describe("VpcBuilder", () => {
 
   describe("well-architected defaults", () => {
     it("creates subnets across 2 availability zones by default", () => {
-      const { template } = buildVpc();
+      const { template } = buildAndSynth();
 
       // 2 AZs x (public + private) = 4 subnets
       template.resourceCountIs("AWS::EC2::Subnet", 4);
     });
 
     it("creates a single NAT gateway by default", () => {
-      const { template } = buildVpc();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::EC2::NatGateway", 1);
     });
 
     it("restricts the default security group via a custom resource", () => {
-      const { template } = buildVpc();
+      const { template } = buildAndSynth();
 
       // CDK's restrictDefaultSecurityGroup is implemented via a
       // Custom::VpcRestrictDefaultSG custom resource.
@@ -56,14 +50,14 @@ describe("VpcBuilder", () => {
     });
 
     it("auto-creates a CloudWatch LogGroup for flow logs", () => {
-      const { result, template } = buildVpc();
+      const { result, template } = buildAndSynth();
 
       expect(result.flowLogsLogGroup).toBeDefined();
       template.resourceCountIs("AWS::Logs::LogGroup", 1);
     });
 
     it("creates exactly one FlowLog resource routed to CloudWatch Logs", () => {
-      const { template } = buildVpc();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::EC2::FlowLog", 1);
       template.hasResourceProperties("AWS::EC2::FlowLog", {
@@ -75,7 +69,7 @@ describe("VpcBuilder", () => {
 
   describe("user overrides", () => {
     it("allows overriding natGateways", () => {
-      const { template } = buildVpc((b) => {
+      const { template } = buildAndSynth((b) => {
         b.natGateways(2);
       });
 
@@ -95,7 +89,7 @@ describe("VpcBuilder", () => {
     });
 
     it("disables flow logs entirely when flowLogs is set to false", () => {
-      const { result, template } = buildVpc((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.flowLogs(false);
       });
 
@@ -125,7 +119,7 @@ describe("VpcBuilder", () => {
     });
 
     it("applies user configure callback to the auto-created LogGroup", () => {
-      const { result, template } = buildVpc((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.flowLogs({
           configure: (lg) =>
             lg.retention(RetentionDays.ONE_WEEK).removalPolicy(RemovalPolicy.DESTROY),

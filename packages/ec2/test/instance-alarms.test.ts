@@ -1,16 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Duration } from "aws-cdk-lib";
+import { Match } from "aws-cdk-lib/assertions";
 import { Stats, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import {
-  InstanceClass,
-  InstanceSize,
-  InstanceType,
-  MachineImage,
-  Vpc,
-  type Instance,
-} from "aws-cdk-lib/aws-ec2";
+import { InstanceClass, InstanceSize, InstanceType, type Instance } from "aws-cdk-lib/aws-ec2";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { buildInstance as buildAndSynth } from "./_helpers.js";
 import { createInstanceBuilder } from "../src/instance-builder.js";
 
 const ALWAYS_ON_ALARM_KEYS = [
@@ -19,28 +13,11 @@ const ALWAYS_ON_ALARM_KEYS = [
   "attachedEbsStatusCheckFailed",
 ] as const;
 
-function buildInstance(
-  configureFn?: (builder: ReturnType<typeof createInstanceBuilder>) => void,
-  instanceType: InstanceType = InstanceType.of(InstanceClass.T3, InstanceSize.MICRO),
-) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const vpc = new Vpc(stack, "TestVpc", { maxAzs: 2, natGateways: 0 });
-  const builder = createInstanceBuilder()
-    .vpc(vpc)
-    .instanceType(instanceType)
-    .machineImage(MachineImage.latestAmazonLinux2023());
-  configureFn?.(builder);
-  const result = builder.build(stack, "TestInstance");
-  return { result, template: Template.fromStack(stack) };
-}
-
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates cpuUtilization, statusCheckFailed, and attachedEbsStatusCheckFailed alarms for any instance type", () => {
-      const { result, template } = buildInstance(
-        undefined,
-        InstanceType.of(InstanceClass.M7G, InstanceSize.LARGE),
+      const { result, template } = buildAndSynth((b) =>
+        b.instanceType(InstanceType.of(InstanceClass.M7G, InstanceSize.LARGE)),
       );
 
       expect(result.alarms.cpuUtilization).toBeDefined();
@@ -50,7 +27,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates cpuUtilization alarm with > 80% threshold", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "CPUUtilization",
@@ -65,7 +42,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates statusCheckFailed alarm with > 0 threshold", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "StatusCheckFailed",
@@ -80,7 +57,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates attachedEbsStatusCheckFailed alarm with >= 1 threshold over 10 minutes", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "StatusCheckFailed_AttachedEBS",
@@ -95,7 +72,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes threshold justification in alarm descriptions", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "CPUUtilization",
@@ -106,9 +83,8 @@ describe("recommended alarms", () => {
 
   describe("contextual cpuCreditBalance alarm", () => {
     it("creates cpuCreditBalance alarm for T3 burstable instances", () => {
-      const { result, template } = buildInstance(
-        undefined,
-        InstanceType.of(InstanceClass.T3, InstanceSize.MICRO),
+      const { result, template } = buildAndSynth((b) =>
+        b.instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO)),
       );
 
       expect(result.alarms.cpuCreditBalance).toBeDefined();
@@ -124,18 +100,16 @@ describe("recommended alarms", () => {
     });
 
     it("creates cpuCreditBalance alarm for T4g burstable instances", () => {
-      const { result } = buildInstance(
-        undefined,
-        InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL),
+      const { result } = buildAndSynth((b) =>
+        b.instanceType(InstanceType.of(InstanceClass.T4G, InstanceSize.SMALL)),
       );
 
       expect(result.alarms.cpuCreditBalance).toBeDefined();
     });
 
     it("does NOT create cpuCreditBalance alarm for non-burstable (M-family) instances", () => {
-      const { result, template } = buildInstance(
-        undefined,
-        InstanceType.of(InstanceClass.M7G, InstanceSize.LARGE),
+      const { result, template } = buildAndSynth((b) =>
+        b.instanceType(InstanceType.of(InstanceClass.M7G, InstanceSize.LARGE)),
       );
 
       expect(result.alarms.cpuCreditBalance).toBeUndefined();
@@ -143,9 +117,8 @@ describe("recommended alarms", () => {
     });
 
     it("does NOT create cpuCreditBalance alarm for non-burstable (C-family) instances", () => {
-      const { result } = buildInstance(
-        undefined,
-        InstanceType.of(InstanceClass.C7G, InstanceSize.LARGE),
+      const { result } = buildAndSynth((b) =>
+        b.instanceType(InstanceType.of(InstanceClass.C7G, InstanceSize.LARGE)),
       );
 
       expect(result.alarms.cpuCreditBalance).toBeUndefined();
@@ -154,7 +127,7 @@ describe("recommended alarms", () => {
 
   describe("customization", () => {
     it("allows customizing cpuUtilization threshold", () => {
-      const { template } = buildInstance((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ cpuUtilization: { threshold: 50 } });
       });
 
@@ -165,7 +138,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing evaluation periods", () => {
-      const { template } = buildInstance((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({
           statusCheckFailed: { evaluationPeriods: 5, datapointsToAlarm: 3 },
         });
@@ -179,7 +152,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing treat missing data", () => {
-      const { template } = buildInstance((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({
           cpuUtilization: { treatMissingData: TreatMissingData.BREACHING },
         });
@@ -192,7 +165,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing cpuCreditBalance threshold on burstable instances", () => {
-      const { template } = buildInstance((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ cpuCreditBalance: { threshold: 25 } });
       });
 
@@ -205,7 +178,7 @@ describe("recommended alarms", () => {
 
   describe("disabling alarms", () => {
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildInstance((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms(false);
       });
 
@@ -214,7 +187,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when enabled is false", () => {
-      const { result, template } = buildInstance((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ enabled: false });
       });
 
@@ -228,7 +201,7 @@ describe("recommended alarms", () => {
         others: [...ALWAYS_ON_ALARM_KEYS.filter((other) => other !== key), "cpuCreditBalance"],
       })),
     )("disables only the $key alarm when set to false", ({ key, others }) => {
-      const { result, template } = buildInstance((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ [key]: false });
       });
 
@@ -240,7 +213,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables cpuCreditBalance explicitly on a burstable instance", () => {
-      const { result, template } = buildInstance((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ cpuCreditBalance: false });
       });
 
@@ -251,7 +224,7 @@ describe("recommended alarms", () => {
 
   describe("no default actions", () => {
     it("creates alarms with no alarm actions", () => {
-      const { template } = buildInstance();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "CPUUtilization",
@@ -263,7 +236,7 @@ describe("recommended alarms", () => {
 
 describe("addAlarm", () => {
   it("creates a custom alarm alongside recommended alarms", () => {
-    const { result, template } = buildInstance((b) => {
+    const { result, template } = buildAndSynth((b) => {
       b.addAlarm("networkIn", (alarm) =>
         alarm
           .metric(
@@ -318,7 +291,7 @@ describe("addAlarm", () => {
   }
 
   it("keeps a custom alarm when recommendedAlarms is false", () => {
-    const { result, template } = buildInstance((b) => {
+    const { result, template } = buildAndSynth((b) => {
       customAlarm(b.recommendedAlarms(false));
     });
 
@@ -327,7 +300,7 @@ describe("addAlarm", () => {
   });
 
   it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
-    const { result, template } = buildInstance((b) => {
+    const { result, template } = buildAndSynth((b) => {
       customAlarm(b.recommendedAlarms({ enabled: false }));
     });
 

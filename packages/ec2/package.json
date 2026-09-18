@@ -4,7 +4,7 @@
   "description": "Composable EC2 instance and VPC builders with well-architected defaults",
   "repository": {
     "type": "git",
-    "url": "https://github.com/laazyj/composureCDK",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
     "directory": "packages/ec2"
   },
   "files": [

@@ -4,7 +4,7 @@
   "description": "Compose-native builders for AWS SES — email identities, receipt rule sets, filters, and rule actions",
   "repository": {
     "type": "git",
-    "url": "https://github.com/laazyj/composureCDK",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
     "directory": "packages/ses"
   },
   "files": [

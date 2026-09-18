@@ -5,7 +5,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/laazyj/composureCDK",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
     "directory": "packages/cdk-testing"
   },
   "main": "./dist/index.js",

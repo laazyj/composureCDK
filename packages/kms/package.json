@@ -4,7 +4,7 @@
   "description": "Composable AWS KMS customer-managed key builder with well-architected defaults",
   "repository": {
     "type": "git",
-    "url": "https://github.com/laazyj/composureCDK",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
     "directory": "packages/kms"
   },
   "files": [

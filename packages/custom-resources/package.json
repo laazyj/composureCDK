@@ -4,7 +4,7 @@
   "description": "Compose-native AwsCustomResource builder for AWS operations with no CloudFormation resource",
   "repository": {
     "type": "git",
-    "url": "https://github.com/laazyj/composureCDK",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
     "directory": "packages/custom-resources"
   },
   "files": [

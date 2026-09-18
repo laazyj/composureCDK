@@ -32,6 +32,7 @@
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "devDependencies": {
     "@composurecdk/core": "*",
     "@types/node": "^26.5.1",

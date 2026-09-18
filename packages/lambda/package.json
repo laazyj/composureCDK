@@ -38,6 +38,7 @@
     "access": "public"
   },
   "type": "module",
+  "sideEffects": false,
   "engines": {
     "node": ">=20"
   },

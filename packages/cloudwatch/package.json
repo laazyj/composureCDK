@@ -4,7 +4,7 @@
   "description": "Composable CloudWatch alarm primitives for composureCDK resource packages",
   "repository": {
     "type": "git",
-    "url": "https://github.com/laazyj/composureCDK",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
     "directory": "packages/cloudwatch"
   },
   "files": [

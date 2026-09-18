@@ -7,6 +7,7 @@
  */
 export const DUAL_PACKAGES = [
   { name: "@composurecdk/core", probe: "compose" },
+  { name: "@composurecdk/eslint-plugin", probe: "rules" },
   { name: "@composurecdk/acm", probe: "createCertificateBuilder" },
   { name: "@composurecdk/apigateway", probe: "createRestApiBuilder" },
   { name: "@composurecdk/budgets", probe: "createBudgetBuilder" },

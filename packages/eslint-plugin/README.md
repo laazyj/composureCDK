@@ -1,6 +1,8 @@
 # @composurecdk/eslint-plugin
 
-Internal ESLint plugin encoding ComposureCDK architectural invariants — tagged builders, lifecycle context, builder copy state. Private to the workspace; not published.
+Internal ESLint plugin encoding ComposureCDK architectural invariants — tagged builders, lifecycle context, builder copy state.
+
+Not yet published (`"private": true`), but held to the same packaging bar as the published `@composurecdk/*` packages: it ships a dual ESM/CommonJS build produced by `tshy`, its `exports` map is generated rather than hand-written, and `check:exports` (`attw` + `publint`) and the `@composurecdk/module-compat` resolution suite gate it on every `npm run verify`. See [ADR-0007](../../docs/adr/0007-dual-esm-cjs-publishing.md#amendment-2026-09-18-eslint-plugin-joins-the-standard).
 
 ## Usage
 
@@ -10,6 +12,20 @@ The root `eslint.config.mjs` consumes the plugin via the `recommended` preset:
 import composurecdk from "@composurecdk/eslint-plugin";
 
 export default [
+  {
+    files: ["packages/*/src/**/*.ts"],
+    plugins: { composurecdk },
+    rules: composurecdk.configs.recommended.rules,
+  },
+];
+```
+
+From a CommonJS flat config the `require()` result is itself the plugin — `rules` and `configs` are own properties of it, so no `.default` unwrapping is needed:
+
+```js
+const composurecdk = require("@composurecdk/eslint-plugin");
+
+module.exports = [
   {
     files: ["packages/*/src/**/*.ts"],
     plugins: { composurecdk },

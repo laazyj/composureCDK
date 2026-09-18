@@ -6,7 +6,7 @@ Internal, CDK-aware test helpers shared across the `@composurecdk/*` suites. Pri
 
 `@composurecdk/core/testing` is the existing home for shared test helpers, and is the wrong home for these, on two counts.
 
-It is public API. `core/testing` is a published subpath: a consumer writing their own builder gets `assertCopyPreservesState` to prove their `[COPY_STATE]` hook, so its helpers are agnostic and carry a semver surface. The helpers here are coupled to this repo's own suites and are not a contract to offer anyone. Hence `"private": true`, as for `eslint-plugin`, `examples` and `module-compat`: no dual ESM/CJS publishing, no `DUAL_PACKAGES` entry in `@composurecdk/module-compat`, no `check:exports` gate.
+It is public API. `core/testing` is a published subpath: a consumer writing their own builder gets `assertCopyPreservesState` to prove their `[COPY_STATE]` hook, so its helpers are agnostic and carry a semver surface. The helpers here are coupled to this repo's own suites and are not a contract to offer anyone. Hence `"private": true`, as for `examples` and `module-compat`: no dual ESM/CJS publishing, no `DUAL_PACKAGES` entry in `@composurecdk/module-compat`, no `check:exports` gate.
 
 It is CDK-version-agnostic by rule. `@composurecdk/core` declares no `aws-cdk-lib` dependency, and the root `eslint.config.mjs` bans the import from `packages/core/src/**` (see [docs/architecture.md](../../docs/architecture.md)). Every helper here needs `App`, `Stack` or `Template`.
 

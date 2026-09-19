@@ -70,9 +70,8 @@ Each rule has a documentation page with its rationale, examples, deliberate excl
 | [`composurecdk/no-cdk-api-above-floor`](docs/rules/no-cdk-api-above-floor.md)                             | `aws-cdk-lib` APIs newer than the supported peer floor — they throw on older versions in the range.                  |
 | [`composurecdk/no-cjs-incompatible-syntax`](docs/rules/no-cjs-incompatible-syntax.md)                     | `import.meta` / top-level `await` in library `src/` — neither emits to CommonJS.                                     |
 | [`composurecdk/no-realm-bound-instanceof`](docs/rules/no-realm-bound-instanceof.md)                       | `instanceof` against an imported class — realm-bound, so it silently returns false across the dual-package boundary. |
+| [`composurecdk/no-typescript-private-modifier`](docs/rules/no-typescript-private-modifier.md)             | The TypeScript `private` modifier — it stays in `keyof T` and leaks through mapped types into the emitted `.d.ts`.   |
 | [`composurecdk/redeclared-prop-must-track-cdk-type`](docs/rules/redeclared-prop-must-track-cdk-type.md)   | A prop re-declared out of an `Omit<CdkProps, …>` that pins a CDK interface instead of reading CDK's own prop type.   |
-
-The `recommended` preset also bans the TypeScript `private` modifier via `no-restricted-syntax` (use ECMAScript `#field` instead — TS `private` leaks through `keyof T` into emitted `.d.ts`, producing TS4094 downstream).
 
 ## Adding a new rule
 

@@ -30,7 +30,7 @@ A previous decision (ADR predecessors; commit `1fcd0dc`, shipped in 0.3.1) delib
 
 2. **Builder classes use ECMAScript private fields (`#field`) rather than the TypeScript `private` modifier.** ECMAScript `#` fields do not appear in `keyof T`, so they are invisible to the `IBuilder<Props, T>` mapped type and to emitted declarations. The only permitted use of `private` is on a constructor (there is no `#constructor` syntax).
 
-3. **Both rules are enforced by ESLint.** `eslint.config.mjs` uses `no-restricted-syntax` scoped to `packages/*/src/**/*.ts` to reject `PropertyDefinition[accessibility='private']`, `MethodDefinition[accessibility='private'][kind!='constructor']`, and `TSParameterProperty[accessibility='private']`. The barrel re-export restriction from 0.3.1 is removed.
+3. **Both rules are enforced by ESLint.** The `composurecdk/no-typescript-private-modifier` rule rejects a `private` property, method or parameter property, scoped by the consuming config to library source. (It began as three `no-restricted-syntax` selectors in `eslint.config.mjs`; it became a named rule so a consumer's own `no-restricted-syntax` config cannot silently replace it.) The barrel re-export restriction from 0.3.1 is removed.
 
 ## Consequences
 

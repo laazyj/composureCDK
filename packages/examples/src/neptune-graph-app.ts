@@ -9,7 +9,6 @@ import {
   SubnetType,
   type Vpc,
 } from "aws-cdk-lib/aws-ec2";
-import { type IRole } from "aws-cdk-lib/aws-iam";
 import { compose, ref } from "@composurecdk/core";
 import {
   createInstanceBuilder,
@@ -19,7 +18,6 @@ import {
   type SecurityGroupBuilderResult,
   type VpcBuilderResult,
 } from "@composurecdk/ec2";
-import { createServiceRoleBuilder, type RoleBuilderResult } from "@composurecdk/iam";
 import {
   clusterGrants,
   createClusterBuilder,
@@ -42,9 +40,9 @@ import {
  * - The two halves of reaching an IAM-authenticated cluster, each declared
  *   where it belongs and both wired inside `compose()` rather than in
  *   `afterBuild` glue: the cluster's `allowDefaultPortFrom(bastionSg)` writes
- *   the ingress rule into its own security group, and the bastion's role
- *   carries the consumer-side `clusterGrants.connect(ref("graph"))` data-plane
- *   grant (ADR-0013).
+ *   the ingress rule into its own security group, and the bastion carries the
+ *   consumer-side `clusterGrants.connect(ref("graph"))` data-plane grant on
+ *   its own `.grant()`, which lands on the role it runs as (ADR-0013).
  * - {@link createSecurityGroupBuilder} for the bastion's closed-egress SG.
  *   The only egress rules are the ones the cross-component wiring adds:
  *   `:8182` to Neptune and `:443` to the SSM interface endpoints, both via
@@ -85,17 +83,6 @@ export function createNeptuneGraphApp(app = new App()) {
         .vpc(ref<VpcBuilderResult>("network").map((r: VpcBuilderResult): Vpc => r.vpc))
         .description("Neptune bastion - SSM-managed, egress only to Neptune and SSM endpoints"),
 
-      // The consumer side of the cluster grant: the role the bastion assumes
-      // asks for Neptune data-plane access, so the edge runs bastionRole →
-      // graph, matching the dependency that already exists.
-      bastionRole: createServiceRoleBuilder("ec2.amazonaws.com").grant(
-        clusterGrants.connect(
-          ref<ClusterBuilderResult>("graph").map(
-            (r: ClusterBuilderResult): DatabaseCluster => r.cluster,
-          ),
-        ),
-      ),
-
       bastion: createInstanceBuilder()
         .vpc(ref<VpcBuilderResult>("network").map((r: VpcBuilderResult): Vpc => r.vpc))
         .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
@@ -106,7 +93,17 @@ export function createNeptuneGraphApp(app = new App()) {
             (r: SecurityGroupBuilderResult): ISecurityGroup => r.securityGroup,
           ),
         )
-        .role(ref<RoleBuilderResult>("bastionRole").map((r: RoleBuilderResult): IRole => r.role)),
+        // The consumer side of the cluster grant: the bastion asks for Neptune
+        // data-plane access, so the edge runs bastion → graph, matching the
+        // dependency that already exists. The grant lands on the role CDK
+        // creates for the instance.
+        .grant(
+          clusterGrants.connect(
+            ref<ClusterBuilderResult>("graph").map(
+              (r: ClusterBuilderResult): DatabaseCluster => r.cluster,
+            ),
+          ),
+        ),
 
       ssmEndpoint: ssmEndpointBase
         .copy()
@@ -133,8 +130,7 @@ export function createNeptuneGraphApp(app = new App()) {
     {
       network: [],
       bastionSg: ["network"],
-      bastionRole: ["graph"],
-      bastion: ["network", "bastionSg", "bastionRole"],
+      bastion: ["network", "bastionSg", "graph"],
       ssmEndpoint: ["network", "bastionSg"],
       ssmMessagesEndpoint: ["network", "bastionSg"],
       ec2MessagesEndpoint: ["network", "bastionSg"],

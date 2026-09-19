@@ -121,20 +121,21 @@ compose(
         "Bastion to Neptune",
       ),
 
-    // The role the bastion assumes — pass it to the instance with `.role(...)`.
-    bastionRole: createServiceRoleBuilder("ec2.amazonaws.com").grant(
-      clusterGrants.connect(ref<ClusterBuilderResult>("graph").get("cluster")),
-    ),
+    bastion: createInstanceBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .securityGroup(ref<SecurityGroupBuilderResult>("bastionSg").get("securityGroup"))
+      .grant(clusterGrants.connect(ref<ClusterBuilderResult>("graph").get("cluster"))),
   },
   {
     graph: ["network", "bastionSg"], // cluster → the SG its ingress rule names
-    bastionRole: ["graph"], // consumer → resource; no reverse edge, no cycle
-    // ... network, bastionSg, bastion
+    bastion: ["network", "bastionSg", "graph"], // consumer → resource; no reverse edge, no cycle
   },
 );
 ```
 
 `clusterGrants.connect(cluster)` delegates to the cluster's native `grantConnect`, which grants the whole `neptune-db:*` namespace on the cluster's ARN. A principal that needs less wants a narrower policy of its own over the [data-plane actions](https://docs.aws.amazon.com/neptune/latest/userguide/iam-dp-actions.html).
+
+The grant goes on any builder that accepts one — an `InstanceBuilder`, a `FunctionBuilder`, or a `RoleBuilder` where the principal is a role you own. Each routes the policy onto whichever role the component runs as, so no separate role component is needed to hold it.
 
 `allowDefaultPortFrom(peer)` takes any `IConnectable` — a security group, an EC2 instance, a VPC-attached Lambda function — and applies `cluster.connections.allowDefaultPortFrom(peer, description)`, opening ingress on the cluster's SG and the matching egress on the peer's. Prefer the peer's _security group_ over the peer itself: naming a compute component makes the cluster depend on it, the reverse edge consumer-side grants exist to avoid.
 

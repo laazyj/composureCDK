@@ -51,7 +51,7 @@
   },
   "devDependencies": {
     "@types/estree": "^1.0.9",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.1",
     "@typescript-eslint/parser": "^8.70.0",
     "eslint": "^10.10.0",
     "typescript": "^6.0.3",

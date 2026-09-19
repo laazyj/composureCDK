@@ -46,6 +46,19 @@ describe("rule documentation", () => {
     expect(body.split("\n")[0]).toBe(`# composurecdk/${name}`);
   });
 
+  it.each(RULE_ENTRIES)("%s writes messages a consumer can act on", (_name, rule) => {
+    // A violation message is the most consumer-facing text the plugin has: it
+    // appears on every report, and unlike the page it cannot be skipped. An
+    // internal identifier in one is an instruction the reader cannot follow.
+    const messages = Object.values(rule.meta?.messages ?? {});
+
+    expect(messages.length).toBeGreaterThan(0);
+    for (const message of messages) {
+      expect(message).not.toMatch(/ADR-\d{4}/);
+      expect(message).not.toMatch(/\bissue #\d+|\(#\d+\)/);
+    }
+  });
+
   it("has no page for a rule that no longer exists", () => {
     const pages = readdirSync(DOCS_DIR)
       .filter((f) => f.endsWith(".md"))

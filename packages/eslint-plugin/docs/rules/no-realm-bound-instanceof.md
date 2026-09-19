@@ -31,7 +31,13 @@ if (typeof value === "object" && value !== null && STATEMENT_BUILDER in value) {
 }
 ```
 
-For a CDK construct you cannot modify, brand the L2 by reading its L1 instead — `CfnResource.isCfnResource(x) && x.cfnResourceType === …`, per [ADR-0011](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0011-cross-component-relationship-guards.md).
+That is the fix when the class is **yours**. The report tells you which case you are in, because the import says so:
+
+| Import                     | Message           | Fix                                                                                                                                                                                             |
+| -------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Relative — your own module | `ownClass`        | Brand it with `Symbol.for(…)`.                                                                                                                                                                  |
+| `aws-cdk-lib`              | `cdkClass`        | Read the L1 — `CfnResource.isCfnResource(x) && x.cfnResourceType === …`, per [ADR-0011](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0011-cross-component-relationship-guards.md). |
+| Any other package          | `dependencyClass` | You cannot brand a class you do not own. Prefer a type guard the package exports, or test a distinguishing property rather than identity.                                                       |
 
 ## Every import is in scope by default, relative ones included
 

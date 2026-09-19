@@ -103,7 +103,9 @@ ruleTester.run("no-realm-bound-instanceof", rule, {
         import { Ref } from "@composurecdk/core";
         const ok = value instanceof Ref;
       `,
-      errors: [{ messageId: "ownClass", data: { name: "Ref", source: "@composurecdk/core" } }],
+      errors: [
+        { messageId: "dependencyClass", data: { name: "Ref", source: "@composurecdk/core" } },
+      ],
     },
     {
       // The TS-only wrappers must not smuggle the check past the rule.
@@ -138,7 +140,7 @@ ruleTester.run("no-realm-bound-instanceof", rule, {
         export const is = (v) => v instanceof StatementBuilder;
       `,
       options: [{ assumeNeverInstalledAsADependency: true }],
-      errors: [{ messageId: "ownClass" }],
+      errors: [{ messageId: "dependencyClass" }],
     },
     {
       name: "a `#` subpath is flagged even with assumeNeverInstalledAsADependency — it can map to a dependency",
@@ -147,7 +149,7 @@ ruleTester.run("no-realm-bound-instanceof", rule, {
         export const is = (v) => v instanceof Thing;
       `,
       options: [{ assumeNeverInstalledAsADependency: true }],
-      errors: [{ messageId: "ownClass" }],
+      errors: [{ messageId: "dependencyClass" }],
     },
     {
       name: "a `#` subpath is flagged by default",
@@ -155,7 +157,23 @@ ruleTester.run("no-realm-bound-instanceof", rule, {
         import { Thing } from "#internal/thing.js";
         export const is = (v) => v instanceof Thing;
       `,
+      errors: [{ messageId: "dependencyClass" }],
+    },
+    {
+      name: "a relative import gets the brand-it advice — the reader owns the class",
+      code: `
+        import { Mine } from "./mine.js";
+        export const is = (v) => v instanceof Mine;
+      `,
       errors: [{ messageId: "ownClass" }],
+    },
+    {
+      name: "a third-party class gets advice the reader can actually follow",
+      code: `
+        import { Thing } from "some-dependency";
+        export const is = (v) => v instanceof Thing;
+      `,
+      errors: [{ messageId: "dependencyClass" }],
     },
     {
       name: "a relative import is still flagged by default",

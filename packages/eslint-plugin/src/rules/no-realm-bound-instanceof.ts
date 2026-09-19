@@ -47,13 +47,18 @@ export const rule: Rule.RuleModule = {
     ],
     messages: {
       cdkClass:
-        "`instanceof {{name}}` is realm-bound and silently returns false across the ESM/CJS copy " +
-        "boundary (ADR-0007). Identify the construct by its L1 instead: `CfnResource.isCfnResource` " +
-        "+ `cfnResourceType === Cfn{{name}}.CFN_RESOURCE_TYPE_NAME` (ADR-0011).",
+        "`instanceof {{name}}` is realm-bound: it returns false for a value created by another " +
+        "copy of `aws-cdk-lib`. Identify the construct by its L1 instead — " +
+        "`CfnResource.isCfnResource(x) && x.cfnResourceType === Cfn{{name}}.CFN_RESOURCE_TYPE_NAME`.",
       ownClass:
-        "`instanceof {{name}}` is realm-bound — `{{source}}` can load twice in one process " +
-        "(ADR-0007). Brand the class with `Symbol.for(...)` and test that instead, as `isRef` in " +
-        "@composurecdk/core does.",
+        "`instanceof {{name}}` is realm-bound: `{{source}}` resolves separately in each copy of " +
+        "this package, so the check returns false for a value that is plainly of that type. " +
+        "Brand the class with `Symbol.for(...)` and test for that brand instead.",
+      dependencyClass:
+        "`instanceof {{name}}` is realm-bound: `{{source}}` can load twice in one process, so the " +
+        "check returns false for a value that is plainly of that type. Prefer a type guard the " +
+        "package provides, or test a distinguishing property rather than identity. If the class " +
+        "is one you own, brand it with `Symbol.for(...)`.",
     },
   },
   create(ctx) {
@@ -85,11 +90,15 @@ export const rule: Rule.RuleModule = {
 
         // Report on the class reference, not the whole expression: the fix
         // replaces the right-hand side, and a narrow squiggle points at it.
-        ctx.report({
-          node: node.right,
-          messageId: isCdkSource(source) ? "cdkClass" : "ownClass",
-          data: { name, source },
-        });
+        // The specifier says whether the reader can brand the class: a relative
+        // import is their own module, anything else is someone else's package.
+        const messageId = isCdkSource(source)
+          ? "cdkClass"
+          : source.startsWith(".")
+            ? "ownClass"
+            : "dependencyClass";
+
+        ctx.report({ node: node.right, messageId, data: { name, source } });
       },
     };
   },

@@ -38,9 +38,9 @@ export const rule: Rule.RuleModule = {
     messages: {
       missingHook:
         "Builder class `{{className}}` has private field(s) {{fields}} but no `[COPY_STATE]` hook. " +
-        "Without the hook, `.copy()` silently drops these fields. " +
-        "Implement `[COPY_STATE](target) { … }` (see ADR-0005) or annotate each field with " +
-        "`// @copy-state: ignore -- reason`.",
+        "`.copy()` shallow-clones props only, so these fields are silently dropped from the " +
+        "clone. Implement `[COPY_STATE](target) { … }` to carry them across, or annotate each " +
+        "field with `// @copy-state: ignore -- reason`.",
       ignoreMarkerNeedsJustification:
         "`@copy-state: ignore` on field `{{field}}` must include a justification after `--` " +
         "(e.g. `// @copy-state: ignore -- regenerated per build`). The reason survives refactors " +

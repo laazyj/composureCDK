@@ -38,10 +38,10 @@ export const rule: Rule.RuleModule = {
     messages: {
       missingField:
         "stringConstraint() is missing required `{{field}}`. Every catalogue entry must set " +
-        "name, allowed, and source (ADR-0010) so synth-time errors name the allowed set and link the AWS doc.",
+        "name, allowed and source, so a synth-time error can name the allowed set and link the AWS doc.",
       emptyField:
         "stringConstraint() `{{field}}` is empty. It is surfaced verbatim in the validation " +
-        "error message (ADR-0010) — give it a meaningful value.",
+        "error message — give it a meaningful value.",
     },
   },
   create(ctx) {

@@ -33,21 +33,21 @@ if (typeof value === "object" && value !== null && STATEMENT_BUILDER in value) {
 
 For a CDK construct you cannot modify, brand the L2 by reading its L1 instead — `CfnResource.isCfnResource(x) && x.cfnResourceType === …`, per [ADR-0011](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0011-cross-component-relationship-guards.md).
 
-## Every import is in scope, relative ones included
+## Every import is in scope by default, relative ones included
 
 A relative import is **not** a same-realm guarantee by default. `./statement-builder.js` resolves separately in each copy of the package, which is exactly how #385 happened.
 
 ## Options
 
-### `assumeSingleInstance`
+### `assumeNeverInstalledAsADependency`
 
 ```js
-"composurecdk/no-realm-bound-instanceof": ["error", { assumeSingleInstance: true }]
+"composurecdk/no-realm-bound-instanceof": ["error", { assumeNeverInstalledAsADependency: true }]
 ```
 
-Asserts that **this package cannot load twice in one process**, so its own modules resolve to one set of class objects. Relative and `#`-subpath imports are then treated as same-realm; bare specifiers are still flagged, because whether a _dependency_ loads twice is a property of the consumer's install, not of your source.
+Asserts that **this package cannot load twice in one process**, so its own modules resolve to one set of class objects. Relative imports are then treated as same-realm; everything else is still flagged, because whether a _dependency_ loads twice is a property of the consumer's install, not of your source.
 
-**This is an application's claim to make.** An application is not installed as anyone's dependency, so it genuinely loads once.
+**An application is the archetype** — nothing installs one as a dependency, so it genuinely loads once. Being `private` is not the test: a private package can still be a dependency, and one in this repo is depended on by seventeen others.
 
 **A library must not set it**, even a single-format one. A consumer can install two versions of your library side by side, and then your relative imports duplicate exactly as a dual-published package's do — the hazard returns with the option silencing it. Shipping one module format is not sufficient; the condition is that nothing can install you twice.
 
@@ -72,7 +72,9 @@ Both uncommon in this ESM source:
 
 - `import = require()` bindings.
 - An intermediate call that breaks the chain — `getClasses().Bucket` reads a runtime value rather than the import.
-- A package importing **itself by name** (`@scope/pkg` from inside `@scope/pkg`) is treated as a dependency, so `assumeSingleInstance` does not exempt it. Conservative rather than wrong — it over-reports, never under-reports — and self-reference needs an `exports` field, which an application, the only legitimate setter of that option, does not have.
+- A **relative path that leaves the package** (`../../other/src/x.js`, possible in a workspace) is exempted by the option although it reaches a different package. This repo bans that import shape outright; a consumer's may not.
+- A **tsconfig path alias** (`@app/thing`, `~/thing`) resolves in-package but looks bare, so it is still flagged under the option — an over-report, not a miss.
+- A package importing **itself by name** (`@scope/pkg` from inside `@scope/pkg`) is treated as a dependency, so `assumeNeverInstalledAsADependency` does not exempt it. Conservative rather than wrong — it over-reports, never under-reports — and self-reference needs an `exports` field, which an application, the only legitimate setter of that option, does not have.
 
 ## How it works
 

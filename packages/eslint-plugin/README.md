@@ -73,18 +73,18 @@ Mixing the two forms is safe: the preset registers the same plugin object this `
 
 Each rule has a documentation page with its rationale, examples, deliberate exclusions and known gaps. `meta.docs.url` points at it, so an editor can open it straight from a reported violation.
 
-| Rule                                                                                                      | Preset           | What it flags                                                                                                        |
-| --------------------------------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------- |
-| [`composurecdk/builder-must-be-tagged`](docs/rules/builder-must-be-tagged.md)                             | `internal`       | `Builder` / `IBuilder` from `@composurecdk/core` in a library builder — use the tagged equivalents.                  |
-| [`composurecdk/builder-must-implement-copy-state`](docs/rules/builder-must-implement-copy-state.md)       | `recommended`    | A builder class holding private state with no `[COPY_STATE]` hook, so `.copy()` silently drops it.                   |
-| [`composurecdk/constraint-metadata-required`](docs/rules/constraint-metadata-required.md)                 | `internal`       | A `stringConstraint({ … })` call with an empty `name`, `allowed` or `source`, degrading every error it produces.     |
-| [`composurecdk/lifecycle-build-context-required`](docs/rules/lifecycle-build-context-required.md)         | `recommended`    | `Lifecycle.build()` missing the `context` param when the class uses `Resolvable<…>`.                                 |
-| [`composurecdk/lifecycle-build-must-forward-context`](docs/rules/lifecycle-build-must-forward-context.md) | `libraryAuthor`  | A two-argument `builder.build(scope, id)` — the sub-builder gets no context, so refs cannot resolve.                 |
-| [`composurecdk/no-cdk-api-above-floor`](docs/rules/no-cdk-api-above-floor.md)                             | `internal`       | `aws-cdk-lib` APIs newer than the supported peer floor — they throw on older versions in the range.                  |
-| [`composurecdk/no-cjs-incompatible-syntax`](docs/rules/no-cjs-incompatible-syntax.md)                     | `dualPublishing` | `import.meta` / top-level `await` in library `src/` — neither emits to CommonJS.                                     |
-| [`composurecdk/no-realm-bound-instanceof`](docs/rules/no-realm-bound-instanceof.md)                       | `recommended`    | `instanceof` against an imported class — realm-bound, so it silently returns false across the dual-package boundary. |
-| [`composurecdk/no-typescript-private-modifier`](docs/rules/no-typescript-private-modifier.md)             | `libraryAuthor`  | The TypeScript `private` modifier — it stays in `keyof T` and leaks through mapped types into the emitted `.d.ts`.   |
-| [`composurecdk/redeclared-prop-must-track-cdk-type`](docs/rules/redeclared-prop-must-track-cdk-type.md)   | `libraryAuthor`  | A prop re-declared out of an `Omit<CdkProps, …>` that pins a CDK interface instead of reading CDK's own prop type.   |
+| Rule                                                                                                      | Preset           | What it flags                                                                                                                             |
+| --------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| [`composurecdk/builder-must-be-tagged`](docs/rules/builder-must-be-tagged.md)                             | `internal`       | `Builder` / `IBuilder` from `@composurecdk/core` in a library builder — use the tagged equivalents.                                       |
+| [`composurecdk/builder-must-implement-copy-state`](docs/rules/builder-must-implement-copy-state.md)       | `recommended`    | A builder class holding private state with no `[COPY_STATE]` hook, so `.copy()` silently drops it.                                        |
+| [`composurecdk/constraint-metadata-required`](docs/rules/constraint-metadata-required.md)                 | `internal`       | A `stringConstraint({ … })` call with an empty `name`, `allowed` or `source`, degrading every error it produces.                          |
+| [`composurecdk/lifecycle-build-context-required`](docs/rules/lifecycle-build-context-required.md)         | `recommended`    | `Lifecycle.build()` missing the `context` param when the class uses `Resolvable<…>`.                                                      |
+| [`composurecdk/lifecycle-build-must-forward-context`](docs/rules/lifecycle-build-must-forward-context.md) | `libraryAuthor`  | A two-argument `builder.build(scope, id)` — the sub-builder gets no context, so refs cannot resolve.                                      |
+| [`composurecdk/no-cdk-api-above-floor`](docs/rules/no-cdk-api-above-floor.md)                             | `internal`       | `aws-cdk-lib` APIs newer than the supported peer floor — they throw on older versions in the range.                                       |
+| [`composurecdk/no-cjs-incompatible-syntax`](docs/rules/no-cjs-incompatible-syntax.md)                     | `dualPublishing` | `import.meta` / top-level `await` in library `src/` — neither emits to CommonJS.                                                          |
+| [`composurecdk/no-realm-bound-instanceof`](docs/rules/no-realm-bound-instanceof.md)                       | `recommended`    | `instanceof` against an imported class — realm-bound, so it silently returns false across the dual-package boundary. **Takes an option.** |
+| [`composurecdk/no-typescript-private-modifier`](docs/rules/no-typescript-private-modifier.md)             | `libraryAuthor`  | The TypeScript `private` modifier — it stays in `keyof T` and leaks through mapped types into the emitted `.d.ts`.                        |
+| [`composurecdk/redeclared-prop-must-track-cdk-type`](docs/rules/redeclared-prop-must-track-cdk-type.md)   | `libraryAuthor`  | A prop re-declared out of an `Omit<CdkProps, …>` that pins a CDK interface instead of reading CDK's own prop type.                        |
 
 ## Versioning
 
@@ -94,6 +94,7 @@ Rule names, messages and default severities are public API ([ADR-0019](../../doc
 - **Tightening an existing rule is breaking**, including a widened selector or a narrowed exemption. New code failing an unchanged rule is not.
 - **Loosening a rule, removing one, or renaming one is breaking.** A removed or renamed rule id in your own `rules:` block is a hard config error, not a silent gap.
 - **Moving a rule between presets, or renaming a preset, is breaking.** Adding a new preset is not.
+- **Option names and their defaults are API too.** Adding an option is minor when its default preserves behaviour, and breaking otherwise. Renaming one is breaking — the schemas reject unknown keys, so an old name becomes a hard config error rather than a silent no-op.
 
 ## Adding a new rule
 
@@ -120,6 +121,7 @@ Rule names, messages and default severities are public API ([ADR-0019](../../doc
 4. Write `docs/rules/<kebab-name>.md`, leading with `# composurecdk/<kebab-name>`. This is where rationale, examples, deliberate exclusions and known gaps live — the rule's own source comment stays a summary plus a link. `meta.docs.url` is derived from the name you registered, so there is nothing to wire up.
 5. Add a row to the table above, linking the page.
 6. Write `test/rules/<kebab-name>.test.ts` using `RuleTester` (see existing tests). Cover at least one valid and one invalid case per `messageId`.
+7. If the rule takes options, give each schema property a `description` (it is what `--print-config` and config inspectors show), keep `additionalProperties: false` so a typo fails loudly, and cover both settings in the tests. Option names are API — see Versioning above.
 
 Steps 3–5 are each asserted by `test/docs.test.ts` and `test/configs/presets.test.ts` — skip one and the suite fails rather than the omission going unnoticed.
 

@@ -104,7 +104,10 @@ export default defineConfig(
       // Nothing installs an application as a dependency, so it genuinely loads
       // once and its own relative imports cannot duplicate. A library must not
       // make this claim — see the rule's documentation.
-      "composurecdk/no-realm-bound-instanceof": ["error", { assumeSingleInstance: true }],
+      "composurecdk/no-realm-bound-instanceof": [
+        "error",
+        { assumeNeverInstalledAsADependency: true },
+      ],
     },
   },
   {

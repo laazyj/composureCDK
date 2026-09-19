@@ -5,6 +5,7 @@ import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
 import { compose, type Lifecycle } from "@composurecdk/core";
+import { singleStack } from "../src/strategies.js";
 import { tags } from "../src/tags.js";
 
 interface CfnTagEntry {
@@ -149,5 +150,22 @@ describe("tags() afterBuild helper", () => {
     >;
     const ownerTags = tagsOnResource(Object.values(buckets)[0]).filter((t) => t.Key === "Owner");
     expect(ownerTags).toEqual([{ Key: "Owner", Value: "builder" }]);
+  });
+
+  // `tags()` receives the scope `build()` was called with, which under a stack
+  // strategy is the App — not a Stack. `@aws-cdk/core:explicitStackTags` makes
+  // `Tags.of().add()` skip `aws:cdk:stack` anywhere in that subtree, so the
+  // stacks the strategy created would carry no stack-level tag at all. That is
+  // the tag cost allocation keys on, and `system` is documented as the place to
+  // put it.
+  it("applies system tags to a strategy's stacks under explicitStackTags", () => {
+    const app = new App({ context: { "@aws-cdk/core:explicitStackTags": true } });
+
+    compose({ primary: bucketComponent() }, { primary: [] })
+      .withStackStrategy(singleStack())
+      .afterBuild(tags({ system: { Owner: "platform" } }))
+      .build(app, "MySystem");
+
+    expect(app.synth().getStackByName("MySystem").tags).toEqual({ Owner: "platform" });
   });
 });

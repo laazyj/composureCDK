@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack, Tags } from "aws-cdk-lib";
+import { Template } from "aws-cdk-lib/assertions";
+import { Bucket } from "aws-cdk-lib/aws-s3";
 import { createStackBuilder } from "../src/stack-builder.js";
 
 describe("StackBuilder", () => {
@@ -60,6 +62,28 @@ describe("StackBuilder", () => {
       const returned = builder.tag("key", "value");
 
       expect(returned).toBe(builder);
+    });
+
+    // The stack-level tag is what cost allocation and tag-based governance key
+    // on, and losing it is silent: the resources inside keep their tags, so a
+    // template diff still looks almost right.
+    it("applies tags to the stack under explicitStackTags", () => {
+      const app = new App({ context: { "@aws-cdk/core:explicitStackTags": true } });
+
+      createStackBuilder().tag("team", "platform").build(app, "TaggedStack");
+
+      expect(app.synth().getStackByName("TaggedStack").tags).toEqual({ team: "platform" });
+    });
+
+    it("still tags resources inside the stack under explicitStackTags", () => {
+      const app = new App({ context: { "@aws-cdk/core:explicitStackTags": true } });
+
+      const { stack } = createStackBuilder().tag("team", "platform").build(app, "TaggedStack");
+      new Bucket(stack, "B");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::S3::Bucket", {
+        Tags: [{ Key: "team", Value: "platform" }],
+      });
     });
   });
 

@@ -28,6 +28,13 @@ const { stack } = createStackBuilder()
   .build(app, "ServiceStack");
 ```
 
+Each tag lands on the Stack itself as well as on the resources inside it, and
+does so whether or not `@aws-cdk/core:explicitStackTags` is set. That flag makes
+CDK's `Tags.of(...).add(...)` skip the Stack, which would otherwise leave the
+stack-level tag that cost allocation and tag-based governance key on silently
+missing. The same guarantee holds for `tags()` applied via `afterBuild`,
+including when a stack strategy — not the caller — created the Stack.
+
 ### Variants and snapshots with `.copy()`
 
 `.copy()` returns an independent builder with the same configured state. Use it to derive variants from a shared base, or to snapshot a builder before handing it to a stack strategy that may be invoked after further mutations:

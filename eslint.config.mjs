@@ -86,12 +86,20 @@ export default defineConfig(
     // No preset declares `files` by design — scoping to library source is the
     // consumer's call, and this is ours.
     files: ["packages/*/src/**/*.ts"],
+    ignores: ["packages/examples/src/**/*.ts"],
     extends: [
       composurecdk.configs.recommended,
       composurecdk.configs.libraryAuthor,
       composurecdk.configs.dualPublishing,
       composurecdk.configs.internal,
     ],
+  },
+  {
+    // The examples are CDK applications: they publish nothing, emit no `.d.ts`
+    // anyone compiles against, and ship one module format. So they take the one
+    // tier that describes them — which is also what a consumer's own app takes.
+    files: ["packages/examples/src/**/*.ts"],
+    extends: [composurecdk.configs.recommended],
   },
   {
     // The ADR-0018 type-level guards declare a `const` purely so its type
@@ -103,17 +111,6 @@ export default defineConfig(
     files: ["packages/*/test/**/*.ts"],
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { varsIgnorePattern: "^_" }],
-    },
-  },
-  {
-    // The examples are application entry points, not library internals: they
-    // build at the root of an App or Stack, where there is no enclosing
-    // component and so no context to forward. Every `.build(app, "…")` there
-    // would trip the rule for no reason, which is consumer-shaped code
-    // behaving correctly rather than a defect to fix.
-    files: ["packages/examples/src/**/*.ts"],
-    rules: {
-      "composurecdk/lifecycle-build-must-forward-context": "off",
     },
   },
   {

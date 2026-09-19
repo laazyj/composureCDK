@@ -32,9 +32,11 @@ only once a package emits a `.d.ts` someone else compiles against — TS4094 and
 TS2883 need an exported mapped type, and a narrowed prop type only hurts when it
 is your published API. A fourth, `lifecycle-build-must-forward-context`, reports
 on root-level builds, which are a handful of sites in a library and very nearly
-every build in an application. This repo already carries that cost as two
+every build in an application. This repo already carried that cost as two
 `eslint-disable` comments in `packages/cloudformation/src` and a blanket
-exclusion for `packages/examples/src`.
+exclusion for `packages/examples/src` — the latter written as a rule override,
+which is exactly the "the preset is wrong for you, work around it" state the
+tiering removes.
 
 Once published, rule names, messages and default severities become API. A rule
 that gets stricter breaks a consumer's CI, and nothing about the change looks
@@ -105,6 +107,11 @@ tier ([#450](https://github.com/laazyj/composureCDK/issues/450)).
   presets, since that makes its severity depend on extend order. The other lists
   the rules deliberately in no preset — awaiting the next major — so that
   "waiting" stays distinguishable from "forgotten".
+- `packages/examples` is the first consumer of the split inside this repo. The
+  examples are CDK applications — they publish nothing and emit no `.d.ts` — so
+  they take `recommended` alone, and the rule override that silenced
+  `lifecycle-build-must-forward-context` across all of `packages/examples/src`
+  is deleted rather than kept. The tier says what the override used to.
 - Each rule's documentation page and the README table both name the rule's tier,
   and both are asserted against `configs`. A tier move is breaking, so the pages
   a consumer reads to choose a tier cannot quietly disagree with the code.

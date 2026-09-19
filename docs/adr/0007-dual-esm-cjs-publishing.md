@@ -125,9 +125,9 @@ exception no longer holds.
 
 **`@composurecdk/eslint-plugin` builds with `tshy`, runs `check:exports`, and is
 registered in `DUAL_PACKAGES` — the same gate as every published package.** It
-stays `private: true` until the release itself, so that the packaging is proven
-by the standing gate for as long as it takes to decide to publish, rather than
-being discovered at the moment of publishing.
+stayed `private: true` until the release itself, so that the packaging was proven
+by the standing gate for as long as the decision took, rather than being
+discovered at the moment of publishing. It is published as of ADR-0019.
 
 The exception it was granted is exactly what let the defect in #465 survive:
 `eslint-plugin` hand-wrote the one `exports` map in the repo that no tool

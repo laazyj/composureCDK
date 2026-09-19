@@ -142,7 +142,7 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
       "Type": "AWS::IAM::Role",
       "UpdateReplacePolicy": "Retain",
     },
-    "MultiStackAppapiDeploymentA87644C95de9b18a41ec02ef96026c26a931afa1": {
+    "MultiStackAppapiDeploymentA87644C9403275c3e129857c8559f39b95a8c426": {
       "DependsOn": [
         "MultiStackAppapiGET2EF1C40F",
       ],
@@ -172,7 +172,7 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
           "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
         },
         "DeploymentId": {
-          "Ref": "MultiStackAppapiDeploymentA87644C95de9b18a41ec02ef96026c26a931afa1",
+          "Ref": "MultiStackAppapiDeploymentA87644C9403275c3e129857c8559f39b95a8c426",
         },
         "MethodSettings": [
           {
@@ -230,7 +230,13 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
                 },
                 ":lambda:path/2015-03-31/functions/",
                 {
-                  "Fn::ImportValue": "ComposureCDK-MultiStackServiceStack:ExportsOutputFnGetAttMultiStackApphandler260E0508Arn47C6D6F6",
+                  "Fn::GetStackOutput": {
+                    "OutputName": "PublishOutputFnGetAttMultiStackApphandler260E0508Arn8EFCBAFB",
+                    "Region": {
+                      "Ref": "AWS::Region",
+                    },
+                    "StackName": "ComposureCDK-MultiStackServiceStack",
+                  },
                 },
                 "/invocations",
               ],
@@ -253,7 +259,13 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
-          "Fn::ImportValue": "ComposureCDK-MultiStackServiceStack:ExportsOutputFnGetAttMultiStackApphandler260E0508Arn47C6D6F6",
+          "Fn::GetStackOutput": {
+            "OutputName": "PublishOutputFnGetAttMultiStackApphandler260E0508Arn8EFCBAFB",
+            "Region": {
+              "Ref": "AWS::Region",
+            },
+            "StackName": "ComposureCDK-MultiStackServiceStack",
+          },
         },
         "Principal": "apigateway.amazonaws.com",
         "SourceArn": {
@@ -291,7 +303,13 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
-          "Fn::ImportValue": "ComposureCDK-MultiStackServiceStack:ExportsOutputFnGetAttMultiStackApphandler260E0508Arn47C6D6F6",
+          "Fn::GetStackOutput": {
+            "OutputName": "PublishOutputFnGetAttMultiStackApphandler260E0508Arn8EFCBAFB",
+            "Region": {
+              "Ref": "AWS::Region",
+            },
+            "StackName": "ComposureCDK-MultiStackServiceStack",
+          },
         },
         "Principal": "apigateway.amazonaws.com",
         "SourceArn": {
@@ -424,10 +442,7 @@ exports[`multi-stack-app > matches the expected service stack template 1`] = `
 {
   "Description": "Service resources for multi-stack example",
   "Outputs": {
-    "ExportsOutputFnGetAttMultiStackApphandler260E0508Arn47C6D6F6": {
-      "Export": {
-        "Name": "ComposureCDK-MultiStackServiceStack:ExportsOutputFnGetAttMultiStackApphandler260E0508Arn47C6D6F6",
-      },
+    "PublishOutputFnGetAttMultiStackApphandler260E0508Arn8EFCBAFB": {
       "Value": {
         "Fn::GetAtt": [
           "MultiStackApphandler260E0508",

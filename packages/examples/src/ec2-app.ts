@@ -1,4 +1,4 @@
-import { App, Stack } from "aws-cdk-lib";
+import { Stack } from "aws-cdk-lib";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import {
   type ISecurityGroup,
@@ -20,6 +20,7 @@ import {
   type VpcBuilderResult,
 } from "@composurecdk/ec2";
 import { createTopicBuilder } from "@composurecdk/sns";
+import { exampleApp } from "./app-context.js";
 
 /**
  * A VPC + two explicit security groups + an EC2 bastion host + an SNS
@@ -57,7 +58,7 @@ import { createTopicBuilder } from "@composurecdk/sns";
  * service endpoints, or `Peer.anyIpv4()` if you only need internet
  * egress and accept the wider blast radius).
  */
-export function createEc2App(app = new App()) {
+export function createEc2App(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-Ec2Stack");
 
   const { alerts } = compose(

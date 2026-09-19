@@ -1,4 +1,4 @@
-import { App, Duration } from "aws-cdk-lib";
+import { Duration } from "aws-cdk-lib";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Source } from "aws-cdk-lib/aws-s3-deployment";
 import { HttpOrigin, S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
@@ -16,6 +16,7 @@ import {
   createDistributionBuilder,
   type DistributionBuilderResult,
 } from "@composurecdk/cloudfront";
+import { exampleApp } from "../app-context.js";
 
 /**
  * A static website hosted on S3 with CloudFront CDN, composed into a single stack.
@@ -45,7 +46,7 @@ import {
  *                Control
  * ```
  */
-export function createStaticWebsiteApp(app = new App()) {
+export function createStaticWebsiteApp(app = exampleApp()) {
   const { stack } = createStackBuilder()
     .description("Static website hosted on S3 with CloudFront CDN")
     .build(app, "ComposureCDK-StaticWebsiteStack");

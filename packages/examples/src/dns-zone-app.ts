@@ -1,4 +1,4 @@
-import { App, Duration, Fn } from "aws-cdk-lib";
+import { Duration, Fn } from "aws-cdk-lib";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { Alpn, HttpsRecordValue } from "aws-cdk-lib/aws-route53";
 import { compose, ref } from "@composurecdk/core";
@@ -28,6 +28,7 @@ import {
   TXT,
   zoneRecords,
 } from "@composurecdk/route53/zone";
+import { exampleApp } from "./app-context.js";
 
 /**
  * A production-like public DNS zone, expressed in the BIND-style zone DSL.
@@ -49,7 +50,7 @@ import {
  * - Composing the record set with a hosted zone and surfacing the delegation
  *   name servers as a CloudFormation output
  */
-export function createDnsZoneApp(app = new App()): void {
+export function createDnsZoneApp(app = exampleApp()): void {
   const { stack } = createStackBuilder()
     .description("Public DNS zone (DSL example)")
     // Route 53 query logging requires us-east-1 — see packages/route53/README.md.

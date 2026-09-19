@@ -5,8 +5,10 @@ import { Size } from "aws-cdk-lib";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Volume } from "aws-cdk-lib/aws-ec2";
-import { MockIntegration, RestApi } from "aws-cdk-lib/aws-apigateway";
+import { MockIntegration, RestApi, type RestApiProps } from "aws-cdk-lib/aws-apigateway";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
+import { buildExampleApp } from "../src/apps.js";
+import { exampleApp } from "../src/app-context.js";
 import { createAgentVolumeApp } from "../src/agent-volume-app.js";
 import { createCrudApiApp } from "../src/crud-api-app.js";
 import { createDynamoStreamProcessorApp } from "../src/dynamo-stream-processor-app.js";
@@ -14,8 +16,16 @@ import { createMockApiApp } from "../src/mock-api-app.js";
 import { createNeptuneGraphApp } from "../src/neptune-graph-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
 
-function buildWithPolicy(buildFn: (stack: Stack) => void): Template {
-  const app = new App();
+function restApi(stack: Stack, props: Partial<RestApiProps> = {}): void {
+  const api = new RestApi(stack, "Api", { restApiName: "TestApi", ...props });
+  api.root.addMethod("GET", new MockIntegration());
+}
+
+function buildWithPolicy(
+  buildFn: (stack: Stack) => void,
+  context?: Record<string, unknown>,
+): Template {
+  const app = new App({ context });
   cleanDeskPolicy(app);
   const stack = new Stack(app, "TestStack");
   buildFn(stack);
@@ -137,15 +147,43 @@ describe("cleanDeskPolicy", () => {
   });
 
   it("overrides RestApi Account and CloudWatch Role removal policy to DESTROY", () => {
-    const template = buildWithPolicy((stack) => {
-      const api = new RestApi(stack, "Api", { restApiName: "TestApi" });
-      api.root.addMethod("GET", new MockIntegration());
-    });
+    const template = buildWithPolicy(restApi);
 
     template.hasResource("AWS::ApiGateway::Account", {
       DeletionPolicy: "Delete",
       UpdateReplacePolicy: "Delete",
     });
+  });
+
+  // Without the guard these throw at synth: "'cloudWatchRole' must be enabled
+  // for 'cloudWatchRoleRemovalPolicy' to be applied."
+  it("still synthesises when the feature flag disables the CloudWatch Role", () => {
+    const template = buildWithPolicy(restApi, {
+      "@aws-cdk/aws-apigateway:disableCloudWatchRole": true,
+    });
+
+    template.resourceCountIs("AWS::ApiGateway::Account", 0);
+  });
+
+  it("still synthesises when the caller disables the CloudWatch Role", () => {
+    const template = buildWithPolicy((stack) => {
+      restApi(stack, { cloudWatchRole: false });
+    });
+
+    template.resourceCountIs("AWS::ApiGateway::Account", 0);
+  });
+
+  // The flag only supplies the default, so an explicit `true` still wins and
+  // the removal policy still has to be applied.
+  it("overrides the removal policy when the caller re-enables the role", () => {
+    const template = buildWithPolicy(
+      (stack) => {
+        restApi(stack, { cloudWatchRole: true });
+      },
+      { "@aws-cdk/aws-apigateway:disableCloudWatchRole": true },
+    );
+
+    template.hasResource("AWS::ApiGateway::Account", { DeletionPolicy: "Delete" });
   });
 
   it("does not affect stacks without the policy", () => {
@@ -312,5 +350,23 @@ describe("cleanDeskPolicy", () => {
 
       mockApiTemplate.resourceCountIs("Custom::DisableBucketLogging", 0);
     });
+  });
+  // The injector registry is hand-maintained, and a construct type missing from
+  // it fails silently — the stack just leaves resources behind on teardown.
+  // This is the assertion that catches that: it swept up the SpecRestApi gap
+  // (an orphaned ApiGateway Account and CloudWatch Role in the petstore stack)
+  // that the per-type tests above could not see.
+  it("leaves nothing Retained across every example stack", () => {
+    const retained = buildExampleApp(exampleApp({ outdir: "cdk.out/clean-desk-sweep" }))
+      .synth()
+      .stacks.flatMap(({ stackName, template }) =>
+        Object.entries(
+          (template as { Resources?: Record<string, { DeletionPolicy?: string }> }).Resources ?? {},
+        )
+          .filter(([, resource]) => resource.DeletionPolicy === "Retain")
+          .map(([logicalId]) => `${stackName}/${logicalId}`),
+      );
+
+    expect(retained).toEqual([]);
   });
 });

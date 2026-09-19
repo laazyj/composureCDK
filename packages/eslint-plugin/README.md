@@ -58,16 +58,19 @@ Mixing the two forms is safe: the preset registers the same plugin object this `
 
 ## Rules
 
-| Rule                                                | What it flags                                                                                                                                                       |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `composurecdk/builder-must-be-tagged`               | `Builder` / `IBuilder` from `@composurecdk/core` in library builders (use `taggedBuilder`).                                                                         |
-| `composurecdk/builder-must-implement-copy-state`    | Builder classes with private fields but no `[COPY_STATE]` hook (see ADR-0005).                                                                                      |
-| `composurecdk/lifecycle-build-context-required`     | `Lifecycle.build()` missing the `context` param when the class uses `Resolvable<…>`.                                                                                |
-| `composurecdk/lifecycle-build-must-forward-context` | A two-argument `builder.build(scope, id)` call — the sub-builder gets no context, so refs passed through a `configure` callback cannot resolve.                     |
-| `composurecdk/no-cdk-api-above-floor`               | `aws-cdk-lib` APIs newer than the supported peer floor (e.g. the per-resource `isCfn<Resource>` L1 static guards) — they throw on older versions in the peer range. |
-| `composurecdk/no-cjs-incompatible-syntax`           | `import.meta` / top-level `await` in library `src/` — neither emits to CommonJS (ADR-0007).                                                                         |
-| `composurecdk/no-realm-bound-instanceof`            | `instanceof` against an imported class in library `src/` — realm-bound, so it silently returns false across the dual-package boundary (ADR-0007).                   |
-| `composurecdk/redeclared-prop-must-track-cdk-type`  | A prop re-declared out of an `Omit<CdkProps, …>` that pins a named CDK interface inside `Resolvable<…>` instead of reading CDK's own prop type (ADR-0018).          |
+Each rule has a documentation page with its rationale, examples, deliberate exclusions and known gaps. `meta.docs.url` points at it, so an editor can open it straight from a reported violation.
+
+| Rule                                                                                                      | What it flags                                                                                                        |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [`composurecdk/builder-must-be-tagged`](docs/rules/builder-must-be-tagged.md)                             | `Builder` / `IBuilder` from `@composurecdk/core` in a library builder — use the tagged equivalents.                  |
+| [`composurecdk/builder-must-implement-copy-state`](docs/rules/builder-must-implement-copy-state.md)       | A builder class holding private state with no `[COPY_STATE]` hook, so `.copy()` silently drops it.                   |
+| [`composurecdk/constraint-metadata-required`](docs/rules/constraint-metadata-required.md)                 | A `stringConstraint({ … })` call with an empty `name`, `allowed` or `source`, degrading every error it produces.     |
+| [`composurecdk/lifecycle-build-context-required`](docs/rules/lifecycle-build-context-required.md)         | `Lifecycle.build()` missing the `context` param when the class uses `Resolvable<…>`.                                 |
+| [`composurecdk/lifecycle-build-must-forward-context`](docs/rules/lifecycle-build-must-forward-context.md) | A two-argument `builder.build(scope, id)` — the sub-builder gets no context, so refs cannot resolve.                 |
+| [`composurecdk/no-cdk-api-above-floor`](docs/rules/no-cdk-api-above-floor.md)                             | `aws-cdk-lib` APIs newer than the supported peer floor — they throw on older versions in the range.                  |
+| [`composurecdk/no-cjs-incompatible-syntax`](docs/rules/no-cjs-incompatible-syntax.md)                     | `import.meta` / top-level `await` in library `src/` — neither emits to CommonJS.                                     |
+| [`composurecdk/no-realm-bound-instanceof`](docs/rules/no-realm-bound-instanceof.md)                       | `instanceof` against an imported class — realm-bound, so it silently returns false across the dual-package boundary. |
+| [`composurecdk/redeclared-prop-must-track-cdk-type`](docs/rules/redeclared-prop-must-track-cdk-type.md)   | A prop re-declared out of an `Omit<CdkProps, …>` that pins a CDK interface instead of reading CDK's own prop type.   |
 
 The `recommended` preset also bans the TypeScript `private` modifier via `no-restricted-syntax` (use ECMAScript `#field` instead — TS `private` leaks through `keyof T` into emitted `.d.ts`, producing TS4094 downstream).
 
@@ -92,8 +95,12 @@ The `recommended` preset also bans the TypeScript `private` modifier via `no-res
    ```
 
 2. Register it in `src/rules/index.ts`.
-3. Add it to `recommendedRules` in `src/configs/recommended.ts` at its intended severity. A test asserts the preset and `rules` stay in step, so omitting this fails the suite.
-4. Write `test/rules/<kebab-name>.test.ts` using `RuleTester` (see existing tests). Cover at least one valid and one invalid case per `messageId`.
+3. Add it to `recommendedRules` in `src/configs/recommended.ts` at its intended severity.
+4. Write `docs/rules/<kebab-name>.md`, leading with `# composurecdk/<kebab-name>`. This is where rationale, examples, deliberate exclusions and known gaps live — the rule's own source comment stays a summary plus a link. `meta.docs.url` is derived from the name you registered, so there is nothing to wire up.
+5. Add a row to the table above, linking the page.
+6. Write `test/rules/<kebab-name>.test.ts` using `RuleTester` (see existing tests). Cover at least one valid and one invalid case per `messageId`.
+
+Steps 3–5 are each asserted by `test/docs.test.ts` and `test/configs/recommended.test.ts` — skip one and the suite fails rather than the omission going unnoticed.
 
 ## Running tests
 

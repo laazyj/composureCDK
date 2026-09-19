@@ -3,35 +3,21 @@ import type { BinaryExpression } from "estree";
 import { chainRoot, importSourceOf, isCdkSource, unwrapWrappers } from "./lib/imports.js";
 
 /**
- * Bans `instanceof` against a class reached through an `import`, because
- * `instanceof` is realm-bound and library `src/` is published dual ESM/CJS
- * (ADR-0007).
+ * Bans `instanceof` against a class reached through an `import`.
  *
- * When both copies of a package load in one process — the dual-package hazard —
- * each copy has its own class objects. An instance minted by one copy fails
- * `instanceof` against the other copy's class, so the check returns `false` for
- * a value that is plainly of that type. That has already shipped as two bugs:
- * #384 (a stack-singleton dedup silently skipped, colliding on a construct id)
- * and #385 (a `StatementBuilder` unrecognised, which skipped the
- * wildcard-resource security guard).
+ * These packages ship as both ECMAScript and CommonJS modules, and both copies
+ * can load in the same process — a consumer importing one while a dependency
+ * requires the other. Each copy evaluates its own class objects, so an instance
+ * created by one fails `instanceof` against the other's class: the check returns
+ * `false` for a value that is plainly of that type.
  *
- * **Every import is in scope, relative ones included.** A relative import is
- * not a same-realm guarantee: `./statement-builder.js` resolves separately in
- * each copy of the package, which is exactly how #385 happened.
+ * It fails silently, which is what makes it dangerous — a deduplication quietly
+ * skipped, a guard quietly bypassed, and no error to trace. Use a `Symbol.for(…)`
+ * brand instead, which is shared across copies.
  *
- * Not flagged, because neither can be duplicated by the hazard:
- * - **Globals and intrinsics** — `x instanceof RegExp`, `instanceof Error`.
- *   They resolve to no import binding, so the scope walk skips them.
- * - **Classes declared in the same module** — the class and every `new` of it
- *   come from one evaluation of that module.
+ * A relative import is no safer: it resolves separately in each copy.
  *
- * Resolution is scope-aware, so a local that shadows an import name is
- * correctly treated as a non-import binding, and TS-only wrappers (`as`, `!`,
- * `satisfies`, angle-bracket assertion) are unwrapped rather than trusted.
- *
- * Known gaps, both uncommon in our ESM src: `import = require()` bindings, and
- * an intermediate call that breaks the chain (`getClasses().Bucket`), which
- * reads a runtime value rather than the import.
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-realm-bound-instanceof.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
   meta: {

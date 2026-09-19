@@ -85,36 +85,17 @@ function propertyName(member: TypeNode): string | undefined {
 
 /**
  * Flags a re-declared CDK prop that pins a named CDK interface inside
- * `Resolvable<…>` instead of reading the type from CDK's own prop (ADR-0018).
+ * `Resolvable<…>` rather than reading the type from CDK's own prop.
  *
- * A builder's props interface is `Omit<CdkProps, K>` plus a re-declaration of
- * each lifted key. Everything inside the `Omit` tracks the consumer's installed
- * `aws-cdk-lib`; a re-declared key spelled `Resolvable<IKey>` does not — it
- * freezes at whatever interface was current when it was written. CDK is
- * migrating its prop types to reference interfaces (`IKey` → `IKeyRef`,
- * `IEventBus` → `IEventBusRef`, …) prop by prop, and each time a pinned prop
- * moves the builder silently starts **rejecting values the wrapped construct
- * accepts**. Nothing else catches it: the suites don't typecheck, and `build`
- * runs against the latest CDK where a narrowed prop still compiles.
+ * A builder's props type is CDK's props type with a few keys lifted out and
+ * re-declared. Everything left inside the `Omit` keeps tracking whichever
+ * `aws-cdk-lib` the consumer installed; a key re-spelled with a named interface
+ * stops tracking it, freezing at whatever that interface meant when it was
+ * written. When CDK later widens that prop, the builder goes on rejecting values
+ * the construct it wraps now accepts — and it surfaces in the consumer's own
+ * compile, not in this package's.
  *
- * The check is syntactic — a property whose name appears in the `Omit<…>` of
- * the same interface's `extends` clause, whose `Resolvable<…>` argument is a
- * bare type reference imported from `aws-cdk-lib` or `@aws-cdk/*`. No type
- * resolution, so it works in the flat config and fires at authoring time.
- *
- * Not flagged, because each is a deliberate exclusion in ADR-0018:
- * - **Primitives and `any`-shaped types** — `Resolvable<string[]>`,
- *   `Resolvable<Record<string, unknown>>` resolve to no CDK import.
- * - **A widened union** — `Resolvable<string | Foo["bar"]>`, where the arm the
- *   builder adds has no CDK prop to read from. Only a bare reference is flagged.
- * - **A shape-replacing re-declaration** — the builder's own type is the point,
- *   and it is not a `Resolvable` of a CDK interface.
- *
- * Known gap: a prop re-declared in a *separate* interface that the props
- * interface mixes in (`@composurecdk/sqs`'s `QueueBuilderExtensionProps`) has
- * no `Omit` of its own to key on, and a hand-written setter standing in for a
- * lifted prop is a class method rather than a property signature. Both are
- * covered by ADR-0018 and by review, not by this rule.
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/redeclared-prop-must-track-cdk-type.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
   meta: {

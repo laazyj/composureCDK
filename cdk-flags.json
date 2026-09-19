@@ -1,0 +1,285 @@
+{
+  "$comment": "CDK feature-flag posture. Every flag aws-cdk-lib ships for a service this repo wraps carries a decision here; `node scripts/cdk-flags.mjs check` fails when CDK adds one that does not, and when a package exists with no entry in \"modules\". Flags for services we do not wrap are out of scope and deliberately absent. Flags CDK declares but removed in v2 are skipped \u2014 `check` derives those from the absence of introducedIn.v2, so they are bookkeeping rather than decisions. Statuses: \"adopted\" (set in packages/examples/cdk.json, with the value), \"declined\" (a deliberate no), \"no-effect\" (measured to change nothing \u2014 see statusReasons). \"recommended\" pins what CDK recommended when the decision was made, so a changed recommendation reopens it. The reason is the point of the file: a status without one fails the check.",
+  "modules": {
+    "acm": ["aws-certificatemanager"],
+    "apigateway": ["aws-apigateway"],
+    "budgets": ["aws-budgets"],
+    "cdk-testing": [],
+    "cloudformation": ["aws-cloudformation"],
+    "cloudfront": ["aws-cloudfront", "aws-cloudfront-origins"],
+    "cloudwatch": ["aws-cloudwatch", "aws-cloudwatch-actions"],
+    "core": ["core"],
+    "custom-resources": ["customresources", "custom-resources"],
+    "dynamodb": ["aws-dynamodb"],
+    "ec2": ["aws-ec2"],
+    "eslint-plugin": [],
+    "events": ["aws-events", "aws-events-targets"],
+    "examples": [],
+    "iam": ["aws-iam"],
+    "kms": ["aws-kms"],
+    "lambda": ["aws-lambda", "aws-lambda-nodejs", "aws-lambda-event-sources"],
+    "logs": ["aws-logs"],
+    "module-compat": [],
+    "neptune": ["aws-neptune"],
+    "route53": [
+      "aws-route53",
+      "aws-route53-targets",
+      "aws-route53-patterns",
+      "aws-route53-patters"
+    ],
+    "s3": ["aws-s3", "aws-s3-deployment", "s3-notifications"],
+    "ses": ["aws-ses"],
+    "sns": ["aws-sns", "aws-sns-subscriptions"],
+    "sqs": ["aws-sqs"]
+  },
+  "statusReasons": {
+    "no-effect": "Setting it at its recommended value changes no example stack's template, measured by `cdk-flags audit`. That is evidence about what the examples ship, not a claim about every builder and prop in the library."
+  },
+  "flags": {
+    "@aws-cdk/aws-apigateway:authorizerChangeDeploymentLogicalId": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-apigateway:disableCloudWatchRole": {
+      "status": "declined",
+      "recommended": true,
+      "because": "The examples assert on the ApiGateway Account and CloudWatch Role that cleanDeskPolicy tears down; adopting it would delete those resources and the assertions with them. A consumer should adopt it \u2014 the role is an account-wide singleton \u2014 and #501 made cleanDeskPolicy survive that."
+    },
+    "@aws-cdk/aws-apigateway:requestValidatorUniqueId": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-cloudfront:defaultFunctionRuntimeV2_0": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-cloudfront:defaultSecurityPolicyTLSv1.2_2021": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-cloudwatch-actions:changeLambdaPermissionLogicalIdForLambdaAction": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-dynamodb:resourcePolicyPerReplica": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-dynamodb:retainTableReplica": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-ec2:bastionHostUseAmazonLinux2023ByDefault": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-ec2:ebsDefaultGp3Volume": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-ec2:ec2SumTImeoutEnabled": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-ec2:launchTemplateDefaultUserData": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-ec2:requirePrivateSubnetsForEgressOnlyInternetGateway": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-ec2:restrictDefaultSecurityGroup": {
+      "status": "no-effect",
+      "recommended": true,
+      "because": "VpcBuilder already sets restrictDefaultSecurityGroup on the prop (packages/ec2/src/vpc-defaults.ts), so the guarantee holds without the flag. This is the doctrine the rest of the library follows: a guarantee that depends on the consumer's context is not a guarantee."
+    },
+    "@aws-cdk/aws-ec2:uniqueImdsv2TemplateName": {
+      "status": "declined",
+      "recommended": true,
+      "because": "Logical-name churn only, on a launch template CDK creates internally. No guarantee at stake, and adopting it replaces the resource in any deployed stack."
+    },
+    "@aws-cdk/aws-events:eventsTargetQueueSameAccount": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-events:requireEventBusPolicySid": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-iam:importedRoleStackSafeDefaultPolicyName": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-iam:minimizePolicies": {
+      "status": "declined",
+      "recommended": true,
+      "because": "Merges IAM statements across 12 example stacks. A policy-size optimisation with no guarantee at stake, and statement merging changes what a reviewer reads in a synthesised policy \u2014 which is the point of the consumer-side grants in ADR-0013. Worth adopting on its own, with its own snapshot review."
+    },
+    "@aws-cdk/aws-iam:oidcRejectUnauthorizedConnections": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-kms:aliasNameRef": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-kms:applyImportedAliasPermissionsToPrincipal": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-kms:reduceCrossAccountRegionPolicyScope": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-lambda-nodejs:sdkV3ExcludeSmithyPackages": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-lambda-nodejs:useLatestRuntimeVersion": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-lambda:createNewPoliciesWithAddToRolePolicy": {
+      "status": "no-effect",
+      "recommended": false
+    },
+    "@aws-cdk/aws-lambda:recognizeLayerVersion": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-lambda:recognizeVersionProps": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-lambda:useCdkManagedLogGroup": {
+      "status": "declined",
+      "recommended": true,
+      "because": "FunctionBuilder already creates the log group explicitly, so the flag is a no-op for builder users \u2014 the one stack it changes is CDK's own BucketDeployment Lambda. Kept unset so that stays visible: the guarantee comes from the builder, not the context."
+    },
+    "@aws-cdk/aws-route53-patterns:useDistribution": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-route53-patters:useCertificate": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-route53-targets:userPoolDomainNameMethodWithoutCustomResource": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-s3:createDefaultLoggingPolicy": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-s3:keepNotificationInImportedBucket": {
+      "status": "no-effect",
+      "recommended": false
+    },
+    "@aws-cdk/aws-s3:publicAccessBlockedByDefault": {
+      "status": "no-effect",
+      "recommended": true,
+      "because": "The flag fills in any BlockPublicAccess option left undefined. BucketBuilder already sets BLOCK_ALL (packages/s3/src/defaults.ts), so there is nothing left to fill \u2014 not because the path is unexercised."
+    },
+    "@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": {
+      "status": "declined",
+      "recommended": true,
+      "because": "Would be an improvement \u2014 without it the access-logs bucket bucket-builder.ts creates carries AccessControl LogDeliveryWrite and ObjectWriter ownership, i.e. ACLs enabled. The builder cannot express that guarantee itself (objectOwnership BUCKET_OWNER_ENFORCED is a synth error while the flag is off), so it needs the decision in issue #502 rather than a manifest entry."
+    },
+    "@aws-cdk/aws-s3:setUniqueReplicationRoleName": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-sns-subscriptions:restrictSqsDescryption": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:annotationsInValidationReport": {
+      "status": "declined",
+      "recommended": true,
+      "because": "Routes every construct annotation into validation-report.json, and scripts/check-validation-report.mjs fails on any violation at any severity \u2014 so adopting it turns today's warnings into build failures. Revisit if that checker gains a severity filter."
+    },
+    "@aws-cdk/core:aspectPrioritiesMutating": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:aspectStabilization": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:automaticL1Traits": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:cfnIncludeRejectComplexResourceUpdateCreatePolicyIntrinsics": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:checkSecretUsage": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:defaultCrossStackReferences": {
+      "status": "adopted",
+      "value": "weak",
+      "recommended": "weak",
+      "because": "CI deploys and destroys these stacks on every run, so the producer protection \"strong\" buys is the wrong trade, and a lingering export is a common cause of a teardown that will not finish. See docs/stack-management.md#cross-stack-references."
+    },
+    "@aws-cdk/core:enableAdditionalMetadataCollection": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:enablePartitionLiterals": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:explicitStackTags": {
+      "status": "no-effect",
+      "recommended": true,
+      "because": "Stack tagging is exercised heavily here. The flag makes Tags.of() skip aws:cdk:stack, and #498 made StackBuilder.tag() and tags({ system }) apply stack-level tags through a second, stack-scoped aspect so they survive it either way."
+    },
+    "@aws-cdk/core:includePrefixInUniqueNameGeneration": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:newStyleStackSynthesis": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:stackRelativeExports": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/core:target-partitions": {
+      "status": "no-effect",
+      "recommended": ["aws", "aws-cn"]
+    },
+    "@aws-cdk/core:validateAgainstDefaultRules": {
+      "status": "declined",
+      "recommended": true,
+      "because": "Left unset by #339. Every rule the ruleset currently raises against the examples is warning severity, and check-validation-report.mjs already fails on those, so adopting it changes nothing today while adding a second gate that can disagree with the first."
+    },
+    "@aws-cdk/core:validateSnapshotRemovalPolicy": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/custom-resources:logApiResponseDataPropertyTrueDefault": {
+      "status": "no-effect",
+      "recommended": false,
+      "because": "CDK recommends false, which is also the unconfigured behaviour, so adopting it changes nothing \u2014 the flag only bites when set true, where it adds an Update event that breaks callers depending on response data. AwsCustomResourceBuilder never sets logApiResponseData, so the caller keeps that choice."
+    },
+    "@aws-cdk/customresources:installLatestAwsSdkDefault": {
+      "status": "no-effect",
+      "recommended": false
+    },
+    "@aws-cdk/s3-notifications:addS3TrustKeyPolicyForSnsSubscriptions": {
+      "status": "no-effect",
+      "recommended": true
+    }
+  }
+}

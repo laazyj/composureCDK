@@ -2,14 +2,12 @@ import type { Rule } from "eslint";
 import type { ClassBody, MethodDefinition } from "estree";
 
 /**
- * Flags Lifecycle-implementing classes whose `build` method does not accept a
- * `context` parameter but whose class body uses `Resolvable<…>`. Such builders
- * accept refs at configuration time but have no way to resolve them at build
- * time — calls to `resolve(value, context)` would receive `undefined` and the
- * ref would throw "cannot be resolved".
+ * Flags Lifecycle-implementing classes whose `build` takes no `context`
+ * parameter although the class body uses `Resolvable<…>`. Such a builder
+ * accepts refs at configuration time but cannot resolve them at build time:
+ * `resolve(value, context)` receives `undefined` and the ref throws.
  *
- * The rule keys on `Resolvable` (a name unique to this codebase) to avoid the
- * false positives that keying on `resolve(` would produce (Promise.resolve, etc.).
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/lifecycle-build-context-required.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
   meta: {

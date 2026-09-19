@@ -3,19 +3,12 @@ import type { CallExpression, Expression, Pattern, Property } from "estree";
 
 /**
  * Requires every `stringConstraint({ ... })` call to set a non-empty `name`,
- * `allowed`, and `source`. These three fields are what make a synth-time
- * validation error useful — it names the property, lists the allowed character
- * set, and links the AWS doc (ADR-0010).
+ * `allowed`, and `source`. The factory's type already makes the keys required,
+ * so the real job is what the type checker cannot see: a present-but-empty
+ * literal compiles fine while degrading every error message the constraint
+ * produces (ADR-0010).
  *
- * The factory's type already makes the keys required, so this rule's real job
- * is the part the type checker cannot see: a present-but-empty string literal
- * (`allowed: ""`) compiles fine yet silently degrades every error message the
- * constraint produces. Non-literal values (e.g. `allowed: SG_ALLOWED`) are
- * left alone — their contents aren't statically knowable.
- *
- * The rule keys on the `stringConstraint` callee name (unique to the catalogue
- * mechanism); a call that spreads another object is skipped to avoid false
- * positives.
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/constraint-metadata-required.md | the rule documentation}.
  */
 const REQUIRED_FIELDS = ["name", "allowed", "source"] as const;
 

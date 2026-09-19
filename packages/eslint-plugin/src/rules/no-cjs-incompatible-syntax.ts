@@ -9,13 +9,11 @@ const FUNCTION_TYPES = new Set([
 
 /**
  * Flags syntax in library `src/` that cannot be emitted to CommonJS:
- * `import.meta`, top-level `await`, and top-level `for await…of`. All are
- * valid ESM but have no CJS equivalent, so `tsc` (and tshy's CommonJS
- * dialect) errors on them.
+ * `import.meta`, top-level `await`, and top-level `for await…of`. Every
+ * package is dual-published, so these break the CommonJS build — catching them
+ * at lint time beats waiting for the per-dialect compile (ADR-0007).
  *
- * Every `@composurecdk/*` package is dual-published (ESM + CJS) — see
- * ADR-0007. Catching these at lint time gives an in-editor error before any
- * build runs, rather than waiting for the per-dialect compile to fail.
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-cjs-incompatible-syntax.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
   meta: {

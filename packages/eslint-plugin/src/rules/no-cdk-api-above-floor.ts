@@ -53,21 +53,11 @@ const FORBIDDEN: ForbiddenMember[] = [
 
 /**
  * Flags use of `aws-cdk-lib` APIs newer than the supported peer-dependency
- * floor. Such calls compile fine (devDeps track the latest CDK) but throw at
- * runtime for consumers on an older, still-supported CDK version.
+ * floor. Such calls compile fine — devDeps track the latest CDK — but throw at
+ * runtime for consumers on an older, still-supported version in the peer range
+ * (ADR-0008).
  *
- * It fires only when the member chain is rooted at an aws-cdk-lib import —
- * `CfnAlarm.isCfnAlarm`, `cw.CfnAlarm.isCfnAlarm` (named or `* as` submodule),
- * `cdk.aws_cloudwatch.CfnAlarm.isCfnAlarm` — resolved through ESLint's scope
- * manager, so a local that shadows the import name (e.g. a parameter named
- * `CfnAlarm`) is correctly treated as a non-cdk binding. `chainRoot` also
- * unwraps the TS-only wrappers a developer might use to silence types
- * (`as`, `satisfies`, `!`, angle-bracket assertion) so they can't smuggle the
- * call past the rule. A call in the chain (e.g. `Stack.of(x).isCfnY()`) still
- * breaks the root link, since that reads a runtime value, not the import.
- *
- * Known gaps: computed bracket access (`CfnAlarm["isCfnAlarm"](x)`) and
- * `import = require()` are not tracked — both are uncommon in our ESM src.
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-cdk-api-above-floor.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
   meta: {

@@ -4,34 +4,12 @@ import { chainRoot, importSourceOf, isCdkSource, unwrapWrappers } from "./lib/im
 
 /**
  * Bans `instanceof` against a class reached through an `import`, because
- * `instanceof` is realm-bound and library `src/` is published dual ESM/CJS
- * (ADR-0007).
+ * `instanceof` is realm-bound and library `src/` is published dual ESM/CJS: when
+ * both copies load in one process each has its own class objects, so the check
+ * returns `false` for a value plainly of that type (ADR-0007). This has already
+ * shipped twice, as #384 and #385.
  *
- * When both copies of a package load in one process — the dual-package hazard —
- * each copy has its own class objects. An instance minted by one copy fails
- * `instanceof` against the other copy's class, so the check returns `false` for
- * a value that is plainly of that type. That has already shipped as two bugs:
- * #384 (a stack-singleton dedup silently skipped, colliding on a construct id)
- * and #385 (a `StatementBuilder` unrecognised, which skipped the
- * wildcard-resource security guard).
- *
- * **Every import is in scope, relative ones included.** A relative import is
- * not a same-realm guarantee: `./statement-builder.js` resolves separately in
- * each copy of the package, which is exactly how #385 happened.
- *
- * Not flagged, because neither can be duplicated by the hazard:
- * - **Globals and intrinsics** — `x instanceof RegExp`, `instanceof Error`.
- *   They resolve to no import binding, so the scope walk skips them.
- * - **Classes declared in the same module** — the class and every `new` of it
- *   come from one evaluation of that module.
- *
- * Resolution is scope-aware, so a local that shadows an import name is
- * correctly treated as a non-import binding, and TS-only wrappers (`as`, `!`,
- * `satisfies`, angle-bracket assertion) are unwrapped rather than trusted.
- *
- * Known gaps, both uncommon in our ESM src: `import = require()` bindings, and
- * an intermediate call that breaks the chain (`getClasses().Bucket`), which
- * reads a runtime value rather than the import.
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-realm-bound-instanceof.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
   meta: {

@@ -17,21 +17,12 @@ function readIgnoreMarker(fieldNode: PropertyDefinition, sourceCode: SourceCode)
 }
 
 /**
- * Flags builder classes (passed as the first arg to `Builder()` or
- * `taggedBuilder()`) that hold private state without a `[COPY_STATE]` hook.
- * Per ADR-0005, `.copy()` shallow-clones `props`; non-`props` state needs
- * `[COPY_STATE]` to carry it onto the cloned instance, otherwise `.copy()`
- * silently drops it and breaks both variant authoring and strategy hand-off.
+ * Flags builder classes holding private state without a `[COPY_STATE]` hook.
+ * `.copy()` shallow-clones `props` only, so non-`props` state is silently
+ * dropped from the clone without the hook, breaking variant authoring and
+ * strategy hand-off (ADR-0005).
  *
- * The rule checks for *existence* of the hook, not correctness — a hook
- * that copies three of five fields will pass. The companion test helper
- * `assertCopyPreservesState` (`@composurecdk/core/testing`) closes the
- * correctness gap on the test side.
- *
- * **Per-field opt-out.** Annotate a field with a leading
- * `// @copy-state: ignore -- justification` comment to exempt it (e.g.
- * for cache-shaped state that's regenerated per build). The justification
- * after `--` is required.
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/builder-must-implement-copy-state.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
   meta: {

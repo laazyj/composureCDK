@@ -13,8 +13,12 @@ interface TSTypeReferenceLike {
 
 /**
  * Flags uses of `Builder()` or `IBuilder<…>` imported from `@composurecdk/core`
- * in library builder files. Library builders should opt into the shared tagging
- * surface via `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation`.
+ * in library builder files. Tagging is cross-cutting and belongs to every
+ * deployable resource, so builders opt into the shared surface via
+ * `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation` rather
+ * than re-inventing it per builder.
+ *
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/builder-must-be-tagged.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
   meta: {

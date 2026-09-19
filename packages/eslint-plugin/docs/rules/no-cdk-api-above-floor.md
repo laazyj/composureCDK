@@ -2,7 +2,7 @@
 
 Flags use of an `aws-cdk-lib` API newer than the package's supported peer-dependency floor.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `internal` (`error`)
 - **Decision:** [ADR-0008](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0008-aws-cdk-lib-version-floors.md)
 
 ## Why

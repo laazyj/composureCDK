@@ -2,7 +2,7 @@
 
 Bans `instanceof` against a class reached through an `import`, in library `src/`.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `recommended` (`error`)
 - **Decision:** [ADR-0007](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0007-dual-esm-cjs-publishing.md), [ADR-0011](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0011-cross-component-relationship-guards.md)
 
 ## Why

@@ -2,7 +2,7 @@
 
 Flags a two-argument `builder.build(scope, id)` call in library source, which gives the sub-builder no context to resolve refs against.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `libraryAuthor` (`error`)
 
 ## Why
 

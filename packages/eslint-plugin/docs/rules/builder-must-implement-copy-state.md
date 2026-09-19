@@ -2,7 +2,7 @@
 
 Flags a builder class holding private state with no `[COPY_STATE]` hook.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `recommended` (`error`)
 - **Decision:** [ADR-0005](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0005-builder-copy.md)
 
 ## Why

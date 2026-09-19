@@ -2,7 +2,7 @@
 
 Requires every `stringConstraint({ … })` call to set a non-empty `name`, `allowed`, and `source`.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `internal` (`error`)
 - **Decision:** [ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md)
 
 ## Why

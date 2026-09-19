@@ -2,7 +2,7 @@
 
 Flags syntax in library `src/` that has no CommonJS emit: `import.meta`, top-level `await`, and top-level `for await…of`.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `dualPublishing` (`error`)
 - **Decision:** [ADR-0007](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0007-dual-esm-cjs-publishing.md)
 
 ## Why

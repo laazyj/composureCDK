@@ -2,7 +2,7 @@
 
 Flags a `Lifecycle` class that uses `Resolvable<…>` but whose `build` method takes no `context` parameter.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `recommended` (`error`)
 
 ## Why
 

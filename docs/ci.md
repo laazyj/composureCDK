@@ -90,7 +90,7 @@ Suppress a false positive with a `# shellcheck disable=SCxxxx` comment inside th
 
 `deploy-test.yml` passes `"[24]"` and `true`, taking that call from 17 jobs to 1.
 
-The trimmed-away work cannot tell you whether the examples deploy. The Node 20/22/26 legs exist to prove dual ESM/CJS resolution across runtimes ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)); the floor shards pin `aws-cdk-lib` down to each package's declared minimum ([ADR-0008](adr/0008-aws-cdk-lib-version-floors.md)). A deploy runs on Node 24 against the installed `aws-cdk-lib` and touches neither dimension. What is kept is the whole `verify` chain on Node 24 — format, `ci:covers-verify`, `licenses:check`, actionlint, typecheck, build, `catalogue:check`, `check:exports`, lint, `cdk-floors:check`, `validate` (synth + CloudFormation Validate), test — which is the part that can.
+The trimmed-away work cannot tell you whether the examples deploy. The Node 20/22/26 legs exist to prove dual ESM/CJS resolution across runtimes ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)); the floor shards pin `aws-cdk-lib` down to each package's declared minimum ([ADR-0008](adr/0008-aws-cdk-lib-version-floors.md)). A deploy runs on Node 24 against the installed `aws-cdk-lib` and touches neither dimension. What is kept is the whole `verify` chain on Node 24 — format, `ci:covers-verify`, `licenses:check`, actionlint, typecheck, build, `catalogue:check`, `check:exports`, lint, `cdk-floors:check`, `cdk-flags:check`, `validate` (synth + CloudFormation Validate), test — which is the part that can.
 
 `skip-cdk-floors` is phrased as a skip rather than a run because an unset input coerces to `false` in GitHub expressions, so `false` has to be the value that means "do the normal thing".
 

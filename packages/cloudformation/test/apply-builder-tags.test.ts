@@ -1,23 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
-import { Template } from "aws-cdk-lib/assertions";
+import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { PolicyDocument, PolicyStatement, Effect } from "aws-cdk-lib/aws-iam";
+import { tagsPerResource } from "@composurecdk/cdk-testing";
 import { applyBuilderTags } from "../src/apply-builder-tags.js";
-
-interface CfnTagEntry {
-  Key: string;
-  Value: string;
-}
-
-interface CfnResourceWithTags {
-  Properties?: { Tags?: CfnTagEntry[] };
-}
-
-function tagsOnResource(resource: CfnResourceWithTags | undefined): CfnTagEntry[] {
-  return resource?.Properties?.Tags ?? [];
-}
 
 describe("applyBuilderTags", () => {
   it("is a no-op when the tag map is empty", () => {
@@ -25,12 +13,9 @@ describe("applyBuilderTags", () => {
     const bucket = new Bucket(stack, "B");
     applyBuilderTags({ bucket }, new Map());
 
-    const template = Template.fromStack(stack);
-    const buckets = template.findResources("AWS::S3::Bucket") as Record<
-      string,
-      CfnResourceWithTags
-    >;
-    expect(Object.values(buckets)[0]?.Properties?.Tags).toBeUndefined();
+    // Exactly one bucket, carrying no tags. The loop-and-assert form this
+    // replaces passed vacuously when no bucket matched.
+    expect(tagsPerResource(Template.fromStack(stack), "AWS::S3::Bucket")).toEqual([[]]);
   });
 
   it("tags top-level IConstruct fields", () => {
@@ -47,17 +32,16 @@ describe("applyBuilderTags", () => {
     );
 
     const template = Template.fromStack(stack);
-    const buckets = template.findResources("AWS::S3::Bucket") as Record<
-      string,
-      CfnResourceWithTags
-    >;
-    const topics = template.findResources("AWS::SNS::Topic") as Record<string, CfnResourceWithTags>;
     const expectedTags = [
       { Key: "Owner", Value: "platform" },
       { Key: "Project", Value: "rig" },
     ];
-    expect(tagsOnResource(Object.values(buckets)[0])).toEqual(expect.arrayContaining(expectedTags));
-    expect(tagsOnResource(Object.values(topics)[0])).toEqual(expect.arrayContaining(expectedTags));
+    expect(tagsPerResource(template, "AWS::S3::Bucket")[0]).toEqual(
+      expect.arrayContaining(expectedTags),
+    );
+    expect(tagsPerResource(template, "AWS::SNS::Topic")[0]).toEqual(
+      expect.arrayContaining(expectedTags),
+    );
   });
 
   it("tags constructs nested one level inside Record-typed fields", () => {
@@ -73,9 +57,8 @@ describe("applyBuilderTags", () => {
     applyBuilderTags(result, new Map([["CostCenter", "1234"]]));
 
     const template = Template.fromStack(stack);
-    const topics = template.findResources("AWS::SNS::Topic") as Record<string, CfnResourceWithTags>;
-    const tagged = Object.values(topics).filter((r) =>
-      tagsOnResource(r).some((t) => t.Key === "CostCenter" && t.Value === "1234"),
+    const tagged = tagsPerResource(template, "AWS::SNS::Topic").filter((tags) =>
+      tags.some((t) => t.Key === "CostCenter" && t.Value === "1234"),
     );
     expect(tagged).toHaveLength(2);
   });
@@ -98,10 +81,11 @@ describe("applyBuilderTags", () => {
     applyBuilderTags(result, new Map([["Owner", "platform"]]));
 
     const template = Template.fromStack(stack);
-    const topics = template.findResources("AWS::SNS::Topic") as Record<string, CfnResourceWithTags>;
-    const taggedNames = Object.entries(topics)
-      .filter(([, r]) => tagsOnResource(r).some((t) => t.Key === "Owner"))
-      .map(([key]) => key);
+    const taggedNames = Object.keys(
+      template.findResources("AWS::SNS::Topic", {
+        Properties: { Tags: Match.arrayWith([Match.objectLike({ Key: "Owner" })]) },
+      }),
+    );
     expect(taggedNames).toHaveLength(2);
     expect(taggedNames.some((n) => n.includes("Direct"))).toBe(true);
     expect(taggedNames.some((n) => n.includes("Wrapped"))).toBe(true);
@@ -128,11 +112,7 @@ describe("applyBuilderTags", () => {
     // The bucket received the tag; the document is unaffected (PolicyDocument
     // exposes no public tag API — verifying via construct identity is enough).
     const template = Template.fromStack(stack);
-    const buckets = template.findResources("AWS::S3::Bucket") as Record<
-      string,
-      CfnResourceWithTags
-    >;
-    expect(tagsOnResource(Object.values(buckets)[0])).toEqual(
+    expect(tagsPerResource(template, "AWS::S3::Bucket")[0]).toEqual(
       expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
     );
   });
@@ -154,11 +134,7 @@ describe("applyBuilderTags", () => {
     }).not.toThrow();
 
     const template = Template.fromStack(stack);
-    const buckets = template.findResources("AWS::S3::Bucket") as Record<
-      string,
-      CfnResourceWithTags
-    >;
-    expect(tagsOnResource(Object.values(buckets)[0])).toEqual(
+    expect(tagsPerResource(template, "AWS::S3::Bucket")[0]).toEqual(
       expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
     );
   });
@@ -177,9 +153,8 @@ describe("applyBuilderTags", () => {
     applyBuilderTags({ alarms: nullProtoMap }, new Map([["Owner", "platform"]]));
 
     const template = Template.fromStack(stack);
-    const topics = template.findResources("AWS::SNS::Topic") as Record<string, CfnResourceWithTags>;
-    const tagged = Object.values(topics).filter((r) =>
-      tagsOnResource(r).some((t) => t.Key === "Owner" && t.Value === "platform"),
+    const tagged = tagsPerResource(template, "AWS::SNS::Topic").filter((tags) =>
+      tags.some((t) => t.Key === "Owner" && t.Value === "platform"),
     );
     expect(tagged).toHaveLength(2);
   });

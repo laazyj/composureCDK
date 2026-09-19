@@ -17,7 +17,7 @@ import { Key } from "aws-cdk-lib/aws-kms";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
 import { fake } from "ts-fake";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
+import { buildFixture, newStack, tagsPerResource } from "@composurecdk/cdk-testing";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import {
@@ -421,21 +421,13 @@ describe("FunctionBuilder", () => {
         .build(stack, "TestFunction");
 
       const template = Template.fromStack(stack);
-      const fns = template.findResources("AWS::Lambda::Function") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      expect(Object.values(fns)[0]?.Properties.Tags).toEqual(
+      expect(tagsPerResource(template, "AWS::Lambda::Function")[0]).toEqual(
         expect.arrayContaining([
           { Key: "Owner", Value: "platform" },
           { Key: "Project", Value: "claude-rig" },
         ]),
       );
-      const logGroups = template.findResources("AWS::Logs::LogGroup") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      expect(Object.values(logGroups)[0]?.Properties.Tags).toEqual(
+      expect(tagsPerResource(template, "AWS::Logs::LogGroup")[0]).toEqual(
         expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
       );
     });

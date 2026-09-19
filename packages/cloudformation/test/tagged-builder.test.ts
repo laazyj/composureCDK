@@ -4,7 +4,7 @@ import { Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
-import { newStack } from "@composurecdk/cdk-testing";
+import { newStack, tagsPerResource } from "@composurecdk/cdk-testing";
 import { type Lifecycle } from "@composurecdk/core";
 import { taggedBuilder } from "../src/tagged-builder.js";
 
@@ -39,19 +39,6 @@ class SyntheticBuilder implements Lifecycle<SyntheticResult> {
   }
 }
 
-interface CfnTagEntry {
-  Key: string;
-  Value: string;
-}
-
-interface CfnResourceWithTags {
-  Properties?: { Tags?: CfnTagEntry[] };
-}
-
-function tagsOnResource(resource: CfnResourceWithTags): CfnTagEntry[] {
-  return resource.Properties?.Tags ?? [];
-}
-
 describe("taggedBuilder", () => {
   describe("type augmentation", () => {
     it("returns an object with .tag() and .tags() methods that chain", () => {
@@ -80,26 +67,19 @@ describe("taggedBuilder", () => {
         .build(stack, "Synth");
 
       const template = Template.fromStack(stack);
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        CfnResourceWithTags
-      >;
-      for (const resource of Object.values(buckets)) {
-        expect(tagsOnResource(resource)).toEqual(
+      for (const tags of tagsPerResource(template, "AWS::S3::Bucket")) {
+        expect(tags).toEqual(
           expect.arrayContaining([
             { Key: "Project", Value: "claude-rig" },
             { Key: "Owner", Value: "platform" },
           ]),
         );
       }
-      const topics = template.findResources("AWS::SNS::Topic") as Record<
-        string,
-        CfnResourceWithTags
-      >;
+      const topicTags = tagsPerResource(template, "AWS::SNS::Topic");
       // primary bucket + secondary topic + 2 alarm topics → 3 topics tagged.
-      expect(Object.keys(topics)).toHaveLength(3);
-      for (const resource of Object.values(topics)) {
-        expect(tagsOnResource(resource)).toEqual(
+      expect(topicTags).toHaveLength(3);
+      for (const tags of topicTags) {
+        expect(tags).toEqual(
           expect.arrayContaining([
             { Key: "Project", Value: "claude-rig" },
             { Key: "Owner", Value: "platform" },
@@ -116,13 +96,9 @@ describe("taggedBuilder", () => {
         .build(stack, "Synth");
 
       const template = Template.fromStack(stack);
-      const topics = template.findResources("AWS::SNS::Topic") as Record<
-        string,
-        CfnResourceWithTags
-      >;
       // Both alarm topics receive the tag in addition to the secondary topic.
-      const taggedTopics = Object.values(topics).filter((r) =>
-        tagsOnResource(r).some((t) => t.Key === "CostCenter" && t.Value === "1234"),
+      const taggedTopics = tagsPerResource(template, "AWS::SNS::Topic").filter((tags) =>
+        tags.some((t) => t.Key === "CostCenter" && t.Value === "1234"),
       );
       expect(taggedTopics).toHaveLength(3);
     });
@@ -131,14 +107,8 @@ describe("taggedBuilder", () => {
       const stack = newStack();
       taggedBuilder<SyntheticProps, SyntheticBuilder>(SyntheticBuilder).build(stack, "Synth");
 
-      const template = Template.fromStack(stack);
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        CfnResourceWithTags
-      >;
-      for (const resource of Object.values(buckets)) {
-        expect(resource.Properties?.Tags).toBeUndefined();
-      }
+      // Exactly one bucket, carrying no tags.
+      expect(tagsPerResource(Template.fromStack(stack), "AWS::S3::Bucket")).toEqual([[]]);
     });
 
     it("applies all tags supplied via .tags({...})", () => {
@@ -148,12 +118,8 @@ describe("taggedBuilder", () => {
         .build(stack, "Synth");
 
       const template = Template.fromStack(stack);
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        CfnResourceWithTags
-      >;
-      for (const resource of Object.values(buckets)) {
-        expect(tagsOnResource(resource)).toEqual(
+      for (const tags of tagsPerResource(template, "AWS::S3::Bucket")) {
+        expect(tags).toEqual(
           expect.arrayContaining([
             { Key: "Owner", Value: "platform" },
             { Key: "Environment", Value: "prod" },
@@ -200,11 +166,7 @@ describe("taggedBuilder", () => {
       expect(warnings[0]).toMatch(/overwritten with "second"/);
 
       const template = Template.fromStack(stack);
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        CfnResourceWithTags
-      >;
-      const allTags = Object.values(buckets).flatMap(tagsOnResource);
+      const allTags = tagsPerResource(template, "AWS::S3::Bucket").flat();
       expect(allTags).toEqual(expect.arrayContaining([{ Key: "Owner", Value: "second" }]));
       expect(allTags.find((t) => t.Key === "Owner")?.Value).toBe("second");
     });
@@ -228,12 +190,8 @@ describe("taggedBuilder", () => {
       const stack = newStack();
       clone.build(stack, "Synth");
       const template = Template.fromStack(stack);
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        CfnResourceWithTags
-      >;
-      for (const resource of Object.values(buckets)) {
-        expect(tagsOnResource(resource)).toEqual(
+      for (const tags of tagsPerResource(template, "AWS::S3::Bucket")) {
+        expect(tags).toEqual(
           expect.arrayContaining([
             { Key: "Owner", Value: "platform" },
             { Key: "Project", Value: "rig" },
@@ -256,11 +214,7 @@ describe("taggedBuilder", () => {
       const stack = newStack();
       clone.build(stack, "Synth");
       const template = Template.fromStack(stack);
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        CfnResourceWithTags
-      >;
-      const allTags = Object.values(buckets).flatMap(tagsOnResource);
+      const allTags = tagsPerResource(template, "AWS::S3::Bucket").flat();
       expect(allTags.find((t) => t.Key === "Owner")?.Value).toBe("platform");
     });
 
@@ -275,11 +229,7 @@ describe("taggedBuilder", () => {
       const stack = newStack();
       original.build(stack, "Synth");
       const template = Template.fromStack(stack);
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        CfnResourceWithTags
-      >;
-      const allTags = Object.values(buckets).flatMap(tagsOnResource);
+      const allTags = tagsPerResource(template, "AWS::S3::Bucket").flat();
       expect(allTags.find((t) => t.Key === "Project")).toBeUndefined();
     });
 

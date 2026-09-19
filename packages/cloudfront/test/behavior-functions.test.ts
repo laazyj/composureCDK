@@ -11,7 +11,7 @@ import {
   FunctionRuntime,
   KeyValueStore,
 } from "aws-cdk-lib/aws-cloudfront";
-import { buildFixture } from "@composurecdk/cdk-testing";
+import { buildFixture, tagsPerResource } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { type BucketBuilderResult } from "@composurecdk/s3";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
@@ -539,29 +539,23 @@ describe("builder-level tags reach inline CloudFront Functions", () => {
         });
     });
 
-    interface CfnTagEntry {
-      Key: string;
-      Value: string;
-    }
-    const fns = template.findResources("AWS::CloudFront::Function") as Record<
-      string,
-      { Properties?: { Tags?: CfnTagEntry[] } }
-    >;
-    expect(Object.keys(fns)).toHaveLength(2);
-    const taggable = cloudFrontFunctionsAreTaggable();
-    for (const fn of Object.values(fns)) {
-      if (taggable) {
-        expect(fn.Properties?.Tags).toEqual(
+    const fnTags = tagsPerResource(template, "AWS::CloudFront::Function");
+    expect(fnTags).toHaveLength(2);
+    if (cloudFrontFunctionsAreTaggable()) {
+      for (const tags of fnTags) {
+        expect(tags).toEqual(
           expect.arrayContaining([
             { Key: "Project", Value: "claude-rig" },
             { Key: "Owner", Value: "platform" },
           ]),
         );
-      } else {
-        // Below aws-cdk-lib 2.251.0 the L1 carries no Tags; the builder's tags
-        // are silently dropped rather than breaking synth.
-        expect(fn.Properties?.Tags).toBeUndefined();
       }
+    } else {
+      // Below aws-cdk-lib 2.251.0 the L1 carries no Tags; the builder's tags
+      // are silently dropped rather than breaking synth. Absent is the whole
+      // assertion here, so it goes through a matcher rather than the helper,
+      // which normalises absent tags to an empty array.
+      template.allResourcesProperties("AWS::CloudFront::Function", { Tags: Match.absent() });
     }
   });
 });

@@ -36,16 +36,18 @@ const stack = newStack({ env: testEnv("us-east-1") });
 
 ## What's here
 
-| export                                       | what it does                                                                                   |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `newStack(props?)`                           | A `Stack` in a fresh `App`. Pass `props.env` for an environment-specific stack.                |
-| `testEnv(region)`                            | A `TestEnvironment` for that region on `TEST_ACCOUNT`.                                         |
-| `TestEnvironment`                            | CDK's `Environment` with `account` and `region` required, which `testEnv` always supplies.     |
-| `TEST_ACCOUNT`                               | The fictitious account those environments name.                                                |
-| `buildFixture(factory, id, defaults?)`       | Binds a builder factory and construct id into a build-and-synthesise fixture.                  |
-| `policyJson(stack)`                          | The synthesised template as a JSON string, for substring assertions over IAM policy documents. |
-| `assertAssignable<Target, Source>()`         | A compile-time assignability assertion — how the ADR-0018 type-level prop guards are written.  |
-| `assertCapabilitiesCovered(grants, covered)` | Pins a suite's capability table against the keys of the grants object it tests.                |
+| export                                       | what it does                                                                                                     |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `newStack(props?)`                           | A `Stack` in a fresh `App`. Pass `props.env` for an environment-specific stack.                                  |
+| `testEnv(region)`                            | A `TestEnvironment` for that region on `TEST_ACCOUNT`.                                                           |
+| `TestEnvironment`                            | CDK's `Environment` with `account` and `region` required, which `testEnv` always supplies.                       |
+| `TEST_ACCOUNT`                               | The fictitious account those environments name.                                                                  |
+| `buildFixture(factory, id, defaults?)`       | Binds a builder factory and construct id into a build-and-synthesise fixture.                                    |
+| `policyJson(stack)`                          | The synthesised template as a JSON string, for substring assertions over IAM policy documents.                   |
+| `tagsPerResource(template, type)`            | The tags on each resource of that type — owns the `findResources` cast. For assertions a matcher cannot express. |
+| `CfnTagEntry`                                | A CloudFormation tag (`Key`/`Value`) as it appears in a synthesised template.                                    |
+| `assertAssignable<Target, Source>()`         | A compile-time assignability assertion — how the ADR-0018 type-level prop guards are written.                    |
+| `assertCapabilitiesCovered(grants, covered)` | Pins a suite's capability table against the keys of the grants object it tests.                                  |
 
 ### Why `assertAssignable` and not vitest's `assertType`
 

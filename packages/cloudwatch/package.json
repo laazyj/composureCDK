@@ -56,7 +56,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
-    "aws-cdk-lib": "^2.268.0",
+    "aws-cdk-lib": "^2.269.0",
     "constructs": "^10.8.1",
     "ts-fake": "^1.2.0",
     "typescript": "^6.0.3",

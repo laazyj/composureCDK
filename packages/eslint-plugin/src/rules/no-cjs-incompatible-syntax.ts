@@ -8,10 +8,13 @@ const FUNCTION_TYPES = new Set([
 ]);
 
 /**
- * Flags syntax in library `src/` that cannot be emitted to CommonJS:
- * `import.meta`, top-level `await`, and top-level `for await…of`. Every
- * package is dual-published, so these break the CommonJS build — catching them
- * at lint time beats waiting for the per-dialect compile (ADR-0007).
+ * Flags syntax with no CommonJS equivalent: `import.meta`, top-level `await` and
+ * top-level `for await…of`.
+ *
+ * These packages are published as both ECMAScript and CommonJS modules from one
+ * source. All three constructs are valid ESM that the CommonJS compile cannot
+ * emit, so each one breaks half the build. Reporting them as you type beats
+ * discovering it when the second dialect compiles.
  *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-cjs-incompatible-syntax.md | the rule documentation}.
  */

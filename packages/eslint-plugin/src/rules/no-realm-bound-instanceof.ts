@@ -3,11 +3,19 @@ import type { BinaryExpression } from "estree";
 import { chainRoot, importSourceOf, isCdkSource, unwrapWrappers } from "./lib/imports.js";
 
 /**
- * Bans `instanceof` against a class reached through an `import`, because
- * `instanceof` is realm-bound and library `src/` is published dual ESM/CJS: when
- * both copies load in one process each has its own class objects, so the check
- * returns `false` for a value plainly of that type (ADR-0007). This has already
- * shipped twice, as #384 and #385.
+ * Bans `instanceof` against a class reached through an `import`.
+ *
+ * These packages ship as both ECMAScript and CommonJS modules, and both copies
+ * can load in the same process — a consumer importing one while a dependency
+ * requires the other. Each copy evaluates its own class objects, so an instance
+ * created by one fails `instanceof` against the other's class: the check returns
+ * `false` for a value that is plainly of that type.
+ *
+ * It fails silently, which is what makes it dangerous — a deduplication quietly
+ * skipped, a guard quietly bypassed, and no error to trace. Use a `Symbol.for(…)`
+ * brand instead, which is shared across copies.
+ *
+ * A relative import is no safer: it resolves separately in each copy.
  *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-realm-bound-instanceof.md | the rule documentation}.
  */

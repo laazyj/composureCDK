@@ -52,10 +52,14 @@ const FORBIDDEN: ForbiddenMember[] = [
 ];
 
 /**
- * Flags use of `aws-cdk-lib` APIs newer than the supported peer-dependency
- * floor. Such calls compile fine — devDeps track the latest CDK — but throw at
- * runtime for consumers on an older, still-supported version in the peer range
- * (ADR-0008).
+ * Flags an `aws-cdk-lib` API newer than the oldest CDK version this package
+ * supports.
+ *
+ * Such a call type-checks and passes tests, because both run against whichever
+ * CDK is installed here — the newest. It then throws at runtime for anyone whose
+ * own `aws-cdk-lib` is older, while still inside the range the package declares
+ * it supports. The fix is a form of the same check that works across the whole
+ * range; the rule's message names one per banned API.
  *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-cdk-api-above-floor.md | the rule documentation}.
  */

@@ -17,10 +17,12 @@ function readIgnoreMarker(fieldNode: PropertyDefinition, sourceCode: SourceCode)
 }
 
 /**
- * Flags builder classes holding private state without a `[COPY_STATE]` hook.
- * `.copy()` shallow-clones `props` only, so non-`props` state is silently
- * dropped from the clone without the hook, breaking variant authoring and
- * strategy hand-off (ADR-0005).
+ * Flags a builder class holding private state with no `[COPY_STATE]` hook.
+ *
+ * `.copy()` shallow-clones the builder's props. State held in private fields sits
+ * outside that copy, so without the hook it is silently dropped: the clone looks
+ * correct and behaves differently. Implement `[COPY_STATE]` to carry such state
+ * onto the clone.
  *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/builder-must-implement-copy-state.md | the rule documentation}.
  */

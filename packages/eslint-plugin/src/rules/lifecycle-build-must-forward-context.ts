@@ -2,11 +2,17 @@ import type { Rule } from "eslint";
 import type { CallExpression, Node } from "estree";
 
 /**
- * Flags `builder.build(scope, id)` calls in library source that omit the third
- * `context` argument. The sub-builder then resolves refs against `{}`, so any
- * `ref()` supplied through a `configure` callback dies with "component not
- * found in context". This is the call-site counterpart to
- * `lifecycle-build-context-required`, which checks the declaration.
+ * Flags a two-argument `builder.build(scope, id)` call, which gives the
+ * sub-builder no context to resolve refs against.
+ *
+ * A builder that delegates must pass its context on. When it does not, the
+ * sub-builder resolves against an empty context, and any ref the caller supplied
+ * through a `configure` callback fails at synth with "component not found in
+ * context".
+ *
+ * This is the call-site counterpart to `lifecycle-build-context-required`, which
+ * checks the declaration. Accepting the parameter is not enough — the common
+ * failure is a builder that takes `context` and then drops it on the way down.
  *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/lifecycle-build-must-forward-context.md | the rule documentation}.
  */

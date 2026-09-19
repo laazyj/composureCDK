@@ -85,10 +85,15 @@ function propertyName(member: TypeNode): string | undefined {
 
 /**
  * Flags a re-declared CDK prop that pins a named CDK interface inside
- * `Resolvable<…>` instead of reading the type from CDK's own prop. A pinned
- * spelling freezes at whatever interface was current when it was written, so the
- * builder silently starts rejecting values the wrapped construct accepts as soon
- * as CDK widens that prop (ADR-0018).
+ * `Resolvable<…>` rather than reading the type from CDK's own prop.
+ *
+ * A builder's props type is CDK's props type with a few keys lifted out and
+ * re-declared. Everything left inside the `Omit` keeps tracking whichever
+ * `aws-cdk-lib` the consumer installed; a key re-spelled with a named interface
+ * stops tracking it, freezing at whatever that interface meant when it was
+ * written. When CDK later widens that prop, the builder goes on rejecting values
+ * the construct it wraps now accepts — and it surfaces in the consumer's own
+ * compile, not in this package's.
  *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/redeclared-prop-must-track-cdk-type.md | the rule documentation}.
  */

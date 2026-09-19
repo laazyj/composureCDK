@@ -1,15 +1,6 @@
 import type { Rule } from "eslint";
 import type { CallExpression, Expression, Pattern, Property } from "estree";
 
-/**
- * Requires every `stringConstraint({ ... })` call to set a non-empty `name`,
- * `allowed`, and `source`. The factory's type already makes the keys required,
- * so the real job is what the type checker cannot see: a present-but-empty
- * literal compiles fine while degrading every error message the constraint
- * produces (ADR-0010).
- *
- * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/constraint-metadata-required.md | the rule documentation}.
- */
 const REQUIRED_FIELDS = ["name", "allowed", "source"] as const;
 
 function propertyKey(property: Property): string | undefined {
@@ -23,6 +14,19 @@ function isEmptyStringLiteral(value: Expression | Pattern): boolean {
   return value.type === "Literal" && typeof value.value === "string" && value.value.trim() === "";
 }
 
+/**
+ * Requires every `stringConstraint({ … })` call to set a non-empty `name`,
+ * `allowed` and `source`.
+ *
+ * Those three fields are what turn a synth-time validation failure into
+ * something actionable — they name the offending property, list the characters
+ * it accepts, and link the AWS documentation. The factory's type already makes
+ * the keys required, so the gap this closes is the one the type checker cannot
+ * see: a present-but-empty string compiles happily while degrading every message
+ * the constraint will ever produce.
+ *
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/constraint-metadata-required.md | the rule documentation}.
+ */
 export const rule: Rule.RuleModule = {
   meta: {
     type: "problem",

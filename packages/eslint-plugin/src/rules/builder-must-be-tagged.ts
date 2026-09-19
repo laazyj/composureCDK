@@ -12,11 +12,14 @@ interface TSTypeReferenceLike {
 }
 
 /**
- * Flags uses of `Builder()` or `IBuilder<…>` imported from `@composurecdk/core`
- * in library builder files. Tagging is cross-cutting and belongs to every
- * deployable resource, so builders opt into the shared surface via
- * `taggedBuilder` / `ITaggedBuilder` from `@composurecdk/cloudformation` rather
- * than re-inventing it per builder.
+ * Flags `Builder()` or `IBuilder<…>` from `@composurecdk/core` in a builder that
+ * wraps a taggable resource.
+ *
+ * Tagging is cross-cutting: every deployable resource needs it, and a consumer
+ * expects the same tagging surface on every builder rather than on whichever
+ * ones remembered to add it. `taggedBuilder` / `ITaggedBuilder` from
+ * `@composurecdk/cloudformation` supply that surface; the core builder does not,
+ * because core stays independent of CloudFormation.
  *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/builder-must-be-tagged.md | the rule documentation}.
  */

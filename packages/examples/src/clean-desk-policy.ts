@@ -3,17 +3,19 @@ import {
   CfnDeletionPolicy,
   CfnResource,
   Duration,
+  FeatureFlags,
   PropertyInjectors,
   RemovalPolicy,
   Stack,
 } from "aws-cdk-lib";
-import type { IAspect, IPropertyInjector } from "aws-cdk-lib";
+import type { IAspect, InjectionContext, IPropertyInjector } from "aws-cdk-lib";
+import { APIGATEWAY_DISABLE_CLOUDWATCH_ROLE } from "aws-cdk-lib/cx-api";
 import { Bucket, CfnBucket, type BucketProps } from "aws-cdk-lib/aws-s3";
 import { Table, TableV2, type TableProps, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { Key, type KeyProps } from "aws-cdk-lib/aws-kms";
 import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
-import { RestApi, type RestApiProps } from "aws-cdk-lib/aws-apigateway";
+import { RestApi, SpecRestApi } from "aws-cdk-lib/aws-apigateway";
 import { DatabaseCluster, type DatabaseClusterProps } from "@aws-cdk/aws-neptune-alpha";
 import {
   AwsCustomResource,
@@ -59,15 +61,36 @@ class BucketRemovalPolicyInjector implements IPropertyInjector {
   }
 }
 
-/**
- * A {@link IPropertyInjector} that overrides `cloudWatchRoleRemovalPolicy`
- * to `RemovalPolicy.DESTROY` on a RestApi. The CDK RestApi uses a separate
- * prop for the Account / CloudWatch Role resources it creates internally.
- */
-class RestApiRemovalPolicyInjector implements IPropertyInjector {
-  readonly constructUniqueId = RestApi.PROPERTY_INJECTION_ID;
+/** The subset of `RestApiBaseProps` this injector reads and writes. */
+interface CloudWatchRoleProps {
+  readonly cloudWatchRole?: boolean;
+  readonly cloudWatchRoleRemovalPolicy?: RemovalPolicy;
+}
 
-  inject(originalProps: RestApiProps): RestApiProps {
+/**
+ * A {@link IPropertyInjector} that overrides `cloudWatchRoleRemovalPolicy` to
+ * `RemovalPolicy.DESTROY` on an API Gateway API, but only when that role is
+ * actually created. CDK uses a separate prop for the Account / CloudWatch Role
+ * resources the API creates internally.
+ *
+ * Both `RestApi` and `SpecRestApi` reject `cloudWatchRoleRemovalPolicy`
+ * outright when `cloudWatchRole` is false, and the role defaults to off once
+ * `@aws-cdk/aws-apigateway:disableCloudWatchRole` is set — which is CDK's
+ * recommended value, because the role is an account-wide singleton. Setting
+ * the removal policy unconditionally turned that flag into a synth failure, so
+ * the default is computed the same way CDK computes it.
+ */
+class CloudWatchRoleRemovalPolicyInjector<
+  Props extends CloudWatchRoleProps,
+> implements IPropertyInjector {
+  constructor(readonly constructUniqueId: string) {}
+
+  inject(originalProps: Props, context: InjectionContext): Props {
+    const cloudWatchRole =
+      originalProps.cloudWatchRole ??
+      !FeatureFlags.of(context.scope).isEnabled(APIGATEWAY_DISABLE_CLOUDWATCH_ROLE);
+    if (!cloudWatchRole) return originalProps;
+
     return { ...originalProps, cloudWatchRoleRemovalPolicy: RemovalPolicy.DESTROY };
   }
 }
@@ -278,6 +301,7 @@ function resolveLogsBucketInStack(
  * - `aws-cdk-lib/aws-logs.LogGroup`
  * - `aws-cdk-lib/aws-ec2.Volume`
  * - `aws-cdk-lib/aws-apigateway.RestApi` (Account + CloudWatch Role)
+ * - `aws-cdk-lib/aws-apigateway.SpecRestApi` (Account + CloudWatch Role)
  * - `@aws-cdk/aws-neptune-alpha.DatabaseCluster` (also clears `deletionProtection`)
  * - `aws-cdk-lib/aws-dynamodb.TableV2` (also clears `deletionProtection`)
  * - `aws-cdk-lib/aws-dynamodb.Table` (also clears `deletionProtection`)
@@ -294,7 +318,8 @@ export function cleanDeskPolicy(scope: IConstruct): void {
   injectors.add(new BucketRemovalPolicyInjector());
   injectors.add(new RemovalPolicyInjector<LogGroupProps>(LogGroup.PROPERTY_INJECTION_ID));
   injectors.add(new RemovalPolicyInjector<VolumeProps>(Volume.PROPERTY_INJECTION_ID));
-  injectors.add(new RestApiRemovalPolicyInjector());
+  injectors.add(new CloudWatchRoleRemovalPolicyInjector(RestApi.PROPERTY_INJECTION_ID));
+  injectors.add(new CloudWatchRoleRemovalPolicyInjector(SpecRestApi.PROPERTY_INJECTION_ID));
   injectors.add(new NeptuneClusterRemovalPolicyInjector());
   injectors.add(new TableV2RemovalPolicyInjector());
   injectors.add(new TableRemovalPolicyInjector());

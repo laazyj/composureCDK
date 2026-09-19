@@ -127,9 +127,11 @@ compose(
   (tracked in laazyj/composureCDK#270; resolved by keeping the role an explicit
   sibling and merging it with the integration target via `combine`, see
   [ADR-0015](0015-combine-multi-ref-combinator.md)); and Neptune's
-  `allowAccessFrom`, which
-  couples an IAM grant with a security-group rule and will migrate its IAM half to
-  a consumer-side `clusterGrants.connect(...)` in a separate breaking change.
+  `allowAccessFrom`, which coupled an IAM grant with a security-group rule
+  (tracked in laazyj/composureCDK#372; resolved by splitting the two halves —
+  the IAM half became a consumer-side `clusterGrants.connect(...)`, while the
+  security-group rule stayed on the cluster whose own group it is written into,
+  renamed `allowDefaultPortFrom` to match the interface-endpoint builder).
 
 ## Alternatives considered
 

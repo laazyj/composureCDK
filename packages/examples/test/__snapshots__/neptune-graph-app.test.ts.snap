@@ -189,8 +189,8 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppbastion33F9E2DF": {
       "DependsOn": [
-        "NeptuneGraphAppbastionInstanceRoleDefaultPolicy6DFAA993",
-        "NeptuneGraphAppbastionInstanceRole1DE27A04",
+        "NeptuneGraphAppbastionRoleDefaultPolicyCB8F45C7",
+        "NeptuneGraphAppbastionRole699B0AF7",
       ],
       "Properties": {
         "AvailabilityZone": {
@@ -328,13 +328,24 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
       "Properties": {
         "Roles": [
           {
-            "Ref": "NeptuneGraphAppbastionInstanceRole1DE27A04",
+            "Ref": "NeptuneGraphAppbastionRole699B0AF7",
           },
         ],
       },
       "Type": "AWS::IAM::InstanceProfile",
     },
-    "NeptuneGraphAppbastionInstanceRole1DE27A04": {
+    "NeptuneGraphAppbastionLaunchTemplate5EFDB6B7": {
+      "Properties": {
+        "LaunchTemplateData": {
+          "MetadataOptions": {
+            "HttpTokens": "required",
+          },
+        },
+        "LaunchTemplateName": "NeptuneGraphApp--bastionLaunchTemplate",
+      },
+      "Type": "AWS::EC2::LaunchTemplate",
+    },
+    "NeptuneGraphAppbastionRole699B0AF7": {
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
@@ -362,16 +373,11 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
             ],
           },
         ],
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "ComposureCDK-NeptuneGraphStack/NeptuneGraphApp--bastion",
-          },
-        ],
+        "MaxSessionDuration": 3600,
       },
       "Type": "AWS::IAM::Role",
     },
-    "NeptuneGraphAppbastionInstanceRoleDefaultPolicy6DFAA993": {
+    "NeptuneGraphAppbastionRoleDefaultPolicyCB8F45C7": {
       "Properties": {
         "PolicyDocument": {
           "Statement": [
@@ -409,25 +415,14 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "NeptuneGraphAppbastionInstanceRoleDefaultPolicy6DFAA993",
+        "PolicyName": "NeptuneGraphAppbastionRoleDefaultPolicyCB8F45C7",
         "Roles": [
           {
-            "Ref": "NeptuneGraphAppbastionInstanceRole1DE27A04",
+            "Ref": "NeptuneGraphAppbastionRole699B0AF7",
           },
         ],
       },
       "Type": "AWS::IAM::Policy",
-    },
-    "NeptuneGraphAppbastionLaunchTemplate5EFDB6B7": {
-      "Properties": {
-        "LaunchTemplateData": {
-          "MetadataOptions": {
-            "HttpTokens": "required",
-          },
-        },
-        "LaunchTemplateName": "NeptuneGraphApp--bastionLaunchTemplate",
-      },
-      "Type": "AWS::EC2::LaunchTemplate",
     },
     "NeptuneGraphAppbastionSgA2525585": {
       "Properties": {
@@ -461,7 +456,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppbastionSgtoComposureCDKNeptuneGraphStackNeptuneGraphAppgraphSecurityGroupD151DD39IndirectPort57EB8748": {
       "Properties": {
-        "Description": "to ComposureCDKNeptuneGraphStackNeptuneGraphAppgraphSecurityGroupD151DD39:{IndirectPort}",
+        "Description": "Neptune bastion to graph",
         "DestinationSecurityGroupId": {
           "Fn::GetAtt": [
             "NeptuneGraphAppgraphSecurityGroupE922E691",
@@ -830,7 +825,7 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
     },
     "NeptuneGraphAppgraphSecurityGroupfromComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA7198IndirectPort8A150FDF": {
       "Properties": {
-        "Description": "from ComposureCDKNeptuneGraphStackNeptuneGraphAppbastionSg36AA7198:{IndirectPort}",
+        "Description": "Neptune bastion to graph",
         "FromPort": {
           "Fn::GetAtt": [
             "NeptuneGraphAppgraph2EE8F381",

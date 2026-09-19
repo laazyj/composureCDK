@@ -6,16 +6,15 @@ Not yet published (`"private": true`), but held to the same packaging bar as the
 
 ## Usage
 
-The root `eslint.config.mjs` consumes the plugin via the `recommended` preset:
+`configs.recommended` is a self-contained flat config entry — it registers the plugin, so extending it is all that is needed:
 
 ```js
 import composurecdk from "@composurecdk/eslint-plugin";
 
 export default [
   {
-    files: ["packages/*/src/**/*.ts"],
-    plugins: { composurecdk },
-    rules: composurecdk.configs.recommended.rules,
+    files: ["src/**/*.ts"],
+    extends: [composurecdk.configs.recommended],
   },
 ];
 ```
@@ -27,14 +26,35 @@ const composurecdk = require("@composurecdk/eslint-plugin");
 
 module.exports = [
   {
-    files: ["packages/*/src/**/*.ts"],
-    plugins: { composurecdk },
-    rules: composurecdk.configs.recommended.rules,
+    files: ["src/**/*.ts"],
+    extends: [composurecdk.configs.recommended],
   },
 ];
 ```
 
-File-level overrides (e.g. disabling a rule on a specific file) belong in the consumer config, not in the preset.
+### Scoping is yours
+
+The preset declares no `files`. The rules are written for **library source** — applying them unscoped will flag test, fixture and config code — but only you know where your source lives, so pick the glob as above. (This repo uses `packages/*/src/**/*.ts`.)
+
+File-level overrides (e.g. disabling a rule on a specific file) likewise belong in your config, not in the preset.
+
+### Picking rules individually
+
+`configs.recommended.rules` is still a plain severity map, so you can register the plugin yourself and take a subset:
+
+```js
+import composurecdk from "@composurecdk/eslint-plugin";
+
+export default [
+  {
+    files: ["src/**/*.ts"],
+    plugins: { composurecdk },
+    rules: { "composurecdk/builder-must-be-tagged": "error" },
+  },
+];
+```
+
+Mixing the two forms is safe: the preset registers the same plugin object this `plugins` entry does, so ESLint sees one plugin rather than a conflicting redefinition.
 
 ## Rules
 
@@ -72,7 +92,7 @@ The `recommended` preset also bans the TypeScript `private` modifier via `no-res
    ```
 
 2. Register it in `src/rules/index.ts`.
-3. Add it to `src/configs/recommended.ts` at its intended severity.
+3. Add it to `recommendedRules` in `src/configs/recommended.ts` at its intended severity. A test asserts the preset and `rules` stay in step, so omitting this fails the suite.
 4. Write `test/rules/<kebab-name>.test.ts` using `RuleTester` (see existing tests). Cover at least one valid and one invalid case per `messageId`.
 
 ## Running tests

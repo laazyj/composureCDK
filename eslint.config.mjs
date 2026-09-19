@@ -76,9 +76,11 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
+    // The preset registers the plugin itself, so no `plugins` entry is needed
+    // here. It declares no `files` by design — scoping it to library source is
+    // the consumer's call, and this is ours.
     files: ["packages/*/src/**/*.ts"],
-    plugins: { composurecdk },
-    rules: composurecdk.configs.recommended.rules,
+    extends: [composurecdk.configs.recommended],
   },
   {
     // The ADR-0018 type-level guards declare a `const` purely so its type

@@ -90,7 +90,7 @@ Suppress a false positive with a `# shellcheck disable=SCxxxx` comment inside th
 
 `deploy-test.yml` passes `"[24]"` and `true`, taking that call from 17 jobs to 1.
 
-The trimmed-away work cannot tell you whether the examples deploy. The Node 20/22/26 legs exist to prove dual ESM/CJS resolution across runtimes ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)); the floor shards pin `aws-cdk-lib` down to each package's declared minimum ([ADR-0008](adr/0008-aws-cdk-lib-version-floors.md)). A deploy runs on Node 24 against the installed `aws-cdk-lib` and touches neither dimension. What is kept is the whole `verify` chain on Node 24 — format, actionlint, typecheck, build, `check:exports`, lint, `cdk-floors:check`, `validate` (synth + CloudFormation Validate), test — which is the part that can.
+The trimmed-away work cannot tell you whether the examples deploy. The Node 20/22/26 legs exist to prove dual ESM/CJS resolution across runtimes ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)); the floor shards pin `aws-cdk-lib` down to each package's declared minimum ([ADR-0008](adr/0008-aws-cdk-lib-version-floors.md)). A deploy runs on Node 24 against the installed `aws-cdk-lib` and touches neither dimension. What is kept is the whole `verify` chain on Node 24 — format, `ci:covers-verify`, `licenses:check`, actionlint, typecheck, build, `catalogue:check`, `check:exports`, lint, `cdk-floors:check`, `validate` (synth + CloudFormation Validate), test — which is the part that can.
 
 `skip-cdk-floors` is phrased as a skip rather than a run because an unset input coerces to `false` in GitHub expressions, so `false` has to be the value that means "do the normal thing".
 
@@ -340,7 +340,10 @@ npm run test
 ```
 
 `npm run verify` chains the exact targets `ci.yml` runs, so a green `verify`
-locally means a green CI. A husky `pre-push` hook runs `npm run verify`
+locally means a green CI. That is enforced rather than maintained: `npm run
+ci:covers-verify` fails if a gate joins `verify` without a matching step in
+`ci.yml`. It is one-directional — CI may run more (`coverage:summary`, the
+floor shards) — and it checks that a step exists, not that it runs. A husky `pre-push` hook runs `npm run verify`
 automatically — a regression cannot reach GitHub without the maintainer seeing
 it first. The only check `verify` cannot reproduce is CI's Node 20 + 24 matrix.
 

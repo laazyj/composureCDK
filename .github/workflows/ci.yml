@@ -73,6 +73,13 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      # `verify` and the steps below are two lists of the same gates. This
+      # fails if a gate is added to `verify` with no step here — which is how
+      # `catalogue:check` came to be enforced only at push time. It checks a
+      # step exists, not that it runs: a step guarded by an `if:` still counts.
+      - name: Check CI covers every verify gate
+        run: npm run ci:covers-verify
+
       # Workflow linting is Node-independent, so one leg is enough. Keyed to the
       # matrix's first entry rather than a literal version: `[0]` always selects
       # exactly one leg whatever `node-versions` holds, whereas `== 24` matches
@@ -93,6 +100,14 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Both need Build first: one imports each package's `dist`, the other
+      # asserts every `files` entry exists — and `files` lists `dist`.
+      - name: Check constraint catalogue in sync
+        run: npm run catalogue:check
+
+      - name: Check every published package ships what it declares
+        run: npm run licenses:check
 
       - name: Check exports
         run: npm run check:exports

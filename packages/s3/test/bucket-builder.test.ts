@@ -4,7 +4,7 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket, BucketEncryption, type BucketProps } from "aws-cdk-lib/aws-s3";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
+import { buildFixture, newStack, tagsPerResource } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBucketBuilder, type BucketBuilderProps } from "../src/bucket-builder.js";
@@ -534,11 +534,7 @@ describe("BucketBuilder", () => {
         withoutLogging(b).tag("Project", "claude-rig").tag("Owner", "platform"),
       );
 
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      const tags = Object.values(buckets)[0]?.Properties.Tags ?? [];
+      const tags = tagsPerResource(template, "AWS::S3::Bucket")[0];
       expect(tags).toEqual(
         expect.arrayContaining([
           { Key: "Project", Value: "claude-rig" },
@@ -550,12 +546,9 @@ describe("BucketBuilder", () => {
     it("does not crash when a sibling result field is undefined", () => {
       const { template } = buildAndSynth((b) => withoutLogging(b).tag("Project", "claude-rig"));
 
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      expect(Object.keys(buckets)).toHaveLength(1);
-      expect(Object.values(buckets)[0]?.Properties.Tags).toEqual(
+      const bucketTags = tagsPerResource(template, "AWS::S3::Bucket");
+      expect(bucketTags).toHaveLength(1);
+      expect(bucketTags[0]).toEqual(
         expect.arrayContaining([{ Key: "Project", Value: "claude-rig" }]),
       );
     });
@@ -567,14 +560,10 @@ describe("BucketBuilder", () => {
 
       const template = Template.fromStack(stack);
       // Both buckets — the primary and the auto-created access-logs sibling — carry the tag.
-      const buckets = template.findResources("AWS::S3::Bucket");
-      expect(Object.keys(buckets)).toHaveLength(2);
-      for (const resource of Object.values(buckets) as {
-        Properties: { Tags?: { Key: string; Value: string }[] };
-      }[]) {
-        expect(resource.Properties.Tags).toEqual(
-          expect.arrayContaining([{ Key: "Project", Value: "claude-rig" }]),
-        );
+      const bucketTags = tagsPerResource(template, "AWS::S3::Bucket");
+      expect(bucketTags).toHaveLength(2);
+      for (const tags of bucketTags) {
+        expect(tags).toEqual(expect.arrayContaining([{ Key: "Project", Value: "claude-rig" }]));
       }
     });
 
@@ -597,21 +586,18 @@ describe("BucketBuilder", () => {
         .build(stack, "TestBucket");
 
       const template = Template.fromStack(stack);
-      const alarms = template.findResources("AWS::CloudWatch::Alarm");
-      expect(Object.keys(alarms).length).toBeGreaterThan(0);
-      const taggable = alarmsAreTaggable();
-      for (const resource of Object.values(alarms) as {
-        Properties: { Tags?: { Key: string; Value: string }[] };
-      }[]) {
-        if (taggable) {
-          expect(resource.Properties.Tags).toEqual(
-            expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
-          );
-        } else {
-          // Below aws-cdk-lib 2.138.0 the L1 carries no Tags; the builder's
-          // tags are silently dropped rather than breaking synth.
-          expect(resource.Properties.Tags).toBeUndefined();
+      const alarmTags = tagsPerResource(template, "AWS::CloudWatch::Alarm");
+      expect(alarmTags.length).toBeGreaterThan(0);
+      if (alarmsAreTaggable()) {
+        for (const tags of alarmTags) {
+          expect(tags).toEqual(expect.arrayContaining([{ Key: "Owner", Value: "platform" }]));
         }
+      } else {
+        // Below aws-cdk-lib 2.138.0 the L1 carries no Tags; the builder's tags
+        // are silently dropped rather than breaking synth. Absent is the whole
+        // assertion here, so it goes through a matcher rather than the helper,
+        // which normalises absent tags to an empty array.
+        template.allResourcesProperties("AWS::CloudWatch::Alarm", { Tags: Match.absent() });
       }
     });
 
@@ -620,11 +606,7 @@ describe("BucketBuilder", () => {
         withoutLogging(b).tags({ Owner: "platform", Environment: "prod" }),
       );
 
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      const tags = Object.values(buckets)[0]?.Properties.Tags ?? [];
+      const tags = tagsPerResource(template, "AWS::S3::Bucket")[0];
       expect(tags).toEqual(
         expect.arrayContaining([
           { Key: "Owner", Value: "platform" },

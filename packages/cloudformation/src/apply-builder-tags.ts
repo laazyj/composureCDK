@@ -46,14 +46,42 @@ function walkAndTag(value: unknown, tags: ReadonlyMap<string, string>): void {
 }
 
 /**
+ * Narrows a tag aspect to the Stack itself. `aws:cdk:stack` is the pseudo
+ * resource type CDK's tag aspect uses for it. Shared across every call: CDK
+ * retains the props object for the aspect's lifetime but only ever reads it.
+ */
+const STACK_ONLY = Object.freeze({ includeResourceTypes: ["aws:cdk:stack"] });
+
+/**
  * Applies every entry of `tags` to `target` via `Tags.of(target).add(...)`.
  * Accepts any iterable of `[key, value]` pairs so callers can pass `Map`,
  * `Object.entries(record)`, or other compatible sources without copying.
+ *
+ * Every tag is applied twice, and both calls are load-bearing.
+ * `@aws-cdk/core:explicitStackTags` — recommended `true` by CDK — makes
+ * `Tags.of(...).add(...)` inject `excludeResourceTypes: ["aws:cdk:stack"]`, so
+ * the plain call alone leaves any Stack in the target's subtree untagged while
+ * the resources inside it still carry the tag. `includeResourceTypes` narrows
+ * an aspect to the listed types alone, so the second call cannot stand in for
+ * the first either.
+ *
+ * Both calls run for every target, not just a Stack. What the flag suppresses
+ * is the aspect's reach over the target's *subtree*, and a target that is not
+ * itself a Stack routinely contains one — `tags()` hands this the scope
+ * `build()` was called with, which under a stack strategy is the `App`. On a
+ * target with no Stack beneath it the second aspect is simply inert; it does
+ * not reach the enclosing Stack, because an aspect only walks downwards.
+ *
+ * Neither call is gated on the flag's value: reading it needs
+ * `cxapi.EXPLICIT_STACK_TAGS`, which does not exist at this package's
+ * aws-cdk-lib floor, and re-tagging with a value already present is a no-op —
+ * so paying for it always is cheaper than a floor bump.
  */
 export function applyTagsToConstruct(target: IConstruct, tags: Iterable<[string, string]>): void {
   const t = Tags.of(target);
   for (const [key, value] of tags) {
     t.add(key, value);
+    t.add(key, value, STACK_ONLY);
   }
 }
 

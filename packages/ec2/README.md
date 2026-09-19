@@ -19,6 +19,31 @@ const server = createInstanceBuilder()
 
 Every [InstanceProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ec2.InstanceProps.html) property is available as a fluent setter on the builder, except `vpc` which is set via the dedicated `.vpc()` method to support cross-component wiring with `ref<T>(...)`.
 
+### Granting access to other resources
+
+An EC2 instance is a grantee: `.grant()` takes the capability helpers resource packages expose, and the permissions land on whichever role the instance runs as ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)).
+
+```ts
+import { createInstanceBuilder } from "@composurecdk/ec2";
+import { bucketGrants, createBucketBuilder, type BucketBuilderResult } from "@composurecdk/s3";
+
+compose(
+  {
+    assets: createBucketBuilder(),
+    server: createInstanceBuilder()
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO))
+      .machineImage(MachineImage.latestAmazonLinux2023())
+      .grant(bucketGrants.readWrite(ref<BucketBuilderResult>("assets").get("bucket"))),
+  },
+  { network: [], assets: [], server: ["network", "assets"] }, // consumer → resource
+);
+```
+
+Declaring the grant here keeps the dependency edge pointing from the instance to the resource, rather than making the resource depend on its own consumer. The grant routes through the instance's `grantPrincipal`, so it follows the role the instance actually runs as: an external `.role(ref(...))`, the role of a supplied `.instanceProfile(...)`, or the role CDK creates when neither is given. **No separate role component is needed to hold a grant.** Where one exists for other reasons, granting on either the instance or that role has the same effect.
+
+For a post-build escape hatch, `result.instance.addToRolePolicy(statement)` still writes a raw statement onto the same role.
+
 ## Secure Defaults
 
 `createInstanceBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.

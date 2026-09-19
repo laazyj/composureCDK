@@ -45,8 +45,11 @@ describe("neptune-graph-app", () => {
       Description: "Neptune bastion to graph",
       SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
     });
-    // The data-plane grant lands on the bastion's own role (ADR-0013).
+    // The data-plane grant lands on the role the bastion runs as — the one CDK
+    // creates for the instance, so no separate role component holds it
+    // (ADR-0013).
     template.hasResourceProperties("AWS::IAM::Policy", {
+      Roles: Match.arrayWith([Match.objectLike({ Ref: Match.stringLikeRegexp("InstanceRole") })]),
       PolicyDocument: Match.objectLike({
         Statement: Match.arrayWith([
           Match.objectLike({ Action: Match.stringLikeRegexp("^neptune-db:") }),

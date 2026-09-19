@@ -8,7 +8,7 @@ A CloudFormation Stack is the unit of deployment in AWS. Every resource belongs 
 How you partition resources across Stacks has real consequences:
 
 - **500 resources per Stack** — a hard CloudFormation limit. Large systems must split.
-- **Cross-stack exports are immutable while imported** — you cannot modify or delete an export that another Stack references. This couples Stack lifecycles.
+- **Cross-stack references couple Stack lifecycles** — how tightly is a decision you make, not a fixed property. See [Cross-Stack References](#cross-stack-references).
 - **Split by lifecycle and ownership, not by service type** — group resources that change together and are owned by the same team, not by whether they are Lambda functions or DynamoDB tables.
 - **Stack subclasses are common** — for example Amazon teams typically use `DeploymentStack` or other custom subclasses rather than `Stack` directly. ComposureCDK supports this through `ScopeFactory`.
 
@@ -64,7 +64,7 @@ compose({ handler, api }, { handler: [], api: ["handler"] })
   .build(app, "MySystem");
 ```
 
-CDK handles cross-stack references automatically — when the API in `apiStack` references the Lambda in `serviceStack`, CDK generates the necessary exports and imports.
+CDK handles cross-stack references automatically — when the API in `apiStack` references the Lambda in `serviceStack`, CDK wires the value across for you. What it emits depends on the reference strength you have chosen; see [Cross-Stack References](#cross-stack-references).
 
 **When to use:** When you need explicit control over which components go into which Stacks. Good for systems with a small, stable number of Stacks where the mapping is obvious.
 
@@ -153,11 +153,31 @@ Start with the simplest approach that meets your needs. You can adopt more sophi
 
 ## Cross-Stack References
 
-When components in different Stacks reference each other (via `ref`), CDK automatically creates CloudFormation exports and imports. This is convenient but comes with constraints:
+When components in different Stacks reference each other (via `ref`), CDK wires the value across automatically. _How_ it does that is a decision you own, through the `@aws-cdk/core:defaultCrossStackReferences` feature flag — read from the **consuming** Stack's context. `CrossStackReferences.of(scope)` overrides it for one scope or resource.
 
-- **Exports are immutable while imported.** If Stack A exports a value that Stack B imports, you cannot change or remove that export until Stack B no longer imports it. This means you cannot freely refactor cross-stack boundaries.
-- **Deploy order matters.** The exporting Stack must be deployed before the importing Stack. CDK Pipelines handles this automatically; manual deploys require careful ordering.
-- **Avoid unnecessary cross-stack references.** Co-locate components that are tightly coupled. Use cross-stack references for stable interfaces between loosely coupled groups.
+| strength   | the consumer reads the value with | the producer's export                       |
+| ---------- | --------------------------------- | ------------------------------------------- |
+| `"strong"` | `Fn::ImportValue`                 | published, and pinned while imported        |
+| `"weak"`   | `Fn::GetStackOutput`              | none — a plain output                       |
+| `"both"`   | `Fn::GetStackOutput`              | published but unimported — a migration step |
+
+Unconfigured, CDK behaves as `"strong"` and warns that the choice was never made. `"weak"` is CDK's recommended value. The table describes same-account, same-region references; see [CDK's reference-strength docs](https://github.com/aws/aws-cdk/blob/main/packages/aws-cdk-lib/README.md#reference-strength) for the cross-region mechanism (copied SSM parameters, not `Fn::ImportValue`) and for cross-account, which is always weak and records no Stack dependency. The flag's own description covers only the cross-region case, so it is easy to assume same-region references are unaffected — they are not.
+
+`"strong"` buys a guarantee: CloudFormation refuses to change or remove an export while another Stack imports it, so a careless producer change cannot break a live consumer. `"weak"` trades that for freedom to move — nothing is pinned, so Stacks can be refactored and destroyed independently, and a producer dropping a value a consumer still reads surfaces as a failed deploy rather than a blocked one.
+
+Long-lived systems usually want `"strong"`. Short-lived ones — ephemeral environments, stacks CI builds and tears down on every run — usually want `"weak"`, where a lingering export is a common cause of a teardown that will not complete. ComposureCDK's own examples set `"weak"` for that reason; see [`packages/examples/cdk.json`](../packages/examples/cdk.json).
+
+Two things hold whichever strength you pick. Same-account references record a Stack dependency, so the producer deploys first — `cdk deploy` includes upstream dependencies unless you pass `--exclusively`. And cross-stack references are still worth avoiding where you can: co-locate components that are tightly coupled, and keep cross-stack references for stable interfaces between loosely coupled groups.
+
+### Migrating from strong to weak
+
+Two deploys, not one, because a producer cannot drop an export while a consumer still imports it:
+
+1. Set the flag to `"both"`. The producer keeps its export and gains an output; consumers switch to `Fn::GetStackOutput`.
+2. Deploy everywhere. CDK warns while you are here — `"both"` is a transitional state, not a destination.
+3. Set the flag to `"weak"` and deploy again. The export goes, now that nothing imports it.
+
+Going the other way, weak to strong, is a single deploy.
 
 ## Per-Output Stack Routing
 

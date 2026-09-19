@@ -74,9 +74,10 @@ dual-publishing rule in origin.** Its hazard is not confined to the linted
 package: any _dependency_ can turn up twice in a process — two versions npm
 could not dedup, a bundler that duplicated one, a dual-published package whose
 halves both loaded. None of that is visible from the linted source, so a
-single-format consumer still wants the rule on. Only its relative-import half is
-specific to dual publishing, and that is an option on the rule rather than a
-tier ([#450](https://github.com/laazyj/composureCDK/issues/450)).
+single-format consumer still wants the rule on. Its relative-import half is
+narrower — it needs only that nothing can install the linted package twice,
+which is not the same as shipping one module format — so it is an option on the
+rule rather than a tier ([#450](https://github.com/laazyj/composureCDK/issues/450)).
 
 ### Semver
 

@@ -15,7 +15,12 @@ import { chainRoot, importSourceOf, isCdkSource, unwrapWrappers } from "./lib/im
  * skipped, a guard quietly bypassed, and no error to trace. Use a `Symbol.for(…)`
  * brand instead, which is shared across copies.
  *
- * A relative import is no safer: it resolves separately in each copy.
+ * A relative import is no safer by default: it resolves separately in each copy.
+ * A package nothing can install twice may say so with
+ * `assumeNeverInstalledAsADependency`, which treats its own modules as
+ * same-realm while still flagging dependencies. An application is the archetype;
+ * being private is not enough, since a private package can still be a
+ * dependency.
  *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-realm-bound-instanceof.md | the rule documentation}.
  */
@@ -23,9 +28,23 @@ export const rule: Rule.RuleModule = {
   meta: {
     type: "problem",
     docs: {
-      description: "Ban realm-bound `instanceof` against imported classes in dual-published source",
+      description: "Ban realm-bound `instanceof` against imported classes",
     },
-    schema: [],
+    schema: [
+      {
+        type: "object",
+        properties: {
+          assumeNeverInstalledAsADependency: {
+            type: "boolean",
+            description:
+              "Exempt this package's own relative imports, on the basis that nothing can " +
+              "install it twice. An application's claim to make; a library must not, since a " +
+              "consumer can install two versions of it side by side.",
+          },
+        },
+        additionalProperties: false,
+      },
+    ],
     messages: {
       cdkClass:
         "`instanceof {{name}}` is realm-bound and silently returns false across the ESM/CJS copy " +
@@ -38,6 +57,10 @@ export const rule: Rule.RuleModule = {
     },
   },
   create(ctx) {
+    const { assumeNeverInstalledAsADependency = false } = (ctx.options[0] ?? {}) as {
+      assumeNeverInstalledAsADependency?: boolean;
+    };
+
     return {
       BinaryExpression(node: BinaryExpression) {
         if (node.operator !== "instanceof") return;
@@ -46,6 +69,10 @@ export const rule: Rule.RuleModule = {
 
         const source = importSourceOf(ctx.sourceCode.getScope(node), root.name);
         if (source === undefined) return;
+        // A relative specifier resolves inside this package, so it duplicates
+        // only if the package itself does. Deliberately not `#` subpaths: the
+        // `imports` field can map one to an external package.
+        if (assumeNeverInstalledAsADependency && source.startsWith(".")) return;
 
         // Name the class, not the namespace it was reached through:
         // `cdk.aws_s3.Bucket` is "Bucket", and the cdk message interpolates

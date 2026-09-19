@@ -46,12 +46,12 @@ ruleTester.run("no-realm-bound-instanceof", rule, {
       `,
     },
     {
-      name: "assumeSingleInstance: a relative import is same-realm",
+      name: "assumeNeverInstalledAsADependency: a relative import is same-realm",
       code: `
         import { StatementBuilder } from "./statement-builder.js";
         export const is = (v) => v instanceof StatementBuilder;
       `,
-      options: [{ assumeSingleInstance: true }],
+      options: [{ assumeNeverInstalledAsADependency: true }],
     },
   ],
   invalid: [
@@ -123,30 +123,30 @@ ruleTester.run("no-realm-bound-instanceof", rule, {
       errors: [{ messageId: "cdkClass", data: { name: "S3Bucket" } }],
     },
     {
-      name: "assumeSingleInstance does not excuse a bare specifier",
+      name: "assumeNeverInstalledAsADependency does not excuse a bare specifier",
       code: `
         import { Bucket } from "aws-cdk-lib/aws-s3";
         export const is = (v) => v instanceof Bucket;
       `,
-      options: [{ assumeSingleInstance: true }],
+      options: [{ assumeNeverInstalledAsADependency: true }],
       errors: [{ messageId: "cdkClass" }],
     },
     {
-      name: "assumeSingleInstance does not excuse a dependency's own class",
+      name: "assumeNeverInstalledAsADependency does not excuse a dependency's own class",
       code: `
         import { StatementBuilder } from "@composurecdk/iam";
         export const is = (v) => v instanceof StatementBuilder;
       `,
-      options: [{ assumeSingleInstance: true }],
+      options: [{ assumeNeverInstalledAsADependency: true }],
       errors: [{ messageId: "ownClass" }],
     },
     {
-      name: "a `#` subpath is flagged even with assumeSingleInstance — it can map to a dependency",
+      name: "a `#` subpath is flagged even with assumeNeverInstalledAsADependency — it can map to a dependency",
       code: `
         import { Thing } from "#internal/thing.js";
         export const is = (v) => v instanceof Thing;
       `,
-      options: [{ assumeSingleInstance: true }],
+      options: [{ assumeNeverInstalledAsADependency: true }],
       errors: [{ messageId: "ownClass" }],
     },
     {

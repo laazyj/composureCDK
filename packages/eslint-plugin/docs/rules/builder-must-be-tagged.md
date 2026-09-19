@@ -2,7 +2,7 @@
 
 Flags `Builder()` or `IBuilder<…>` imported from `@composurecdk/core` in a library builder, where the tagged equivalents belong.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `internal` (`error`)
 
 ## Why
 

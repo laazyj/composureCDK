@@ -76,11 +76,44 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
-    // The preset registers the plugin itself, so no `plugins` entry is needed
-    // here. It declares no `files` by design — scoping it to library source is
-    // the consumer's call, and this is ours.
+    // All four presets: this repo writes builders (`recommended`), publishes them
+    // for others to compile against (`libraryAuthor`), ships both module formats
+    // (`dualPublishing`), and owns the house rules (`internal`). A consumer takes
+    // only the tiers true for them — a CDK application, for instance, takes
+    // `recommended` alone. Each registers the same plugin object, so combining
+    // them is not a redefinition.
+    //
+    // No preset declares `files` by design — scoping to library source is the
+    // consumer's call, and this is ours.
     files: ["packages/*/src/**/*.ts"],
+    ignores: ["packages/examples/src/**/*.ts", "packages/cdk-testing/src/**/*.ts"],
+    extends: [
+      composurecdk.configs.recommended,
+      composurecdk.configs.libraryAuthor,
+      composurecdk.configs.dualPublishing,
+      composurecdk.configs.internal,
+    ],
+  },
+  {
+    // The examples are CDK applications: they publish nothing, emit no `.d.ts`
+    // anyone compiles against, and ship one module format. So they take the one
+    // tier that describes them — which is also what a consumer's own app takes.
+    files: ["packages/examples/src/**/*.ts"],
     extends: [composurecdk.configs.recommended],
+  },
+  {
+    // Shared test helpers: private, built by plain `tsc` to one format, so the
+    // dual-publishing rules do not apply. The other tiers do — 17 packages
+    // compile against its `.d.ts`, and because their `test` target depends on
+    // `^build`, its code also runs under every one of their aws-cdk-lib floors.
+    // It declares no floor of its own but inherits the strictest of theirs,
+    // which is why `internal` stays on.
+    files: ["packages/cdk-testing/src/**/*.ts"],
+    extends: [
+      composurecdk.configs.recommended,
+      composurecdk.configs.libraryAuthor,
+      composurecdk.configs.internal,
+    ],
   },
   {
     // The ADR-0018 type-level guards declare a `const` purely so its type
@@ -92,17 +125,6 @@ export default defineConfig(
     files: ["packages/*/test/**/*.ts"],
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { varsIgnorePattern: "^_" }],
-    },
-  },
-  {
-    // The examples are application entry points, not library internals: they
-    // build at the root of an App or Stack, where there is no enclosing
-    // component and so no context to forward. Every `.build(app, "…")` there
-    // would trip the rule for no reason, which is consumer-shaped code
-    // behaving correctly rather than a defect to fix.
-    files: ["packages/examples/src/**/*.ts"],
-    rules: {
-      "composurecdk/lifecycle-build-must-forward-context": "off",
     },
   },
   {

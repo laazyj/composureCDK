@@ -65,3 +65,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0016: Encapsulate SDK-only operations as domain actions on the owning builder](0016-domain-action-custom-resource.md)
 - [ADR-0017: Template-text validity as an opt-in Aspect, not builder enforcement](0017-template-text-policy.md)
 - [ADR-0018: Re-declared builder props take their type from the CDK prop](0018-re-declared-props-track-cdk-prop-types.md)
+- [ADR-0019: Lint rules as public contract — preset tiers and rule semver](0019-lint-rules-as-public-contract.md)

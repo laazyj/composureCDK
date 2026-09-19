@@ -2,7 +2,7 @@
 
 Flags the TypeScript `private` modifier on a class member, in favour of an ECMAScript `#` private field.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `libraryAuthor` (`error`)
 - **Decision:** [ADR-0001](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0001-builder-type-emission.md)
 
 ## Why

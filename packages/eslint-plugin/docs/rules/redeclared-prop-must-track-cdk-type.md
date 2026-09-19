@@ -2,7 +2,7 @@
 
 Flags a re-declared CDK prop that pins a named CDK interface inside `Resolvable<…>` instead of reading the type from CDK's own prop.
 
-- **Severity in `recommended`:** `error`
+- **Preset:** `libraryAuthor` (`error`)
 - **Decision:** [ADR-0018](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0018-re-declared-props-track-cdk-prop-types.md)
 
 ## Why

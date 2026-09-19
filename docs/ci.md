@@ -96,7 +96,7 @@ The trimmed-away work cannot tell you whether the examples deploy. The Node 20/2
 
 ## Versioning
 
-Fixed versioning across all packages — when any package changes, all bump together, so `@composurecdk/apigateway@0.5.0` always works with `@composurecdk/core@0.5.0`. `@composurecdk/examples` is versioned alongside the rest but marked `"private": true` so it is never published.
+Fixed versioning across all packages — when any package changes, all bump together, so `@composurecdk/apigateway@0.5.0` always works with `@composurecdk/core@0.5.0`. `@composurecdk/examples`, `@composurecdk/cdk-testing` and `@composurecdk/module-compat` are versioned alongside the rest but marked `"private": true`, so they are never published.
 
 Bumps are derived from [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) since the previous tag:
 
@@ -217,7 +217,7 @@ Publishing uses [trusted publishers](https://docs.npmjs.com/trusted-publishers/)
 **Adding a new package:**
 
 1. Add `"publishConfig": { "access": "public" }` to its `package.json`.
-2. Publish only the new package once (full `release publish` would fail on already-published packages):
+2. Publish only the new package once. A full `npx nx release publish` also works — nx skips any package whose current version is already on the registry — but naming the project keeps the blast radius to the one package you intend to publish:
 
    ```sh
    # Option A: automation token

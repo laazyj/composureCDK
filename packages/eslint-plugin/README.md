@@ -2,7 +2,11 @@
 
 Internal ESLint plugin encoding ComposureCDK architectural invariants — tagged builders, lifecycle context, builder copy state.
 
-Not yet published (`"private": true`), but held to the same packaging bar as the published `@composurecdk/*` packages: it ships a dual ESM/CommonJS build produced by `tshy`, its `exports` map is generated rather than hand-written, and `check:exports` (`attw` + `publint`) and the `@composurecdk/module-compat` resolution suite gate it on every `npm run verify`. See [ADR-0007](../../docs/adr/0007-dual-esm-cjs-publishing.md#amendment-2026-09-18-eslint-plugin-joins-the-standard).
+```sh
+npm install --save-dev @composurecdk/eslint-plugin
+```
+
+Ships a dual ESM/CommonJS build, so it loads from either kind of flat config. Rule names, messages, preset names and option names are public API — see [Versioning](#versioning).
 
 ## Usage
 

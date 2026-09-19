@@ -15,7 +15,10 @@ import { chainRoot, importSourceOf, isCdkSource, unwrapWrappers } from "./lib/im
  * skipped, a guard quietly bypassed, and no error to trace. Use a `Symbol.for(…)`
  * brand instead, which is shared across copies.
  *
- * A relative import is no safer: it resolves separately in each copy.
+ * A relative import is no safer by default: it resolves separately in each copy.
+ * A package that genuinely cannot load twice — an application, which nothing
+ * installs as a dependency — may say so with `assumeSingleInstance`, which
+ * treats its own modules as same-realm while still flagging dependencies.
  *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-realm-bound-instanceof.md | the rule documentation}.
  */
@@ -25,7 +28,13 @@ export const rule: Rule.RuleModule = {
     docs: {
       description: "Ban realm-bound `instanceof` against imported classes in dual-published source",
     },
-    schema: [],
+    schema: [
+      {
+        type: "object",
+        properties: { assumeSingleInstance: { type: "boolean" } },
+        additionalProperties: false,
+      },
+    ],
     messages: {
       cdkClass:
         "`instanceof {{name}}` is realm-bound and silently returns false across the ESM/CJS copy " +
@@ -38,6 +47,10 @@ export const rule: Rule.RuleModule = {
     },
   },
   create(ctx) {
+    const { assumeSingleInstance = false } = (ctx.options[0] ?? {}) as {
+      assumeSingleInstance?: boolean;
+    };
+
     return {
       BinaryExpression(node: BinaryExpression) {
         if (node.operator !== "instanceof") return;
@@ -46,6 +59,10 @@ export const rule: Rule.RuleModule = {
 
         const source = importSourceOf(ctx.sourceCode.getScope(node), root.name);
         if (source === undefined) return;
+        // A relative specifier resolves inside this package, so it duplicates
+        // only if the package itself does. Deliberately not `#` subpaths: the
+        // `imports` field can map one to an external package.
+        if (assumeSingleInstance && source.startsWith(".")) return;
 
         // Name the class, not the namespace it was reached through:
         // `cdk.aws_s3.Bucket` is "Bucket", and the cdk message interpolates

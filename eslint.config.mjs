@@ -100,6 +100,12 @@ export default defineConfig(
     // tier that describes them — which is also what a consumer's own app takes.
     files: ["packages/examples/src/**/*.ts"],
     extends: [composurecdk.configs.recommended],
+    rules: {
+      // Nothing installs an application as a dependency, so it genuinely loads
+      // once and its own relative imports cannot duplicate. A library must not
+      // make this claim — see the rule's documentation.
+      "composurecdk/no-realm-bound-instanceof": ["error", { assumeSingleInstance: true }],
+    },
   },
   {
     // Shared test helpers: private, built by plain `tsc` to one format, so the

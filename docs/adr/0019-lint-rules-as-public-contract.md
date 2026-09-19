@@ -107,11 +107,18 @@ tier ([#450](https://github.com/laazyj/composureCDK/issues/450)).
   presets, since that makes its severity depend on extend order. The other lists
   the rules deliberately in no preset — awaiting the next major — so that
   "waiting" stays distinguishable from "forgotten".
-- `packages/examples` is the first consumer of the split inside this repo. The
-  examples are CDK applications — they publish nothing and emit no `.d.ts` — so
-  they take `recommended` alone, and the rule override that silenced
-  `lifecycle-build-must-forward-context` across all of `packages/examples/src`
-  is deleted rather than kept. The tier says what the override used to.
+- This repo is the split's first consumer, and its own packages take three
+  different tier sets. Libraries take all four. `packages/examples` takes
+  `recommended` alone — the examples are CDK applications, publishing nothing
+  and emitting no `.d.ts` — which deletes the rule override that had silenced
+  `lifecycle-build-must-forward-context` across the whole package. The tier now
+  says what the override used to.
+- `packages/cdk-testing` is the interesting case: single-format, so the
+  dual-publishing rules are off, but `internal` stays. It declares no
+  `aws-cdk-lib` floor, yet 17 floor-declaring packages depend on it and their
+  `test` target depends on `^build`, so its code runs under every one of their
+  floors. A package inherits the strictest floor of anything that depends on
+  it, which is not visible from its own manifest.
 - Each rule's documentation page and the README table both name the rule's tier,
   and both are asserted against `configs`. A tier move is breaking, so the pages
   a consumer reads to choose a tier cannot quietly disagree with the code.

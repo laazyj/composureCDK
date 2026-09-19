@@ -86,7 +86,7 @@ export default defineConfig(
     // No preset declares `files` by design — scoping to library source is the
     // consumer's call, and this is ours.
     files: ["packages/*/src/**/*.ts"],
-    ignores: ["packages/examples/src/**/*.ts"],
+    ignores: ["packages/examples/src/**/*.ts", "packages/cdk-testing/src/**/*.ts"],
     extends: [
       composurecdk.configs.recommended,
       composurecdk.configs.libraryAuthor,
@@ -100,6 +100,20 @@ export default defineConfig(
     // tier that describes them — which is also what a consumer's own app takes.
     files: ["packages/examples/src/**/*.ts"],
     extends: [composurecdk.configs.recommended],
+  },
+  {
+    // Shared test helpers: private, built by plain `tsc` to one format, so the
+    // dual-publishing rules do not apply. The other tiers do — 17 packages
+    // compile against its `.d.ts`, and because their `test` target depends on
+    // `^build`, its code also runs under every one of their aws-cdk-lib floors.
+    // It declares no floor of its own but inherits the strictest of theirs,
+    // which is why `internal` stays on.
+    files: ["packages/cdk-testing/src/**/*.ts"],
+    extends: [
+      composurecdk.configs.recommended,
+      composurecdk.configs.libraryAuthor,
+      composurecdk.configs.internal,
+    ],
   },
   {
     // The ADR-0018 type-level guards declare a `const` purely so its type

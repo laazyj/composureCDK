@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/cdk-testing",
-  "version": "0.9.5",
+  "version": "0.10.0",
   "description": "Internal CDK-aware test helpers shared across the @composurecdk/* suites (stack fixtures, synthesised-policy JSON, type-level assignability guards).",
   "private": true,
   "repository": {

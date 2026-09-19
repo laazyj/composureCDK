@@ -1,3 +1,81 @@
+## 0.10.0 (2026-09-19)
+
+### 🚀 Features
+
+- **cdk-testing:** add private shared test-helper package ([2720ed8](https://github.com/laazyj/composureCDK/commit/2720ed8))
+- **cdk-testing:** add buildFixture, the Tier B build-and-synthesise helper ([dc02651](https://github.com/laazyj/composureCDK/commit/dc02651))
+- **cloudformation:** check AWS::CloudFront::Function functionCode by default ([#415](https://github.com/laazyj/composureCDK/pull/415), [#414](https://github.com/laazyj/composureCDK/issues/414))
+- **cloudformation:** check AWS::CloudFront::KeyValueStore comment by default ([#417](https://github.com/laazyj/composureCDK/pull/417), [#416](https://github.com/laazyj/composureCDK/issues/416))
+- **cloudfront:** warn on bucket-wide expiry on an origin bucket ([#443](https://github.com/laazyj/composureCDK/pull/443), [#440](https://github.com/laazyj/composureCDK/issues/440))
+- **ec2:** make InstanceBuilder a grantee builder ([#487](https://github.com/laazyj/composureCDK/pull/487), [#486](https://github.com/laazyj/composureCDK/issues/486))
+- **eslint-plugin:** flag a re-declared prop that pins a CDK interface ([bb4c581](https://github.com/laazyj/composureCDK/commit/bb4c581))
+- **eslint-plugin:** add no-typescript-private-modifier ([#490](https://github.com/laazyj/composureCDK/pull/490))
+- ⚠️ **neptune:** migrate cluster access to consumer-side grants ([#420](https://github.com/laazyj/composureCDK/pull/420), [#372](https://github.com/laazyj/composureCDK/issues/372))
+
+### 🩹 Fixes
+
+- ship LICENSE with every published package ([2a4568a](https://github.com/laazyj/composureCDK/commit/2a4568a))
+- **apigateway:** read apiDefinition type from CDK's own prop ([c2c31fb](https://github.com/laazyj/composureCDK/commit/c2c31fb))
+- **ci:** install peer deps in cdk-floors enforce ([ba5c90c](https://github.com/laazyj/composureCDK/commit/ba5c90c))
+- **dynamodb:** read encryptionKey and encryption types from CDK's own props ([6f90b9d](https://github.com/laazyj/composureCDK/commit/6f90b9d))
+- **ec2:** read cross-component prop types from CDK's own props ([b3c1a7a](https://github.com/laazyj/composureCDK/commit/b3c1a7a))
+- **eslint-plugin:** make configs.recommended a real flat config ([#484](https://github.com/laazyj/composureCDK/pull/484), [#480](https://github.com/laazyj/composureCDK/issues/480))
+- **events:** accept every log group CDK's own CloudWatchLogGroup target takes ([86a4a09](https://github.com/laazyj/composureCDK/commit/86a4a09))
+- **events:** read every target helper's resource type from CDK's own constructor ([#451](https://github.com/laazyj/composureCDK/pull/451))
+- **iam:** read assumedBy and permissionsBoundary types from CDK's own props ([dfe4d35](https://github.com/laazyj/composureCDK/commit/dfe4d35))
+- **lambda:** read role and stream onFailure types from CDK's own props ([455bed0](https://github.com/laazyj/composureCDK/commit/455bed0))
+- **lambda:** read the log group ARN from wherever the installed CDK keeps it ([#436](https://github.com/laazyj/composureCDK/issues/436))
+- **neptune:** read securityGroups and vpc types from CDK's own props ([7499d25](https://github.com/laazyj/composureCDK/commit/7499d25))
+- **route53:** accept every role CDK's own delegation record takes ([8e79294](https://github.com/laazyj/composureCDK/commit/8e79294))
+- **route53:** read alias-target resource types from CDK's own constructors ([#452](https://github.com/laazyj/composureCDK/pull/452))
+- **s3:** accept every distribution CDK's own BucketDeploymentProps takes ([f7fa645](https://github.com/laazyj/composureCDK/commit/f7fa645))
+- **ses:** read the receipt rule action type from CDK's own prop ([f7f2317](https://github.com/laazyj/composureCDK/commit/f7f2317))
+- **ses:** read action and zone types from CDK's own props ([6d752ac](https://github.com/laazyj/composureCDK/commit/6d752ac))
+- **ses:** build the provider Runtime inside the function ([b484385](https://github.com/laazyj/composureCDK/commit/b484385))
+- **sns:** read TopicBuilderProps.masterKey type from CDK's own prop ([ddc8e0c](https://github.com/laazyj/composureCDK/commit/ddc8e0c))
+- **sqs:** read encryptionMasterKey type from CDK's own prop ([7feaf82](https://github.com/laazyj/composureCDK/commit/7feaf82))
+
+### 🔥 Performance
+
+- **nx:** exclude test files from dependents' build inputs ([#474](https://github.com/laazyj/composureCDK/pull/474), [#467](https://github.com/laazyj/composureCDK/issues/467))
+
+### ⚠️ Breaking Changes
+
+- **neptune:** migrate cluster access to consumer-side grants ([#420](https://github.com/laazyj/composureCDK/pull/420), [#372](https://github.com/laazyj/composureCDK/issues/372))
+  `allowAccessFrom(peer)` and the exported `ClusterAccessor`
+  type are removed. Declare the two halves separately — the network path on
+  the cluster, the IAM grant on the grantee:
+  ```ts
+  // Before
+  graph: createClusterBuilder().allowAccessFrom(
+    ref<InstanceBuilderResult>("bastion").get("instance"),
+  ),
+  // { graph: ["network", "bastion"] }
+  // After
+  graph: createClusterBuilder().allowDefaultPortFrom(
+    ref<SecurityGroupBuilderResult>("bastionSg").get("securityGroup"),
+  ),
+  bastionRole: createServiceRoleBuilder("ec2.amazonaws.com").grant(
+    clusterGrants.connect(ref<ClusterBuilderResult>("graph").get("cluster")),
+  ),
+  // { graph: ["network", "bastionSg"], bastionRole: ["graph"] }
+  ```
+  `allowDefaultPortFrom` takes a plain `IConnectable` — prefer the peer's
+  security group over the peer itself, since naming a compute component
+  makes the cluster depend on it. The IAM grant must go on a builder that
+  accepts grants, so where the old call granted a construct that owns a role
+  (an EC2 instance), give that construct an explicit role component and put
+  the grant there. Deployed permissions are unchanged — the same
+  `neptune-db:*` and the same ingress rule — only the logical IDs move. With
+  `.iamAuthentication(false)` the network rule is the whole grant: drop the
+  `clusterGrants.connect` call, which the alpha L2 rejects at synth rather
+  than emitting an inert policy.
+
+### 💀 Thank You
+
+- Claude
+- Jason Duffett
+
 ## 0.9.5 (2026-08-21)
 
 ### 🚀 Features

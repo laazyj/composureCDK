@@ -109,8 +109,9 @@ export const rule: Rule.RuleModule = {
       pinnedType:
         "`{{prop}}` re-declares a prop omitted from `{{base}}`, but pins `{{pinned}}` — the " +
         "builder stops accepting what CDK accepts as soon as CDK widens the prop. Read the type " +
-        'from CDK\'s own prop instead: `Resolvable<NonNullable<{{base}}["{{prop}}"]>>` (ADR-0018). ' +
-        "Keep the indexed access inline — a named alias reintroduces ADR-0001's TS2883.",
+        'from CDK\'s own prop instead: `Resolvable<NonNullable<{{base}}["{{prop}}"]>>`. ' +
+        "Keep the indexed access inline — extracting it to a named alias puts an unnameable " +
+        "type into the emitted declaration.",
     },
   },
   create(ctx) {

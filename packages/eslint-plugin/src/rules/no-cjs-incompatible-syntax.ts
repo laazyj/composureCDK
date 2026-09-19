@@ -28,11 +28,11 @@ export const rule: Rule.RuleModule = {
     schema: [],
     messages: {
       importMeta:
-        "`import.meta` cannot be emitted to CommonJS. Every package is dual-published (ADR-0007) — " +
-        "avoid `import.meta` in library `src/`.",
+        "`import.meta` has no CommonJS equivalent, so it breaks the CommonJS half of a " +
+        "dual-published build. Take the value from a parameter or a caller instead.",
       topLevelAwait:
-        "Top-level `await` cannot be emitted to CommonJS. Every package is dual-published (ADR-0007) — " +
-        "move the `await` inside an async function.",
+        "Top-level `await` has no CommonJS equivalent, so it breaks the CommonJS half of a " +
+        "dual-published build. Move the `await` inside an async function.",
     },
   },
   create(ctx) {

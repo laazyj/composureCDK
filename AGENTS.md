@@ -66,7 +66,7 @@ Each entry carries a `status`, the `recommended` value it was decided against, a
 
 - `adopted` — set in [`packages/examples/cdk.json`](packages/examples/cdk.json), with the value. `check` asserts the two agree; [`app-context.test.ts`](packages/examples/test/app-context.test.ts) keeps the third copy, `EXAMPLE_CONTEXT`, in step.
 - `declined` — a deliberate no.
-- `no-effect` — setting it changes no example stack's template. This is evidence rather than judgement: `npm run cdk-flags:audit` re-measures it. Read it narrowly — it says nothing changes in the 14 stacks we ship, not that the flag cannot affect a builder no example exercises. Where the real reason is that a builder already guarantees the flag's intent, say so in `because` instead of leaning on the shared reason.
+- `no-effect` — setting it changes no example stack's template or stack-level tags. This is evidence rather than judgement: `npm run cdk-flags:audit` re-measures it. Both are compared: stack tags live on the assembly artifact rather than in the template, so a template-only diff was blind to them. Read it narrowly — it says nothing changes in the 14 stacks we ship, not that the flag cannot affect a builder no example exercises. Where the real reason is that a builder already guarantees the flag's intent, say so in `because` instead of leaning on the shared reason.
 
 `audit` is manual rather than part of `verify` because it synthesises the whole example app once per flag — the same split as `cdk-floors establish` versus `cdk-floors check`. Run it after a CDK upgrade, and whenever an example starts exercising something it did not before.
 

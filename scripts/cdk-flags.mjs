@@ -13,14 +13,16 @@
  *   flags are set and to what. Cheap; wired into `npm run verify`.
  * - `audit` is the evidence behind the `no-effect` verdicts: it synthesises
  *   every example stack once per flag at that flag's recommended value and
- *   diffs the templates against the baseline. It checks the manifest's
- *   evidence-based claims — that a `no-effect` flag really changes nothing.
- *   Measured one flag at a time, so "no effect alone, effective once another is
- *   adopted" is out of its reach. `declined` is a judgement
- *   the templates cannot confirm (the two validation-report flags change a
- *   build gate, not a template), so it is not measured. Slow (one synth of the
- *   whole app per flag), so it is manual rather than part of `verify` — the same
- *   split as `cdk-floors establish` versus `cdk-floors check`.
+ *   diffs each stack's template *and its stack-level tags* against the baseline.
+ *   Tags are in there because they live on the assembly artifact rather than in
+ *   the template, so a template-only diff cannot see them. It checks the
+ *   manifest's evidence-based claims — that a `no-effect` flag really changes
+ *   nothing. Measured one flag at a time, so "no effect alone, effective once
+ *   another is adopted" is out of its reach. `declined` is a judgement synthesis
+ *   cannot confirm (the two validation-report flags change a build gate, not a
+ *   stack), so it is not measured. Slow (one synth of the whole app per flag),
+ *   so it is manual rather than part of `verify` — the same split as
+ *   `cdk-floors establish` versus `cdk-floors check`.
  *
  * Usage:
  *   node scripts/cdk-flags.mjs check
@@ -75,6 +77,16 @@ function packageByModule(modules) {
     Object.entries(modules).flatMap(([pkg, cdkModules]) => cdkModules.map((m) => [m, pkg])),
   );
 }
+
+/**
+ * Context the CDK CLI supplies that synthesising programmatically does not.
+ * Without version reporting there is no `AWS::CDK::Metadata` resource in any
+ * template, so a flag whose only effect is that resource's `Analytics` blob
+ * reads as `no-effect` — `@aws-cdk/core:enableAdditionalMetadataCollection`
+ * changes 0 of 14 stacks without it and 14 of 14 with it. CI deploys via
+ * `npx cdk deploy`, which leaves reporting on, so on is the honest baseline.
+ */
+const CLI_CONTEXT = { "aws:cdk:version-reporting": true };
 
 /**
  * A module or package name reduced to letters and digits, so CDK's inconsistent
@@ -229,15 +241,41 @@ async function audit() {
   const root = join(EXAMPLES, "cdk.out", "flag-audit");
   rmSync(root, { recursive: true, force: true });
 
-  const templates = (context, tag) => {
-    const assembly = buildExampleApp(exampleApp({ outdir: join(root, tag), context })).synth();
-    return new Map(assembly.stacks.map((s) => [s.stackName, JSON.stringify(s.template)]));
+  // `@aws-cdk/core:explicitStackTags` is why the tags are in here: it silently
+  // emptied `StackBuilder.tag()` (#498) while leaving every template
+  // byte-identical, so the verdict for it read the same before the fix as after.
+  const synthesise = (context, label) => {
+    const assembly = buildExampleApp(
+      exampleApp({ outdir: join(root, label), context: { ...CLI_CONTEXT, ...context } }),
+    ).synth();
+    return new Map(
+      assembly.stacks.map((s) => [
+        s.stackName,
+        JSON.stringify({ template: s.template, tags: s.tags }),
+      ]),
+    );
   };
 
   // `exampleApp` merges EXAMPLE_CONTEXT, so this baseline is the posture the
   // examples actually deploy with — adopted flags included — not an empty
   // context. A flag's measured effect is its effect on what CI ships.
-  const baseline = templates({}, "baseline");
+  const baseline = synthesise({}, "baseline");
+
+  // The tags axis only tests anything while some example actually sets a
+  // stack-level tag — three of fourteen do. If that stops being true the
+  // comparison silently goes back to being template-only, and every verdict it
+  // underwrites becomes hollow again while the audit still passes.
+  const tagged = [...baseline.values()].filter(
+    (stack) => Object.keys(JSON.parse(stack).tags ?? {}).length > 0,
+  );
+  if (tagged.length === 0) {
+    console.error(
+      "cdk-flags audit failed — no example stack carries a stack-level tag, so comparing tags " +
+        "proves nothing. Restore a `.tag()` on an example stack, or drop the axis deliberately.",
+    );
+    process.exit(1);
+  }
+
   const disagreements = [];
   const owner = packageByModule(modules);
   const scoped = Object.keys(FLAGS).filter(
@@ -254,7 +292,7 @@ async function audit() {
 
     let changed;
     try {
-      const after = templates({ [flag]: FLAGS[flag].recommendedValue }, normalise(flag));
+      const after = synthesise({ [flag]: FLAGS[flag].recommendedValue }, normalise(flag));
       changed = [...new Set([...baseline.keys(), ...after.keys()])].filter(
         (name) => baseline.get(name) !== after.get(name),
       );
@@ -274,7 +312,7 @@ async function audit() {
 
   if (disagreements.length > 0) {
     console.error(
-      `cdk-flags audit found ${disagreements.length} manifest claim(s) the templates disagree with:\n${disagreements.join("\n")}`,
+      `cdk-flags audit found ${disagreements.length} manifest claim(s) the synthesised stacks disagree with:\n${disagreements.join("\n")}`,
     );
     process.exit(1);
   }

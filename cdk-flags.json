@@ -17,7 +17,7 @@
     "examples": [],
     "iam": ["aws-iam"],
     "kms": ["aws-kms"],
-    "lambda": ["aws-lambda", "aws-lambda-nodejs", "aws-lambda-event-sources"],
+    "lambda": ["aws-lambda", "aws-lambda-nodejs", "aws-lambda-event-sources", "triggers"],
     "logs": ["aws-logs"],
     "module-compat": [],
     "neptune": ["aws-neptune"],

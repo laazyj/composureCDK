@@ -6,6 +6,11 @@ export {
 } from "./function-builder.js";
 export { functionGrants } from "./grants.js";
 export { FUNCTION_DEFAULTS } from "./defaults.js";
+export {
+  INVOKE_ON_DEPLOY_TIMEOUT_WARNING_ID,
+  INVOKE_ON_DEPLOY_DEFAULTS,
+  type InvokeOnDeployOptions,
+} from "./invoke-on-deploy.js";
 export { type FunctionAlarmConfig, type PercentageAlarmConfig } from "./alarm-config.js";
 export { FUNCTION_ALARM_DEFAULTS } from "./alarm-defaults.js";
 export {

@@ -8,6 +8,8 @@ This package wraps `AwsCustomResource` as a builder so those calls become first-
 
 > **When a domain builder already covers the call you need, prefer it** — it scopes IAM automatically and reads as intent rather than plumbing (e.g. a future SES `.activate()`). This builder is for the long tail of one-off SDK calls that don't justify a domain builder.
 
+> **Invoking your own Lambda during deployment is a different job** — use [`.invokeOnDeploy()`](../lambda/README.md#deploy-time-invocation-invokeondeploy) on the function builder. Reaching for `onCreate: { service: "Lambda", action: "invoke" }` here **will not fail the deployment when your handler fails**: the provider only reports `FAILED` when the _SDK call_ throws, and a handler that throws still returns HTTP 200 with a `FunctionError` field, so the deploy goes green.
+
 ## Usage
 
 ```ts

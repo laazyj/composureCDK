@@ -254,25 +254,29 @@ async function audit() {
     const assembly = buildExampleApp(
       exampleApp({ outdir: join(root, label), context: { ...CLI_CONTEXT, ...context } }),
     ).synth();
-    const fingerprints = new Map(
+    return new Map(
       assembly.stacks.map((s) => [
         s.stackName,
         JSON.stringify({ template: s.template, manifest: s.manifest }),
       ]),
     );
-    return { fingerprints, stacks: assembly.stacks };
   };
 
   // `exampleApp` merges EXAMPLE_CONTEXT, so this baseline is the posture the
   // examples actually deploy with — adopted flags included — not an empty
   // context. A flag's measured effect is its effect on what CI ships.
-  const { fingerprints: baseline, stacks: baselineStacks } = synthesise({}, "baseline");
+  const baseline = synthesise({}, "baseline");
 
   // Tags are the only artifact-manifest property an example's own code sets, via
   // `StackBuilder.tag()` — three of fourteen stacks do. Everything else in there
   // is either structural (`dependencies`) or a synthesizer constant, so if the
   // tags go, nothing is left asserting that comparing the manifest has teeth.
-  if (!baselineStacks.some((s) => Object.keys(s.tags).length > 0)) {
+  //
+  // Read out of the fingerprint rather than off the artifact, so it asserts the
+  // manifest is in *what gets compared* — the property that can rot — rather
+  // than merely that some example still calls `.tag()`. CDK omits `tags`
+  // entirely when empty, so presence is the whole test.
+  if (![...baseline.values()].some((f) => JSON.parse(f).manifest.properties.tags)) {
     console.error(
       "cdk-flags audit failed — no example stack carries a stack-level tag, so nothing proves " +
         "the artifact manifest is compared at all. Restore a `.tag()` on an example stack.",
@@ -296,10 +300,7 @@ async function audit() {
 
     let changed;
     try {
-      const { fingerprints: after } = synthesise(
-        { [flag]: FLAGS[flag].recommendedValue },
-        normalise(flag),
-      );
+      const after = synthesise({ [flag]: FLAGS[flag].recommendedValue }, normalise(flag));
       changed = [...new Set([...baseline.keys(), ...after.keys()])].filter(
         (name) => baseline.get(name) !== after.get(name),
       );

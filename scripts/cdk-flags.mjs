@@ -21,16 +21,25 @@
  *   build gate, not a template), so it is not measured. Slow (one synth of the
  *   whole app per flag), so it is manual rather than part of `verify` — the same
  *   split as `cdk-floors establish` versus `cdk-floors check`.
+ * - `recommended` synthesises the examples once with every flag in CDK's
+ *   `CURRENTLY_RECOMMENDED_FLAGS` set at the same time, and fails if that
+ *   breaks. One synth, so unlike `audit` it is cheap enough for `verify` and CI.
+ *   It catches what the per-flag loop structurally cannot — flag interactions,
+ *   and flags for modules we do not wrap that still reach constructs our
+ *   builders create — and in exchange names no culprit when it fails, which is
+ *   what `audit` is for. See "CDK feature flags" in AGENTS.md for why the repo
+ *   holds itself to this.
  *
  * Usage:
  *   node scripts/cdk-flags.mjs check
+ *   node scripts/cdk-flags.mjs recommended    # requires a built examples package
  *   node scripts/cdk-flags.mjs audit          # requires a built examples package
  */
 
-import { readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { FLAGS } from "aws-cdk-lib/cx-api";
+import { CURRENTLY_RECOMMENDED_FLAGS, FLAGS } from "aws-cdk-lib/cx-api";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST = join(REPO_ROOT, "cdk-flags.json");
@@ -215,29 +224,86 @@ function check() {
   );
 }
 
-async function audit() {
-  const { modules, flags } = readManifest();
-  // The static-website example stages an asset by a path relative to the
-  // package, so synthesis has to run from there.
+/**
+ * Binds a `templates(context, tag)` function that synthesises the whole example
+ * app under `context`. The static-website example stages an asset by a path
+ * relative to the package, so synthesis has to run from there, and `dist/` has
+ * to exist — hence the explicit failure rather than a raw module-not-found.
+ */
+async function exampleSynthesiser(outRoot) {
   process.chdir(EXAMPLES);
-  const load = (file) => import(pathToFileURL(join(EXAMPLES, file)).href);
-  const { buildExampleApp } = await load("dist/src/apps.js");
-  const { exampleApp } = await load("dist/src/app-context.js");
+  const entry = join(EXAMPLES, "dist/src/apps.js");
+  if (!existsSync(entry)) {
+    console.error(`Missing ${entry} — run \`npx nx run @composurecdk/examples:build\` first.`);
+    process.exit(1);
+  }
+  const { buildExampleApp } = await import(pathToFileURL(entry).href);
+  const { exampleApp } = await import(
+    pathToFileURL(join(EXAMPLES, "dist/src/app-context.js")).href
+  );
 
-  // One full assembly per flag, so clear the tree rather than accumulating
-  // fifty stale copies across runs.
-  const root = join(EXAMPLES, "cdk.out", "flag-audit");
+  // A caller may synthesise the whole app dozens of times, so clear the tree
+  // rather than accumulating stale assemblies across runs.
+  const root = join(EXAMPLES, "cdk.out", outRoot);
   rmSync(root, { recursive: true, force: true });
 
-  const templates = (context, tag) => {
-    const assembly = buildExampleApp(exampleApp({ outdir: join(root, tag), context })).synth();
-    return new Map(assembly.stacks.map((s) => [s.stackName, JSON.stringify(s.template)]));
+  return (context, tag) => {
+    const app = buildExampleApp(exampleApp({ outdir: join(root, tag), context }));
+    const assembly = app.synth();
+    // Stack-level tags live on the assembly artifact, not in the template, so a
+    // template-only comparison is blind to them. `@aws-cdk/core:explicitStackTags`
+    // is exactly that shape — it silently emptied `StackBuilder.tag()` (#498)
+    // while leaving every template byte-identical.
+    const stacks = new Map(
+      assembly.stacks.map((s) => [
+        s.stackName,
+        JSON.stringify({ template: s.template, tags: s.tags }),
+      ]),
+    );
+    return { app, stacks };
   };
+}
+
+async function recommended() {
+  const templates = await exampleSynthesiser("flag-recommended");
+  // CDK derives CURRENTLY_RECOMMENDED_FLAGS from the flags that exist in v2, so
+  // it needs no filtering — the v2-removed ones that throw are already absent.
+  // A throw here is the finding: the examples do not hold under the posture a
+  // consumer following CDK's own advice is running.
+  // Deliberately the whole recommended set, including the flags the manifest
+  // records as `declined`. Those reasons are about this repo's own build gates,
+  // not about what a consumer's app should do — a consumer who takes CDK's
+  // advice will set them, so that is the posture worth surviving.
+  const { app, stacks } = templates(CURRENTLY_RECOMMENDED_FLAGS, "all");
+
+  // Without this the gate could pass having tested nothing: `exampleApp` merges
+  // the caller's context over EXAMPLE_CONTEXT, and if that order ever flipped,
+  // or the context stopped reaching the App, synthesis would still succeed.
+  // `cdk-floors enforce` asserts its version override bound for the same reason.
+  const unbound = Object.entries(CURRENTLY_RECOMMENDED_FLAGS).filter(
+    ([flag, value]) => JSON.stringify(app.node.tryGetContext(flag)) !== JSON.stringify(value),
+  );
+  if (unbound.length > 0) {
+    console.error(
+      `cdk-flags recommended failed — ${unbound.length} flag(s) did not reach the App, so nothing was tested:\n` +
+        unbound.map(([flag]) => `  ${flag}`).join("\n"),
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `cdk-flags recommended passed (${Object.keys(CURRENTLY_RECOMMENDED_FLAGS).length} recommended flags set and bound, ${stacks.size} stacks synthesised)`,
+  );
+}
+
+async function audit() {
+  const { modules, flags } = readManifest();
+  const templates = await exampleSynthesiser("flag-audit");
 
   // `exampleApp` merges EXAMPLE_CONTEXT, so this baseline is the posture the
   // examples actually deploy with — adopted flags included — not an empty
   // context. A flag's measured effect is its effect on what CI ships.
-  const baseline = templates({}, "baseline");
+  const { stacks: baseline } = templates({}, "baseline");
   const disagreements = [];
   const owner = packageByModule(modules);
   const scoped = Object.keys(FLAGS).filter(
@@ -254,7 +320,10 @@ async function audit() {
 
     let changed;
     try {
-      const after = templates({ [flag]: FLAGS[flag].recommendedValue }, normalise(flag));
+      const { stacks: after } = templates(
+        { [flag]: FLAGS[flag].recommendedValue },
+        normalise(flag),
+      );
       changed = [...new Set([...baseline.keys(), ...after.keys()])].filter(
         (name) => baseline.get(name) !== after.get(name),
       );
@@ -283,7 +352,7 @@ async function audit() {
   );
 }
 
-const modes = { check, audit };
+const modes = { check, recommended, audit };
 const mode = process.argv[2] ?? "";
 
 if (!Object.hasOwn(modes, mode)) {

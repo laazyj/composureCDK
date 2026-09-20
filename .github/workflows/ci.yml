@@ -132,6 +132,12 @@ jobs:
       - name: Validate example stacks
         run: npm run validate
 
+      # The consumer-facing half of the flag posture — see "CDK feature flags"
+      # in AGENTS.md. Runs after `validate` so a plain synth failure reports
+      # against the default context first, where the message is clearer.
+      - name: Synthesise under CDK's recommended feature flags
+        run: npm run cdk-flags:recommended
+
       # id: test — the coverage steps below key off whether this actually ran.
       - name: Test
         id: test

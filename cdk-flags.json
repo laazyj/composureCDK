@@ -33,7 +33,7 @@
     "sqs": ["aws-sqs"]
   },
   "statusReasons": {
-    "no-effect": "Setting it at its recommended value changes no example stack's template, measured by `cdk-flags audit`. That is evidence about what the examples ship, not a claim about every builder and prop in the library."
+    "no-effect": "Setting it at its recommended value changes no example stack's template or stack-level tags, measured by `cdk-flags audit`. That is evidence about what the examples ship \u2014 not a claim about every builder and prop, nor about effects that surface outside the synthesised assembly."
   },
   "flags": {
     "@aws-cdk/aws-apigateway:authorizerChangeDeploymentLogicalId": {

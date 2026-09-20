@@ -68,7 +68,11 @@ Each entry carries a `status`, the `recommended` value it was decided against, a
 - `declined` — a deliberate no.
 - `no-effect` — setting it changes no example stack's template. This is evidence rather than judgement: `npm run cdk-flags:audit` re-measures it. Read it narrowly — it says nothing changes in the 14 stacks we ship, not that the flag cannot affect a builder no example exercises. Where the real reason is that a builder already guarantees the flag's intent, say so in `because` instead of leaning on the shared reason.
 
-`audit` is manual rather than part of `verify` because it synthesises the whole example app once per flag — the same split as `cdk-floors establish` versus `cdk-floors check`. Run it after a CDK upgrade, and whenever an example starts exercising something it did not before.
+`npm run cdk-flags:recommended` is the consumer-facing half, and it is a gate rather than a record: it synthesises the examples once with **every** flag in CDK's `CURRENTLY_RECOMMENDED_FLAGS` set at the same time, and fails if that breaks. A builder guarantee must not depend on the consumer leaving CDK unconfigured, and a consumer who runs `cdk flags` and takes the advice is running all of them. It catches what the per-flag loop structurally cannot — flag interactions, and flags for modules we do not wrap that still reach constructs our builders create — at the cost of naming no culprit when it fails. `audit` is the bisect tool for that.
+
+Be precise about what it proves: **every example stack still synthesises**, nothing more. It does not catch a flag that changes output without throwing, and it says nothing about the builders no example exercises — around half of them. Running each package's own suite under the recommended posture is the deeper form and is not done yet.
+
+`audit` is manual rather than part of `verify` because it synthesises the whole example app once per flag. That is the same split as `cdk-floors establish` versus `cdk-floors check`. Run `audit` after a CDK upgrade, and whenever an example starts exercising something it did not before.
 
 ## Release artefacts
 

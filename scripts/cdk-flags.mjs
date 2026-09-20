@@ -13,9 +13,10 @@
  *   flags are set and to what. Cheap; wired into `npm run verify`.
  * - `audit` is the evidence behind the `no-effect` verdicts: it synthesises
  *   every example stack once per flag at that flag's recommended value and
- *   diffs each stack's template *and its stack-level tags* against the baseline.
- *   Tags are in there because they live on the assembly artifact rather than in
- *   the template, so a template-only diff cannot see them. It checks the
+ *   diffs each stack's whole cloud-assembly artifact — its template plus its
+ *   artifact manifest — against the baseline, rather than a chosen subset of its
+ *   fields, so an effect on a field nobody thought of is still visible. It
+ *   checks `cdk-flags.json`'s
  *   manifest's evidence-based claims — that a `no-effect` flag really changes
  *   nothing. Measured one flag at a time, so "no effect alone, effective once
  *   another is adopted" is out of its reach. `declined` is a judgement synthesis
@@ -241,37 +242,40 @@ async function audit() {
   const root = join(EXAMPLES, "cdk.out", "flag-audit");
   rmSync(root, { recursive: true, force: true });
 
-  // `@aws-cdk/core:explicitStackTags` is why the tags are in here: it silently
-  // emptied `StackBuilder.tag()` (#498) while leaving every template
-  // byte-identical, so the verdict for it read the same before the fix as after.
+  // `explicitStackTags` is the incident behind comparing the artifact rather than
+  // a field list: it moved `properties.tags` while leaving every template
+  // byte-identical (#498), so a template-only diff called it `no-effect`.
+  //
+  // Safe to compare wholesale because every path the artifact manifest carries is
+  // a bare filename within the outdir (`templateFile`, `additionalMetadataFile`).
+  // The absolute paths — `aws:cdk:creationStack` frames, which name this script —
+  // live in the metadata file, which the manifest only names and never inlines.
   const synthesise = (context, label) => {
     const assembly = buildExampleApp(
       exampleApp({ outdir: join(root, label), context: { ...CLI_CONTEXT, ...context } }),
     ).synth();
-    return new Map(
+    const fingerprints = new Map(
       assembly.stacks.map((s) => [
         s.stackName,
-        JSON.stringify({ template: s.template, tags: s.tags }),
+        JSON.stringify({ template: s.template, manifest: s.manifest }),
       ]),
     );
+    return { fingerprints, stacks: assembly.stacks };
   };
 
   // `exampleApp` merges EXAMPLE_CONTEXT, so this baseline is the posture the
   // examples actually deploy with — adopted flags included — not an empty
   // context. A flag's measured effect is its effect on what CI ships.
-  const baseline = synthesise({}, "baseline");
+  const { fingerprints: baseline, stacks: baselineStacks } = synthesise({}, "baseline");
 
-  // The tags axis only tests anything while some example actually sets a
-  // stack-level tag — three of fourteen do. If that stops being true the
-  // comparison silently goes back to being template-only, and every verdict it
-  // underwrites becomes hollow again while the audit still passes.
-  const tagged = [...baseline.values()].filter(
-    (stack) => Object.keys(JSON.parse(stack).tags ?? {}).length > 0,
-  );
-  if (tagged.length === 0) {
+  // Tags are the only artifact-manifest property an example's own code sets, via
+  // `StackBuilder.tag()` — three of fourteen stacks do. Everything else in there
+  // is either structural (`dependencies`) or a synthesizer constant, so if the
+  // tags go, nothing is left asserting that comparing the manifest has teeth.
+  if (!baselineStacks.some((s) => Object.keys(s.tags).length > 0)) {
     console.error(
-      "cdk-flags audit failed — no example stack carries a stack-level tag, so comparing tags " +
-        "proves nothing. Restore a `.tag()` on an example stack, or drop the axis deliberately.",
+      "cdk-flags audit failed — no example stack carries a stack-level tag, so nothing proves " +
+        "the artifact manifest is compared at all. Restore a `.tag()` on an example stack.",
     );
     process.exit(1);
   }
@@ -292,7 +296,10 @@ async function audit() {
 
     let changed;
     try {
-      const after = synthesise({ [flag]: FLAGS[flag].recommendedValue }, normalise(flag));
+      const { fingerprints: after } = synthesise(
+        { [flag]: FLAGS[flag].recommendedValue },
+        normalise(flag),
+      );
       changed = [...new Set([...baseline.keys(), ...after.keys()])].filter(
         (name) => baseline.get(name) !== after.get(name),
       );

@@ -64,7 +64,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@composurecdk/eslint-plugin": "*",
-    "@eslint-community/eslint-plugin-eslint-comments": "^4.8.0",
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
     "@eslint/js": "^10.0.1",
     "@nx/eslint-plugin": "23.2.1",
     "@nx/js": "23.2.1",

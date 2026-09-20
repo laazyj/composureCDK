@@ -33,7 +33,7 @@
     "sqs": ["aws-sqs"]
   },
   "statusReasons": {
-    "no-effect": "Setting it at its recommended value changes no example stack's template, measured by `cdk-flags audit`. That is evidence about what the examples ship, not a claim about every builder and prop in the library."
+    "no-effect": "Setting it at its recommended value changes nothing in the assembly `cdk-flags audit` synthesises \u2014 14 example stacks, roughly 20 of the ~50 builder factories, compared on each stack's template and stack-level tags. Evidence about what the examples ship, not a claim about every builder and prop, and not about deploy-time or runtime behaviour."
   },
   "flags": {
     "@aws-cdk/aws-apigateway:authorizerChangeDeploymentLogicalId": {
@@ -231,8 +231,9 @@
       "because": "CI deploys and destroys these stacks on every run, so the producer protection \"strong\" buys is the wrong trade, and a lingering export is a common cause of a teardown that will not finish. See docs/stack-management.md#cross-stack-references."
     },
     "@aws-cdk/core:enableAdditionalMetadataCollection": {
-      "status": "no-effect",
-      "recommended": true
+      "status": "declined",
+      "recommended": true,
+      "because": "Expands the usage data CDK sends AWS to include L2 property keys, BOOL/ENUM property values and method names. That is a consumer's call, not one the examples should make on their behalf by being the pattern people copy \u2014 and it churns the Analytics blob in all 14 stacks. It read `no-effect` until the audit started synthesising with version reporting on: without that there is no AWS::CDK::Metadata resource for it to touch."
     },
     "@aws-cdk/core:enablePartitionLiterals": {
       "status": "no-effect",
@@ -275,7 +276,8 @@
     },
     "@aws-cdk/customresources:installLatestAwsSdkDefault": {
       "status": "no-effect",
-      "recommended": false
+      "recommended": false,
+      "because": "CDK recommends false, which is also the unconfigured behaviour, so adopting it changes nothing \u2014 it is a structural no-op rather than an unmeasured one."
     },
     "@aws-cdk/s3-notifications:addS3TrustKeyPolicyForSnsSubscriptions": {
       "status": "no-effect",

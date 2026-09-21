@@ -49,6 +49,32 @@ const handler = createFunctionBuilder()
   .build(stack, "MyFunction");
 ```
 
+## Environment variables
+
+Each **value** in `.environment(...)` is independently `Resolvable`, so a variable can carry a sibling's output while the rest stay literal:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createRestApiBuilder, type RestApiBuilderResult } from "@composurecdk/apigateway";
+
+compose(
+  {
+    api: createRestApiBuilder().restApiName("Orders"),
+    worker: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("lambda"))
+      .environment({
+        API_URL: ref("api", (r: RestApiBuilderResult) => r.api.url),
+        LOG_LEVEL: "info",
+      }),
+  },
+  { api: [], worker: ["api"] },
+);
+```
+
+Per value rather than over the whole record, because mixing the two is the common case: wrapping the record would push every literal through the same `ref`, and through [`combine`](../core/README.md) as soon as two siblings are involved.
+
 ## Environment variable encryption
 
 Lambda encrypts environment variables at rest with an AWS-managed key. `.environmentEncryption(...)` opts into a customer-managed one, and accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system rather than a construct created before `compose`:

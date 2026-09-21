@@ -789,6 +789,57 @@ describe("FunctionBuilder", () => {
     });
   });
 
+  describe("environment", () => {
+    /** The arn a `Key` at logical id `EnvKey` renders. */
+    const KEY_ARN_TOKEN = { "Fn::GetAtt": ["EnvKeyCD7B3BF3", "Arn"] };
+
+    /** The minimum a function needs to synthesise, for the fixture's callback. */
+    const deployable = (b: ReturnType<typeof createFunctionBuilder>) =>
+      b
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"));
+
+    it("passes literal values through", () => {
+      const { template } = buildAndSynth((b) => deployable(b).environment({ LOG_LEVEL: "info" }));
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        Environment: { Variables: { LOG_LEVEL: "info" } },
+      });
+    });
+
+    it("adds no Environment when unset", () => {
+      const { template } = buildAndSynth(deployable);
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        Environment: Match.absent(),
+      });
+    });
+
+    // The rest build by hand, following `environmentEncryption` above: the
+    // referenced construct must live in the stack *and* be reachable through
+    // the build context, and `buildFixture` fixes its context before it makes
+    // the stack.
+    // Builds by hand, following `environmentEncryption` above: the referenced
+    // construct must live in the stack *and* be reachable through the build
+    // context, and `buildFixture` fixes its context before it makes the stack.
+    it("resolves a Resolvable value alongside a literal one", () => {
+      const stack = newStack();
+      const key = new Key(stack, "EnvKey");
+
+      deployable(createFunctionBuilder())
+        .environment({
+          KEY_ARN: ref("k", (r: { key: Key }) => r.key.keyArn),
+          LOG_LEVEL: "debug",
+        })
+        .build(stack, "TestFunction", { k: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Lambda::Function", {
+        Environment: { Variables: { KEY_ARN: KEY_ARN_TOKEN, LOG_LEVEL: "debug" } },
+      });
+    });
+  });
+
   describe("[COPY_STATE]", () => {
     it("preserves #customAlarms across .copy()", () => {
       const errorMetric = (fn: LambdaFunction): Metric =>

@@ -9,6 +9,7 @@ import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import type { Trigger } from "aws-cdk-lib/triggers";
 import { type IConstruct } from "constructs";
 import {
+  combine,
   COPY_STATE,
   type Grant,
   GrantQueue,
@@ -70,14 +71,15 @@ function logGroupArnOf(logGroup: NonNullable<FunctionProps["logGroup"]>, id: str
  * Configuration properties for the Lambda function builder.
  *
  * Extends the CDK {@link FunctionProps} with builder-specific options. The
- * `role` and `environmentEncryption` props are widened to {@link Resolvable}
- * so a role or key built by a sibling component can be referenced via
- * `ref(...)` at configuration time; both read their inner type from CDK's own
- * prop so they keep tracking it (ADR-0018).
+ * `role` and `environmentEncryption` are widened to {@link Resolvable}, and
+ * `environment` to a record of `Resolvable` values, so a role, key or value
+ * built by a sibling component can be referenced via `ref(...)` at
+ * configuration time. Each reads its inner type from CDK's own prop so they
+ * keep tracking it (ADR-0018).
  */
 export interface FunctionBuilderProps extends Omit<
   FunctionProps,
-  "role" | "environmentEncryption"
+  "role" | "environmentEncryption" | "environment"
 > {
   /**
    * The IAM execution role to attach to the function. When set, the builder
@@ -113,6 +115,21 @@ export interface FunctionBuilderProps extends Omit<
    * @see https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-encryption
    */
   environmentEncryption?: Resolvable<NonNullable<FunctionProps["environmentEncryption"]>>;
+
+  /**
+   * Key-value pairs the function can read from `process.env` (e.g.
+   * `.environment({ API_URL: ref("api", (r) => r.api.url), LOG_LEVEL: "info" })`).
+   *
+   * Each **value** is independently {@link Resolvable}, rather than the record
+   * as a whole, because mixing a reference with literals is the common case:
+   * wrapping the record would push every literal through the same `ref`, and
+   * through {@link combine} as soon as two siblings are involved. Matches
+   * `validationZones` in `@composurecdk/acm`.
+   *
+   * The value type is read from CDK's own prop rather than written as `string`,
+   * so it tracks `aws-cdk-lib` (ADR-0018).
+   */
+  environment?: Record<string, Resolvable<NonNullable<FunctionProps["environment"]>[string]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -446,6 +463,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     const {
       role: roleResolvable,
       environmentEncryption,
+      environment,
       recommendedAlarms: alarmConfig,
       ...functionProps
     } = this.props;
@@ -483,6 +501,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       ...(environmentEncryption !== undefined
         ? { environmentEncryption: resolve(environmentEncryption, context) }
         : {}),
+      ...(environment !== undefined ? { environment: resolve(combine(environment), context) } : {}),
     } as FunctionProps;
 
     const fn = new LambdaFunction(scope, id, mergedProps);

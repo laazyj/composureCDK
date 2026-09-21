@@ -149,8 +149,10 @@
       "recommended": false
     },
     "@aws-cdk/aws-lambda:recognizeLayerVersion": {
-      "status": "no-effect",
-      "recommended": true
+      "status": "adopted",
+      "value": true,
+      "recommended": true,
+      "because": "Folds a function's layer properties into the hash behind `fn.currentVersion`. Was `no-effect` until an example published a version: `.invokeOnDeploy()` addresses its handler by `currentVersion`, so without this a layer change leaves the version — and therefore the deploy-time invocation — pointing at stale code."
     },
     "@aws-cdk/aws-lambda:recognizeVersionProps": {
       "status": "no-effect",

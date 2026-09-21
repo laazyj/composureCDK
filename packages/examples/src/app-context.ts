@@ -16,6 +16,17 @@ import { App, type AppProps } from "aws-cdk-lib";
  */
 export const EXAMPLE_CONTEXT: Record<string, unknown> = {
   /**
+   * `fn.currentVersion`'s logical id incorporates the function's layer
+   * properties, so a layer change publishes a new version.
+   *
+   * Adopted once an example began publishing versions: `.invokeOnDeploy()`
+   * addresses its handler by `currentVersion`, and without this the version
+   * would not move when a layer did — leaving the deploy-time invocation
+   * pointing at stale code.
+   */
+  "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+
+  /**
    * Cross-stack references are weak: the consumer reads the producer's output
    * with `Fn::GetStackOutput` instead of importing a CloudFormation export.
    *

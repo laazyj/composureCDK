@@ -38,6 +38,84 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
     },
   },
   "Resources": {
+    "AWSCDKTriggerCustomResourceProviderCustomResourceProviderHandler97BECD91": {
+      "DependsOn": [
+        "AWSCDKTriggerCustomResourceProviderCustomResourceProviderRoleE18FAF0A",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "<asset-hash>.zip",
+        },
+        "Handler": "__entrypoint__.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "AWSCDKTriggerCustomResourceProviderCustomResourceProviderRoleE18FAF0A",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "AWSCDKTriggerCustomResourceProviderCustomResourceProviderRoleE18FAF0A": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+        ],
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "lambda:InvokeFunction",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "CrudApiAppseedCatalogue2B5BB9AA",
+                              "Arn",
+                            ],
+                          },
+                          ":*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "Inline",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
     "CrudApiAppapi10BB4639": {
       "Properties": {
         "Description": "Minimal REST API backed directly by DynamoDB - no Lambda in the request path",
@@ -700,6 +778,297 @@ exports[`crud-api-app > matches the expected synthesised template 1`] = `
         },
       },
       "Type": "AWS::ApiGateway::Method",
+    },
+    "CrudApiAppseedCatalogue2B5BB9AA": {
+      "DependsOn": [
+        "CrudApiAppseedCatalogueExecutionRoleDefaultPolicy80086B5B",
+        "CrudApiAppseedCatalogueExecutionRoleC352F68A",
+      ],
+      "Properties": {
+        "Code": {
+          "ZipFile": "
+const SEED = [
+  { name: "widget", description: "reference gadget seeded at deploy time" },
+  { name: "sprocket", description: "reference gadget seeded at deploy time" },
+];
+
+exports.handler = async () => {
+  const url = process.env.API_URL + "gadgets";
+  for (const gadget of SEED) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(gadget),
+    });
+    if (!response.ok) {
+      throw new Error(
+        "Seeding " + gadget.name + " failed: " + response.status + " " + (await response.text()),
+      );
+    }
+  }
+};
+",
+        },
+        "Environment": {
+          "Variables": {
+            "API_URL": {
+              "Fn::Join": [
+                "",
+                [
+                  "https://",
+                  {
+                    "Ref": "CrudApiAppapi10BB4639",
+                  },
+                  ".execute-api.",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  ".",
+                  {
+                    "Ref": "AWS::URLSuffix",
+                  },
+                  "/",
+                  {
+                    "Ref": "CrudApiAppapiDeploymentStageprod63E3B455",
+                  },
+                  "/",
+                ],
+              ],
+            },
+            "LOG_LEVEL": "info",
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "CrudApiAppseedCatalogueLogGroup2411D5E4",
+          },
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "CrudApiAppseedCatalogueExecutionRoleC352F68A",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 30,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CrudApiAppseedCatalogueCurrentVersionAAB7FB9D48cd7e00ee69ac898d058a864c717bfa": {
+      "Metadata": {
+        "aws:cdk:do-not-refactor": true,
+      },
+      "Properties": {
+        "FunctionName": {
+          "Ref": "CrudApiAppseedCatalogue2B5BB9AA",
+        },
+      },
+      "Type": "AWS::Lambda::Version",
+    },
+    "CrudApiAppseedCatalogueDeploymentTrigger": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "CrudApiAppapiAccount5B690490",
+        "CrudApiAppapiCloudWatchRole810E208F",
+        "CrudApiAppapigadgetsidDELETE7DABC736",
+        "CrudApiAppapigadgetsidGETD2E65655",
+        "CrudApiAppapigadgetsidPUTC8C63FA8",
+        "CrudApiAppapigadgetsid63850498",
+        "CrudApiAppapigadgetsGET3F9B2891",
+        "CrudApiAppapigadgetsPOSTD967DB14",
+        "CrudApiAppapigadgets8FBAE8D7",
+        "CrudApiAppapiDeploymentBBBA8FB46bdd15762d310f6d375bee5fc720052b",
+        "CrudApiAppapiDeploymentStageprod63E3B455",
+        "CrudApiAppapi10BB4639",
+        "CrudApiAppapiAccessLogsEBB08D31",
+        "CrudApiAppapiClientErrorAlarmC27B35AB",
+        "CrudApiAppapiLatencyAlarmC04E2904",
+        "CrudApiAppapiServerErrorAlarmA175324C",
+        "CrudApiAppseedCatalogueExecutionRoleDefaultPolicy80086B5B",
+        "CrudApiAppseedCatalogueExecutionRoleC352F68A",
+      ],
+      "Properties": {
+        "ExecuteOnHandlerChange": true,
+        "HandlerArn": {
+          "Ref": "CrudApiAppseedCatalogueCurrentVersionAAB7FB9D48cd7e00ee69ac898d058a864c717bfa",
+        },
+        "InvocationType": "RequestResponse",
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "AWSCDKTriggerCustomResourceProviderCustomResourceProviderHandler97BECD91",
+            "Arn",
+          ],
+        },
+        "Timeout": "60000",
+      },
+      "Type": "Custom::Trigger",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "CrudApiAppseedCatalogueDurationAlarmD82E4F2F": {
+      "Properties": {
+        "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 27000ms (90% of 30000ms timeout).",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/seed-catalogue/duration",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "CrudApiAppseedCatalogue2B5BB9AA",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Threshold": 27000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppseedCatalogueErrorsAlarmF10D99C7": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/seed-catalogue/errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "CrudApiAppseedCatalogue2B5BB9AA",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppseedCatalogueExecutionRoleC352F68A": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "CrudApiAppseedCatalogueLogGroup2411D5E4",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "CrudApiAppseedCatalogueLogGroup2411D5E4",
+                              "Arn",
+                            ],
+                          },
+                          ":log-stream:*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "LogsWriter",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CrudApiAppseedCatalogueExecutionRoleDefaultPolicy80086B5B": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CrudApiAppseedCatalogueExecutionRoleDefaultPolicy80086B5B",
+        "Roles": [
+          {
+            "Ref": "CrudApiAppseedCatalogueExecutionRoleC352F68A",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CrudApiAppseedCatalogueLogGroup2411D5E4": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiAppseedCatalogueThrottlesAlarmF700C4F4": {
+      "Properties": {
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/seed-catalogue/throttles",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "CrudApiAppseedCatalogue2B5BB9AA",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
     },
     "CrudApiApptableE9F135F3": {
       "DeletionPolicy": "Retain",

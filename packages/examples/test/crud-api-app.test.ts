@@ -109,6 +109,36 @@ describe("crud-api-app", () => {
     });
   });
 
+  it("seeds the catalogue during deployment, gated on the API being reachable", () => {
+    template.resourceCountIs("Custom::Trigger", 1);
+
+    const [trigger] = Object.values(template.findResources("Custom::Trigger")) as {
+      Properties: { InvocationType: string };
+      DependsOn?: string[];
+    }[];
+
+    // Synchronous, so a seed failure fails the deployment rather than
+    // reporting success after the fact.
+    expect(trigger.Properties.InvocationType).toBe("RequestResponse");
+
+    // `after` names the whole API component, so the wait covers the stage —
+    // the seeder calls the invoke URL, which a bare RestApi does not serve.
+    expect(trigger.DependsOn ?? []).toEqual(
+      expect.arrayContaining([expect.stringContaining("Stage")]),
+    );
+  });
+
+  it("gives the seeder the API url and its literal log level", () => {
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: {
+          API_URL: Match.objectLike({ "Fn::Join": Match.anyValue() }),
+          LOG_LEVEL: "info",
+        },
+      },
+    });
+  });
+
   it("matches the expected synthesised template", () => {
     expect(template.toJSON()).toMatchSnapshot();
   });

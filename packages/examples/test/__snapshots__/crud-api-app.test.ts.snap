@@ -859,7 +859,7 @@ exports.handler = async () => {
       },
       "Type": "AWS::Lambda::Function",
     },
-    "CrudApiAppseedCatalogueCurrentVersionAAB7FB9D48cd7e00ee69ac898d058a864c717bfa": {
+    "CrudApiAppseedCatalogueCurrentVersionAAB7FB9Dfe6536a22e0e8ec7897716b49e9e84c0": {
       "Metadata": {
         "aws:cdk:do-not-refactor": true,
       },
@@ -895,7 +895,7 @@ exports.handler = async () => {
       "Properties": {
         "ExecuteOnHandlerChange": true,
         "HandlerArn": {
-          "Ref": "CrudApiAppseedCatalogueCurrentVersionAAB7FB9D48cd7e00ee69ac898d058a864c717bfa",
+          "Ref": "CrudApiAppseedCatalogueCurrentVersionAAB7FB9Dfe6536a22e0e8ec7897716b49e9e84c0",
         },
         "InvocationType": "RequestResponse",
         "ServiceToken": {

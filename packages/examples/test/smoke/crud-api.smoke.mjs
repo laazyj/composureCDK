@@ -18,6 +18,29 @@ export default {
     const base = restApiUrl(api, region, "/gadgets");
     const marker = `smoke-${process.pid}-${Date.now()}`;
 
+    // The catalogue the stack seeded through this API during deployment, via
+    // `.invokeOnDeploy()`. Reading it back proves the deploy-time invocation
+    // actually ran and actually reached the API — a green deploy alone only
+    // proves the trigger did not report failure.
+    try {
+      const { gadgets } = await jsonRequest(base);
+      const seeded = (gadgets ?? []).filter((g) =>
+        g.description?.includes("seeded at deploy time"),
+      );
+      const names = new Set(seeded.map((g) => g.name));
+
+      if (!names.has("widget") || !names.has("sprocket")) {
+        fail(
+          `GET ${base} — deploy-time seed missing; found ${JSON.stringify([...names])} among ${(gadgets ?? []).length} gadgets`,
+        );
+        return;
+      }
+      pass(`GET ${base} — deploy-time seed present (${seeded.length} reference gadgets)`);
+    } catch (err) {
+      fail(`${base} — reading the deploy-time seed: ${err.message}`);
+      return;
+    }
+
     try {
       const created = await jsonRequest(base, {
         method: "POST",

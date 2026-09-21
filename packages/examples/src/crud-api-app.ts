@@ -1,12 +1,14 @@
-import { Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import {
   AwsIntegration,
   PassthroughBehavior,
   type MethodOptions,
 } from "aws-cdk-lib/aws-apigateway";
 import { AttributeType } from "aws-cdk-lib/aws-dynamodb";
+import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { compose, combine, ref } from "@composurecdk/core";
-import { createRestApiBuilder } from "@composurecdk/apigateway";
+import { createRestApiBuilder, type RestApiBuilderResult } from "@composurecdk/apigateway";
+import { createFunctionBuilder } from "@composurecdk/lambda";
 import { createTableBuilder, tableGrants, type TableBuilderResult } from "@composurecdk/dynamodb";
 import { createServiceRoleBuilder, type RoleBuilderResult } from "@composurecdk/iam";
 import { createKeyBuilder, type KeyBuilderResult } from "@composurecdk/kms";
@@ -121,6 +123,40 @@ const DELETE_OPERATION = gadgetIntegration(
 );
 
 /**
+ * Seeds the catalogue through the API the stack just deployed, as part of
+ * shipping it. Inline like every other example handler — `examples` is
+ * private, so there is no asset-shipping constraint, and inline keeps the
+ * behaviour readable next to the stack that runs it.
+ *
+ * It **throws** on a non-2xx. That is the whole contract of
+ * `.invokeOnDeploy()`: returning an error object here would be a successful
+ * invocation as far as Lambda is concerned, and the deployment would go green
+ * with an unseeded catalogue.
+ */
+const SEED_CATALOGUE_HANDLER = `
+const SEED = [
+  { name: "widget", description: "reference gadget seeded at deploy time" },
+  { name: "sprocket", description: "reference gadget seeded at deploy time" },
+];
+
+exports.handler = async () => {
+  const url = process.env.API_URL + "gadgets";
+  for (const gadget of SEED) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(gadget),
+    });
+    if (!response.ok) {
+      throw new Error(
+        "Seeding " + gadget.name + " failed: " + response.status + " " + (await response.text()),
+      );
+    }
+  }
+};
+`;
+
+/**
  * A minimal CRUD REST API backed directly by DynamoDB — no Lambda in the
  * request path. Each HTTP verb is wired straight to a DynamoDB action via
  * `AwsIntegration` and a VTL mapping template:
@@ -189,12 +225,28 @@ export function createCrudApiApp(app = exampleApp()) {
                 .addMethod("DELETE", DELETE_OPERATION, OK),
             ),
         ),
+
+      seedCatalogue: createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline(SEED_CATALOGUE_HANDLER))
+        .timeout(Duration.seconds(30))
+        // `api.url` does not exist until the API is built, so the value is a
+        // `ref` resolved at build time while `LOG_LEVEL` stays literal.
+        .environment({
+          API_URL: ref("api", (r: RestApiBuilderResult) => r.api.url),
+          LOG_LEVEL: "info",
+        })
+        // The whole component, not one construct out of it: the call needs the
+        // stage deployed, not merely the RestApi created.
+        .invokeOnDeploy({ after: [ref<RestApiBuilderResult>("api")] }),
     },
     {
       tableKey: [],
       table: ["tableKey"],
       apiRole: ["table"],
       api: ["table", "apiRole"],
+      seedCatalogue: ["api"],
     },
   ).build(stack, "CrudApiApp");
 

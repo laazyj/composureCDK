@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/custom-resources",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Compose-native AwsCustomResource builder for AWS operations with no CloudFormation resource",
   "repository": {
     "type": "git",

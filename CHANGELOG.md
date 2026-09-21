@@ -1,3 +1,78 @@
+## 0.10.1 (2026-09-21)
+
+### 🚀 Features
+
+- record a decision for every in-scope CDK feature flag ([d93129c](https://github.com/laazyj/composureCDK/commit/d93129c))
+- ⚠️ **eslint-plugin:** split the preset into four tiers ([#491](https://github.com/laazyj/composureCDK/pull/491))
+- **eslint-plugin:** add assumeNeverInstalledAsADependency to no-realm-bound-instanceof ([#494](https://github.com/laazyj/composureCDK/pull/494), [#450](https://github.com/laazyj/composureCDK/issues/450))
+- ⚠️ **eslint-plugin:** publish the package ([#496](https://github.com/laazyj/composureCDK/pull/496))
+- **examples:** set cross-stack reference strength explicitly to weak ([#412](https://github.com/laazyj/composureCDK/pull/412))
+- **examples:** seed the CRUD catalogue at deploy time ([e593eb6](https://github.com/laazyj/composureCDK/commit/e593eb6))
+- **lambda:** invoke a function during deployment with .invokeOnDeploy() ([c1d47ef](https://github.com/laazyj/composureCDK/commit/c1d47ef))
+- **lambda:** widen environment values to Resolvable ([af720d4](https://github.com/laazyj/composureCDK/commit/af720d4))
+
+### 🩹 Fixes
+
+- measure cdk-flags no-effect verdicts honestly ([22f1ff6](https://github.com/laazyj/composureCDK/commit/22f1ff6))
+- **cloudformation:** preserve stack-level tags ([890fc5c](https://github.com/laazyj/composureCDK/commit/890fc5c))
+- **eslint-plugin:** make rule messages actionable for consumers ([#495](https://github.com/laazyj/composureCDK/pull/495))
+- **examples:** stop cleanDeskPolicy retaining API Gateway roles ([#501](https://github.com/laazyj/composureCDK/pull/501))
+
+### ⚠️ Breaking Changes
+
+- **eslint-plugin:** publish the package ([#496](https://github.com/laazyj/composureCDK/pull/496))
+  @composurecdk/eslint-plugin is now published. Its rule
+  names, messages, preset names, option names and default severities are
+  public API from this release."
+  M docs/adr/0007-dual-esm-cjs-publishing.md
+  M docs/ci.md
+  M packages/eslint-plugin/README.md
+  M packages/eslint-plugin/package.json
+- **eslint-plugin:** split the preset into four tiers ([#491](https://github.com/laazyj/composureCDK/pull/491))
+  `configs.recommended` no longer enables
+  lifecycle-build-must-forward-context, no-typescript-private-modifier,
+  redeclared-prop-must-track-cdk-type or no-cjs-incompatible-syntax. Extend
+  `libraryAuthor` and `dualPublishing` alongside it to keep them.
+  - refactor(lint): scope the examples to the recommended tier
+    The examples are CDK applications: they publish nothing, emit no `.d.ts`
+    anyone compiles against, and ship one module format. They were taking
+    all four tiers plus a rule override silencing
+    lifecycle-build-must-forward-context across the whole package.
+    Give them the one tier that describes them, and delete the override. The
+    other rules were inert there anyway — no Builder imports, no
+    stringConstraint calls, no import.meta, and the single isCfn* use is the
+    portable guard the floor rule allows.
+  - refactor(lint): scope cdk-testing to the tiers that describe it
+    It is built by plain `tsc` to one format, so the dual-publishing rules
+    do not apply. The rest do: 17 packages compile against its `.d.ts`, and
+    since their `test` target depends on `^build`, its code also runs under
+    every one of their aws-cdk-lib floors — it declares none itself but
+    inherits the strictest of theirs."
+    A docs/adr/0019-lint-rules-as-public-contract.md
+    M docs/adr/README.md
+    M eslint.config.mjs
+    M packages/eslint-plugin/README.md
+    M packages/eslint-plugin/docs/rules/builder-must-be-tagged.md
+    M packages/eslint-plugin/docs/rules/builder-must-implement-copy-state.md
+    M packages/eslint-plugin/docs/rules/constraint-metadata-required.md
+    M packages/eslint-plugin/docs/rules/lifecycle-build-context-required.md
+    M packages/eslint-plugin/docs/rules/lifecycle-build-must-forward-context.md
+    M packages/eslint-plugin/docs/rules/no-cdk-api-above-floor.md
+    M packages/eslint-plugin/docs/rules/no-cjs-incompatible-syntax.md
+    M packages/eslint-plugin/docs/rules/no-realm-bound-instanceof.md
+    M packages/eslint-plugin/docs/rules/no-typescript-private-modifier.md
+    M packages/eslint-plugin/docs/rules/redeclared-prop-must-track-cdk-type.md
+    A packages/eslint-plugin/src/configs/presets.ts
+    D packages/eslint-plugin/src/configs/recommended.ts
+    M packages/eslint-plugin/src/index.ts
+    A packages/eslint-plugin/test/configs/presets.test.ts
+    D packages/eslint-plugin/test/configs/recommended.test.ts
+    M packages/eslint-plugin/test/docs.test.ts
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.10.0 (2026-09-19)
 
 ### 🚀 Features

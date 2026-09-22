@@ -29,7 +29,7 @@ npm run actionlint
 
 Use npx nx to run build/test scripts — this is an nx monorepo.
 
-**Install dependencies with npm 11** (`npm install -g npm@11`). npm 10 and 11 disagree on how optional peer deps are pinned in the lockfile, and ours is generated under npm 11 — so under npm 10 `npm ci` fails with `Missing: yaml@2.9.0 from lock file`, and `npm install` "fixes" it by rewriting the lockfile, stripping `libc` fields npm 11 wrote. Neither is a defect in the lockfile and neither wants committing: CI pins npm 11 across the whole Node matrix for exactly this reason (see the `Pin npm` step in [ci.yml](.github/workflows/ci.yml)). Node 20 and 22 ship npm 10, so a default install on either needs the pin.
+**Install dependencies with `npx -y npm@11 ci`.** npm refuses to install under npm 10, which Node 22 ships. Do not `npm install -g npm@11` instead: in agent sandboxes the self-upgrade fails with `Cannot find module 'promise-retry'`. In Claude Code on the web, the SessionStart hook in [`.claude/hooks/session-start.sh`](.claude/hooks/session-start.sh) runs the install and puts shellcheck on `PATH` in the background.
 
 Lint is an nx target too: `npm run lint` runs `nx run-many -t lint`, which caches per project so unchanged packages fast-succeed. Each package carries a `"lint": "eslint ."` script, so nx infers a `lint` target the same way it infers `build`/`test`/`typecheck` from package.json scripts — add that line when you create a package. Three things make this correct rather than merely fast:
 

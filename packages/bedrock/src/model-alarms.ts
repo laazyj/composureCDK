@@ -1,13 +1,10 @@
 import { Duration } from "aws-cdk-lib";
 import type { FoundationModelIdentifier } from "aws-cdk-lib/aws-bedrock";
-import { ComparisonOperator, Metric, type MetricOptions } from "aws-cdk-lib/aws-cloudwatch";
+import { Metric, type MetricOptions } from "aws-cdk-lib/aws-cloudwatch";
 import type { IConstruct } from "constructs";
-import type {
-  AlarmConfigDefaults,
-  AlarmDefinition,
-  ResolvedAlarmConfig,
-} from "@composurecdk/cloudwatch";
+import type { AlarmConfigDefaults, AlarmDefinition } from "@composurecdk/cloudwatch";
 import { resolveAlarmConfig, resolveAlarmThresholdBasis } from "@composurecdk/cloudwatch";
+import { toDefinition } from "./alarm-definition.js";
 import type { InferenceProfile } from "./inference-profile.js";
 import { isInferenceProfile } from "./inference-target.js";
 import type { ModelAlarmConfig } from "./model-alarm-config.js";
@@ -87,25 +84,6 @@ const THRESHOLD_ALARMS: Record<ThresholdAlarmKey, AlarmSpec> = {
     describe: (id, t) => `p90 time to first token for ${id} exceeds ${String(t)} ms.`,
   },
 };
-
-function toDefinition(
-  key: string,
-  metric: Metric,
-  cfg: ResolvedAlarmConfig,
-  description: string,
-): AlarmDefinition {
-  return {
-    key,
-    alarmName: cfg.alarmName,
-    metric,
-    threshold: cfg.threshold,
-    comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
-    evaluationPeriods: cfg.evaluationPeriods,
-    datapointsToAlarm: cfg.datapointsToAlarm,
-    treatMissingData: cfg.treatMissingData,
-    description,
-  };
-}
 
 function quotaAlarm(
   scope: IConstruct,

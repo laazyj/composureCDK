@@ -52,6 +52,9 @@
     "@composurecdk/cloudformation": "^0.10.0",
     "@composurecdk/cloudwatch": "^0.10.0",
     "@composurecdk/core": "^0.10.0",
+    "@composurecdk/custom-resources": "^0.10.0",
+    "@composurecdk/iam": "^0.10.0",
+    "@composurecdk/logs": "^0.10.0",
     "aws-cdk-lib": "^2.138.0",
     "constructs": "^10.0.0"
   },

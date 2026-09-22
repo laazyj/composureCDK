@@ -1,7 +1,9 @@
 import { Duration, Stack } from "aws-cdk-lib";
+import { FoundationModelIdentifier } from "aws-cdk-lib/aws-bedrock";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { SqsSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
+import { createModelAlarmBuilder, inferenceProfile, modelGrants } from "@composurecdk/bedrock";
 import { combine, compose, ref } from "@composurecdk/core";
 import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
 import { createFunctionBuilder, sqsEventSource } from "@composurecdk/lambda";
@@ -10,8 +12,45 @@ import { createQueueBuilder, type QueueBuilderResult } from "@composurecdk/sqs";
 import { exampleApp } from "./app-context.js";
 
 /**
+ * A global profile, so the stack deploys in any commercial Region whether or
+ * not the model has an in-Region or geographic profile there.
+ */
+const TRIAGE_MODEL = inferenceProfile.global(
+  new FoundationModelIdentifier("amazon.nova-2-lite-v1:0"),
+);
+
+/**
+ * Classifies each order note and logs the result for the smoke test. Failed
+ * records are reported individually so a retry re-sends only those.
+ */
+const PROCESSOR_CODE = `
+const { BedrockRuntimeClient, ConverseCommand } = require("@aws-sdk/client-bedrock-runtime");
+const client = new BedrockRuntimeClient({});
+const PROMPT = "Classify this order note as exactly one word: gift, complaint, delivery or other. Note: ";
+exports.handler = async (event) => {
+  const batchItemFailures = [];
+  for (const r of event.Records) {
+    try {
+      const res = await client.send(new ConverseCommand({
+        modelId: process.env.MODEL_ID,
+        messages: [{ role: "user", content: [{ text: PROMPT + r.body }] }],
+        inferenceConfig: { maxTokens: 10, temperature: 0 },
+      }));
+      const category = res.output.message.content[0].text.trim().toLowerCase();
+      console.log("processed order", r.body, "category=" + category);
+    } catch (err) {
+      console.error("failed to classify order", r.messageId, err);
+      batchItemFailures.push({ itemIdentifier: r.messageId });
+    }
+  }
+  return { batchItemFailures };
+};
+`;
+
+/**
  * Order intake fanned out through SNS to an SQS work queue, which feeds a
- * Lambda consumer — paired with a separate SNS alert topic for alarms.
+ * Lambda consumer that triages each order's note with an Amazon Bedrock
+ * model — paired with a separate SNS alert topic for alarms.
  * Publishers write one event to the `orderEvents` topic; SNS delivers it
  * to the `orders` queue (raw, by subscription default) and the consumer
  * drains it. New subscribers (an audit log, a fraud check) attach to the
@@ -19,9 +58,8 @@ import { exampleApp } from "./app-context.js";
  *
  * The queue gets ComposureCDK's recommended SQS alarms by default
  * (oldest-message age, in-flight near-quota); the processor gets the
- * recommended Lambda alarms (errors, throttles — the duration alarm is
- * timeout-relative and the processor leaves timeout at the CDK default,
- * so it is not emitted) plus the event-source contextual alarms
+ * recommended Lambda alarms (errors, throttles, duration against its
+ * 30-second timeout) plus the event-source contextual alarms
  * (failed-invocation, dropped-event) once the queue is wired in; a custom
  * alarm watches empty-receive rate as a low-traffic signal.
  * `alarmActionsPolicy` wires every alarm in the stack to publish to the
@@ -110,14 +148,11 @@ export function createOrderProcessorApp(app = exampleApp()) {
       processor: createFunctionBuilder()
         .runtime(Runtime.NODEJS_22_X)
         .handler("index.handler")
-        // Logs each order so the post-deploy smoke test can prove the
-        // consumer is wired and the execution role can read the queue.
-        .code(
-          Code.fromInline(
-            "exports.handler = async (event) => { for (const r of event.Records) console.log('processed order', r.body); };",
-          ),
-        )
+        .code(Code.fromInline(PROCESSOR_CODE))
         .memorySize(256)
+        .timeout(Duration.seconds(30))
+        .environment({ MODEL_ID: TRIAGE_MODEL.profileId })
+        .grant(modelGrants.invoke(TRIAGE_MODEL))
         .description("Order processor - consumes and processes order messages")
         // The event source is declared as data: `sqsEventSource` resolves
         // the sibling queue `ref` at build time and `addEventSource` grants
@@ -126,6 +161,8 @@ export function createOrderProcessorApp(app = exampleApp()) {
           "orders",
           sqsEventSource(ref("orders", (r: QueueBuilderResult) => r.queue)),
         ),
+
+      triageModelAlarms: createModelAlarmBuilder().model(TRIAGE_MODEL),
     },
     {
       alerts: [],
@@ -133,6 +170,7 @@ export function createOrderProcessorApp(app = exampleApp()) {
       orders: [],
       orderEvents: ["orders", "orderEventsDlq"],
       processor: ["orders"],
+      triageModelAlarms: [],
     },
   ).build(stack, "OrderProcessor");
 

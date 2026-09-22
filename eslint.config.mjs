@@ -11,6 +11,11 @@ export default defineConfig(
   {
     ignores: [
       "**/dist/",
+      // tshy's intermediates, written and removed during a build. A `lint` task
+      // running alongside that package's `build` otherwise walks into them and
+      // fails on files no tsconfig covers.
+      "**/.tshy/",
+      "**/.tshy-build/",
       "**/node_modules/",
       "**/cdk.out/",
       "**/coverage/",

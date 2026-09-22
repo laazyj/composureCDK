@@ -161,3 +161,13 @@ set or a hand-formatted ARN. That ARN builder also gives the helper its
 method/path/stage scoping for free, so per-method granularity needs no separate
 helper. This is a narrow exception, not a reversal — prefer a native `grant*`
 method whenever one exists.
+
+A second, narrower case is a target that is not a construct at all.
+`bedrock`'s `modelGrants.invoke` grants access to foundation models and
+cross-Region inference profiles, which CDK models as values
+(`FoundationModelIdentifier`) with no ARN builder that reaches beyond the
+stack's Region. There the helper forms ARNs with `Arn.format` and may emit more
+than one action and statement, provided each is transcribed from AWS's own
+specification — the Service Authorization Reference for actions and ARN
+formats, the service's user guide for the policy shape — rather than chosen by
+the library.

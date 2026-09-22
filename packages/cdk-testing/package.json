@@ -20,14 +20,6 @@
     "dist",
     "README.md"
   ],
-  "scripts": {
-    "lint": "eslint .",
-    "clean": "rm -rf dist",
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
   "keywords": [],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",

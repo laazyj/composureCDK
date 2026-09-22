@@ -1,0 +1,21 @@
+{
+  "name": "@composurecdk/examples",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "targets": {
+    "cdk": { "command": "cdk", "options": { "cwd": "{projectRoot}" }, "dependsOn": ["build"] },
+    "synth": {
+      "command": "cdk synth",
+      "options": { "cwd": "{projectRoot}" },
+      "dependsOn": ["build"]
+    },
+    "deploy": {
+      "command": "cdk deploy",
+      "options": { "cwd": "{projectRoot}" },
+      "dependsOn": ["build"]
+    },
+    "validate": {
+      "command": "cdk synth --quiet && node ../../scripts/check-validation-report.mjs cdk.out/validation-report.json",
+      "options": { "cwd": "{projectRoot}" }
+    }
+  }
+}

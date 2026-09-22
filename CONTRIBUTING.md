@@ -66,7 +66,10 @@ npx -y npm@11 ci
 ```
 
 This is an [nx](https://nx.dev/) monorepo; the publishable packages live under
-[`packages/`](packages/). Use `npx nx` to run targets.
+[`packages/`](packages/). nx is the only task runner — packages carry no npm
+`scripts`, and their targets are derived from each package's shape by
+[`scripts/nx-package-targets.mjs`](scripts/nx-package-targets.mjs). Use `npx nx`
+to run them; the root `npm run` scripts are thin aliases over `nx run-many`.
 
 ```sh
 # Build everything
@@ -76,8 +79,9 @@ npm run build
 npm run test
 
 # Work on a single package
-npx nx build @composurecdk/core
-npx nx test  @composurecdk/core
+npx nx build      @composurecdk/core
+npx nx test       @composurecdk/core
+npx nx test:watch @composurecdk/core
 
 # Run the example stacks (synth/unit tests)
 npx nx test @composurecdk/examples

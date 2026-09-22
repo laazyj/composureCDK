@@ -8,13 +8,6 @@
     "url": "git+https://github.com/laazyj/composureCDK.git",
     "directory": "packages/module-compat"
   },
-  "scripts": {
-    "lint": "eslint .",
-    "clean": "rm -rf node_modules/.vite",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
   "keywords": [],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",

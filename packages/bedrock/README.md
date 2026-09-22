@@ -107,9 +107,28 @@ createModelAlarmBuilder()
 
 No alarm actions are configured; route them with `alarmActionsPolicy`.
 
+## Model invocation logging
+
+`createModelInvocationLoggingBuilder()` turns on [model invocation logging](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html) for the account in the stack's Region ([GENSEC01-BP04](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp04.html)). The setting has no CloudFormation resource, so a custom resource applies it on deploy and deletes it with the stack.
+
+```ts
+createModelInvocationLoggingBuilder()
+  .largeDataBucket(ref("audit", (r: BucketBuilderResult) => r.bucket))
+  .largeDataKeyPrefix("bedrock");
+```
+
+It creates:
+
+- a log group, from `@composurecdk/logs`' defaults; customise it with `logGroup: { configure }`;
+- a role Bedrock assumes to write to the log group's `aws/bedrock/modelinvocations` stream, trusted only for this account and Region;
+- an alarm on failed deliveries to the log group, and to the large-data bucket when one is configured.
+
+Every modality is logged by default (`MODEL_INVOCATION_LOGGING_DEFAULTS`). Bodies over 100 KB and binary data are only logged to a `largeDataBucket`.
+
+The setting is one per account and Region. Build it once: a second stack's configuration overwrites the first, and deleting either stack turns logging off.
+
 ## Not yet covered
 
-- **Model invocation logging** ([GENSEC01-BP04](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp04.html)). An account-wide, per-Region setting with no CloudFormation resource.
 - **Guardrails** ([GENSEC02-BP01](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec02-bp01.html)).
 - **Application inference profiles**, for cost allocation tags.
 - **Private connectivity** ([GENSEC01-BP02](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp02.html)): a `bedrock-runtime` interface endpoint, built with `@composurecdk/ec2`.

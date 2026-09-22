@@ -3,6 +3,7 @@
   "modules": {
     "acm": ["aws-certificatemanager"],
     "apigateway": ["aws-apigateway"],
+    "bedrock": ["aws-bedrock"],
     "budgets": ["aws-budgets"],
     "cdk-testing": [],
     "cloudformation": ["aws-cloudformation"],

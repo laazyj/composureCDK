@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Duration } from "aws-cdk-lib";
+import { type CfnResource, Duration } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import {
   CertificateValidation,
@@ -136,6 +136,36 @@ describe("CertificateBuilder", () => {
         DomainValidationOptions: Match.arrayWith([
           Match.objectLike({ DomainName: "example.com" }),
           Match.objectLike({ DomainName: "www.example.net" }),
+        ]),
+      });
+    });
+
+    it("resolves a ref'd zone alongside a concrete one", () => {
+      const stack = newStack();
+      const apex = new PublicHostedZone(stack, "Apex", { zoneName: "example.com" });
+      const other = new PublicHostedZone(stack, "Other", { zoneName: "example.net" });
+
+      createCertificateBuilder()
+        .domainName("example.com")
+        .subjectAlternativeNames(["www.example.net"])
+        // The point of the prop being a record of `Resolvable`s: one zone comes
+        // from a sibling component, the other is already in hand.
+        .validationZones({
+          "example.com": apex,
+          "www.example.net": ref("dns", (r: { zone: PublicHostedZone }) => r.zone),
+        })
+        .recommendedAlarms(false)
+        .build(stack, "MixedCert", { dns: { zone: other } });
+
+      /** How a same-stack hosted zone renders in the certificate's properties. */
+      const zoneRef = (zone: PublicHostedZone) => ({
+        Ref: stack.getLogicalId(zone.node.defaultChild as CfnResource),
+      });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::CertificateManager::Certificate", {
+        DomainValidationOptions: Match.arrayWith([
+          Match.objectLike({ DomainName: "example.com", HostedZoneId: zoneRef(apex) }),
+          Match.objectLike({ DomainName: "www.example.net", HostedZoneId: zoneRef(other) }),
         ]),
       });
     });

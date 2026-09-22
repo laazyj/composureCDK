@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "plugins": ["./scripts/nx-package-targets.mjs"],
   "namedInputs": {
     "sharedGlobals": [],
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
@@ -28,6 +29,9 @@
       "cache": true,
       "inputs": ["default", "^production"]
     },
+    "test:watch": {
+      "dependsOn": ["^build"]
+    },
     "check:exports": {
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/dist/**/*", "{projectRoot}/package.json"],
@@ -40,14 +44,21 @@
       "cache": true
     },
     "lint": {
-      "dependsOn": [{ "projects": ["@composurecdk/eslint-plugin"], "target": "build" }],
+      "dependsOn": [
+        {
+          "projects": ["@composurecdk/eslint-plugin"],
+          "target": "build"
+        }
+      ],
       "cache": true,
       "inputs": [
         "default",
         "^production",
         "{workspaceRoot}/eslint.config.mjs",
         "{workspaceRoot}/packages/eslint-plugin/src/**/*",
-        { "externalDependencies": ["eslint", "typescript-eslint", "@typescript-eslint/parser"] }
+        {
+          "externalDependencies": ["eslint", "typescript-eslint", "@typescript-eslint/parser"]
+        }
       ]
     },
     "test:update": {

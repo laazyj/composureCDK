@@ -45,7 +45,9 @@ export default {
     // previous run.
     const run = `${process.pid}-${Date.now()}`;
 
-    // 1. Direct send — proves the queue and its consumer are wired.
+    // 1. Direct send — proves the queue and its consumer are wired, and that
+    // the consumer's role can invoke the triage model: the log line only
+    // carries a category once the model has answered.
     const directMarker = `smoke-direct-${run}`;
     const directStartMs = Date.now();
     aws(
@@ -54,26 +56,23 @@ export default {
       "--queue-url",
       queueUrl,
       "--message-body",
-      directMarker,
+      `Please gift wrap this order ${directMarker}`,
       "--output",
       "json",
     );
     pass(`${queueUrl} — order message sent`);
 
-    // The event source delivers the message to the consumer; a log line
-    // carrying the marker proves the function was invoked AND its
-    // execution role could read the queue and write logs.
     const processed = await waitForLogEvents(aws, {
       logGroup,
       sinceMs: directStartMs,
-      filterPattern: directMarker,
+      filterPattern: `${directMarker} category=`,
       timeoutMs: 60_000,
     });
 
     if (processed) {
-      pass(`${fnName} — consumed and logged the order message`);
+      pass(`${fnName} — consumed the order message and classified it with Bedrock`);
     } else {
-      fail(`${logGroup} — order message ${directMarker} not processed within 60s`);
+      fail(`${logGroup} — order message ${directMarker} not classified within 60s`);
     }
 
     // 2. Publish through the intake topic — proves the SNS subscription

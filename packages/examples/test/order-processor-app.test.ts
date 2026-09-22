@@ -132,11 +132,10 @@ describe("order-processor-app", () => {
   });
 
   it("creates the recommended Lambda alarms for the consumer", () => {
-    // errors + throttles, plus the two event-source contextual alarms
-    // (ordersFailedInvocations, ordersDroppedEvents) emitted because an SQS
-    // event source is attached. The duration alarm is timeout-relative and
-    // the consumer leaves timeout at the CDK default, so it is not emitted.
-    template.resourcePropertiesCountIs("AWS::CloudWatch::Alarm", { Namespace: "AWS/Lambda" }, 4);
+    // errors, throttles and duration, plus the two event-source contextual
+    // alarms (ordersFailedInvocations, ordersDroppedEvents) emitted because
+    // an SQS event source is attached.
+    template.resourcePropertiesCountIs("AWS::CloudWatch::Alarm", { Namespace: "AWS/Lambda" }, 5);
   });
 
   it("creates the dead-letter depth alarm that surfaces undelivered notifications", () => {
@@ -153,11 +152,40 @@ describe("order-processor-app", () => {
     });
   });
 
-  it("creates the topic, queue, and consumer recommended alarms", () => {
-    // Each topic ships 4 recommended (8); the work queue ships 2 recommended
-    // + 1 custom, the DLQ 2 from the dlq alarm profile (5); the Lambda
-    // consumer ships 2 recommended (errors, throttles) + 2 contextual
-    // event-source alarms (4).
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 17);
+  it("grants the consumer the triage model through its global profile", () => {
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: Match.arrayWith(["bedrock:InvokeModel"]),
+            Resource: Match.objectLike({
+              "Fn::Join": [
+                "",
+                Match.arrayWith([Match.stringLikeRegexp("inference-profile/global")]),
+              ],
+            }),
+          }),
+        ]),
+      },
+    });
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: { Variables: { MODEL_ID: "global.amazon.nova-2-lite-v1:0" } },
+    });
+  });
+
+  it("creates the model's recommended alarms", () => {
+    template.resourcePropertiesCountIs(
+      "AWS::CloudWatch::Alarm",
+      {
+        Namespace: "AWS/Bedrock",
+        Dimensions: [{ Name: "ModelId", Value: "global.amazon.nova-2-lite-v1:0" }],
+      },
+      3,
+    );
+  });
+
+  it("creates the topic, queue, consumer and model recommended alarms", () => {
+    // topics 8 + queues 5 + Lambda 5 + model 3
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 21);
   });
 });

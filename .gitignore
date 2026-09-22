@@ -8,7 +8,10 @@ coverage
 packages/*/src/package.json
 cdk.out
 .vscode/
-.claude/
+# Per-user Claude Code state stays local; the shared settings and hooks are tracked.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 .playwright-mcp/
 
 # cdk-floors establish draft (curated values live in cdk-floors.json)

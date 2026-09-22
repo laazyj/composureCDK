@@ -1,6 +1,9 @@
 {
   "name": "composurecdk",
   "description": "Composable, lifecycle-managed AWS infrastructure built on AWS CDK — monorepo for the @composurecdk/* packages.",
+  "engines": {
+    "npm": ">=11"
+  },
   "nx": {
     "includedScripts": []
   },

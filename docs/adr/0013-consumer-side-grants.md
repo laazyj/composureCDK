@@ -1,6 +1,6 @@
 # ADR 0013: Consumer-side IAM grants — declare a grant where the dependency already points
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-04
 
 ## Context

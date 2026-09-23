@@ -127,8 +127,37 @@ Every modality is logged by default (`MODEL_INVOCATION_LOGGING_DEFAULTS`). Bodie
 
 The setting is one per account and Region. Build it once: a second stack's configuration overwrites the first, and deleting either stack turns logging off.
 
+## Guardrails
+
+`createGuardrailBuilder()` creates a guardrail and publishes a version of it ([GENSEC02-BP01](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec02-bp01.html)). A configuration change publishes a new version, so callers never use the working draft.
+
+```ts
+compose(
+  {
+    safety: createGuardrailBuilder()
+      .name("support-assistant")
+      .topicPolicyConfig({
+        topicsConfig: [{ name: "Legal", definition: "Legal advice.", type: "DENY" }],
+      }),
+    handler: createFunctionBuilder()
+      // runtime, handler, code …
+      .grant(
+        modelGrants.invoke(haiku, {
+          requireGuardrail: ref("safety", (r: GuardrailBuilderResult) => r.reference),
+        }),
+      ),
+  },
+  { safety: [], handler: ["safety"] },
+);
+```
+
+By default the guardrail filters every harmful-content category (sexual, violence, hate, insults, misconduct) and prompt attacks at `HIGH`, with the Bedrock console's default blocked message (`GUARDRAIL_DEFAULTS`). Topic, word, sensitive-information and contextual-grounding policies depend on the workload and are not defaulted.
+
+`requireGuardrail` makes the grantee [use the guardrail](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-permissions-id.html): the invoke allow is conditioned on `bedrock:GuardrailIdentifier`, an explicit deny refuses any other call, and the grantee may apply the guardrail. `guardrailGrants.apply` grants `bedrock:ApplyGuardrail` alone.
+
+Guardrail errors and throttles are only published per account, so the guardrail's alarms are opt-in: `invocationsIntervened` (Sum) and `invocationLatency` (p90), each with a threshold you supply.
+
 ## Not yet covered
 
-- **Guardrails** ([GENSEC02-BP01](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec02-bp01.html)).
 - **Application inference profiles**, for cost allocation tags.
 - **Private connectivity** ([GENSEC01-BP02](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp02.html)): a `bedrock-runtime` interface endpoint, built with `@composurecdk/ec2`.

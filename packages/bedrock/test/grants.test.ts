@@ -4,8 +4,8 @@ import { Template } from "aws-cdk-lib/assertions";
 import { FoundationModelIdentifier, ProvisionedModel } from "aws-cdk-lib/aws-bedrock";
 import { AccountRootPrincipal, type IGrantable, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { newStack, policyJson, TEST_ACCOUNT, testEnv } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
-import { modelGrants } from "../src/grants.js";
+import { type Grant, ref } from "@composurecdk/core";
+import { guardrailGrants, modelGrants } from "../src/grants.js";
 import { inferenceProfile } from "../src/inference-profile.js";
 import { type InferenceTarget, invocationArns } from "../src/inference-target.js";
 
@@ -31,14 +31,22 @@ function roleIn(stack: Stack): Role {
   return new Role(stack, "Role", { assumedBy: new ServicePrincipal("lambda.amazonaws.com") });
 }
 
-function statementsFor(target: InferenceTarget): unknown[] {
+const GUARDRAIL = {
+  guardrailArn: `arn:aws:bedrock:${REGION}:${TEST_ACCOUNT}:guardrail/gr1`,
+  version: "3",
+};
+const GUARDRAIL_ID = `${GUARDRAIL.guardrailArn}:${GUARDRAIL.version}`;
+
+function statementsOf(grant: Grant<IGrantable>): unknown[] {
   const stack = regionalStack();
-  modelGrants.invoke(target).applyTo(roleIn(stack), {});
+  grant.applyTo(roleIn(stack), {});
   const policies = Template.fromStack(stack).findResources("AWS::IAM::Policy");
   return Object.values(policies).flatMap(
     (p) => (p as PolicyResource).Properties.PolicyDocument.Statement,
   );
 }
+
+const statementsFor = (target: InferenceTarget) => statementsOf(modelGrants.invoke(target));
 
 describe("modelGrants.invoke", () => {
   it("grants a foundation model in the source Region", () => {
@@ -173,5 +181,86 @@ describe("invocationArns", () => {
         ],
       ],
     });
+  });
+});
+
+describe("modelGrants.invoke with requireGuardrail", () => {
+  it("conditions the allow on the guardrail, denies calls without it and lets it be applied", () => {
+    expect(statementsOf(modelGrants.invoke(MODEL, { requireGuardrail: GUARDRAIL }))).toEqual([
+      {
+        Action: ACTIONS,
+        Effect: "Allow",
+        Resource: fmArn(REGION),
+        Condition: { StringEquals: { "bedrock:GuardrailIdentifier": GUARDRAIL_ID } },
+      },
+      {
+        Action: ACTIONS,
+        Effect: "Deny",
+        Resource: fmArn(REGION),
+        Condition: { StringNotEquals: { "bedrock:GuardrailIdentifier": GUARDRAIL_ID } },
+      },
+      { Action: "bedrock:ApplyGuardrail", Effect: "Allow", Resource: GUARDRAIL.guardrailArn },
+    ]);
+  });
+
+  it("keeps a profile's own conditions alongside the guardrail's", () => {
+    const profile = inferenceProfile.geographic({
+      model: MODEL,
+      geography: "eu",
+      routingRegions: ["eu-west-3"],
+    });
+
+    expect(statementsOf(modelGrants.invoke(profile, { requireGuardrail: GUARDRAIL }))).toEqual([
+      {
+        Action: ACTIONS,
+        Effect: "Allow",
+        Resource: PROFILE_ARN,
+        Condition: { StringEquals: { "bedrock:GuardrailIdentifier": GUARDRAIL_ID } },
+      },
+      {
+        Action: ACTIONS,
+        Effect: "Allow",
+        Resource: [fmArn(REGION), fmArn("eu-west-3")],
+        Condition: {
+          StringEquals: {
+            "bedrock:InferenceProfileArn": PROFILE_ARN,
+            "bedrock:GuardrailIdentifier": GUARDRAIL_ID,
+          },
+        },
+      },
+      {
+        Action: ACTIONS,
+        Effect: "Deny",
+        Resource: [PROFILE_ARN, fmArn(REGION), fmArn("eu-west-3")],
+        Condition: { StringNotEquals: { "bedrock:GuardrailIdentifier": GUARDRAIL_ID } },
+      },
+      { Action: "bedrock:ApplyGuardrail", Effect: "Allow", Resource: GUARDRAIL.guardrailArn },
+    ]);
+  });
+
+  it("resolves the target and guardrail from the build context", () => {
+    const stack = regionalStack();
+
+    modelGrants
+      .invoke(
+        ref<{ model: InferenceTarget }, InferenceTarget>("config", (r) => r.model),
+        {
+          requireGuardrail: ref<{ guardrail: typeof GUARDRAIL }, typeof GUARDRAIL>(
+            "safety",
+            (r) => r.guardrail,
+          ),
+        },
+      )
+      .applyTo(roleIn(stack), { config: { model: MODEL }, safety: { guardrail: GUARDRAIL } });
+
+    expect(policyJson(stack)).toContain(GUARDRAIL_ID);
+  });
+});
+
+describe("guardrailGrants.apply", () => {
+  it("allows applying the guardrail", () => {
+    expect(statementsOf(guardrailGrants.apply(GUARDRAIL))).toEqual([
+      { Action: "bedrock:ApplyGuardrail", Effect: "Allow", Resource: GUARDRAIL.guardrailArn },
+    ]);
   });
 });

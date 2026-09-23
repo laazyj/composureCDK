@@ -1,15 +1,5 @@
-import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
-
-/**
- * 3 breaching minutes out of 5: SDK retries absorb isolated throttles and
- * transient errors, so a single datapoint is noise. No traffic emits no data.
- */
-const SUSTAINED = {
-  evaluationPeriods: 5,
-  datapointsToAlarm: 3,
-  treatMissingData: TreatMissingData.NOT_BREACHING,
-};
+import { SUSTAINED } from "./alarm-definition.js";
 
 interface ModelAlarmDefaults {
   enabled: true;

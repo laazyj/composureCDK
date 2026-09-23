@@ -9,7 +9,20 @@ export {
   inferenceProfile,
 } from "./inference-profile.js";
 export { type InferenceTarget, invocationArns } from "./inference-target.js";
-export { modelGrants } from "./grants.js";
+export { guardrailGrants, type ModelInvokeGrantOptions, modelGrants } from "./grants.js";
+export {
+  createGuardrailBuilder,
+  type GuardrailBuilderProps,
+  type GuardrailBuilderResult,
+  type GuardrailReference,
+  type IGuardrailBuilder,
+} from "./guardrail-builder.js";
+export { GUARDRAIL_DEFAULTS } from "./guardrail-defaults.js";
+export {
+  type GuardrailAlarmConfig,
+  type GuardrailMetrics,
+  guardrailMetrics,
+} from "./guardrail-alarms.js";
 export {
   createModelAlarmBuilder,
   type IModelAlarmBuilder,

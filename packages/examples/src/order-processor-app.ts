@@ -4,8 +4,10 @@ import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { SqsSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import {
+  createGuardrailBuilder,
   createModelAlarmBuilder,
   createModelInvocationLoggingBuilder,
+  type GuardrailBuilderResult,
   inferenceProfile,
   modelGrants,
 } from "@composurecdk/bedrock";
@@ -25,8 +27,9 @@ const TRIAGE_MODEL = inferenceProfile.global(
 );
 
 /**
- * Classifies each order note and logs the result for the smoke test. Failed
- * records are reported individually so a retry re-sends only those.
+ * Classifies each order note through the guardrail and logs the result, or
+ * that the guardrail blocked it, for the smoke test. Failed records are
+ * reported individually so a retry re-sends only those.
  */
 const PROCESSOR_CODE = `
 const { BedrockRuntimeClient, ConverseCommand } = require("@aws-sdk/client-bedrock-runtime");
@@ -40,9 +43,15 @@ exports.handler = async (event) => {
         modelId: process.env.MODEL_ID,
         messages: [{ role: "user", content: [{ text: PROMPT + r.body }] }],
         inferenceConfig: { maxTokens: 10, temperature: 0 },
+        guardrailConfig: {
+          guardrailIdentifier: process.env.GUARDRAIL_ARN,
+          guardrailVersion: process.env.GUARDRAIL_VERSION,
+        },
       }));
-      const category = res.output.message.content[0].text.trim().toLowerCase();
-      console.log("processed order", r.body, "category=" + category);
+      const outcome = res.stopReason === "guardrail_intervened"
+        ? "blocked=guardrail"
+        : "category=" + res.output.message.content[0].text.trim().toLowerCase();
+      console.log("processed order", r.body, outcome);
     } catch (err) {
       console.error("failed to classify order", r.messageId, err);
       batchItemFailures.push({ itemIdentifier: r.messageId });
@@ -89,9 +98,12 @@ exports.handler = async (event) => {
  *   the model's alarms
  * - Model invocation logging via `createModelInvocationLoggingBuilder`,
  *   with its delivery-failure alarm
+ * - A guardrail from `createGuardrailBuilder`, which the consumer must apply:
+ *   `modelGrants.invoke(…, { requireGuardrail })` denies any call without it
  */
 export function createOrderProcessorApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-OrderProcessorStack");
+  const guardrail = ref<GuardrailBuilderResult>("safety").get("reference");
 
   const { alerts } = compose(
     {
@@ -161,8 +173,12 @@ export function createOrderProcessorApp(app = exampleApp()) {
         .code(Code.fromInline(PROCESSOR_CODE))
         .memorySize(256)
         .timeout(Duration.seconds(30))
-        .environment({ MODEL_ID: TRIAGE_MODEL.profileId })
-        .grant(modelGrants.invoke(TRIAGE_MODEL))
+        .environment({
+          MODEL_ID: TRIAGE_MODEL.profileId,
+          GUARDRAIL_ARN: guardrail.get("guardrailArn"),
+          GUARDRAIL_VERSION: guardrail.get("version"),
+        })
+        .grant(modelGrants.invoke(TRIAGE_MODEL, { requireGuardrail: guardrail }))
         .description("Order processor - consumes and processes order messages")
         // The event source is declared as data: `sqsEventSource` resolves
         // the sibling queue `ref` at build time and `addEventSource` grants
@@ -174,6 +190,8 @@ export function createOrderProcessorApp(app = exampleApp()) {
 
       triageModelAlarms: createModelAlarmBuilder().model(TRIAGE_MODEL),
 
+      safety: createGuardrailBuilder().name("order-triage"),
+
       // Account-wide per Region: deploying this stack turns logging on for the
       // account, replacing any existing configuration, and deleting it turns
       // logging off. A real system would build it once, in a shared stack.
@@ -184,8 +202,9 @@ export function createOrderProcessorApp(app = exampleApp()) {
       orderEventsDlq: [],
       orders: [],
       orderEvents: ["orders", "orderEventsDlq"],
-      processor: ["orders"],
+      processor: ["orders", "safety"],
       triageModelAlarms: [],
+      safety: [],
       invocationLogging: [],
     },
   ).build(stack, "OrderProcessor");

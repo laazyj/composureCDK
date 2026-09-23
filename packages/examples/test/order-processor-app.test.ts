@@ -174,6 +174,29 @@ describe("order-processor-app", () => {
     });
   });
 
+  it("requires the consumer to apply a published guardrail", () => {
+    template.resourceCountIs("AWS::Bedrock::Guardrail", 1);
+    template.resourceCountIs("AWS::Bedrock::GuardrailVersion", 1);
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: "Deny",
+            Condition: { StringNotEquals: { "bedrock:GuardrailIdentifier": Match.anyValue() } },
+          }),
+        ]),
+      },
+    });
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: {
+        Variables: Match.objectLike({
+          GUARDRAIL_ARN: Match.anyValue(),
+          GUARDRAIL_VERSION: Match.anyValue(),
+        }),
+      },
+    });
+  });
+
   it("creates the model's recommended alarms", () => {
     template.resourcePropertiesCountIs(
       "AWS::CloudWatch::Alarm",

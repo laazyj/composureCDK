@@ -28,7 +28,7 @@ describe("order-processor-app", () => {
   it("configures the queue with the requested visibility timeout and retention", () => {
     template.hasResourceProperties("AWS::SQS::Queue", {
       QueueName: "orders",
-      VisibilityTimeout: 120,
+      VisibilityTimeout: 180,
       MessageRetentionPeriod: 1_209_600,
       ReceiveMessageWaitTimeSeconds: 20,
       SqsManagedSseEnabled: true,

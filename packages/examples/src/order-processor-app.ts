@@ -117,9 +117,9 @@ export function createOrderProcessorApp(app = exampleApp()) {
 
       orders: createQueueBuilder()
         .queueName("orders")
-        // Visibility timeout > expected processing time. Workload-specific —
-        // not defaulted by the builder.
-        .visibilityTimeout(Duration.minutes(2))
+        // At least 6x the processor's timeout, so Lambda can retry a
+        // throttled batch. Workload-specific — not defaulted by the builder.
+        .visibilityTimeout(Duration.minutes(3))
         // Retain undelivered work for the full SQS maximum so a downstream
         // incident can be replayed.
         .retentionPeriod(Duration.days(14))

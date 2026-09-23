@@ -45,9 +45,8 @@ export function alarmName(input: string): AlarmName {
 
 /**
  * Builds an {@link AlarmName} by kebab-casing each segment and joining with
- * `sep`. Empty segments after kebab-casing are dropped, so callers can pass
- * e.g. `Stack.of(scope).stackName` without worrying about token-resolution
- * artefacts.
+ * `sep`. Empty segments after kebab-casing are dropped. Segments must be
+ * literals: an unresolved token fails validation.
  */
 export function joinAlarmName(segments: readonly string[], sep = "/"): AlarmName {
   const parts = segments.map(kebab).filter((s) => s.length > 0);

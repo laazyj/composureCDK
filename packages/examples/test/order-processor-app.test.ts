@@ -153,24 +153,45 @@ describe("order-processor-app", () => {
     });
   });
 
-  it("grants the consumer the triage model through its global profile", () => {
+  it("routes the triage model through a tagged application inference profile", () => {
+    template.hasResourceProperties("AWS::Bedrock::ApplicationInferenceProfile", {
+      InferenceProfileName: "order-triage",
+      ModelSource: {
+        CopyFrom: {
+          "Fn::Join": ["", Match.arrayWith([Match.stringLikeRegexp("inference-profile/global")])],
+        },
+      },
+      Tags: [{ Key: "CostCentre", Value: "order-processing" }],
+    });
+  });
+
+  it("grants the consumer the triage model only through its application profile", () => {
+    const appProfileArn = {
+      "Fn::GetAtt": [Match.stringLikeRegexp("triageProfile"), "InferenceProfileArn"],
+    };
     template.hasResourceProperties("AWS::IAM::Policy", {
       PolicyDocument: {
         Statement: Match.arrayWith([
           Match.objectLike({
             Action: Match.arrayWith(["bedrock:InvokeModel"]),
-            Resource: Match.objectLike({
-              "Fn::Join": [
-                "",
-                Match.arrayWith([Match.stringLikeRegexp("inference-profile/global")]),
-              ],
-            }),
+            Resource: appProfileArn,
+          }),
+          Match.objectLike({
+            Condition: {
+              StringEquals: Match.objectLike({ "bedrock:InferenceProfileArn": appProfileArn }),
+            },
           }),
         ]),
       },
     });
     template.hasResourceProperties("AWS::Lambda::Function", {
-      Environment: { Variables: { MODEL_ID: "global.amazon.nova-2-lite-v1:0" } },
+      Environment: {
+        Variables: {
+          MODEL_ID: {
+            "Fn::GetAtt": [Match.stringLikeRegexp("triageProfile"), "InferenceProfileArn"],
+          },
+        },
+      },
     });
   });
 
@@ -197,12 +218,19 @@ describe("order-processor-app", () => {
     });
   });
 
-  it("creates the model's recommended alarms", () => {
+  it("creates the model's recommended alarms on the application profile", () => {
     template.resourcePropertiesCountIs(
       "AWS::CloudWatch::Alarm",
       {
         Namespace: "AWS/Bedrock",
-        Dimensions: [{ Name: "ModelId", Value: "global.amazon.nova-2-lite-v1:0" }],
+        Dimensions: [
+          {
+            Name: "ModelId",
+            Value: {
+              "Fn::GetAtt": [Match.stringLikeRegexp("triageProfile"), "InferenceProfileId"],
+            },
+          },
+        ],
       },
       3,
     );

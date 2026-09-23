@@ -5,6 +5,8 @@ import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { SqsSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import {
   createGuardrailBuilder,
+  type ApplicationInferenceProfileBuilderResult,
+  createApplicationInferenceProfileBuilder,
   createModelAlarmBuilder,
   createModelInvocationLoggingBuilder,
   type GuardrailBuilderResult,
@@ -93,9 +95,10 @@ exports.handler = async (event) => {
  *   subscription from both queues
  * - Composing the queues alongside `createTopicBuilder` and routing all
  *   alarm actions through `alarmActionsPolicy`
- * - Invoking a model through a global cross-Region inference profile, with
- *   `modelGrants.invoke` on the consumer and `createModelAlarmBuilder` for
- *   the model's alarms
+ * - Invoking a model through an application inference profile over a global
+ *   cross-Region profile, tagged so the order processor's model usage shows in
+ *   cost allocation, with `modelGrants.invoke` on the consumer and
+ *   `createModelAlarmBuilder` for the model's alarms
  * - Model invocation logging via `createModelInvocationLoggingBuilder`,
  *   with its delivery-failure alarm
  * - A guardrail from `createGuardrailBuilder`, which the consumer must apply:
@@ -104,6 +107,8 @@ exports.handler = async (event) => {
 export function createOrderProcessorApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-OrderProcessorStack");
   const guardrail = ref<GuardrailBuilderResult>("safety").get("reference");
+  const triageProfile =
+    ref<ApplicationInferenceProfileBuilderResult>("triageProfile").get("profile");
 
   const { alerts } = compose(
     {
@@ -174,11 +179,11 @@ export function createOrderProcessorApp(app = exampleApp()) {
         .memorySize(256)
         .timeout(Duration.seconds(30))
         .environment({
-          MODEL_ID: TRIAGE_MODEL.profileId,
+          MODEL_ID: triageProfile.get("profileArn"),
           GUARDRAIL_ARN: guardrail.get("guardrailArn"),
           GUARDRAIL_VERSION: guardrail.get("version"),
         })
-        .grant(modelGrants.invoke(TRIAGE_MODEL, { requireGuardrail: guardrail }))
+        .grant(modelGrants.invoke(triageProfile, { requireGuardrail: guardrail }))
         .description("Order processor - consumes and processes order messages")
         // The event source is declared as data: `sqsEventSource` resolves
         // the sibling queue `ref` at build time and `addEventSource` grants
@@ -188,7 +193,12 @@ export function createOrderProcessorApp(app = exampleApp()) {
           sqsEventSource(ref("orders", (r: QueueBuilderResult) => r.queue)),
         ),
 
-      triageModelAlarms: createModelAlarmBuilder().model(TRIAGE_MODEL),
+      triageProfile: createApplicationInferenceProfileBuilder()
+        .inferenceProfileName("order-triage")
+        .source(TRIAGE_MODEL)
+        .tag("CostCentre", "order-processing"),
+
+      triageModelAlarms: createModelAlarmBuilder().model(triageProfile),
 
       safety: createGuardrailBuilder().name("order-triage"),
 
@@ -202,8 +212,9 @@ export function createOrderProcessorApp(app = exampleApp()) {
       orderEventsDlq: [],
       orders: [],
       orderEvents: ["orders", "orderEventsDlq"],
-      processor: ["orders", "safety"],
-      triageModelAlarms: [],
+      processor: ["orders", "triageProfile", "safety"],
+      triageProfile: [],
+      triageModelAlarms: ["triageProfile"],
       safety: [],
       invocationLogging: [],
     },

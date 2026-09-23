@@ -3,7 +3,12 @@ import { FoundationModelIdentifier } from "aws-cdk-lib/aws-bedrock";
 import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { SqsSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
-import { createModelAlarmBuilder, inferenceProfile, modelGrants } from "@composurecdk/bedrock";
+import {
+  createModelAlarmBuilder,
+  createModelInvocationLoggingBuilder,
+  inferenceProfile,
+  modelGrants,
+} from "@composurecdk/bedrock";
 import { combine, compose, ref } from "@composurecdk/core";
 import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
 import { createFunctionBuilder, sqsEventSource } from "@composurecdk/lambda";
@@ -79,6 +84,11 @@ exports.handler = async (event) => {
  *   subscription from both queues
  * - Composing the queues alongside `createTopicBuilder` and routing all
  *   alarm actions through `alarmActionsPolicy`
+ * - Invoking a model through a global cross-Region inference profile, with
+ *   `modelGrants.invoke` on the consumer and `createModelAlarmBuilder` for
+ *   the model's alarms
+ * - Model invocation logging via `createModelInvocationLoggingBuilder`,
+ *   with its delivery-failure alarm
  */
 export function createOrderProcessorApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-OrderProcessorStack");
@@ -163,6 +173,11 @@ export function createOrderProcessorApp(app = exampleApp()) {
         ),
 
       triageModelAlarms: createModelAlarmBuilder().model(TRIAGE_MODEL),
+
+      // Account-wide per Region: deploying this stack turns logging on for the
+      // account, replacing any existing configuration, and deleting it turns
+      // logging off. A real system would build it once, in a shared stack.
+      invocationLogging: createModelInvocationLoggingBuilder(),
     },
     {
       alerts: [],
@@ -171,6 +186,7 @@ export function createOrderProcessorApp(app = exampleApp()) {
       orderEvents: ["orders", "orderEventsDlq"],
       processor: ["orders"],
       triageModelAlarms: [],
+      invocationLogging: [],
     },
   ).build(stack, "OrderProcessor");
 

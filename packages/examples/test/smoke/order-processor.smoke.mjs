@@ -97,5 +97,31 @@ export default {
     } else {
       fail(`${logGroup} — published event ${fanoutMarker} not processed within 60s`);
     }
+
+    // 3. Model invocation logging records the direct-send classification,
+    // marker included. Delivery lags the call by minutes, so this runs last.
+    const [invocationLogGroup] = findStackResources(aws, STACK, {
+      type: "AWS::Logs::LogGroup",
+      namePattern: /invocationLogging/i,
+    });
+    if (!invocationLogGroup) {
+      fail(`${STACK} — invocation logging log group not found`);
+      return;
+    }
+    const invocationLogs = invocationLogGroup.PhysicalResourceId;
+
+    const logged = await waitForLogEvents(aws, {
+      logGroup: invocationLogs,
+      sinceMs: directStartMs,
+      filterPattern: directMarker,
+      timeoutMs: 300_000,
+      intervalMs: 10_000,
+    });
+
+    if (logged) {
+      pass(`${invocationLogs} — model invocation logged`);
+    } else {
+      fail(`${invocationLogs} — invocation for ${directMarker} not logged within 5 minutes`);
+    }
   },
 };

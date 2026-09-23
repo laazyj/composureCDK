@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { createOrderProcessorApp } from "../src/order-processor-app.js";
 
@@ -15,7 +15,8 @@ describe("order-processor-app", () => {
   });
 
   it("creates one Lambda consumer wired to the queue via an event source", () => {
-    template.resourceCountIs("AWS::Lambda::Function", 1);
+    // Plus the provider Lambda behind the invocation-logging custom resource.
+    template.resourceCountIs("AWS::Lambda::Function", 2);
     template.hasResourceProperties("AWS::Lambda::Function", {
       Runtime: "nodejs22.x",
       Handler: "index.handler",
@@ -184,8 +185,19 @@ describe("order-processor-app", () => {
     );
   });
 
-  it("creates the topic, queue, consumer and model recommended alarms", () => {
-    // topics 8 + queues 5 + Lambda 5 + model 3
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 21);
+  it("turns on model invocation logging with a delivery-failure alarm", () => {
+    // The SDK call is a JSON string joined around tokens, so match on its text.
+    expect(JSON.stringify(template.findResources("Custom::AWS"))).toContain(
+      "PutModelInvocationLoggingConfiguration",
+    );
+    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+      Namespace: "AWS/Bedrock",
+      MetricName: "ModelInvocationLogsCloudWatchDeliveryFailure",
+    });
+  });
+
+  it("creates the topic, queue, consumer, model and logging recommended alarms", () => {
+    // topics 8 + queues 5 + Lambda 5 + model 3 + logging 1
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 22);
   });
 });

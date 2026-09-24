@@ -34,6 +34,8 @@ Three things about that file are deliberate:
 
 **They are named `prettier:check` / `prettier:write`, not `format:check` / `format`.** `nx format` and `nx format:check` are built-in nx commands, and the builtin wins: with the targets named that way, `npx nx format:check` silently ran nx's own affected-files check and exited 0 without checking anything.
 
+One consequence of routing everything through nx: **a gate can only be invoked as an nx target where `node_modules` exists.** Two CI jobs deliberately run without installing — `cdk-floors-enforce`, whose script does its own floor-pinned install and needs the clean checkout, and `release-notify`, which has no dependencies at all and drives the preinstalled `gh`. Both call `node scripts/…` directly, and say why inline. The nx target still exists for everyone else.
+
 `verify` is an `nx:noop` target whose `dependsOn` lists every gate. It is one unordered graph, so the old cheap-gates-first fail-fast is gone; the pre-push hook passes `--nxBail` to stop at the first failure, and CI keeps one step per gate, which is where ordering now lives. `scripts/ci-covers-verify.mjs` reads that `dependsOn` and fails if a gate has no CI step.
 
 ## Inputs are only ever tracked files

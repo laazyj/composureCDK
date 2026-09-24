@@ -67,9 +67,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # No `npm ci` or setup-node: the script has no dependencies and drives the
-      # preinstalled gh CLI.
+      # preinstalled gh CLI. So it is called directly rather than as
+      # `nx release:issue-comments` — nx cannot run before its node_modules exist.
       - name: Comment on released issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.release.outputs.tag }}
-        run: npx nx release:issue-comments workspace-root -- --tag="$TAG"
+        run: node scripts/release-issue-comments.mjs --tag="$TAG"

@@ -251,6 +251,8 @@ jobs:
           cache: npm
 
       # No `npm ci` — enforce does the floor-pinned install itself, and the
-      # fresh checkout is the clean tree the npm override requires.
+      # fresh checkout is the clean tree the npm override requires. That is also
+      # why this calls the script directly rather than `nx cdk-floors:enforce`:
+      # nx cannot run before its own node_modules exist.
       - name: Enforce
-        run: npx nx cdk-floors:enforce
+        run: node scripts/cdk-floors.mjs enforce

@@ -2,7 +2,11 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "plugins": ["./tools/package-targets.mjs"],
   "namedInputs": {
-    "sharedGlobals": [],
+    "sharedGlobals": [
+      {
+        "runtime": "node --version"
+      }
+    ],
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
       "default",
@@ -34,12 +38,23 @@
     },
     "check:exports": {
       "dependsOn": ["build"],
-      "inputs": ["{projectRoot}/dist/**/*", "{projectRoot}/package.json"],
+      "inputs": [
+        "production",
+        {
+          "externalDependencies": ["@arethetypeswrong/cli", "publint"]
+        }
+      ],
       "cache": true
     },
     "validate": {
       "dependsOn": ["build"],
-      "inputs": ["{projectRoot}/dist/**/*", "{projectRoot}/cdk.json"],
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "externalDependencies": ["aws-cdk"]
+        }
+      ],
       "outputs": ["{projectRoot}/cdk.out"],
       "cache": true
     },
@@ -98,5 +113,6 @@
       "pattern": "v{version}"
     }
   },
-  "analytics": false
+  "analytics": false,
+  "cacheDirectory": ".nx/cache"
 }

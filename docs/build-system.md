@@ -56,7 +56,9 @@ One consequence of routing everything through nx: **a gate can only be invoked a
 
 ## Inputs are only ever tracked files
 
-nx hashes tracked files, so a glob that matches only gitignored paths matches nothing. `{projectRoot}/dist/**/*` is such a glob — it contributes zero files to a hash, which makes it look like coverage it is not. Declare `src/**` (or `production`) instead and let `dependsOn` handle ordering; `dependsOn` does not feed the hash either.
+nx hashes tracked files, so a glob that matches only gitignored paths matches nothing. `{projectRoot}/dist/**/*` is such a glob — it contributes zero files to a hash, which makes it look like coverage it is not. Declare `production` (or `src/**`) instead and let `dependsOn` handle ordering; `dependsOn` does not feed the hash either.
+
+`check:exports` and `validate` were both declared that way, and both replayed cached passes against a `dist` they had never seen: a change under `src/` rebuilt the package and `attw`/`publint` reported success from cache. They now take `production`, plus the external dependencies whose versions decide the verdict.
 
 ## Lint
 
@@ -81,7 +83,7 @@ Two things to know if you change it:
 - **`sharedGlobals` must stay declared.** nx provides it built-in, but defining your own `default` that references it makes it your responsibility; drop it and every nx command fails with `"sharedGlobals" is an invalid fileset`.
 - **The exclusion list is short because the tree is tidy.** `dist`, `coverage`, `.tshy` and `cdk.out` are gitignored and nx only hashes tracked files, so they are already out. `package.json` must stay in `production` — tshy reads its build config from there.
 
-Note what the hash does _not_ cover: the Node version. Nothing in `namedInputs` is a `runtime` input, so a cached result is reused across Node majors. That is fine locally, and fine in CI today because each matrix leg starts cold. It would stop being fine the moment CI restores a shared task cache — see [CI](ci.md).
+**The Node version is part of every hash.** `sharedGlobals` carries a `{ "runtime": "node --version" }` input, so no task result can be replayed across Node majors. Without it a restored cache would let one matrix leg replay another's results and report success without running anything, which is the whole point of the matrix — see [CI](ci.md#nx-task-cache).
 
 ## Installing dependencies
 

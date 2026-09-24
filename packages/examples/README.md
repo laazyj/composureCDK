@@ -42,6 +42,27 @@ npx nx cdk examples -- destroy --all                                          # 
 
 To skip IAM approval prompts (e.g. in CI): add `--require-approval never` to deploy commands.
 
+## Adding an example
+
+Examples are expansive demonstrations, not feature showcases. Each one is a simplified real-world application built from several features working together, deployed by CI and proven against live AWS by a smoke test. Before adding one, check it clears this bar:
+
+- **It demonstrates a system, not a resource.** One feature or one resource type is the job of the package README and that package's tests. An example earns its place by showing how a set of features composes into something recognisable — an API over a datastore, a queue-driven worker, a website behind a CDN.
+- **It is grounded in a use case.** Name the workload the stack would serve. If the best available description is "shows how X works", it is package-README material.
+- **It does not re-demonstrate what existing examples already cover.** Alarm routing through `alarmActionsPolicy` and an SNS topic, for instance, already appears in several stacks; repeating it adds deploy cost and obscures whatever is actually new. Prefer extending an existing example over adding a near-duplicate stack.
+- **It is deployable and verifiable.** CI deploys every example; an example whose behaviour cannot be exercised by a smoke test is not worth deploying, so write the smoke test as part of adding it (step 4).
+
+Then:
+
+1. **Name the stack with the `ComposureCDK-` prefix.** The CI IAM policy and the smoke test discover stacks by this prefix — see [docs/ci.md](../../docs/ci.md#stack-naming-convention).
+2. **Register it in [`src/apps.ts`](src/apps.ts)** — the single registry of examples, used by both the `bin/app.ts` entrypoint CI deploys and the tests that assert across every stack.
+3. **Add a row to the table above.**
+4. **Add a post-deploy smoke test that exercises it.** The runner at [`scripts/smoke-test.mjs`](../../scripts/smoke-test.mjs) (run by the `deploy-test` workflow) auto-discovers `*.smoke.mjs` files under [`test/smoke/`](test/smoke/). Stack health (`CREATE_COMPLETE` / `UPDATE_COMPLETE`) is checked automatically via the prefix, but that only proves the stack deployed — **it is not sufficient**. Add a sibling `<name>.smoke.mjs` that drives the example's runtime surface end to end and asserts the effect: call the endpoint and check the response, send the message or write the record and check the consumer's log line (which also proves its execution role had the permissions it needed). Each module default-exports `{ name, run(ctx) }`, where `ctx` provides `aws`, `region`, `pass(msg)`, and `fail(msg)`. Shared AWS CLI plumbing (output lookups, resource discovery, log polling, retries) lives in [`test/smoke/_helpers.mjs`](test/smoke/_helpers.mjs) — extend it rather than re-implementing a variant per check.
+5. **Grant any AWS permissions the smoke test needs.** The check runs as the deploy-test OIDC role, not the CDK execution role, so an action it calls against the deployed stack (publishing a message, writing an item, invoking a function) needs a statement in [`.github/cloudformation/github-oidc-role.yml`](../../.github/cloudformation/github-oidc-role.yml), scoped the way its neighbours are, plus a line in [docs/ci.md](../../docs/ci.md#security-notes). That stack is deployed by hand, so say so in the PR — it must be redeployed before the next `deploy-test` run or the check fails with `AccessDenied`.
+
+Once it synthesises, run `npx nx cdk-flags:audit`: a new stack can make a feature flag that changed nothing start mattering, and the manifest's `no-effect` verdicts are measured against these stacks. See [docs/cdk-feature-flags.md](../../docs/cdk-feature-flags.md).
+
+Per-stack unit/synth tests live in [`test/`](test/) — add one alongside the example following the existing patterns. These are separate from the post-deploy smoke checks under `test/smoke/`.
+
 ## Feature flags
 
 CDK feature flags are declared, not inherited. [`cdk.json`](cdk.json) carries the context the CLI synthesises with, and [`src/app-context.ts`](src/app-context.ts) carries the same map for the tests — CDK applies CLI context _after_ an `App`'s `context` prop, so a divergence would leave the tests asserting a template CI never deploys. `test/app-context.test.ts` asserts the two stay in sync.

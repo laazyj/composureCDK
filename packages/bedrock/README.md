@@ -63,6 +63,8 @@ foundationModelFor(profile.profileId).modelId; // "anthropic.claude-haiku-4-5-20
 
 `parse` and `foundationModelFor` throw on an id without a known geography or `global` prefix (`INFERENCE_PROFILE_GEOGRAPHIES`), rather than mistake a provider such as `anthropic.` for one.
 
+Profiles are plain values rather than the alpha `CrossRegionInferenceProfile` L2, for the [reasons given for guardrails](#why-the-l1-constructs-not-the-alpha-l2) and because its grants don't match what live IAM needs ([#536](https://github.com/laazyj/composureCDK/issues/536)).
+
 ## Grants
 
 `modelGrants.invoke(target)` grants `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`, which together cover `InvokeModel`, `Converse` and their streaming variants. Pass it to any grantee builder's `grant(...)`.

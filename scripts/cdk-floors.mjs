@@ -91,7 +91,7 @@ function apply() {
       `  ${pkg.padEnd(16)} aws-cdk-lib ^${floor}${extras.length > 0 ? ` + ${extras.join(", ")}` : ""}`,
     );
   }
-  console.log("\nApplied to package.json files (run `npx nx format` to normalise).");
+  console.log("\nApplied to package.json files (run `npx nx prettier:write` to normalise).");
 }
 
 /** Asserts each package.json peer range matches the manifest; non-zero on drift. */

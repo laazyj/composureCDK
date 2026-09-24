@@ -1,0 +1,50 @@
+# Build system
+
+Why the nx setup is shaped the way it is. [AGENTS.md](../AGENTS.md#build-system) carries the rules; this is the reasoning behind them.
+
+## Targets are derived, not written
+
+[`tools/package-targets.mjs`](../tools/package-targets.mjs) is an nx plugin that reads each `packages/*/package.json` and produces that package's targets. The packages are near-identical, so their commands were near-identical: 25 manifests repeating the same seven scripts, with nothing checking them for drift. Two predicates cover every difference — a `tshy` key means the package is dual-published ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)), so it builds with `tshy` and gets `check:exports`; failing that, a `tsconfig.build.json` means it builds with `tsc`. Everything else is uniform.
+
+The plugin is the only copy of the commands, so a new package needs no build configuration and cannot fall out of step. A package that does carry a `scripts` block silently opts itself back out: nx loads workspace plugins before its built-in `package-json` inference and the built-in wins the merge, so a script shadows the derived target of the same name.
+
+### Why the tool runs directly
+
+Targets use `nx:run-commands`, not the `nx:run-script` executor nx infers from package.json `scripts`. `run-script` spawns `npm run <script>` per task, and under parallelism an npm startup intermittently aborts inside npm's own config loader (`Exit prior to config file resolving`), failing the task before the tool runs — [#323](https://github.com/laazyj/composureCDK/issues/323), and [npm/cli#8425](https://github.com/npm/cli/issues/8425) upstream, closed _not planned_.
+
+One npm call remains, inside a tool rather than the runner: `attw --pack .` shells out to `npm pack`, so `check:exports` still starts an npm process per package.
+
+### Why commands and scheduling live apart
+
+The plugin supplies only the command. `dependsOn`, `cache`, `inputs` and `outputs` stay in `targetDefaults` in [`nx.json`](../nx.json), because that keeps caching policy next to the `namedInputs` it is written against, and because it also governs the `workspace-root` project in [`project.json`](../project.json), which the plugin does not create.
+
+A target genuinely unique to one package belongs in that package's own `project.json` rather than behind a conditional in the plugin. [`packages/examples/project.json`](../packages/examples/project.json) is the only one: `cdk`, `synth`, `deploy` and `validate` drive the CDK CLI against the example app.
+
+## Lint
+
+`nx run-many -t lint` caches per project, so unchanged packages fast-succeed. Three things make that correct rather than merely fast.
+
+**Loose top-level files** (`eslint.config.mjs`, `scripts/**`, `tools/**`, `vitest.config.base.ts`) belong to no package, so the `workspace-root` project in the root [`project.json`](../project.json) lints them. A plain `.mjs` module there also needs a line in `eslint.config.mjs` — both in `allowDefaultProject` and in the `disableTypeChecked` block, since these are untyped node modules; without the second, type-aware rules fire on inferred `any` and the file cannot lint clean.
+
+**The custom rules** in `@composurecdk/eslint-plugin` drive every package's lint result, so `targetDefaults.lint` both depends on that package's `build` (the flat config imports its compiled output) and lists its `src/**` as a lint input, so a rule change busts the dependent lint caches.
+
+**Not the `@nx/eslint` inference plugin.** It infers the same `lint` targets, but it evaluates the root flat config during graph construction to skip projects with no lintable files. That imports `@composurecdk/eslint-plugin` before it is built, so every nx command fails on a fresh checkout. Our plugin reads only file names, so the config is not loaded until lint actually runs — by which point `dependsOn` has built the plugin.
+
+**tshy's intermediates are ignored.** `.tshy/` and `.tshy-build/` are gitignored, and eslint ignores them too: a `lint` task running alongside that package's `build` otherwise walks into generated files no tsconfig covers and fails on them.
+
+## What counts as an input
+
+`namedInputs` in [`nx.json`](../nx.json) sets this. `production` is `default` minus `test/**`, `README.md` and `vitest.config.ts` — the files that cannot change a package's `dist/`. `build` takes `["production", "^production"]`; `typecheck`, `test` and `lint` take `["default", "^production"]`, because a package's own tests do affect its typecheck and test run while a _dependency's_ never do.
+
+Without that split, `default` falls back to nx's built-in `{projectRoot}/**/*` and a one-line edit to any test file re-runs `build`, `typecheck` and `lint` for every dependent — measured at 71 of 75 tasks for a comment appended to `packages/core/test/testing.test.ts`.
+
+Two things to know if you change it:
+
+- **`sharedGlobals` must stay declared.** nx provides it built-in, but defining your own `default` that references it makes it your responsibility; drop it and every nx command fails with `"sharedGlobals" is an invalid fileset`.
+- **The exclusion list is short because the tree is tidy.** `dist`, `coverage`, `.tshy` and `cdk.out` are gitignored and nx only hashes tracked files, so they are already out. `package.json` must stay in `production` — tshy reads its build config from there.
+
+Note what the hash does _not_ cover: the Node version. Nothing in `namedInputs` is a `runtime` input, so a cached result is reused across Node majors. That is fine locally, and fine in CI today because each matrix leg starts cold. It would stop being fine the moment CI restores a shared task cache — see [CI](ci.md).
+
+## Installing dependencies
+
+Use `npx -y npm@11 ci`. npm refuses to install under npm 10, which Node 22 ships, and the root `package.json` declares `"engines": { "npm": ">=11" }`. Do not `npm install -g npm@11` instead: in agent sandboxes the self-upgrade fails with `Cannot find module 'promise-retry'`. In Claude Code on the web, the SessionStart hook in [`.claude/hooks/session-start.sh`](../.claude/hooks/session-start.sh) runs the install and puts shellcheck on `PATH` in the background.

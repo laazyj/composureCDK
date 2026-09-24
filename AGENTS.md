@@ -27,30 +27,17 @@ npm run actionlint
 
 ## Build system
 
-Use npx nx to run every task — this is an nx monorepo, and nx is the only task runner. Packages carry no `scripts` block at all: [`scripts/nx-package-targets.mjs`](scripts/nx-package-targets.mjs) derives each package's targets from its shape, so a new package needs no build configuration and nothing to keep in step. Two predicates decide what a package gets — a `tshy` key means it is dual-published, so it builds with `tshy` and gets `check:exports`; failing that, a `tsconfig.build.json` means it builds with `tsc`. Everything else (`lint`, `typecheck`, `test`, `test:watch`, `test:update`, `clean`) is uniform. Read the plugin for the commands; it is short and it is the only copy of them.
+This is an nx monorepo and **nx is the only task runner**. Packages carry no `scripts` block: [`tools/package-targets.mjs`](tools/package-targets.mjs) derives each one's targets from its shape, so a new package needs no build configuration. Run anything with `npx nx <target> <project>`. See [docs/build-system.md](docs/build-system.md) for why it is built this way — read it before changing `nx.json`, `project.json` or the plugin.
 
-Three rules keep it that way:
+**Install dependencies with `npx -y npm@11 ci`**, not `npm install -g npm@11` — the self-upgrade fails in agent sandboxes.
 
-- **The plugin supplies the command, `targetDefaults` in [`nx.json`](nx.json) supply the scheduling** — `dependsOn`, `cache`, `inputs`, `outputs`. That keeps caching policy next to the `namedInputs` it is written against, and covers the `workspace-root` project in [`project.json`](project.json), which the plugin does not create.
-- **A target unique to one package lives in that package's own `project.json`**, not behind a conditional in the plugin. [`packages/examples/project.json`](packages/examples/project.json) is the only one: `cdk`, `synth`, `deploy` and `validate` drive the CDK CLI against the example app.
-- **Targets run their tool directly** (`nx:run-commands`). Inferring them from package.json `scripts` — nx's default — makes every task spawn `npm run <script>`, and concurrent npm startups intermittently abort inside npm's own config loader, failing the task before the tool runs ([#323](https://github.com/laazyj/composureCDK/issues/323)). nx loads the plugin during graph construction, so it must not import anything the repo builds.
+Rules:
 
-**Install dependencies with `npx -y npm@11 ci`.** npm refuses to install under npm 10, which Node 22 ships. Do not `npm install -g npm@11` instead: in agent sandboxes the self-upgrade fails with `Cannot find module 'promise-retry'`. In Claude Code on the web, the SessionStart hook in [`.claude/hooks/session-start.sh`](.claude/hooks/session-start.sh) runs the install and puts shellcheck on `PATH` in the background.
-
-`npm run lint` runs `nx run-many -t lint`, which caches per project so unchanged packages fast-succeed. Three things make that correct rather than merely fast:
-
-- **Loose top-level files** (`eslint.config.mjs`, `scripts/**`, `vitest.config.base.ts`) belong to no package, so they are linted by the `workspace-root` project defined in the root [`project.json`](project.json). If you add a source file outside `packages/` and outside those globs, extend that project's `lint` target so it stays covered.
-- **The custom rules** in `@composurecdk/eslint-plugin` drive every package's lint result, so `targetDefaults.lint` in [`nx.json`](nx.json) both depends on that package's `build` (the flat config imports its compiled output) and lists its `src/**` as a lint input, so a rule change busts the dependent lint caches.
-- **Not the `@nx/eslint` inference plugin.** It infers the same `lint` targets, but it evaluates the root flat config during graph construction (to skip projects with no lintable files). That imports `@composurecdk/eslint-plugin` before it is built, so every nx command fails on a fresh checkout. Our plugin reads only file names, so the config is not loaded until lint actually runs — by which point `dependsOn` has built the plugin.
-
-**What counts as an input** is set by `namedInputs` in [`nx.json`](nx.json). `production` is `default` minus `test/**`, `README.md` and `vitest.config.ts` — the files that cannot change a package's `dist/`. `build` takes `["production", "^production"]`; `typecheck`, `test` and `lint` take `["default", "^production"]`, because a package's own tests do affect its typecheck and test run while a _dependency's_ never do.
-
-Without that split, `default` falls back to nx's built-in `{projectRoot}/**/*` and a one-line edit to any test file re-runs `build`, `typecheck` and `lint` for every dependent — measured at 71 of 75 tasks for a comment appended to `packages/core/test/testing.test.ts`.
-
-Two things to know if you change it:
-
-- **`sharedGlobals` must stay declared.** nx provides it built-in, but defining your own `default` that references it makes it your responsibility; drop it and every nx command fails with `"sharedGlobals" is an invalid fileset`.
-- **The exclusion list is short because the tree is tidy.** `dist`, `coverage`, `.tshy` and `cdk.out` are gitignored and nx only hashes tracked files, so they are already out. `package.json` must stay in `production` — tshy reads its build config from there.
+- **Never add a `scripts` block to a package.** It silently shadows the derived target and puts the task back behind `npm run`, which is what [#323](https://github.com/laazyj/composureCDK/issues/323) was.
+- **The plugin supplies the command; `targetDefaults` in [`nx.json`](nx.json) supply the scheduling** (`dependsOn`, `cache`, `inputs`, `outputs`). A target unique to one package goes in that package's own `project.json`, not behind a conditional in the plugin.
+- **The plugin must not import anything the repo builds** — nx loads it during graph construction. This is also why `@nx/eslint` is not used.
+- **A new source file outside `packages/`** must be covered by the `workspace-root` `lint` target in the root [`project.json`](project.json); a plain `.mjs` also needs adding to both lists that name it in `eslint.config.mjs`.
+- **`sharedGlobals` must stay declared** in `namedInputs`, and `package.json` must stay in `production` — tshy reads its build config from there.
 
 ## Publishing & module format
 

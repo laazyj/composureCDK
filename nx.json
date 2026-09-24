@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
-  "plugins": ["./scripts/nx-package-targets.mjs"],
+  "plugins": ["./tools/package-targets.mjs"],
   "namedInputs": {
     "sharedGlobals": [],
     "default": ["{projectRoot}/**/*", "sharedGlobals"],

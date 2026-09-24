@@ -68,8 +68,9 @@ npx -y npm@11 ci
 This is an [nx](https://nx.dev/) monorepo; the publishable packages live under
 [`packages/`](packages/). nx is the only task runner — packages carry no npm
 `scripts`, and their targets are derived from each package's shape by
-[`scripts/nx-package-targets.mjs`](scripts/nx-package-targets.mjs). Use `npx nx`
-to run them; the root `npm run` scripts are thin aliases over `nx run-many`.
+[`tools/package-targets.mjs`](tools/package-targets.mjs). Use `npx nx` to run
+them; the root `npm run` scripts are thin aliases over `nx run-many`. See
+[docs/build-system.md](docs/build-system.md) for how the setup fits together.
 
 ```sh
 # Build everything

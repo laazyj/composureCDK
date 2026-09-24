@@ -13,7 +13,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-export const createNodesV2 = [
+export const createNodes = [
   "packages/*/package.json",
   (manifestPaths, _options, context) =>
     manifestPaths.map((manifestPath) => {

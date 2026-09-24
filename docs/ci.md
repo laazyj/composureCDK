@@ -41,6 +41,19 @@ Cutting a release
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Creates the GitHub Release from the matching `CHANGELOG.md` section, then runs `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
 - **`release-notify.yml`** — `workflow_run` listener on Release. Comments on the issues the release addressed (see [Release notifications](#release-notifications)).
 
+## nx task cache
+
+Every CI leg used to start cold, so an unchanged package was rebuilt and retested on each of the four Node majors, every run. `ci.yml` now restores `.nx/cache` (nx's cache directory, pointed at the repo by `cacheDirectory` in [`nx.json`](../nx.json) so it is a cacheable path rather than `~/.nx/<id>/cache`), and nx replays any task whose inputs hash to a stored entry.
+
+What makes that safe is the hash, not the cache key. Two things had to be true first:
+
+- **The Node version is part of every task hash**, via a `{ "runtime": "node --version" }` input in `sharedGlobals`. Without it, a result produced on Node 26 could be replayed on the Node 20 leg, which would report success without running anything — the matrix would still be green and would no longer mean anything.
+- **No cached target may declare an input that matches nothing.** `check:exports` and `validate` both keyed on `{projectRoot}/dist/**/*`, which is gitignored and therefore invisible to nx's hasher, so they replayed against a `dist` they had never seen. See [inputs are only ever tracked files](build-system.md#inputs-are-only-ever-tracked-files).
+
+The key is per-leg (`nx-<os>-node<major>-<lockfile hash>-<sha>`) so the four legs do not race to save, with `restore-keys` falling back to the most recent entry for that leg. The `sha` suffix means every run writes a fresh entry instead of skipping the save on a key that already exists; GitHub evicts least-recently-used once the repo passes its cache limit.
+
+Only the main `ci` job restores it. `cdk-floors-enforce` has nothing to gain: it installs its own floor-pinned dependency tree and already runs its tests with `--skip-nx-cache`, so it neither reads nor writes entries.
+
 ## Coverage reporting
 
 Coverage is reported on PRs without any external service (no Codecov/Coveralls account, no secrets, no data leaving GitHub). It is a reporting layer only — the actual gate is each package's `perFile` thresholds in `vitest.config.ts`, enforced by `npx nx run-many -t test`.

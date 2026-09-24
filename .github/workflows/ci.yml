@@ -70,6 +70,22 @@ jobs:
         env:
           npm_config_engine_strict: ${{ matrix.node-version != 20 }}
 
+      # nx replays a task whose inputs hash to a cached entry, so this turns an
+      # unchanged package into a restore instead of a rebuild. Correctness rests
+      # on the hash, not on this key: `sharedGlobals` carries a `node --version`
+      # runtime input, so a result produced on another Node major can never be
+      # replayed here. The key is per-leg anyway, so the legs do not race to
+      # save, and `github.sha` makes every run write a fresh entry rather than
+      # skipping the save on a key that already exists.
+      - name: Restore nx cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('package-lock.json') }}-
+            nx-${{ runner.os }}-node${{ matrix.node-version }}-
+
       - name: Check formatting
         run: npx nx prettier:check
 

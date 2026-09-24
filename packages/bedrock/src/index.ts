@@ -1,4 +1,11 @@
 export {
+  type ApplicationInferenceProfileBuilderProps,
+  type ApplicationInferenceProfileBuilderResult,
+  createApplicationInferenceProfileBuilder,
+  type IApplicationInferenceProfileBuilder,
+} from "./application-inference-profile-builder.js";
+export {
+  type ApplicationInferenceProfile,
   foundationModelFor,
   type GeographicInferenceProfile,
   type GeographicInferenceProfileOptions,

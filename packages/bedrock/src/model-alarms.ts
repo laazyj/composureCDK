@@ -9,13 +9,13 @@ import {
   type ThresholdAlarmSpec,
   toDefinition,
 } from "./alarm-definition.js";
-import type { InferenceProfile } from "./inference-profile.js";
-import { isInferenceProfile } from "./inference-target.js";
+import type { ApplicationInferenceProfile, InferenceProfile } from "./inference-profile.js";
 import type { ModelAlarmConfig } from "./model-alarm-config.js";
 import { MODEL_ALARM_DEFAULTS } from "./model-alarm-defaults.js";
 
 /** A model whose `AWS/Bedrock` metrics an alarm can read. */
-export type ModelAlarmTarget = FoundationModelIdentifier | InferenceProfile;
+export type ModelAlarmTarget =
+  FoundationModelIdentifier | InferenceProfile | ApplicationInferenceProfile;
 
 /** `AWS/Bedrock` metrics for one model, for alarms added with `addAlarm()`. */
 export interface ModelMetrics {
@@ -29,7 +29,7 @@ const PERIOD = Duration.minutes(1);
 
 /** Returns the `AWS/Bedrock` metrics for `target`. */
 export function modelMetrics(target: ModelAlarmTarget): ModelMetrics {
-  const modelId = isInferenceProfile(target) ? target.profileId : target.modelId;
+  const modelId = "profileId" in target ? target.profileId : target.modelId;
   return {
     modelId,
     metric: (metricName, options) =>

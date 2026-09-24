@@ -6,7 +6,7 @@ import { AccountRootPrincipal, type IGrantable, Role, ServicePrincipal } from "a
 import { newStack, policyJson, TEST_ACCOUNT, testEnv } from "@composurecdk/cdk-testing";
 import { type Grant, ref } from "@composurecdk/core";
 import { guardrailGrants, modelGrants } from "../src/grants.js";
-import { inferenceProfile } from "../src/inference-profile.js";
+import { type ApplicationInferenceProfile, inferenceProfile } from "../src/inference-profile.js";
 import { type InferenceTarget, invocationArns } from "../src/inference-target.js";
 
 const MODEL_ID = "anthropic.claude-haiku-4-5-20251001-v1:0";
@@ -261,6 +261,95 @@ describe("guardrailGrants.apply", () => {
   it("allows applying the guardrail", () => {
     expect(statementsOf(guardrailGrants.apply(GUARDRAIL))).toEqual([
       { Action: "bedrock:ApplyGuardrail", Effect: "Allow", Resource: GUARDRAIL.guardrailArn },
+    ]);
+  });
+});
+
+describe("modelGrants.invoke on an application inference profile", () => {
+  const APP_ARN = `arn:aws:bedrock:${REGION}:${TEST_ACCOUNT}:application-inference-profile/app1`;
+  const app = (source: ApplicationInferenceProfile["source"]): ApplicationInferenceProfile => ({
+    kind: "application",
+    profileArn: APP_ARN,
+    profileId: "app1",
+    source,
+  });
+
+  it("grants the profile and its model, reachable only through the profile", () => {
+    expect(statementsFor(app(MODEL))).toEqual([
+      { Action: ACTIONS, Effect: "Allow", Resource: APP_ARN },
+      {
+        Action: ACTIONS,
+        Effect: "Allow",
+        Resource: fmArn(REGION),
+        Condition: { StringEquals: { "bedrock:InferenceProfileArn": APP_ARN } },
+      },
+    ]);
+  });
+
+  it("scopes a system-defined source's models to the application profile alone", () => {
+    const profile = inferenceProfile.geographic({
+      model: MODEL,
+      geography: "eu",
+      routingRegions: ["eu-west-3"],
+    });
+
+    expect(statementsFor(app(profile))).toEqual([
+      { Action: ACTIONS, Effect: "Allow", Resource: APP_ARN },
+      {
+        Action: ACTIONS,
+        Effect: "Allow",
+        Resource: [fmArn(REGION), fmArn("eu-west-3")],
+        Condition: { StringEquals: { "bedrock:InferenceProfileArn": APP_ARN } },
+      },
+    ]);
+  });
+
+  it("requires a guardrail through the application profile", () => {
+    const statements = statementsOf(
+      modelGrants.invoke(app(MODEL), { requireGuardrail: GUARDRAIL }),
+    );
+
+    expect(statements).toContainEqual({
+      Action: ACTIONS,
+      Effect: "Allow",
+      Resource: fmArn(REGION),
+      Condition: {
+        StringEquals: {
+          "bedrock:InferenceProfileArn": APP_ARN,
+          "bedrock:GuardrailIdentifier": GUARDRAIL_ID,
+        },
+      },
+    });
+    expect(statements).toContainEqual({
+      Action: ACTIONS,
+      Effect: "Deny",
+      Resource: [APP_ARN, fmArn(REGION)],
+      Condition: { StringNotEquals: { "bedrock:GuardrailIdentifier": GUARDRAIL_ID } },
+    });
+  });
+
+  it("keeps a global source's Region conditions and grants no global profile", () => {
+    expect(statementsFor(app(inferenceProfile.global(MODEL)))).toEqual([
+      { Action: ACTIONS, Effect: "Allow", Resource: APP_ARN },
+      {
+        Action: ACTIONS,
+        Effect: "Allow",
+        Resource: fmArn(REGION),
+        Condition: {
+          StringEquals: { "aws:RequestedRegion": REGION, "bedrock:InferenceProfileArn": APP_ARN },
+        },
+      },
+      {
+        Action: ACTIONS,
+        Effect: "Allow",
+        Resource: `arn:aws:bedrock:::foundation-model/${MODEL_ID}`,
+        Condition: {
+          StringEquals: {
+            "aws:RequestedRegion": "unspecified",
+            "bedrock:InferenceProfileArn": APP_ARN,
+          },
+        },
+      },
     ]);
   });
 });

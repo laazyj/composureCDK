@@ -61,6 +61,16 @@ describe("createModelAlarmBuilder", () => {
     });
   });
 
+  it("dimensions an application inference profile by its profile id", () => {
+    const { template } = buildAndSynth((b) =>
+      b.model({ kind: "application", profileArn: "arn", profileId: "k7vwfv6mgfmj", source: MODEL }),
+    );
+
+    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+      Dimensions: [{ Name: "ModelId", Value: "k7vwfv6mgfmj" }],
+    });
+  });
+
   it("enables the latency alarms with a threshold", () => {
     const { template } = buildAndSynth((b) =>
       b.recommendedAlarms({

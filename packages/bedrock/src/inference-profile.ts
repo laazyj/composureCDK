@@ -56,6 +56,26 @@ export interface GlobalInferenceProfile {
 /** A system-defined cross-Region inference profile. */
 export type InferenceProfile = GeographicInferenceProfile | GlobalInferenceProfile;
 
+/**
+ * An application inference profile: an account-owned profile, tagged for
+ * cost allocation, that routes to a foundation model or a system-defined
+ * profile. Build one with `createApplicationInferenceProfileBuilder()`.
+ *
+ * @see https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-create.html
+ */
+export interface ApplicationInferenceProfile {
+  readonly kind: "application";
+  /** The profile's ARN, which callers pass as the model id. */
+  readonly profileArn: string;
+  /**
+   * The profile's id, the last segment of {@link profileArn}: the `ModelId`
+   * its invocation metrics are reported under.
+   */
+  readonly profileId: string;
+  /** What the profile routes to. */
+  readonly source: FoundationModelIdentifier | InferenceProfile;
+}
+
 /** Options for {@link inferenceProfile.geographic}. */
 export type GeographicInferenceProfileOptions = Pick<
   GeographicInferenceProfile,

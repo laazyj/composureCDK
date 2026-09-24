@@ -55,7 +55,7 @@
     "@composurecdk/custom-resources": "^0.10.0",
     "@composurecdk/iam": "^0.10.0",
     "@composurecdk/logs": "^0.10.0",
-    "aws-cdk-lib": "^2.143.0",
+    "aws-cdk-lib": "^2.166.0",
     "constructs": "^10.0.0"
   },
   "devDependencies": {

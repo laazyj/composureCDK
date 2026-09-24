@@ -157,6 +157,15 @@ By default the guardrail filters every harmful-content category (sexual, violenc
 
 Guardrail errors and throttles are only published per account, so the guardrail's alarms are opt-in: `invocationsIntervened` (Sum) and `invocationLatency` (p90), each with a threshold you supply.
 
+### Why the L1 constructs, not the alpha L2
+
+The builder wraps `CfnGuardrail` and `CfnGuardrailVersion` because the `Guardrail` L2 is still only in `@aws-cdk/aws-bedrock-alpha`. Building on the alpha would:
+
+- make it a peer dependency of this whole package, version-locked to each `aws-cdk-lib` release, even for consumers who only use `modelGrants`;
+- inherit its bug of replacing the guardrail version on every deploy ([aws/aws-cdk#38674](https://github.com/aws/aws-cdk/issues/38674)).
+
+When `aws-cdk-lib` ships a stable `Guardrail`, the builder will move onto it ([#533](https://github.com/laazyj/composureCDK/issues/533)). `result.reference` (used by grants and alarms) and `GUARDRAIL_DEFAULTS` carry over; `result.guardrail`, `result.version` and the `CfnGuardrailProps`-shaped props will change to the L2's.
+
 ## Not yet covered
 
 - **Application inference profiles**, for cost allocation tags.

@@ -196,6 +196,13 @@ Bedrock reports calls through the profile under its own id, not the source model
 
 The builder wraps `CfnApplicationInferenceProfile` rather than the alpha `ApplicationInferenceProfile` L2 for the reasons given for [guardrails](#why-the-l1-constructs-not-the-alpha-l2), and because `modelGrants` grants what live IAM needs rather than the alpha's broader grants. It will move onto the L2 when `aws-cdk-lib` ships one ([#534](https://github.com/laazyj/composureCDK/issues/534)); the `ApplicationInferenceProfile` value, grants and alarms carry over.
 
-## Not yet covered
+## Private connectivity
 
-- **Private connectivity** ([GENSEC01-BP02](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp02.html)): a `bedrock-runtime` interface endpoint, built with `@composurecdk/ec2`.
+To keep model calls off the public internet ([GENSEC01-BP02](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp02.html)), give the VPC a `bedrock-runtime` interface endpoint with `@composurecdk/ec2`:
+
+```ts
+createInterfaceEndpointBuilder()
+  .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+  .service(InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME)
+  .allowDefaultPortFrom(ref<FunctionBuilderResult>("handler").get("function"));
+```

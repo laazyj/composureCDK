@@ -39,12 +39,13 @@ compose(
 
 `modelGrants` and `createModelAlarmBuilder` take an `InferenceTarget`:
 
-| Target                               | Invokes                                                                            |
-| ------------------------------------ | ---------------------------------------------------------------------------------- |
-| `FoundationModelIdentifier`          | A foundation model in the stack's Region                                           |
-| `inferenceProfile.geographic({ … })` | A cross-Region profile that stays within one geography (`us`, `eu`, `apac`, …)     |
-| `inferenceProfile.global(model)`     | A cross-Region profile that routes to any supported commercial Region              |
-| `IModel`                             | Any model by ARN, e.g. `ProvisionedModel.fromProvisionedModelArn(…)` (grants only) |
+| Target                               | Invokes                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `FoundationModelIdentifier`          | A foundation model in the stack's Region                                                    |
+| `inferenceProfile.geographic({ … })` | A cross-Region profile that stays within one geography (`us`, `eu`, `apac`, …)              |
+| `inferenceProfile.global(model)`     | A cross-Region profile that routes to any supported commercial Region                       |
+| `ApplicationInferenceProfile`        | An account-owned profile over a model or system-defined profile, tagged for cost allocation |
+| `IModel`                             | Any model by ARN, e.g. `ProvisionedModel.fromProvisionedModelArn(…)` (grants only)          |
 
 A profile's id is derived from its model, so the id a caller invokes and the model it is granted cannot drift apart. Use `new FoundationModelIdentifier("…")` for a model newer than the installed CDK's constants.
 
@@ -66,13 +67,14 @@ foundationModelFor(profile.profileId).modelId; // "anthropic.claude-haiku-4-5-20
 
 `modelGrants.invoke(target)` grants `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`, which together cover `InvokeModel`, `Converse` and their streaming variants. Pass it to any grantee builder's `grant(...)`.
 
-| Target     | Statements                                                                                                                                                                                                   |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Model      | The foundation model in the source Region                                                                                                                                                                    |
-| Geographic | The profile; the foundation model in the source Region and every routing Region, conditioned on `bedrock:InferenceProfileArn`                                                                                |
-| Global     | The profile; the foundation model in the source Region; the Region-less foundation model ARN with `aws:RequestedRegion: unspecified`. Both model statements are conditioned on `bedrock:InferenceProfileArn` |
+| Target      | Statements                                                                                                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Model       | The foundation model in the source Region                                                                                                                                                                    |
+| Geographic  | The profile; the foundation model in the source Region and every routing Region, conditioned on `bedrock:InferenceProfileArn`                                                                                |
+| Global      | The profile; the foundation model in the source Region; the Region-less foundation model ARN with `aws:RequestedRegion: unspecified`. Both model statements are conditioned on `bedrock:InferenceProfileArn` |
+| Application | The profile; its source's foundation models, conditioned on `bedrock:InferenceProfileArn` being the application profile                                                                                      |
 
-These follow the policies in the Bedrock user guide for [geographic](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html#geographic-cris-iam-setup) and [global](https://docs.aws.amazon.com/bedrock/latest/userguide/global-cross-region-inference.html#global-cris-iam-setup) cross-Region inference. The `bedrock:InferenceProfileArn` condition makes the foundation models reachable only through the profile ([GENSEC01-BP01](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp01.html)); to also call a model directly, grant it separately.
+The model and system-profile rows follow the policies in the Bedrock user guide for [geographic](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html#geographic-cris-iam-setup) and [global](https://docs.aws.amazon.com/bedrock/latest/userguide/global-cross-region-inference.html#global-cris-iam-setup) cross-Region inference. The `bedrock:InferenceProfileArn` condition makes the foundation models reachable only through the profile ([GENSEC01-BP01](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp01.html)); to also call a model directly, grant it separately. The application row was verified against live IAM for a global source: the source profile needs no statement of its own.
 
 `invocationArns(target, scope)` returns the same resource ARNs for policies you write yourself, such as service control policies.
 
@@ -166,7 +168,32 @@ The builder wraps `CfnGuardrail` and `CfnGuardrailVersion` because the `Guardrai
 
 When `aws-cdk-lib` ships a stable `Guardrail`, the builder will move onto it ([#533](https://github.com/laazyj/composureCDK/issues/533)). `result.reference` (used by grants and alarms) and `GUARDRAIL_DEFAULTS` carry over; `result.guardrail`, `result.version` and the `CfnGuardrailProps`-shaped props will change to the L2's.
 
+## Application inference profiles
+
+`createApplicationInferenceProfileBuilder()` creates an account-owned inference profile over a foundation model or a system-defined profile. The builder's tags land on the profile, so a workload's model usage can be separated in cost allocation.
+
+```ts
+const supportModel = ref<ApplicationInferenceProfileBuilderResult>("supportModel").get("profile");
+
+compose(
+  {
+    supportModel: createApplicationInferenceProfileBuilder()
+      .inferenceProfileName("support-assistant")
+      .source(haiku)
+      .tag("CostCentre", "support"),
+    handler: createFunctionBuilder()
+      // runtime, handler, code …
+      .environment({ MODEL_ID: supportModel.get("profileArn") })
+      .grant(modelGrants.invoke(supportModel)),
+  },
+  { supportModel: [], handler: ["supportModel"] },
+);
+```
+
+Bedrock reports calls through the profile under its own id, not the source model's, so alarm on the profile: `createModelAlarmBuilder().model(supportModel)`.
+
+The builder wraps `CfnApplicationInferenceProfile` rather than the alpha `ApplicationInferenceProfile` L2 for the reasons given for [guardrails](#why-the-l1-constructs-not-the-alpha-l2), and because `modelGrants` grants what live IAM needs rather than the alpha's broader grants. It will move onto the L2 when `aws-cdk-lib` ships one ([#534](https://github.com/laazyj/composureCDK/issues/534)); the `ApplicationInferenceProfile` value, grants and alarms carry over.
+
 ## Not yet covered
 
-- **Application inference profiles**, for cost allocation tags.
 - **Private connectivity** ([GENSEC01-BP02](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp02.html)): a `bedrock-runtime` interface endpoint, built with `@composurecdk/ec2`.

@@ -1,6 +1,6 @@
 #!/bin/bash
 # SessionStart hook for Claude Code on the web: arrive with the toolchain
-# `npm run verify` (and so the husky pre-push hook) needs. See AGENTS.md#build-system.
+# `nx verify` (and so the husky pre-push hook) needs. See AGENTS.md#build-system.
 set -euo pipefail
 
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then

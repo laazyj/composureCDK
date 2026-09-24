@@ -72,4 +72,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.release.outputs.tag }}
-        run: npm run release:issue-comments -- --tag="$TAG"
+        run: npx nx release:issue-comments workspace-root -- --tag="$TAG"

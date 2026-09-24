@@ -43,7 +43,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build
+        run: npx nx run-many -t build
 
       - name: Synth against the chosen aws-cdk-lib version
-        run: npm run cdk-floor:validate
+        run: npx nx cdk-floor:validate

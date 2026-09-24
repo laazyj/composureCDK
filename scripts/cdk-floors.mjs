@@ -10,7 +10,7 @@
  * - `apply` writes each package's `peerDependencies.aws-cdk-lib` from the
  *   manifest. Run it after editing `cdk-floors.json`.
  * - `check` asserts every package.json matches the manifest, exiting non-zero
- *   on drift. Cheap; wired into the main CI job and `npm run verify`.
+ *   on drift. Cheap; wired into the main CI job and `npx nx verify`.
  * - `enforce` pins aws-cdk-lib to a declared floor (via a temporary npm
  *   `overrides`, which forces every copy in the tree, not just the hoisted
  *   one) on a from-scratch install, asserts the floor actually bound, then
@@ -91,7 +91,7 @@ function apply() {
       `  ${pkg.padEnd(16)} aws-cdk-lib ^${floor}${extras.length > 0 ? ` + ${extras.join(", ")}` : ""}`,
     );
   }
-  console.log("\nApplied to package.json files (run `npm run format` to normalise).");
+  console.log("\nApplied to package.json files (run `npx nx format` to normalise).");
 }
 
 /** Asserts each package.json peer range matches the manifest; non-zero on drift. */
@@ -115,7 +115,7 @@ function check() {
   }
   if (mismatches.length > 0) {
     console.error(
-      `cdk-floors check failed — run \`npm run cdk-floors:apply\`:\n${mismatches.join("\n")}`,
+      `cdk-floors check failed — run \`npx nx cdk-floors:apply\`:\n${mismatches.join("\n")}`,
     );
     process.exit(1);
   }

@@ -33,7 +33,7 @@ Cutting a release
 
 `deploy-test.yml` also runs standalone via `workflow_dispatch`.
 
-- **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20/22/24/26 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are just `npm run` scripts — the same ones `npm run verify` chains locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). The Node 24 leg also reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)). It holds no write scopes, so it stays callable from `deploy-test.yml`.
+- **`ci.yml`** — runs format/typecheck/build/`check:exports`/lint/test on a Node 20/22/24/26 matrix, on every push and PR. Also `workflow_call`-able. Quality gate for everything downstream. The steps are the same nx targets `npx nx verify` depends on locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). The Node 24 leg also reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)). It holds no write scopes, so it stays callable from `deploy-test.yml`.
 - **`coverage-comment.yml`** — `workflow_run` listener on CI. Posts the coverage table as a sticky PR comment (see [Coverage reporting](#coverage-reporting)).
 - **`deploy-test.yml`** — calls CI as a pre-deploy sanity check (Node 24 only, no floor shards — see [Trimming CI for deploy-test](#trimming-ci-for-deploy-test)), then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation. Runs on demand via `workflow_dispatch`, and automatically on any push to `release/**` — **that is the release gate**, and it lands as a check on the release PR next to CI. A release branch is the only ref holding exactly what is being released, version bumps and changelog included; `main`'s HEAD is a different tree, and tag time is too late to gate anything.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`; pushing the branch is also what starts the deploy gate above.
@@ -43,12 +43,12 @@ Cutting a release
 
 ## Coverage reporting
 
-Coverage is reported on PRs without any external service (no Codecov/Coveralls account, no secrets, no data leaving GitHub). It is a reporting layer only — the actual gate is each package's `perFile` thresholds in `vitest.config.ts`, enforced by `npm run test`.
+Coverage is reported on PRs without any external service (no Codecov/Coveralls account, no secrets, no data leaving GitHub). It is a reporting layer only — the actual gate is each package's `perFile` thresholds in `vitest.config.ts`, enforced by `npx nx run-many -t test`.
 
 How it fits together:
 
-- **`vitest.config.base.ts`** emits the `json-summary` reporter alongside `text`, so every `npm run test` writes `packages/<pkg>/coverage/coverage-summary.json`. `nx.json` lists `{projectRoot}/coverage` in the `test` target's `outputs`, so a cached test run still restores the summary files.
-- **[`scripts/coverage-summary.mjs`](../scripts/coverage-summary.mjs)** (`npm run coverage:summary`) merges every package's summary into one markdown table — per-package and an overall total computed as summed-covered / summed-total, not an average of percentages. It writes `coverage/coverage-summary.md`, prints to stdout, and appends to `$GITHUB_STEP_SUMMARY` when set.
+- **`vitest.config.base.ts`** emits the `json-summary` reporter alongside `text`, so every `npx nx run-many -t test` writes `packages/<pkg>/coverage/coverage-summary.json`. `nx.json` lists `{projectRoot}/coverage` in the `test` target's `outputs`, so a cached test run still restores the summary files.
+- **[`scripts/coverage-summary.mjs`](../scripts/coverage-summary.mjs)** (`npx nx coverage:summary`) merges every package's summary into one markdown table — per-package and an overall total computed as summed-covered / summed-total, not an average of percentages. It writes `coverage/coverage-summary.md`, prints to stdout, and appends to `$GITHUB_STEP_SUMMARY` when set.
 - **The Node 24 leg of `ci.yml`'s matrix** builds the summary after its `Test` step (so it lands on the Actions run page), and — on `pull_request` events — uploads `coverage-summary.md` plus the PR number as a `coverage-summary` artifact. These are steps on the matrix job, not a job of their own: a sibling job had to repeat the whole build → typecheck → test chain the Node 24 leg already runs, duplicating ~3.5 min of wall-clock per CI run for byte-identical output.
 - **[`coverage-comment.yml`](../.github/workflows/coverage-comment.yml)** listens for CI's `workflow_run` completion, downloads that artifact, and posts it as a sticky PR comment via `marocchino/sticky-pull-request-comment` (keyed `header: coverage`, so it updates in place instead of adding a comment per push).
 
@@ -57,12 +57,12 @@ Notes:
 - **Why two workflows.** `ci.yml` is `workflow_call`-able from `deploy-test.yml`, and GitHub only ever _narrows_ permissions down a reusable-workflow chain. A job inside `ci.yml` declaring `pull-requests: write` therefore fails validation for any caller that lacks that scope — statically, at parse time, regardless of whether the posting step's `if:` would ever let it run. Keeping `ci.yml` at `contents: read` makes it callable from anywhere; the write scope lives only in `coverage-comment.yml`.
 - **Fork PRs** now get a comment too. `workflow_run` executes in the base-repo context with a writable `GITHUB_TOKEN`, which the old in-line comment step could not obtain. The listener never checks out or executes PR code — it only reads the uploaded markdown and the PR number, which it validates is numeric before use.
 - `coverage-comment.yml` must exist on the **default branch** to fire; `workflow_run` always dispatches the default-branch copy. Changes to it are not exercised by the PR that introduces them.
-- The summary and upload steps run with `if: always()`, so when a package dips below its threshold and fails `npm run test`, reviewers still see the table (with the offending package flagged). The job status still reflects the failure — the gate is unchanged. Because they now share a job with the earlier gates, they additionally guard on `steps.test.conclusion != 'skipped'`: a typecheck or lint failure skips `Test`, leaving no `coverage-summary.json` to merge, and the reporting steps should stay quiet rather than fail a second time on the same root cause.
+- The summary and upload steps run with `if: always()`, so when a package dips below its threshold and fails `npx nx run-many -t test`, reviewers still see the table (with the offending package flagged). The job status still reflects the failure — the gate is unchanged. Because they now share a job with the earlier gates, they additionally guard on `steps.test.conclusion != 'skipped'`: a typecheck or lint failure skips `Test`, leaving no `coverage-summary.json` to merge, and the reporting steps should stay quiet rather than fail a second time on the same root cause.
 - **A missing artifact is a normal outcome, not a failure of the listener.** A cancelled CI run (push-over-push) or one that fails an earlier gate in the Node 24 leg uploads nothing, so `coverage-comment.yml` tolerates the download (`continue-on-error`) and gates its posting steps on that step's `outcome`: no artifact, no comment, run stays green. Hard-failing there would report the same root cause a second time, as a separate red run alongside the CI failure that caused it. The listener is deliberately **not** gated on `workflow_run.conclusion == 'success'` — a coverage threshold miss fails `Test` but still uploads the table, and that is exactly the run whose comment reviewers want.
 
 ## Linting the workflows
 
-`npm run actionlint` runs [actionlint](https://github.com/rhysd/actionlint) over `.github/workflows/`. It is chained into `npm run verify` (so the husky `pre-push` hook catches it), fires from `lint-staged` in `pre-commit` whenever a workflow file is staged, and runs in CI as the **Lint workflows** step. Same npm script in all three places — CI executes the gate, it does not define it.
+`npx nx actionlint` runs [actionlint](https://github.com/rhysd/actionlint) over `.github/workflows/`. It is chained into `npx nx verify` (so the husky `pre-push` hook catches it), fires from `lint-staged` in `pre-commit` whenever a workflow file is staged, and runs in CI as the **Lint workflows** step. Same nx target in all three places — CI executes the gate, it does not define it.
 
 Workflow files are the case that most needs a local gate, because CI is least able to check them: a `workflow_run` listener always dispatches the _default-branch_ copy, and an edit to a trigger is not exercised until it next fires. `actionlint` is often the only pre-merge signal a workflow change gets.
 
@@ -75,7 +75,7 @@ Four things make this reliable rather than decorative:
 
 shellcheck comes from `PATH` rather than npm because the packages that vendored its binary cost ~97 transitive dependencies — including the abandoned `decompress`, which has no fixed release for [GHSA-mp2f-45pm-3cg9](https://github.com/advisories/GHSA-mp2f-45pm-3cg9) — and pinned nothing in return: they resolved the _latest_ shellcheck at install time, so two clones a month apart already disagreed. The script enforces a **minimum of 0.9.0** instead, and names the version it found when it rejects one. Contributors need `shellcheck >= 0.9` on `PATH`; note that Debian bullseye and Ubuntu 20.04 still package 0.7.x.
 
-The whole run takes ~300ms, so it is simply always run rather than cached or path-filtered: nx's own overhead on a cache _hit_ exceeds the cost of doing the work, and a path filter is one more thing to drift. It is a plain `node scripts/*.mjs` npm script like `catalogue:check` and `cdk-floors:check`.
+The whole run takes ~300ms, so it is simply always run rather than cached or path-filtered: nx's own overhead on a cache _hit_ exceeds the cost of doing the work, and a path filter is one more thing to drift. It is one of the plain `node scripts/*.mjs` gates on the `workspace-root` project, like `catalogue:check` and `cdk-floors:check` — all of them `cache: false` for the same reason.
 
 Suppress a false positive with a `# shellcheck disable=SCxxxx` comment inside the `run:` block, and say why — as `ci.yml`'s `Read distinct floors from manifest` step does, where single quotes are load-bearing and "fixing" SC2016 would break the script.
 
@@ -114,7 +114,7 @@ Scopes are optional and do not affect the bump.
 1. **Preview locally.**
 
    ```sh
-   npm run release:dryrun
+   npx nx release:dryrun
    ```
 
    Prints the planned version, changelog, and per-package bumps. Safe any time. The script calls `releaseVersion` then `releaseChangelog` via nx's programmatic API — the same path the CI workflow uses as subcommands. `nx release --dry-run` (the top-level command) is intentionally not used; see the comment in [`scripts/release-dryrun.mjs`](../scripts/release-dryrun.mjs) for the nx@22 config-shape constraint that forces this. `nx.json` sets `commit/tag/push` to `false` under both `release.version.git` and `release.changelog.git`, so a non-dry-run local invocation modifies files but does not commit, tag, or push — `git restore` undoes it.
@@ -171,7 +171,7 @@ Create a fine-grained PAT (or GitHub App) scoped to this repo with `contents:wri
 >
 > Published to npm as `@composurecdk/*@0.9.1`.
 
-Which issues those are is worked out by [`scripts/release-issue-comments.mjs`](../scripts/release-issue-comments.mjs) (`npm run release:issue-comments`) from the published release body — see its header for the discovery rules and why the release body, rather than `CHANGELOG.md`, is the source. Every comment carries a hidden `<!-- composurecdk-release: vX.Y.Z -->` marker, so nothing is ever posted twice; issues are commented on whatever their state, since a closed one is exactly the case worth announcing.
+Which issues those are is worked out by [`scripts/release-issue-comments.mjs`](../scripts/release-issue-comments.mjs) (`npx nx release:issue-comments`) from the published release body — see its header for the discovery rules and why the release body, rather than `CHANGELOG.md`, is the source. Every comment carries a hidden `<!-- composurecdk-release: vX.Y.Z -->` marker, so nothing is ever posted twice; issues are commented on whatever their state, since a closed one is exactly the case worth announcing.
 
 Notes:
 
@@ -330,24 +330,24 @@ Because a push to `release/**` now deploys by itself, pair the environment polic
 ## Running locally
 
 ```sh
-npm run verify         # all CI checks in one go
-npm run format:check   # or run individually
-npm run typecheck
-npm run build
-npm run check:exports
-npm run lint
-npm run test
+npx nx verify         # all CI checks in one go
+npx nx prettier:check  # or run individually
+npx nx run-many -t typecheck
+npx nx run-many -t build
+npx nx run-many -t check:exports
+npx nx run-many -t lint
+npx nx run-many -t test
 ```
 
-`npm run verify` chains the exact targets `ci.yml` runs, so a green `verify`
-locally means a green CI. That is enforced rather than maintained: `npm run
+`npx nx verify` chains the exact targets `ci.yml` runs, so a green `verify`
+locally means a green CI. That is enforced rather than maintained: `npx nx
 ci:covers-verify` fails if a gate joins `verify` without a matching step in
 `ci.yml`. It is one-directional — CI may run more (`coverage:summary`, the
-floor shards) — and it checks that a step exists, not that it runs. A husky `pre-push` hook runs `npm run verify`
+floor shards) — and it checks that a step exists, not that it runs. A husky `pre-push` hook runs `npx nx verify`
 automatically — a regression cannot reach GitHub without the maintainer seeing
 it first. The only check `verify` cannot reproduce is CI's Node 20 + 24 matrix.
 
-`npm run lint` is `nx run-many -t lint` — a cached nx target like build and
+`npx nx run-many -t lint` is `nx run-many -t lint` — a cached nx target like build and
 test, so re-running it after an unrelated change fast-succeeds from cache
 instead of re-linting the whole tree. Every package is linted in place, and
 loose top-level files are linted by the `workspace-root` project (see
@@ -355,7 +355,7 @@ loose top-level files are linted by the `workspace-root` project (see
 
 `check:exports` runs `attw` + `publint` per package against the built `dist/`,
 catching broken or masquerading `exports` maps and dual-package issues. The
-`@composurecdk/module-compat` package (run by `npm run test`) spawns `node` to
+`@composurecdk/module-compat` package (run by `npx nx run-many -t test`) spawns `node` to
 load every package under both `require()` and `import`, and synthesizes a CDK
 app under each module system. Together they enforce the dual-publish standard
 ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)).

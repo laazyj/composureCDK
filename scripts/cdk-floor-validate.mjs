@@ -20,7 +20,7 @@
  * `cdk-floors:check` (manifest <-> package.json) and `cdk-floors:enforce`
  * (per-package real-install import probe). See ADR-0008.
  *
- * Run `npm run build` first (this packs from each package's dist).
+ * Run `npx nx run-many -t build` first (this packs from each package's dist).
  *
  * Usage:
  *   node scripts/cdk-floor-validate.mjs                       # default: max(declared floors)

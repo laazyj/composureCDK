@@ -100,7 +100,7 @@ An `overrides` entry forces the floor across the whole tree, but npm only honour
 it on a clean install; hence the from-scratch reinstall and the post-install
 resolution assertion that fails loudly if the floor did not actually bind.
 
-A complementary `scripts/cdk-floor-validate.mjs` (`npm run cdk-floor:validate`,
+A complementary `scripts/cdk-floor-validate.mjs` (`npx nx cdk-floor:validate`,
 also a `workflow_dispatch` workflow) synthesises a representative `compose()`
 system against any chosen aws-cdk-lib version. On-demand only — for bug repro,
 candidate-floor validation before editing the manifest, and release prep.

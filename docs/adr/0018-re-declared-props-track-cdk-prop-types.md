@@ -134,7 +134,7 @@ check and the value is never read, so it carries the `_` prefix that
 
 Structural assignment ignores the props the builder replaces outright, so those
 need no exemption — and a prop that is merely widened must never be given one.
-The guard is checked by `tsc`, not by vitest, so `npm run verify` now chains
+The guard is checked by `tsc`, not by vitest, so `npx nx verify` now chains
 `typecheck` alongside `lint` and `test`: `build` is `tshy`, which compiles
 `src` only, so without it the pre-push gate never reads the guards at all.
 
@@ -158,7 +158,7 @@ The guard is checked by `tsc`, not by vitest, so `npm run verify` now chains
   warning is now a lint rule and an ADR; the notes stay as version-specific
   context but are no longer the only thing standing between the codebase and a
   regression.
-- **`npm run verify` is slower by a `typecheck` pass**, which it should have
+- **`npx nx verify` is slower by a `typecheck` pass**, which it should have
   been running regardless: it is the step CI runs and the gate `AGENTS.md`
   describes as "the same gate CI runs".
 - **Type-level assertions per package (#388) are not needed.** They would detect

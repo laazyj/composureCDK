@@ -8,33 +8,6 @@
     "includedScripts": []
   },
   "scripts": {
-    "lint": "npx nx run-many -t lint",
-    "lint:fix": "npx nx run-many -t lint -- --fix",
-    "actionlint": "node scripts/actionlint.mjs",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "typecheck": "npx nx run-many -t typecheck",
-    "test": "npx nx run-many -t test",
-    "coverage:summary": "node scripts/coverage-summary.mjs",
-    "cdk-floors:apply": "node scripts/cdk-floors.mjs apply",
-    "cdk-floors:check": "node scripts/cdk-floors.mjs check",
-    "cdk-flags:audit": "node scripts/cdk-flags.mjs audit",
-    "cdk-flags:check": "node scripts/cdk-flags.mjs check",
-    "cdk-floors:enforce": "node scripts/cdk-floors.mjs enforce",
-    "cdk-floors:establish": "node scripts/cdk-floors.mjs establish",
-    "cdk-floor:validate": "node scripts/cdk-floor-validate.mjs",
-    "build": "npx nx run-many -t build",
-    "check:exports": "npx nx run-many -t check:exports",
-    "validate": "npx nx run-many -t validate",
-    "ci:covers-verify": "node scripts/ci-covers-verify.mjs",
-    "licenses": "node scripts/sync-licenses.mjs",
-    "licenses:check": "node scripts/sync-licenses.mjs --check",
-    "catalogue": "node scripts/gen-constraint-catalogue.mjs",
-    "catalogue:check": "node scripts/gen-constraint-catalogue.mjs --check",
-    "clean": "npx nx run-many -t clean && npx nx reset && rm -rf node_modules",
-    "verify": "npm run format:check && npm run ci:covers-verify && npm run actionlint && npm run build && npm run catalogue:check && npm run licenses:check && npm run check:exports && npm run lint && npm run typecheck && npm run cdk-floors:check && npm run cdk-flags:check && npm run validate && npm run test",
-    "release:dryrun": "node scripts/release-dryrun.mjs",
-    "release:issue-comments": "node scripts/release-issue-comments.mjs",
     "prepare": "husky"
   },
   "repository": {
@@ -62,7 +35,7 @@
   ],
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md,yaml,yml}": "prettier --write",
-    ".github/workflows/*.yml": "npm run actionlint --"
+    ".github/workflows/*.yml": "npx nx actionlint --"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",

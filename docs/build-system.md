@@ -20,6 +20,26 @@ The plugin supplies only the command. `dependsOn`, `cache`, `inputs` and `output
 
 A target genuinely unique to one package belongs in that package's own `project.json` rather than behind a conditional in the plugin. [`packages/examples/project.json`](../packages/examples/project.json) is the only one: `cdk`, `synth`, `deploy` and `validate` drive the CDK CLI against the example app.
 
+## Root gates and the single entry point
+
+The root `package.json` carries no task scripts — only `prepare`, which npm's own lifecycle requires. Everything else is an nx target, so `npx nx <target>` is the one way to run anything, and `npx nx verify` is the whole gate. The husky `pre-push` hook and every CI step go through it.
+
+The workspace-wide gates — `prettier:check`, `actionlint`, `ci:covers-verify`, `catalogue:check`, `licenses:check`, `cdk-floors:check`, `cdk-flags:check` and their write-side siblings — are targets on the `workspace-root` project in [`project.json`](../project.json). They were npm scripts, which made them invisible to the graph: they could not be scheduled against the packages' work, and `verify` had to chain them by hand with `&&`, spawning an npm process per gate. As one graph the cold gate drops from ~123s to ~102s and the warm one from ~10.3s to ~4.6s.
+
+Three things about that file are deliberate:
+
+**They are all `cache: false`.** Measured directly, every one of them is sub-second — `catalogue:check` and `licenses:check` are 30ms each; only `prettier:check` (~4s) is not trivial, and its inputs are every tracked file, so its cache could never hit. nx's own overhead on a cache hit exceeds the work, which is the argument [`ci.md`](ci.md#linting-the-workflows) already made for `actionlint`. Declaring `inputs` for an uncached target buys nothing and is a live hazard: an input list that misses a file the script reads turns into a stale pass the moment someone adds `cache: true`.
+
+**Their scheduling is inline rather than in `targetDefaults`.** That is the one exception to the rule above, and it is because these targets are singletons — a `targetDefaults` entry per gate would be a worse version of the same thing.
+
+**They are named `prettier:check` / `prettier:write`, not `format:check` / `format`.** `nx format` and `nx format:check` are built-in nx commands, and the builtin wins: with the targets named that way, `npx nx format:check` silently ran nx's own affected-files check and exited 0 without checking anything.
+
+`verify` is an `nx:noop` target whose `dependsOn` lists every gate. It is one unordered graph, so the old cheap-gates-first fail-fast is gone; the pre-push hook passes `--nxBail` to stop at the first failure, and CI keeps one step per gate, which is where ordering now lives. `scripts/ci-covers-verify.mjs` reads that `dependsOn` and fails if a gate has no CI step.
+
+## Inputs are only ever tracked files
+
+nx hashes tracked files, so a glob that matches only gitignored paths matches nothing. `{projectRoot}/dist/**/*` is such a glob — it contributes zero files to a hash, which makes it look like coverage it is not. Declare `src/**` (or `production`) instead and let `dependsOn` handle ordering; `dependsOn` does not feed the hash either.
+
 ## Lint
 
 `nx run-many -t lint` caches per project, so unchanged packages fast-succeed. Three things make that correct rather than merely fast.

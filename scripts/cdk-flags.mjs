@@ -10,7 +10,7 @@
  *
  * - `check` asserts the manifest covers every in-scope flag, names no flag that
  *   no longer exists, and agrees with `packages/examples/cdk.json` about which
- *   flags are set and to what. Cheap; wired into `npm run verify`.
+ *   flags are set and to what. Cheap; wired into `npx nx verify`.
  * - `audit` is the evidence behind the `no-effect` verdicts: it synthesises
  *   every example stack once per flag at that flag's recommended value and
  *   diffs each stack's whole cloud-assembly artifact — its template plus its

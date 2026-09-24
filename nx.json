@@ -75,7 +75,7 @@
     "version": {
       "conventionalCommits": true,
       "fallbackCurrentVersionResolver": "disk",
-      "preVersionCommand": "npm run verify",
+      "preVersionCommand": "nx verify",
       "git": {
         "commit": false,
         "tag": false,

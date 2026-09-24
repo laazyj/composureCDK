@@ -9,8 +9,78 @@
         "{workspaceRoot}/scripts/**/*",
         "{workspaceRoot}/tools/**/*",
         "{workspaceRoot}/vitest.config.base.ts",
-        { "externalDependencies": ["eslint"] }
-      ]
+        "{workspaceRoot}/packages/eslint-plugin/src/**/*",
+        {
+          "externalDependencies": ["eslint", "typescript-eslint", "@typescript-eslint/parser"]
+        }
+      ],
+      "dependsOn": [{ "projects": ["@composurecdk/eslint-plugin"], "target": "build" }],
+      "cache": true
+    },
+    "prettier:write": { "command": "prettier --write .", "cache": false },
+    "prettier:check": { "command": "prettier --check .", "cache": false },
+    "actionlint": { "command": "node scripts/actionlint.mjs", "cache": false },
+    "ci:covers-verify": { "command": "node scripts/ci-covers-verify.mjs", "cache": false },
+    "catalogue": {
+      "command": "node scripts/gen-constraint-catalogue.mjs",
+      "dependsOn": [{ "projects": "*", "target": "build" }],
+      "cache": false
+    },
+    "catalogue:check": {
+      "command": "node scripts/gen-constraint-catalogue.mjs --check",
+      "dependsOn": [{ "projects": "*", "target": "build" }],
+      "cache": false
+    },
+    "licenses": {
+      "command": "node scripts/sync-licenses.mjs",
+      "dependsOn": [{ "projects": "*", "target": "build" }],
+      "cache": false
+    },
+    "licenses:check": {
+      "command": "node scripts/sync-licenses.mjs --check",
+      "dependsOn": [{ "projects": "*", "target": "build" }],
+      "cache": false
+    },
+    "cdk-floors:check": { "command": "node scripts/cdk-floors.mjs check", "cache": false },
+    "cdk-floors:apply": { "command": "node scripts/cdk-floors.mjs apply", "cache": false },
+    "cdk-floors:enforce": { "command": "node scripts/cdk-floors.mjs enforce", "cache": false },
+    "cdk-floors:establish": { "command": "node scripts/cdk-floors.mjs establish", "cache": false },
+    "cdk-floor:validate": { "command": "node scripts/cdk-floor-validate.mjs", "cache": false },
+    "cdk-flags:check": { "command": "node scripts/cdk-flags.mjs check", "cache": false },
+    "cdk-flags:audit": { "command": "node scripts/cdk-flags.mjs audit", "cache": false },
+    "coverage:summary": {
+      "command": "node scripts/coverage-summary.mjs",
+      "dependsOn": [{ "projects": "*", "target": "test" }],
+      "cache": false
+    },
+    "clean": {
+      "command": "nx reset && rm -rf node_modules",
+      "dependsOn": [{ "projects": "*", "target": "clean" }],
+      "cache": false
+    },
+    "release:dryrun": { "command": "node scripts/release-dryrun.mjs", "cache": false },
+    "release:issue-comments": {
+      "command": "node scripts/release-issue-comments.mjs",
+      "cache": false
+    },
+    "verify": {
+      "executor": "nx:noop",
+      "dependsOn": [
+        "prettier:check",
+        "ci:covers-verify",
+        "actionlint",
+        "catalogue:check",
+        "licenses:check",
+        "cdk-floors:check",
+        "cdk-flags:check",
+        { "projects": "*", "target": "build" },
+        { "projects": "*", "target": "check:exports" },
+        { "projects": "*", "target": "lint" },
+        { "projects": "*", "target": "typecheck" },
+        { "projects": "*", "target": "validate" },
+        { "projects": "*", "target": "test" }
+      ],
+      "cache": false
     }
   }
 }

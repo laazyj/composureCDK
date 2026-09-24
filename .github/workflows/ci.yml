@@ -71,14 +71,14 @@ jobs:
           npm_config_engine_strict: ${{ matrix.node-version != 20 }}
 
       - name: Check formatting
-        run: npm run format:check
+        run: npx nx prettier:check
 
       # `verify` and the steps below are two lists of the same gates. This
       # fails if a gate is added to `verify` with no step here — which is how
       # `catalogue:check` came to be enforced only at push time. It checks a
       # step exists, not that it runs: a step guarded by an `if:` still counts.
       - name: Check CI covers every verify gate
-        run: npm run ci:covers-verify
+        run: npx nx ci:covers-verify
 
       # Workflow linting is Node-independent, so one leg is enough. Keyed to the
       # matrix's first entry rather than a literal version: `[0]` always selects
@@ -86,56 +86,57 @@ jobs:
       # nothing the moment 24 leaves the matrix — silently dropping the gate,
       # which is the failure mode this whole check exists to prevent.
       #
-      # Runs before the build so a malformed workflow fails in seconds, matching
-      # its position in `npm run verify`. This is also the only pre-merge signal
+      # Kept early so a malformed workflow fails the job in seconds. `nx verify`
+      # has no such ordering — its gates are one unordered graph, so CI is where
+      # cheap-gate-first lives. This is also the only pre-merge signal
       # for workflow changes that cannot test themselves: `workflow_run`
       # listeners always dispatch the default-branch copy, and an edited trigger
       # is not exercised until it next fires.
       - name: Lint workflows
         if: matrix.node-version == fromJSON(inputs.node-versions || '[20, 22, 24, 26]')[0]
-        run: npm run actionlint
+        run: npx nx actionlint
 
       - name: Typecheck
-        run: npm run typecheck
+        run: npx nx run-many -t typecheck
 
       - name: Build
-        run: npm run build
+        run: npx nx run-many -t build
 
       # Both need Build first: one imports each package's `dist`, the other
       # asserts every `files` entry exists — and `files` lists `dist`.
       - name: Check constraint catalogue in sync
-        run: npm run catalogue:check
+        run: npx nx catalogue:check
 
       - name: Check every published package ships what it declares
-        run: npm run licenses:check
+        run: npx nx licenses:check
 
       - name: Check exports
-        run: npm run check:exports
+        run: npx nx run-many -t check:exports
 
       - name: Lint
-        run: npm run lint
+        run: npx nx run-many -t lint
 
       # Cheap gate: each package's peerDependencies.aws-cdk-lib must match the
       # cdk-floors.json manifest (ADR-0008).
       - name: Check CDK floor ranges in sync
-        run: npm run cdk-floors:check
+        run: npx nx cdk-floors:check
 
       # Cheap gate: every CDK feature flag for a service we wrap carries a
       # decision in cdk-flags.json, and the adopted ones match the examples'
       # cdk.json. Fails when a CDK upgrade ships a flag nobody has triaged.
       - name: Check CDK feature flags reviewed
-        run: npm run cdk-flags:check
+        run: npx nx cdk-flags:check
 
       # Synthesises the example stacks once and fails on any CloudFormation
-      # Validate finding. Same step `npm run verify` runs locally, so this
+      # Validate finding. Same step `npx nx verify` runs locally, so this
       # should only ever fire for something that skipped the pre-push hook.
       - name: Validate example stacks
-        run: npm run validate
+        run: npx nx run-many -t validate
 
       # id: test — the coverage steps below key off whether this actually ran.
       - name: Test
         id: test
-        run: npm run test
+        run: npx nx run-many -t test
 
       # Self-contained coverage reporting (no external service): merge every
       # package's json-summary output into one markdown table
@@ -162,7 +163,7 @@ jobs:
       # must stay quiet rather than fail a second time on the same root cause.
       - name: Build coverage summary
         if: always() && matrix.node-version == 24 && steps.test.conclusion != 'skipped'
-        run: npm run coverage:summary
+        run: npx nx coverage:summary
 
       # The workflow_run listener has no access to this run's PR context, so the
       # number travels with the artifact.
@@ -252,4 +253,4 @@ jobs:
       # No `npm ci` — enforce does the floor-pinned install itself, and the
       # fresh checkout is the clean tree the npm override requires.
       - name: Enforce
-        run: npm run cdk-floors:enforce
+        run: npx nx cdk-floors:enforce

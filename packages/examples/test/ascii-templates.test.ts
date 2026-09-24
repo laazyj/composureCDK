@@ -15,7 +15,7 @@ const MAX_REPORTED = 5;
  * `JSON.stringify` escapes control characters to ASCII text, so scanning its
  * output for anything outside printable ASCII is exactly the template-level
  * question. Synthesising into the package's own `cdk.out` keeps the staged
- * assets reclaimable by `npm run clean` rather than leaking to the system
+ * assets reclaimable by `nx clean` rather than leaking to the system
  * temp directory.
  */
 describe("synthesised example templates", () => {

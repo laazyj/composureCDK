@@ -1,6 +1,6 @@
 # @composurecdk/bedrockagentcore
 
-Amazon Bedrock AgentCore for [ComposureCDK](../../README.md): agent runtimes, memory and gateways, with secure defaults, consumer-side grants and CloudWatch alarms.
+Amazon Bedrock AgentCore for [ComposureCDK](../../README.md): agent runtimes, memory, gateways and evaluations, with secure defaults, consumer-side grants and CloudWatch alarms.
 
 It builds on the stable [`aws-cdk-lib/aws-bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html) module. Model access comes from [`@composurecdk/bedrock`](../bedrock/README.md).
 
@@ -116,6 +116,46 @@ createRuntimeBuilder()
   // …
   .grant(gatewayGrants.invoke(ref<GatewayBuilderResult>("tools").get("gateway")));
 ```
+
+## Evaluations
+
+`createEvaluatorBuilder()` builds a custom evaluator. An LLM-as-a-judge evaluator takes its model as a `@composurecdk/bedrock` target, and the result returns it as `judge`. Built-in evaluators are not resources; select them with `EvaluatorSelector.builtin(...)`.
+
+`createOnlineEvaluationBuilder()` scores a sample of an agent's traces, at the service's default 10%. It is created enabled. Its execution role can read the traces and write results, but has **no model access**: CDK's role would allow `bedrock:InvokeModel` on every model in every Region. Grant each judge explicitly:
+
+```ts
+compose(
+  {
+    tone: createEvaluatorBuilder()
+      .evaluatorName("tone")
+      .level(EvaluationLevel.TRACE)
+      .llmAsAJudge({ model: haiku, instructions, ratingScale }),
+    quality: createOnlineEvaluationBuilder()
+      .onlineEvaluationConfigName("support_quality")
+      .dataSource(
+        ref<RuntimeBuilderResult>("agent").map((r) =>
+          DataSourceConfig.fromAgentRuntimeEndpoint(r.runtime),
+        ),
+      )
+      .evaluators([
+        EvaluatorSelector.builtin(BuiltinEvaluator.HELPFULNESS),
+        ref<EvaluatorBuilderResult>("tone").get("selector"),
+      ])
+      .grant(modelGrants.invoke(haiku)),
+  },
+  { tone: [], quality: ["agent", "tone"] },
+);
+```
+
+Score alarms are opt-in. Each fires when an evaluator's hourly average score is below the threshold in 2 of 3 hours, and is keyed by the evaluator's metric name in `Bedrock-AgentCore/Evaluations`:
+
+```ts
+createOnlineEvaluationBuilder().recommendedAlarms({
+  scores: { "Builtin.Helpfulness": { threshold: 0.5 } },
+});
+```
+
+Online evaluation needs [CloudWatch Transaction Search](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Transaction-Search.html) enabled in the account (#543), and an agent instrumented with ADOT.
 
 ## Alarms
 

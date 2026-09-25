@@ -61,6 +61,10 @@
       "floor": "2.183.0",
       "gatedBy": "aws-xray.CfnTransactionSearchConfig (introduced 2.183.0)"
     },
+    "bedrockagentcore": {
+      "floor": "2.255.0",
+      "gatedBy": "aws-bedrockagentcore.RuntimeEndpoint, the stable AgentCore L2s (introduced 2.255.0)"
+    },
     "acm": {
       "floor": "2.119.0",
       "gatedBy": "aws-certificatemanager.KeyAlgorithm (introduced 2.119.0)"

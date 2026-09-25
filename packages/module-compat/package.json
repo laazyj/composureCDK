@@ -19,6 +19,7 @@
     "@composurecdk/acm": "^0.10.0",
     "@composurecdk/apigateway": "^0.10.0",
     "@composurecdk/bedrock": "^0.10.0",
+    "@composurecdk/bedrockagentcore": "^0.10.0",
     "@composurecdk/budgets": "^0.10.0",
     "@composurecdk/cloudformation": "^0.10.0",
     "@composurecdk/cloudfront": "^0.10.0",

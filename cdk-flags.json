@@ -4,6 +4,7 @@
     "acm": ["aws-certificatemanager"],
     "apigateway": ["aws-apigateway"],
     "bedrock": ["aws-bedrock"],
+    "bedrockagentcore": ["aws-bedrockagentcore"],
     "budgets": ["aws-budgets"],
     "cdk-testing": [],
     "cloudformation": ["aws-cloudformation"],

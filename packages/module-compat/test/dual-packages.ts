@@ -11,6 +11,7 @@ export const DUAL_PACKAGES = [
   { name: "@composurecdk/acm", probe: "createCertificateBuilder" },
   { name: "@composurecdk/apigateway", probe: "createRestApiBuilder" },
   { name: "@composurecdk/bedrock", probe: "createModelAlarmBuilder" },
+  { name: "@composurecdk/bedrockagentcore", probe: "createRuntimeBuilder" },
   { name: "@composurecdk/budgets", probe: "createBudgetBuilder" },
   { name: "@composurecdk/cloudformation", probe: "createStackBuilder" },
   { name: "@composurecdk/cloudfront", probe: "createDistributionBuilder" },

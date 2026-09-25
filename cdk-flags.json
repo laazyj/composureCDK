@@ -31,7 +31,8 @@
     "s3": ["aws-s3", "aws-s3-deployment", "s3-notifications"],
     "ses": ["aws-ses"],
     "sns": ["aws-sns", "aws-sns-subscriptions"],
-    "sqs": ["aws-sqs"]
+    "sqs": ["aws-sqs"],
+    "xray": ["aws-xray"]
   },
   "statusReasons": {
     "no-effect": "Setting it at its recommended value changes nothing in the assembly `cdk-flags audit` synthesises \u2014 14 example stacks, roughly 20 of the ~50 builder factories, compared on each stack's whole cloud-assembly artifact rather than a chosen subset of its fields. Of those fields only the template, stack tags and stack dependencies vary between examples today; the rest are synthesizer constants. Evidence about what the examples ship, not a claim about every builder and prop, and not about deploy-time or runtime behaviour."

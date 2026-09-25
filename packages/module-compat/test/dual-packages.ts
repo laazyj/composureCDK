@@ -30,4 +30,5 @@ export const DUAL_PACKAGES = [
   { name: "@composurecdk/ses", probe: "createEmailIdentityBuilder" },
   { name: "@composurecdk/sns", probe: "createTopicBuilder" },
   { name: "@composurecdk/sqs", probe: "createQueueBuilder" },
+  { name: "@composurecdk/xray", probe: "createTransactionSearchBuilder" },
 ] as const;

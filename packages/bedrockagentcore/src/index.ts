@@ -49,6 +49,15 @@ export {
 } from "./runtime-builder.js";
 export { RUNTIME_DEFAULTS } from "./runtime-defaults.js";
 export {
+  createSessionQuotaAlarmBuilder,
+  type ISessionQuotaAlarmBuilder,
+  type QuotaAlarmConfig,
+  SESSION_QUOTA_ALARM_DEFAULTS,
+  type SessionQuotaAlarmBuilderProps,
+  type SessionQuotaAlarmConfig,
+  type SessionQuotaAlarmBuilderResult,
+} from "./session-quota-alarm-builder.js";
+export {
   createRuntimeEndpointBuilder,
   type IRuntimeEndpointBuilder,
   type RuntimeEndpointBuilderProps,

@@ -176,3 +176,14 @@ createRuntimeBuilder().recommendedAlarms({
   throttles: false,
 });
 ```
+
+### Session quotas
+
+`ActiveSessionCount` covers the whole account and Region, so its alarms come from one `createSessionQuotaAlarmBuilder()` per account and Region, not from each runtime. Each alarm is opt-in and needs the account's quota from Service Quotas, because quotas vary by Region and can be raised. It fires at 80% of the quota unless `thresholdPercent` says otherwise.
+
+```ts
+createSessionQuotaAlarmBuilder().recommendedAlarms({
+  runtime: { quota: 2500 },
+  browser: { quota: 1000 },
+});
+```

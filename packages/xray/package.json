@@ -1,0 +1,76 @@
+{
+  "name": "@composurecdk/xray",
+  "version": "0.10.2",
+  "description": "Composable AWS X-Ray: account-level CloudWatch Transaction Search",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
+    "directory": "packages/xray"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "aws",
+    "cdk",
+    "aws-cdk",
+    "infrastructure-as-code",
+    "iac",
+    "composurecdk",
+    "xray",
+    "tracing",
+    "observability",
+    "transaction-search"
+  ],
+  "author": "Jason Duffett (https://github.com/laazyj)",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "tshy": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": "./src/index.ts"
+    }
+  },
+  "peerDependencies": {
+    "@composurecdk/core": "^0.10.0",
+    "aws-cdk-lib": "^2.183.0",
+    "constructs": "^10.0.0"
+  },
+  "devDependencies": {
+    "@composurecdk/cdk-testing": "*",
+    "@types/node": "^26.6.1",
+    "aws-cdk-lib": "^2.269.0",
+    "constructs": "^10.8.1",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.0"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    }
+  },
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "module": "./dist/esm/index.js",
+  "nx": {
+    "tags": [
+      "scope:lib"
+    ]
+  }
+}

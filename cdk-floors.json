@@ -57,6 +57,10 @@
       "floor": "2.166.0",
       "gatedBy": "aws-bedrock.CfnApplicationInferenceProfile (introduced 2.166.0); also CfnGuardrailVersion (2.143.0), CfnGuardrail (2.140.0), tags on AWS::CloudWatch::Alarm (2.138.0) and FoundationModelIdentifier/ProvisionedModel (2.115.0)"
     },
+    "xray": {
+      "floor": "2.183.0",
+      "gatedBy": "aws-xray.CfnTransactionSearchConfig (introduced 2.183.0)"
+    },
     "acm": {
       "floor": "2.119.0",
       "gatedBy": "aws-certificatemanager.KeyAlgorithm (introduced 2.119.0)"

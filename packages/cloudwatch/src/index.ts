@@ -12,6 +12,15 @@ export {
 export { defaultAlarmName } from "./default-alarm-name.js";
 export { createAlarms } from "./create-alarms.js";
 export { resolveAlarmConfig, type ResolvedAlarmConfig } from "./resolve-alarm-config.js";
+export {
+  type QuotaAlarmConfig,
+  type QuotaAlarmOptions,
+  resolveQuotaAlarm,
+  resolveThresholdAlarms,
+  SUSTAINED_ALARM_DEFAULTS,
+  greaterThanAlarmDefinition,
+  type ThresholdAlarmSpec,
+} from "./threshold-alarms.js";
 export { alarmActionsPolicy } from "./policies/alarm-actions-policy.js";
 export type {
   AlarmActionsPolicyConfig,

@@ -1,8 +1,7 @@
 import { Duration } from "aws-cdk-lib";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { AlarmConfig, AlarmConfigDefaults, AlarmDefinition } from "@composurecdk/cloudwatch";
-import { resolveAlarmConfig } from "@composurecdk/cloudwatch";
-import { toDefinition } from "./alarm-definition.js";
+import { resolveAlarmConfig, greaterThanAlarmDefinition } from "@composurecdk/cloudwatch";
 
 /**
  * Controls the recommended alarms for model invocation logging. Set an alarm
@@ -99,7 +98,7 @@ export function resolveModelInvocationLoggingAlarmDefinitions(
       period: Duration.minutes(1),
     });
     return [
-      toDefinition(
+      greaterThanAlarmDefinition(
         key,
         metric,
         cfg,

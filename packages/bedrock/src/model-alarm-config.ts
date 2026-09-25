@@ -1,15 +1,4 @@
-import type { AlarmConfig } from "@composurecdk/cloudwatch";
-
-/**
- * Configuration for an alarm whose threshold is a fraction of a quota the
- * caller supplies.
- */
-export type QuotaAlarmConfig = Omit<AlarmConfig, "threshold"> & {
-  /** The applied quota, in the metric's unit. Required when enabling the alarm. */
-  quota: number;
-  /** Threshold as a fraction of {@link quota}, in (0, 1]. */
-  thresholdPercent?: number;
-};
+import type { AlarmConfig, QuotaAlarmConfig } from "@composurecdk/cloudwatch";
 
 /**
  * Controls which recommended alarms are created for a model. Set an alarm to

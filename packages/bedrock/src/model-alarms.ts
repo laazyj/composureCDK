@@ -3,12 +3,11 @@ import type { FoundationModelIdentifier } from "aws-cdk-lib/aws-bedrock";
 import { Metric, type MetricOptions } from "aws-cdk-lib/aws-cloudwatch";
 import type { IConstruct } from "constructs";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
-import { resolveAlarmConfig, resolveAlarmThresholdBasis } from "@composurecdk/cloudwatch";
 import {
+  resolveQuotaAlarm,
   resolveThresholdAlarms,
   type ThresholdAlarmSpec,
-  toDefinition,
-} from "./alarm-definition.js";
+} from "@composurecdk/cloudwatch";
 import type { ApplicationInferenceProfile, InferenceProfile } from "./inference-profile.js";
 import type { ModelAlarmConfig } from "./model-alarm-config.js";
 import { MODEL_ALARM_DEFAULTS } from "./model-alarm-defaults.js";
@@ -83,48 +82,6 @@ function thresholdAlarms(modelId: string): Record<ThresholdAlarmKey, ThresholdAl
   };
 }
 
-function quotaAlarm(
-  scope: IConstruct,
-  metrics: ModelMetrics,
-  config: ModelAlarmConfig["estimatedTpmQuotaUsage"],
-): AlarmDefinition[] {
-  if (!config) return [];
-  const quota = resolveAlarmThresholdBasis({
-    scope,
-    value: config.quota,
-    resolve: (q) => q,
-    warningId: "@composurecdk/bedrock:token-tpm-quota-alarm",
-    alarmLabel: "Bedrock estimated TPM quota usage",
-    suppressHint: "recommendedAlarms({ estimatedTpmQuotaUsage: false })",
-  });
-  if (quota === undefined) return [];
-  const percent =
-    config.thresholdPercent ?? MODEL_ALARM_DEFAULTS.estimatedTpmQuotaUsage.thresholdPercent;
-  if (!(quota > 0)) {
-    throw new Error(
-      `estimatedTpmQuotaUsage: quota must be a positive number, got ${String(quota)}.`,
-    );
-  }
-  if (!(percent > 0 && percent <= 1)) {
-    throw new Error(
-      `estimatedTpmQuotaUsage: thresholdPercent must be in (0, 1], got ${String(percent)}.`,
-    );
-  }
-  const cfg = resolveAlarmConfig(
-    { ...config, threshold: Math.floor(quota * percent) },
-    { ...MODEL_ALARM_DEFAULTS.optIn, threshold: 0 },
-  );
-  return [
-    toDefinition(
-      "estimatedTpmQuotaUsage",
-      metrics.metric("EstimatedTPMQuotaUsage", { statistic: "Maximum" }),
-      cfg,
-      `Estimated token usage for ${metrics.modelId} exceeds ${String(percent * 100)}% of the ` +
-        `${String(quota)} tokens-per-minute quota.`,
-    ),
-  ];
-}
-
 /** Resolves the recommended alarm configuration for a model's metrics. */
 export function resolveModelAlarmDefinitions(
   scope: IConstruct,
@@ -139,5 +96,19 @@ export function resolveModelAlarmDefinitions(
     (metricName, statistic) => metrics.metric(metricName, { statistic }),
   );
 
-  return [...definitions, ...quotaAlarm(scope, metrics, config?.estimatedTpmQuotaUsage)];
+  return [
+    ...definitions,
+    ...resolveQuotaAlarm({
+      scope,
+      key: "estimatedTpmQuotaUsage",
+      config: config?.estimatedTpmQuotaUsage,
+      metric: () => metrics.metric("EstimatedTPMQuotaUsage", { statistic: "Maximum" }),
+      defaultThresholdPercent: MODEL_ALARM_DEFAULTS.estimatedTpmQuotaUsage.thresholdPercent,
+      warningId: "@composurecdk/bedrock:token-tpm-quota-alarm",
+      alarmLabel: "Bedrock estimated TPM quota usage",
+      describe: (quota, percent) =>
+        `Estimated token usage for ${metrics.modelId} exceeds ${String(percent * 100)}% of the ` +
+        `${String(quota)} tokens-per-minute quota.`,
+    }),
+  ];
 }

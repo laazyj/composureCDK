@@ -1,7 +1,11 @@
 import { Duration } from "aws-cdk-lib";
 import { Metric, type MetricOptions } from "aws-cdk-lib/aws-cloudwatch";
-import type { AlarmConfig, AlarmDefinition } from "@composurecdk/cloudwatch";
-import { resolveThresholdAlarms, type ThresholdAlarmSpec } from "./alarm-definition.js";
+import {
+  type AlarmConfig,
+  type AlarmDefinition,
+  resolveThresholdAlarms,
+  type ThresholdAlarmSpec,
+} from "@composurecdk/cloudwatch";
 import type { GuardrailReference } from "./guardrail-builder.js";
 
 /** `AWS/Bedrock/Guardrails` metrics for one guardrail version. */

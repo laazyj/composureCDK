@@ -1,5 +1,4 @@
-import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
-import { SUSTAINED } from "./alarm-definition.js";
+import { type AlarmConfigDefaults, SUSTAINED_ALARM_DEFAULTS } from "@composurecdk/cloudwatch";
 
 interface ModelAlarmDefaults {
   enabled: true;
@@ -20,10 +19,10 @@ interface ModelAlarmDefaults {
  */
 export const MODEL_ALARM_DEFAULTS: ModelAlarmDefaults = {
   enabled: true,
-  invocationThrottles: { threshold: 0, ...SUSTAINED },
-  invocationServerErrors: { threshold: 0, ...SUSTAINED },
-  invocationClientErrors: { threshold: 0, ...SUSTAINED },
-  optIn: SUSTAINED,
+  invocationThrottles: { threshold: 0, ...SUSTAINED_ALARM_DEFAULTS },
+  invocationServerErrors: { threshold: 0, ...SUSTAINED_ALARM_DEFAULTS },
+  invocationClientErrors: { threshold: 0, ...SUSTAINED_ALARM_DEFAULTS },
+  optIn: SUSTAINED_ALARM_DEFAULTS,
   /** Leaves 20% headroom to act before requests are throttled. */
   estimatedTpmQuotaUsage: { thresholdPercent: 0.8 },
 };

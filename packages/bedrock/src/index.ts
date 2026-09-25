@@ -36,7 +36,8 @@ export {
   type ModelAlarmBuilderProps,
   type ModelAlarmBuilderResult,
 } from "./model-alarm-builder.js";
-export { type ModelAlarmConfig, type QuotaAlarmConfig } from "./model-alarm-config.js";
+export { type ModelAlarmConfig } from "./model-alarm-config.js";
+export { type QuotaAlarmConfig } from "@composurecdk/cloudwatch";
 export { MODEL_ALARM_DEFAULTS } from "./model-alarm-defaults.js";
 export { type ModelAlarmTarget, type ModelMetrics, modelMetrics } from "./model-alarms.js";
 export {

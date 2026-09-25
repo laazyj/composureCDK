@@ -54,7 +54,7 @@ PR.
 ## Development setup
 
 Prerequisites: **Node.js >= 22** and **shellcheck >= 0.9** on your `PATH`
-(`brew install shellcheck`, `sudo apt-get install shellcheck`). `npm run verify`
+(`brew install shellcheck`, `sudo apt-get install shellcheck`). `npx nx verify`
 lints the workflows unconditionally and the `pre-push` hook runs `verify`, so
 you need shellcheck to push whatever you changed — see
 [linting the workflows](docs/ci.md#linting-the-workflows).
@@ -69,15 +69,17 @@ This is an [nx](https://nx.dev/) monorepo; the publishable packages live under
 [`packages/`](packages/). nx is the only task runner — packages carry no npm
 `scripts`, and their targets are derived from each package's shape by
 [`tools/package-targets.mjs`](tools/package-targets.mjs). Use `npx nx` to run
-them; the root `npm run` scripts are thin aliases over `nx run-many`. See
-[docs/build-system.md](docs/build-system.md) for how the setup fits together.
+them. The root `package.json` also keeps `build`, `test`, `lint`, `format` and
+`verify` as one-line forwards to the matching nx target, so the familiar
+commands work. See [docs/build-system.md](docs/build-system.md) for how the
+setup fits together.
 
 ```sh
 # Build everything
-npm run build
+npm run build          # or: npx nx run-many -t build
 
 # Test everything
-npm run test
+npm test               # or: npx nx run-many -t test
 
 # Work on a single package
 npx nx build      @composurecdk/core
@@ -118,7 +120,7 @@ and is referenced (not duplicated) here. The highlights:
   runs it automatically:
 
   ```sh
-  npm run verify
+  npx nx verify
   ```
 
   This chains build, export checks (`attw` + `publint`), lint, format check, and
@@ -127,8 +129,8 @@ and is referenced (not duplicated) here. The highlights:
 - Auto-fix lint and formatting where possible:
 
   ```sh
-  npm run lint:fix
-  npm run format
+  npx nx run-many -t lint -- --fix
+  npx nx prettier:write
   ```
 
 - Add or update tests for the behaviour you change.

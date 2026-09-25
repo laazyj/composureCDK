@@ -20,7 +20,7 @@ standard.
 
 **Every publishable `@composurecdk/*` package ships both an ESM and a CommonJS
 build, produced by [`tshy`](https://github.com/isaacs/tshy). Regression
-enforcement runs as nx targets / npm scripts — locally first, with CI as a thin
+enforcement runs as nx targets — locally first, with CI as a thin
 executor of the same targets.**
 
 ### Build: `tshy`
@@ -49,18 +49,18 @@ Each package declares `engines.node: ">=20"`.
 
 ### Enforcement is local-first
 
-The enforcement mechanisms are nx targets / npm scripts, identical in shape to
+The enforcement mechanisms are nx targets, identical in shape to
 `build`/`lint`/`test`. CI runs the same targets — it is not where enforcement
-_lives_. A maintainer running `npm run verify` gets the exact gate CI runs.
+_lives_. A maintainer running `npx nx verify` gets the exact gate CI runs.
 
-| Mechanism                                             | What it catches                                                                                  | Feedback point                             |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| `composurecdk/no-cjs-incompatible-syntax` ESLint rule | `import.meta` / top-level `await` in `src/` — no CJS emit                                        | In-editor, instant                         |
-| `composurecdk/no-realm-bound-instanceof` ESLint rule  | `instanceof` against an imported class in `src/` — realm-bound, silently false across the hazard | In-editor, instant                         |
-| `attw` + `publint` (`check:exports` nx target)        | Broken/masquerading exports, dual-package issues, packaging mistakes                             | `npm run check:exports` / `npm run verify` |
-| `@composurecdk/module-compat` consumption tests       | A package failing to resolve under `require()` or `import`, or the CJS `cdk synth` path breaking | `npm test` / `npm run verify`              |
-| husky `pre-push` hook                                 | Any of the above reaching GitHub                                                                 | Automatic, before push                     |
-| CI Node 20 + 24 matrix                                | Version-specific resolution breakage                                                             | CI (the one genuinely CI-only check)       |
+| Mechanism                                             | What it catches                                                                                  | Feedback point                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `composurecdk/no-cjs-incompatible-syntax` ESLint rule | `import.meta` / top-level `await` in `src/` — no CJS emit                                        | In-editor, instant                                   |
+| `composurecdk/no-realm-bound-instanceof` ESLint rule  | `instanceof` against an imported class in `src/` — realm-bound, silently false across the hazard | In-editor, instant                                   |
+| `attw` + `publint` (`check:exports` nx target)        | Broken/masquerading exports, dual-package issues, packaging mistakes                             | `npx nx run-many -t check:exports` / `npx nx verify` |
+| `@composurecdk/module-compat` consumption tests       | A package failing to resolve under `require()` or `import`, or the CJS `cdk synth` path breaking | `npx nx run-many -t test` / `npx nx verify`          |
+| husky `pre-push` hook                                 | Any of the above reaching GitHub                                                                 | Automatic, before push                               |
+| CI Node 20 + 24 matrix                                | Version-specific resolution breakage                                                             | CI (the one genuinely CI-only check)                 |
 
 ### Dual-package hazard
 
@@ -110,7 +110,7 @@ cross-realm-safe discriminator.
   across the supported Node range, and it does not fix the `ts-node`/Jest CJS
   case in issue #119.
 - **Enforcement in CI only.** Rejected — it makes the feedback loop a push away.
-  composureCDK's CI already just runs `npm run` scripts, so enforcement is
+  composureCDK's CI already just runs nx targets, so enforcement is
   implemented as nx targets that run locally and in CI alike.
 
 ## Amendment (2026-09-18): `eslint-plugin` joins the standard

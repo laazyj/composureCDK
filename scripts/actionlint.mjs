@@ -5,7 +5,7 @@
  *
  * Wraps `actionlint` (via the `github-actionlint` npm package, which fetches
  * the official release binary) so the gate runs identically from a developer's
- * `npm run verify` and from CI — see docs/ci.md#linting-the-workflows.
+ * `npx nx verify` and from CI — see docs/ci.md#linting-the-workflows.
  *
  * The wrapper exists because actionlint treats shellcheck as *optional*: it
  * shells out to shellcheck only if it can find it, and silently reports a

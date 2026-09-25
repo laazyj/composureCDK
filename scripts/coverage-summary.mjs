@@ -6,7 +6,7 @@
  * `vitest.config.base.ts`) into a single markdown table.
  *
  * Self-contained coverage reporting for PRs — no external service. Run after
- * `npm run test` in CI; the output is:
+ * `npx nx run-many -t test` in CI; the output is:
  *
  *   1. printed to stdout,
  *   2. written to `coverage/coverage-summary.md` (the CI job feeds this file to
@@ -15,7 +15,7 @@
  *      on the Actions run page.
  *
  * Per-package pass/fail is already enforced by each `vitest.config.ts`'s
- * `perFile` thresholds during `npm run test`; this script only *reports*, it
+ * `perFile` thresholds during `npx nx run-many -t test`; this script only *reports*, it
  * does not gate.
  *
  * Usage:

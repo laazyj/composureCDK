@@ -22,7 +22,7 @@
  * directory entry, not just this instance.
  *
  * - default: write the missing or stale `LICENSE` copies.
- * - `--check`: exit non-zero on any problem. Wired into `npm run verify`, so
+ * - `--check`: exit non-zero on any problem. Wired into `npx nx verify`, so
  *   the root licence cannot change without the copies following it.
  *
  * Usage:
@@ -88,7 +88,7 @@ function main() {
       console.error(
         `${String(all.length)} problem(s) across ${String(packages.length)} published packages:\n  ` +
           `${all.join("\n  ")}\n` +
-          "Run `npm run licenses` to refresh the copies; manifest problems need an edit.",
+          "Run `npx nx licenses` to refresh the copies; manifest problems need an edit.",
       );
       process.exit(1);
     }

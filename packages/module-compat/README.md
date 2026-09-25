@@ -13,7 +13,7 @@ process per case:
   package, exercising the real `cdk synth` path from issue #119.
 
 This is a private, unpublished workspace package — it exists only to run in CI
-and `npm run verify`.
+and `npx nx verify`.
 
 ## Layout
 

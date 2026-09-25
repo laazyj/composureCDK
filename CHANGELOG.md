@@ -1,3 +1,26 @@
+## 0.10.2 (2026-09-25)
+
+### 🚀 Features
+
+- **bedrock:** add model grants, profiles and alarms ([e9ab369](https://github.com/laazyj/composureCDK/commit/e9ab369))
+- **bedrock:** add model invocation logging builder ([602c1dd](https://github.com/laazyj/composureCDK/commit/602c1dd))
+- **bedrock:** add guardrails and require them on model grants ([65a77b6](https://github.com/laazyj/composureCDK/commit/65a77b6))
+- **bedrock:** add application inference profiles ([1def3c7](https://github.com/laazyj/composureCDK/commit/1def3c7))
+- **examples:** triage order notes with a Bedrock model ([9c32e92](https://github.com/laazyj/composureCDK/commit/9c32e92))
+- **examples:** log the order processor's model invocations ([82708d9](https://github.com/laazyj/composureCDK/commit/82708d9))
+- **examples:** apply a guardrail to the order processor's model calls ([958edc3](https://github.com/laazyj/composureCDK/commit/958edc3))
+- **examples:** tag the order processor's model usage by profile ([dca4d62](https://github.com/laazyj/composureCDK/commit/dca4d62))
+
+### 🩹 Fixes
+
+- **cloudwatch:** give nested-stack alarms a literal default name ([#525](https://github.com/laazyj/composureCDK/issues/525))
+- **examples:** raise order queue visibility to 3 minutes ([d5c9322](https://github.com/laazyj/composureCDK/commit/d5c9322))
+- **lint:** ignore tshy's build intermediates ([7dd3bc3](https://github.com/laazyj/composureCDK/commit/7dd3bc3))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.10.1 (2026-09-21)
 
 ### 🚀 Features

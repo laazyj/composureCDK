@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/bedrock",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Composable Amazon Bedrock model access: cross-Region inference profiles, invocation grants and alarms",
   "repository": {
     "type": "git",

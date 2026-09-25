@@ -8,6 +8,11 @@
     "includedScripts": []
   },
   "scripts": {
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
+    "lint": "nx run-many -t lint",
+    "format": "nx prettier:write",
+    "verify": "nx verify",
     "prepare": "husky"
   },
   "repository": {

@@ -69,15 +69,17 @@ This is an [nx](https://nx.dev/) monorepo; the publishable packages live under
 [`packages/`](packages/). nx is the only task runner — packages carry no npm
 `scripts`, and their targets are derived from each package's shape by
 [`tools/package-targets.mjs`](tools/package-targets.mjs). Use `npx nx` to run
-them — the root `package.json` carries no task scripts. See
-[docs/build-system.md](docs/build-system.md) for how the setup fits together.
+them. The root `package.json` also keeps `build`, `test`, `lint`, `format` and
+`verify` as one-line forwards to the matching nx target, so the familiar
+commands work. See [docs/build-system.md](docs/build-system.md) for how the
+setup fits together.
 
 ```sh
 # Build everything
-npx nx run-many -t build
+npm run build          # or: npx nx run-many -t build
 
 # Test everything
-npx nx run-many -t test
+npm test               # or: npx nx run-many -t test
 
 # Work on a single package
 npx nx build      @composurecdk/core

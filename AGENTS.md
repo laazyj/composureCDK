@@ -27,13 +27,13 @@ npx nx actionlint
 
 ## Build system
 
-This is an nx monorepo and **nx is the only task runner**. There are no task scripts anywhere — not in the packages, not at the root — so `npx nx` is the single entry point. Packages' targets are derived from their shape by [`tools/package-targets.mjs`](tools/package-targets.mjs); the workspace-wide gates are targets on the `workspace-root` project in [`project.json`](project.json). `npx nx verify` runs the lot, and is what the pre-push hook and CI run. See [docs/build-system.md](docs/build-system.md) for why it is built this way — read it before changing `nx.json`, `project.json` or the plugin.
+This is an nx monorepo and **nx is the only task runner**. Packages' targets are derived from their shape by [`tools/package-targets.mjs`](tools/package-targets.mjs); the workspace-wide gates are targets on the `workspace-root` project in [`project.json`](project.json). `npx nx verify` runs the lot, and is what the pre-push hook and CI run. The root `package.json` keeps five scripts (`build`, `test`, `lint`, `format`, `verify`) purely so the familiar commands work; each is a one-line forward to an nx target and nothing more. See [docs/build-system.md](docs/build-system.md) for why it is built this way — read it before changing `nx.json`, `project.json` or the plugin.
 
 **Install dependencies with `npx -y npm@11 ci`**, not `npm install -g npm@11` — the self-upgrade fails in agent sandboxes.
 
 Rules:
 
-- **Never add a `scripts` block**, to a package or to the root. At the root it hides a gate from the graph; in a package it silently shadows the derived target and puts the task back behind `npm run`, which is what [#323](https://github.com/laazyj/composureCDK/issues/323) was.
+- **Never add a `scripts` block to a package.** It silently shadows the derived target and puts the task back behind `npm run`, which is what [#323](https://github.com/laazyj/composureCDK/issues/323) was. A root script is allowed only if it forwards to one nx target verbatim — no flags, no `&&`, no logic. Anything that needs configuration is a target, not a script.
 - **The plugin supplies the command; `targetDefaults` in [`nx.json`](nx.json) supply the scheduling** (`dependsOn`, `cache`, `inputs`, `outputs`). A target unique to one package goes in that package's own `project.json`, not behind a conditional in the plugin.
 - **The plugin must not import anything the repo builds** — nx loads it during graph construction. This is also why `@nx/eslint` is not used.
 - **A new workspace-wide gate** is a target on `workspace-root`, and must be added to `verify`'s `dependsOn` and to `ci.yml`; `npx nx ci:covers-verify` fails otherwise.

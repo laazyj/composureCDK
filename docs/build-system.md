@@ -22,7 +22,23 @@ A target genuinely unique to one package belongs in that package's own `project.
 
 ## Root gates and the single entry point
 
-The root `package.json` carries no task scripts — only `prepare`, which npm's own lifecycle requires. Everything else is an nx target, so `npx nx <target>` is the one way to run anything, and `npx nx verify` is the whole gate. The husky `pre-push` hook and every CI step go through it.
+Every gate is an nx target, so `npx nx <target>` is the one way to run anything and `npx nx verify` is the whole gate. The husky `pre-push` hook and every CI step go through it.
+
+The root `package.json` keeps five scripts anyway — `build`, `test`, `lint`, `format`, `verify` — plus `prepare`, which npm's lifecycle requires. They exist for familiarity: `npm test` and `npm run build` are what a first-time contributor, an IDE task list or a generic CI template reaches for first, and having them cost nothing is better than having them be wrong. Each is a single verbatim forward:
+
+```json
+"build": "nx run-many -t build",
+"test": "nx run-many -t test",
+"lint": "nx run-many -t lint",
+"format": "nx prettier:write",
+"verify": "nx verify"
+```
+
+The rule that keeps this from becoming two entry points again is that **a root script may add no configuration** — no flags, no `&&` chains, no logic. That is the line the old `verify` crossed: it chained thirteen gates with `&&`, which made it the only definition of what the gate was, invisible to the graph. A forwarder cannot drift, because there is nothing in it to drift.
+
+They stay out of the graph because the root manifest sets `"nx": { "includedScripts": [] }`. Without that, nx would infer a target from each one and run it through `npm run` — the wrapping [#323](https://github.com/laazyj/composureCDK/issues/323) was about, and `build` would recurse into itself.
+
+`format` forwards to `prettier:write` rather than a same-named target because `nx format` is a built-in nx command; see below.
 
 The workspace-wide gates — `prettier:check`, `actionlint`, `ci:covers-verify`, `catalogue:check`, `licenses:check`, `cdk-floors:check`, `cdk-flags:check` and their write-side siblings — are targets on the `workspace-root` project in [`project.json`](../project.json). They were npm scripts, which made them invisible to the graph: they could not be scheduled against the packages' work, and `verify` had to chain them by hand with `&&`, spawning an npm process per gate. As one graph the cold gate drops from ~123s to ~102s and the warm one from ~10.3s to ~4.6s.
 

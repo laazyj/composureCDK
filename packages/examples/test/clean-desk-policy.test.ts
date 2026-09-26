@@ -151,15 +151,22 @@ describe("cleanDeskPolicy", () => {
     // defaults to RETAIN; it is an L2 `LogGroup`, so the LogGroup injector
     // covers it without a Bedrock-specific one.
     it("sets the invocation-logging and processor log groups to Delete", () => {
-      const logGroups = Object.values(
-        template.findResources("AWS::Logs::LogGroup") as Record<
-          string,
-          { DeletionPolicy?: string }
-        >,
-      );
+      const logGroups = template.findResources("AWS::Logs::LogGroup") as Record<
+        string,
+        { DeletionPolicy?: string }
+      >;
+      // Named by logical id: the policy adds log groups of its own (one per
+      // helper function), so a count would break whenever that changes.
+      const deletionPolicies = [
+        "OrderProcessorinvocationLoggingLogGroup",
+        "OrderProcessorprocessorLogGroup",
+      ]
+        .map((prefix) =>
+          Object.entries(logGroups).find(([logicalId]) => logicalId.startsWith(prefix)),
+        )
+        .map((entry) => entry?.[1].DeletionPolicy);
 
-      expect(logGroups).toHaveLength(2);
-      expect(logGroups.map((logGroup) => logGroup.DeletionPolicy)).toEqual(["Delete", "Delete"]);
+      expect(deletionPolicies).toEqual(["Delete", "Delete"]);
     });
 
     // The guardrail, its version and the application inference profile are

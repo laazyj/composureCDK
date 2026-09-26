@@ -62,11 +62,13 @@ nx hashes tracked files, so a glob that matches only gitignored paths matches no
 
 ## Lint
 
-`nx run-many -t lint` caches per project, so unchanged packages fast-succeed. Three things make that correct rather than merely fast.
+`nx run-many -t lint` caches per project, so unchanged packages fast-succeed. These make that correct rather than merely fast.
 
 **Loose top-level files** (`eslint.config.mjs`, `scripts/**`, `tools/**`, `vitest.config.base.ts`) belong to no package, so the `workspace-root` project in the root [`project.json`](../project.json) lints them. A plain `.mjs` module there also needs a line in `eslint.config.mjs` — both in `allowDefaultProject` and in the `disableTypeChecked` block, since these are untyped node modules; without the second, type-aware rules fire on inferred `any` and the file cannot lint clean.
 
 **The custom rules** in `@composurecdk/eslint-plugin` drive every package's lint result, so `targetDefaults.lint` both depends on that package's `build` (the flat config imports its compiled output) and lists its `src/**` as a lint input, so a rule change busts the dependent lint caches.
+
+**Dependencies are built first.** Type-aware rules resolve other `@composurecdk/*` packages through their built `dist/` types, so `lint` depends on `^build`, as `typecheck` and `test` do. Without it, lint in the same run can read a dependency's `dist/` before or while it is built, and fail on unresolved `any`.
 
 **Not the `@nx/eslint` inference plugin.** It infers the same `lint` targets, but it evaluates the root flat config during graph construction to skip projects with no lintable files. That imports `@composurecdk/eslint-plugin` before it is built, so every nx command fails on a fresh checkout. Our plugin reads only file names, so the config is not loaded until lint actually runs — by which point `dependsOn` has built the plugin.
 

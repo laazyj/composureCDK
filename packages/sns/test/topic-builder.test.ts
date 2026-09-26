@@ -209,8 +209,78 @@ describe("TopicBuilder", () => {
     });
   });
 
+  describe("policy", () => {
+    it("returns the topic's own policy, which holds the enforceSSL statement", () => {
+      const { result, template } = buildAndSynth();
+
+      expect(result.policy).toBeDefined();
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [Match.objectLike({ Sid: "AllowPublishThroughSSLOnly" })],
+        }),
+      });
+      expect(result.policy?.node.path).toBe(`${result.topic.node.path}/Policy`);
+    });
+
+    it("is undefined when the topic has no policy statements", () => {
+      const { result } = buildAndSynth((b) => b.enforceSSL(false));
+
+      expect(result.policy).toBeUndefined();
+    });
+  });
+
+  describe("allowServicePublish", () => {
+    it("adds the statement to the topic's own policy alongside enforceSSL", () => {
+      const { template } = buildAndSynth((b) => b.allowServicePublish("budgets.amazonaws.com"));
+
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [
+            Match.objectLike({ Sid: "AllowPublishThroughSSLOnly" }),
+            Match.objectLike({
+              Effect: "Allow",
+              Principal: { Service: "budgets.amazonaws.com" },
+              Action: "sns:Publish",
+              Resource: { Ref: Match.anyValue() },
+            }),
+          ],
+        }),
+      });
+    });
+
+    it("creates the policy when enforceSSL is off", () => {
+      const { result, template } = buildAndSynth((b) =>
+        b.enforceSSL(false).allowServicePublish("budgets.amazonaws.com"),
+      );
+
+      expect(result.policy).toBeDefined();
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+    });
+
+    it("adds conditions to the statement", () => {
+      const { template } = buildAndSynth((b) =>
+        b.allowServicePublish("codestar-notifications.amazonaws.com", {
+          conditions: { StringEquals: { "aws:SourceAccount": "123456789012" } },
+        }),
+      );
+
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Principal: { Service: "codestar-notifications.amazonaws.com" },
+              Condition: { StringEquals: { "aws:SourceAccount": "123456789012" } },
+            }),
+          ]),
+        }),
+      });
+    });
+  });
+
   describe("[COPY_STATE]", () => {
-    it("preserves #customAlarms and #subscriptions across .copy()", () => {
+    it("preserves #customAlarms, #subscriptions and #servicePublishers across .copy()", () => {
       const failedMetric = (topic: ITopic): Metric =>
         new Metric({
           namespace: "AWS/SNS",
@@ -227,17 +297,20 @@ describe("TopicBuilder", () => {
             a.metric(failedMetric).threshold(1).greaterThanOrEqual(),
           );
           b.addSubscription("first", new EmailSubscription("first@example.com"));
+          b.allowServicePublish("budgets.amazonaws.com");
         },
         mutate: (b) => {
           b.addAlarm("secondCustom", (a) =>
             a.metric(failedMetric).threshold(5).greaterThanOrEqual(),
           );
           b.addSubscription("second", new EmailSubscription("second@example.com"));
+          b.allowServicePublish("events.amazonaws.com");
         },
         build: (b) => b.build(new Stack(new App(), "S"), "Topic"),
         inspect: (r) => ({
           alarms: Object.keys(r.alarms).sort(),
           subscriptions: Object.keys(r.subscriptions).sort(),
+          policyStatements: r.policy?.document.statementCount,
         }),
       });
     });

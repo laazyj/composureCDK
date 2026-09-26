@@ -1,0 +1,106 @@
+import { Annotations, Aspects, CfnResource, Stack, Token } from "aws-cdk-lib";
+import { CfnTopicInlinePolicy, CfnTopicPolicy } from "aws-cdk-lib/aws-sns";
+import { type IConstruct } from "constructs";
+
+/**
+ * The warning id `warn` mode annotates with. Pass it to
+ * `Annotations.of(scope).acknowledgeWarning(...)` to silence a known case.
+ */
+export const TOPIC_POLICY_CONFLICT_WARNING_ID = "@composurecdk/sns:topic-policy-conflict";
+
+/** Configuration for {@link topicPolicyConflictPolicy}. */
+export interface TopicPolicyConflictPolicyConfig {
+  /**
+   * `throw` fails synth at the first conflict; `warn` annotates every
+   * conflict and carries on.
+   *
+   * @default "throw"
+   */
+  onViolation?: "throw" | "warn";
+}
+
+/**
+ * The topics a topic-policy resource writes to, keyed so two references to
+ * one topic compare equal, or `undefined` for any other node. Detected by
+ * resource-type string rather than `instanceof`, which fails across realms.
+ */
+function targetsOf(node: IConstruct): { document: unknown; keys: string[] } | undefined {
+  if (!CfnResource.isCfnResource(node)) return undefined;
+
+  let topics: unknown;
+  let document: unknown;
+  if (node.cfnResourceType === CfnTopicPolicy.CFN_RESOURCE_TYPE_NAME) {
+    const policy = node as CfnTopicPolicy;
+    topics = policy.topics;
+    document = policy.policyDocument;
+  } else if (node.cfnResourceType === CfnTopicInlinePolicy.CFN_RESOURCE_TYPE_NAME) {
+    const inline = node as CfnTopicInlinePolicy;
+    topics = [inline.topicArn];
+    document = inline.policyDocument;
+  } else {
+    return undefined;
+  }
+
+  const stack = Stack.of(node);
+  const resolved: unknown = stack.resolve(topics);
+  if (!Array.isArray(resolved)) return undefined;
+
+  // A literal ARN names the same topic from any stack; an intrinsic (`Ref`,
+  // `Fn::ImportValue`) only means something inside the stack it resolves in.
+  const stackPath = stack.node.path;
+  const keys = resolved.map((topic: unknown) =>
+    typeof topic === "string" && !Token.isUnresolved(topic)
+      ? topic
+      : `${stackPath}:${JSON.stringify(topic)}`,
+  );
+  return { document, keys };
+}
+
+/**
+ * Fails synth when more than one `AWS::SNS::TopicPolicy` or
+ * `AWS::SNS::TopicInlinePolicy` targets the same SNS topic. Each replaces the
+ * topic's single access policy, so the last one CloudFormation applies wins
+ * and nothing reports it. See the package README for the full rationale.
+ *
+ * Two resources holding the same `PolicyDocument` object render the same
+ * document, so the order cannot matter and they are not reported. This is
+ * what lets `@composurecdk/budgets` keep its retained transitional policy
+ * beside the topic's own.
+ *
+ * Installs a CDK Aspect; call it once on any scope before `app.synth()`.
+ *
+ * @example
+ * ```ts
+ * topicPolicyConflictPolicy(app);
+ * ```
+ */
+export function topicPolicyConflictPolicy(
+  scope: IConstruct,
+  config: TopicPolicyConflictPolicyConfig = {},
+): void {
+  const { onViolation = "throw" } = config;
+  const claims = new Map<string, { node: IConstruct; document: unknown }>();
+
+  Aspects.of(scope).add({
+    visit(node: IConstruct): void {
+      const found = targetsOf(node);
+      if (found === undefined) return;
+
+      for (const key of found.keys) {
+        const prior = claims.get(key);
+        if (prior === undefined) {
+          claims.set(key, { node, document: found.document });
+          continue;
+        }
+        if (prior.node === node || prior.document === found.document) continue;
+
+        const message =
+          `${node.node.path}: another topic policy (${prior.node.node.path}) already targets ` +
+          `SNS topic ${key}, and whichever CloudFormation applies last replaces the other. ` +
+          `Add statements with topic.addToResourcePolicy(...) instead.`;
+        if (onViolation === "throw") throw new Error(message);
+        Annotations.of(node).addWarningV2(TOPIC_POLICY_CONFLICT_WARNING_ID, message);
+      }
+    },
+  });
+}

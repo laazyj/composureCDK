@@ -77,6 +77,7 @@ Applies the AWS Cost Optimization pillar defaults: `ACTUAL` at 80% and `FORECAST
 | `limitUnit`                               | `"USD"`     | Matches the AWS Billing console default.                                      |
 | `recommendedThresholds.actualPercent`     | `80`        | Early-warning threshold before breach.                                        |
 | `recommendedThresholds.forecastedPercent` | `100`       | Trending-over-budget alert for the period.                                    |
+| `topicPolicy`                             | `true`      | Budgets cannot deliver to an SNS topic whose policy does not allow it.        |
 
 Exported as `BUDGET_DEFAULTS`.
 
@@ -90,6 +91,8 @@ The statement is added to the topic's own access policy with `topic.addToResourc
 
 - **A topic created in CDK:** a transitional policy that shares the topic's own `PolicyDocument`, so both resources always render the same document. It sits at the logical id earlier versions used for a separate Budgets-only policy, and is retained on removal. Deleting that old resource would make CloudFormation reset the topic's policy after the update had written the merged one. This keeps the upgrade safe and will be removed in a later release; with its `Retain` policy in place by then, removing it resets nothing.
 - **An imported topic** (`Topic.fromTopicArn`): CDK cannot add to its policy, so the builder creates a standalone `TopicPolicy` as before. It replaces whatever policy the topic already has, and the builder emits a synth warning (`@composurecdk/budgets:imported-topic-policy`) saying so.
+
+To manage the topics' access policies yourself, turn this off with `.topicPolicy(false)`. The builder then adds no statement and creates no policy; Budgets cannot deliver to a topic whose policy does not allow `budgets.amazonaws.com` to publish.
 
 ## Recommended Alarms
 

@@ -260,6 +260,20 @@ describe("BudgetBuilder", () => {
       Template.fromStack(stack).resourceCountIs("AWS::SNS::TopicPolicy", 2);
     });
 
+    it("leaves the topic's policy alone with topicPolicy(false)", () => {
+      const stack = newStack();
+      const topic = new Topic(stack, "AlertsTopic");
+
+      const result = createBudgetBuilder()
+        .limit({ amount: 50 })
+        .topicPolicy(false)
+        .notifyOnActual(100, { sns: topic })
+        .build(stack, "NoPolicyBudget");
+
+      expect(result.topicPolicies).toEqual({});
+      Template.fromStack(stack).resourceCountIs("AWS::SNS::TopicPolicy", 0);
+    });
+
     it("keeps the enforceSSL statement of a createTopicBuilder topic (#551)", () => {
       const stack = newStack();
       topicPolicyConflictPolicy(stack);

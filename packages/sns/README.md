@@ -290,6 +290,22 @@ createSubscriptionBuilder()
   .build(stack, "OrdersToQueue");
 ```
 
+## Topic Policy Conflict Policy
+
+An SNS topic has exactly one access policy. Every `AWS::SNS::TopicPolicy` and `AWS::SNS::TopicInlinePolicy` replaces it outright, so when two target the same topic, whichever CloudFormation applies last wins and the other's statements disappear. CloudFormation gives no error or warning, and the order can change between deployments.
+
+`topicPolicyConflictPolicy` catches this at synth. It installs a CDK Aspect over a scope and fails synth when a second policy resource targets a topic that already has one:
+
+```ts
+import { topicPolicyConflictPolicy } from "@composurecdk/sns";
+
+topicPolicyConflictPolicy(app); // or { onViolation: "warn" } to annotate instead
+```
+
+The usual cause is a `new TopicPolicy(...)` for a topic built in CDK, alongside the policy CDK creates for the topic itself (for example, for the `enforceSSL` default). Add to the topic's own policy with `topic.addToResourcePolicy(...)` instead.
+
+Two policy resources that share one `PolicyDocument` object always render the same document, so they are not reported. The check matches topics by the resolved `Topics`/`TopicArn` value: a literal ARN matches across stacks, and a `Ref` matches within its stack.
+
 ## Examples
 
 - [OrderProcessorStack](../examples/src/order-processor-app.ts) — SNS → SQS fan-out with a dead-letter queue on the subscription

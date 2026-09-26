@@ -15,3 +15,8 @@ export {
   type SubscriptionBuilderResult,
 } from "./subscription-builder.js";
 export { SUBSCRIPTION_DEFAULTS, type SubscriptionDefaults } from "./subscription-defaults.js";
+export {
+  topicPolicyConflictPolicy,
+  TOPIC_POLICY_CONFLICT_WARNING_ID,
+  type TopicPolicyConflictPolicyConfig,
+} from "./policies/topic-policy-conflict-policy.js";

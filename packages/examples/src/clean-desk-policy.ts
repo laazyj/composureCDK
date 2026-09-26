@@ -308,6 +308,11 @@ function resolveLogsBucketInStack(
  * - `aws-cdk-lib/aws-kms.Key` (also shortens the pending-deletion window to
  *   the 7-day AWS minimum)
  *
+ * `@composurecdk/bedrock` needs no injector of its own: its model invocation
+ * log group is an L2 `LogGroup` (covered above), and the guardrail, guardrail
+ * version and application inference profile are L1s with no removal policy,
+ * so CloudFormation deletes them by default.
+ *
  * If new stateful construct types are added to example stacks (e.g.
  * SQS queues), add a corresponding injector here.
  *

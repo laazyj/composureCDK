@@ -2,14 +2,10 @@ import { describe, it, expect } from "vitest";
 import { Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { AnyPrincipal, Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { newStack, testEnv } from "@composurecdk/cdk-testing";
-import { compose, ref } from "@composurecdk/core";
-import {
-  createTopicBuilder,
-  type TopicBuilderResult,
-  topicPolicyConflictPolicy,
-} from "@composurecdk/sns";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBudgetBuilder } from "../src/budget-builder.js";
 import { email } from "../src/email.js";
@@ -274,25 +270,31 @@ describe("BudgetBuilder", () => {
       Template.fromStack(stack).resourceCountIs("AWS::SNS::TopicPolicy", 0);
     });
 
-    it("keeps the enforceSSL statement of a createTopicBuilder topic (#551)", () => {
+    it("keeps the statements already in the topic's policy (#551)", () => {
       const stack = newStack();
-      topicPolicyConflictPolicy(stack);
+      // Stands in for createTopicBuilder()'s enforceSSL statement, which CDK
+      // only wires from 2.178.0, above this package's floor.
+      const topic = new Topic(stack, "AlertsTopic");
+      topic.addToResourcePolicy(
+        new PolicyStatement({
+          sid: "Existing",
+          effect: Effect.DENY,
+          principals: [new AnyPrincipal()],
+          actions: ["sns:Publish"],
+          resources: [topic.topicArn],
+        }),
+      );
 
-      compose(
-        {
-          alerts: createTopicBuilder().displayName("alerts"),
-          budget: createBudgetBuilder()
-            .budgetName("monthly")
-            .limit({ amount: 4, unit: "USD" })
-            .withRecommendedThresholds({ sns: ref<TopicBuilderResult>("alerts").get("topic") }),
-        },
-        { alerts: [], budget: ["alerts"] },
-      ).build(stack, "App");
+      createBudgetBuilder()
+        .budgetName("monthly")
+        .limit({ amount: 4, unit: "USD" })
+        .withRecommendedThresholds({ sns: topic })
+        .build(stack, "Budget");
 
       Template.fromStack(stack).allResourcesProperties("AWS::SNS::TopicPolicy", {
         PolicyDocument: Match.objectLike({
           Statement: [
-            Match.objectLike({ Sid: "AllowPublishThroughSSLOnly" }),
+            Match.objectLike({ Sid: "Existing" }),
             Match.objectLike({ Sid: "AllowBudgetsPublish" }),
           ],
         }),

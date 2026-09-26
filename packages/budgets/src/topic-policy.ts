@@ -7,7 +7,9 @@ import type { IConstruct } from "constructs";
 function isTopicPolicy(x: unknown): x is TopicPolicy {
   const cfn = (x as IConstruct | undefined)?.node.defaultChild;
   return (
-    CfnResource.isCfnResource(cfn) && cfn.cfnResourceType === CfnTopicPolicy.CFN_RESOURCE_TYPE_NAME
+    cfn !== undefined &&
+    CfnResource.isCfnResource(cfn) &&
+    cfn.cfnResourceType === CfnTopicPolicy.CFN_RESOURCE_TYPE_NAME
   );
 }
 

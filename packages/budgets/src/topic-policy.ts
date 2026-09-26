@@ -53,7 +53,7 @@ export function createBudgetsTopicPolicies(
         "@composurecdk/budgets:imported-topic-policy",
         `SNS topic ${key} was not created in this app, so its access policy cannot be added to. ` +
           `This TopicPolicy grants budgets.amazonaws.com SNS:Publish and replaces the topic's ` +
-          `existing policy.`,
+          `existing policy. Set topicPolicy(false) to manage the topic's policy yourself.`,
       );
       policies[key] = policy;
     } else if (isTopicPolicy(policyDependable)) {

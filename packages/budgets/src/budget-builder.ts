@@ -82,6 +82,15 @@ export interface BudgetBuilderProps {
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html
    */
   recommendedAlarms?: BudgetAlarmConfig | false;
+  /**
+   * Whether to grant `budgets.amazonaws.com` `SNS:Publish` on the SNS
+   * topics this budget notifies. Set to `false` when you manage those
+   * topics' access policies yourself; Budgets cannot deliver to a topic
+   * whose policy does not allow it.
+   *
+   * @default true
+   */
+  topicPolicy?: boolean;
 }
 
 /**
@@ -97,7 +106,8 @@ export interface BudgetBuilderResult {
    * statement itself is added to each topic's own policy; see
    * {@link createBudgetsTopicPolicies} for what is created and why.
    *
-   * `{}` when no SNS subscribers were configured.
+   * `{}` when no SNS subscribers were configured, or `topicPolicy` is
+   * `false`.
    */
   topicPolicies: Record<string, TopicPolicy>;
   /**
@@ -238,7 +248,11 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
   }
 
   build(scope: IConstruct, id: string, context: Record<string, object> = {}): BudgetBuilderResult {
-    const { recommendedAlarms: alarmConfig, ...budgetProps } = this.props;
+    const {
+      recommendedAlarms: alarmConfig,
+      topicPolicy = BUDGET_DEFAULTS.topicPolicy,
+      ...budgetProps
+    } = this.props;
 
     const budgetType = budgetProps.budgetType ?? BUDGET_DEFAULTS.budgetType;
     const timeUnit = budgetProps.timeUnit ?? BUDGET_DEFAULTS.timeUnit;
@@ -281,7 +295,7 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
 
     const budget = new CfnBudget(scope, id, cfnProps);
 
-    const topicPolicies = createBudgetsTopicPolicies(scope, id, snsTopics);
+    const topicPolicies = topicPolicy ? createBudgetsTopicPolicies(scope, id, snsTopics) : {};
     const alarms = buildBudgetAlarms(
       scope,
       id,

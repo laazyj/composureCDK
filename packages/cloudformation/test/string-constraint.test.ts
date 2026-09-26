@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { CfnParameter } from "aws-cdk-lib";
+import { newStack } from "@composurecdk/cdk-testing";
 import {
   sanitizeString,
   stringConstraint,
@@ -13,6 +15,10 @@ const LOWER = stringConstraint({
   allowed: "lowercase letters and hyphens",
   source: "https://example.test/constraint",
 });
+
+function unresolvedString(): string {
+  return new CfnParameter(newStack(), "Env").valueAsString;
+}
 
 describe("stringConstraint", () => {
   it("derives an anchored, length-bounded pattern from the spec", () => {
@@ -61,6 +67,15 @@ describe("validateString", () => {
       validateString("aBc", LOWER);
     }).toThrow(/is invalid. Allowed: lowercase letters and hyphens. See https:\/\/example.test/);
   });
+
+  it("skips a value holding an unresolved token", () => {
+    expect(() => {
+      validateString(unresolvedString(), LOWER);
+    }).not.toThrow();
+    expect(() => {
+      validateString(`BAD-${unresolvedString()}`, LOWER);
+    }).not.toThrow();
+  });
 });
 
 describe("sanitizeString", () => {
@@ -88,5 +103,10 @@ describe("sanitizeString", () => {
       source: "https://example.test",
     };
     expect(() => sanitizeString("abc", patternOnly)).toThrow(/cannot be sanitised/);
+  });
+
+  it("returns a value holding an unresolved token unchanged", () => {
+    const token = unresolvedString();
+    expect(sanitizeString(token, LOWER)).toBe(token);
   });
 });

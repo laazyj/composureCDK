@@ -1,4 +1,3 @@
-import { Token } from "aws-cdk-lib";
 import { charSets, stringConstraint, validateString } from "@composurecdk/cloudformation";
 
 /**
@@ -42,26 +41,23 @@ const SECURITY_GROUP_NAME = stringConstraint({
 });
 
 /**
- * Validates an EC2 security group description. Unresolved CDK tokens are
- * skipped — their value is resolved by CloudFormation and is not knowable at
- * synth (ADR-0010).
+ * Validates an EC2 security group description.
  *
  * @throws on invalid input.
  */
 export function validateSecurityGroupDescription(raw: string): void {
-  if (Token.isUnresolved(raw)) return;
   validateString(raw, SECURITY_GROUP_DESCRIPTION);
 }
 
 /**
  * Validates an EC2 security group name. AWS additionally reserves the `sg-`
  * prefix for generated group IDs, so a user-supplied name must not use it.
- * Unresolved CDK tokens are skipped (ADR-0010).
+ * The prefix check applies to tokens too, since a literal prefix survives
+ * resolution.
  *
  * @throws on invalid input.
  */
 export function validateSecurityGroupName(raw: string): void {
-  if (Token.isUnresolved(raw)) return;
   if (raw.startsWith("sg-")) {
     throw new Error(
       `EC2 SecurityGroup GroupName "${raw}" must not start with the reserved "sg-" prefix. See ${SG_SOURCE}.`,

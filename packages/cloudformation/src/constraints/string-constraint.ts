@@ -1,3 +1,5 @@
+import { Token } from "aws-cdk-lib";
+
 /**
  * The shared mechanism behind the AWS-property constraint catalogue.
  *
@@ -71,10 +73,15 @@ export function stringConstraint(spec: {
  * violation. Use for **user-authored** values the author can fix — the error
  * fires at the call site, naming the allowed set and linking the AWS doc.
  *
+ * A value holding an unresolved CDK token is skipped: its value is not
+ * knowable at synth (ADR-0010 rule 6). Every `validate*` wrapper inherits this
+ * guard, so none needs its own.
+ *
  * @throws If `value` is shorter than `minLength`, longer than `maxLength`, or
  * contains characters outside the constraint's pattern.
  */
 export function validateString(value: string, constraint: StringConstraint): void {
+  if (Token.isUnresolved(value)) return;
   if (constraint.minLength !== undefined && value.length < constraint.minLength) {
     throw new Error(
       `${constraint.name} "${value}" is shorter than the ${String(constraint.minLength)}-character minimum. See ${constraint.source}.`,
@@ -98,6 +105,9 @@ export function validateString(value: string, constraint: StringConstraint): voi
  * for **derived** values the author does not control (e.g. a DNS name composed
  * into a construct ID), where rewriting is the only sensible move.
  *
+ * A value holding an unresolved CDK token is returned unchanged — rewriting it
+ * would destroy the token (ADR-0010 rule 6).
+ *
  * @throws If the constraint is pattern-only and declares no sanitisation pattern.
  */
 export function sanitizeString(
@@ -110,6 +120,7 @@ export function sanitizeString(
       `${constraint.name} cannot be sanitised: the constraint has no character class.`,
     );
   }
+  if (Token.isUnresolved(value)) return value;
   let out = value.replace(constraint.sanitizePattern, replacement);
   if (constraint.maxLength !== undefined && out.length > constraint.maxLength) {
     out = out.slice(0, constraint.maxLength);

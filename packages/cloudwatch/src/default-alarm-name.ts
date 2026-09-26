@@ -1,5 +1,5 @@
-import { Stack } from "aws-cdk-lib";
 import type { IConstruct } from "constructs";
+import { stackNameSegments } from "@composurecdk/cloudformation";
 import { type AlarmName, joinAlarmName } from "./alarm-name.js";
 
 /**
@@ -15,10 +15,5 @@ import { type AlarmName, joinAlarmName } from "./alarm-name.js";
  * `alarmName` is not supplied on the {@link AlarmDefinition}.
  */
 export function defaultAlarmName(scope: IConstruct, id: string, key: string): AlarmName {
-  return joinAlarmName([...stackSegments(Stack.of(scope)), id, key]);
-}
-
-function stackSegments(stack: Stack): string[] {
-  const parent = stack.nestedStackParent;
-  return parent ? [...stackSegments(parent), stack.node.id] : [stack.stackName];
+  return joinAlarmName([...stackNameSegments(scope), id, key]);
 }

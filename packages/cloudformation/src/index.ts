@@ -7,6 +7,7 @@ export {
   type StackBuilderResult,
 } from "./stack-builder.js";
 export { singleStack, groupedStacks } from "./strategies.js";
+export { stackNameSegments } from "./stack-name-segments.js";
 export { outputs, type OutputDefinition, type OutputDefinitions } from "./outputs.js";
 export { taggedBuilder, type ITaggedBuilder, TAG_OVERRIDE_WARNING_NAME } from "./tagged-builder.js";
 export { applyBuilderTags } from "./apply-builder-tags.js";

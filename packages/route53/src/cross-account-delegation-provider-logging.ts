@@ -2,6 +2,7 @@ import { Annotations, CfnResource, Stack, Token } from "aws-cdk-lib";
 import { CfnFunction } from "aws-cdk-lib/aws-lambda";
 import { CfnLogGroup, type LogGroup } from "aws-cdk-lib/aws-logs";
 import type { IConstruct } from "constructs";
+import { stackNameSegments } from "@composurecdk/cloudformation";
 import { createLogGroupBuilder, type ILogGroupBuilder } from "@composurecdk/logs";
 
 /**
@@ -51,7 +52,7 @@ export type DelegationProviderLoggingConfig =
       /**
        * Customize the auto-created LogGroup sub-builder. Receives a builder
        * pre-seeded with the `/aws/lambda/<stackName>-cross-account-zone-delegation`
-       * log-group name; the retention/removal defaults from
+       * log-group name (`<stackName>` from `stackNameSegments`, joined by `/`); the retention/removal defaults from
        * {@link createLogGroupBuilder} are merged in at `build()` time and are
        * overridable by anything set here.
        *
@@ -133,7 +134,7 @@ export function applyDelegationProviderLogging(
     return undefined;
   }
 
-  const defaultName = `${DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX}/${stack.stackName}-cross-account-zone-delegation`;
+  const defaultName = `${DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX}/${stackNameSegments(stack).join("/")}-cross-account-zone-delegation`;
   let subBuilder: ILogGroupBuilder = createLogGroupBuilder().logGroupName(defaultName);
   if (cfg?.configure) {
     subBuilder = cfg.configure(subBuilder);

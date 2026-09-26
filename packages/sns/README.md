@@ -53,6 +53,24 @@ import { TOPIC_DEFAULTS } from "@composurecdk/sns";
 const topic = createTopicBuilder().topicName("my-topic").enforceSSL(false).build(stack, "MyTopic");
 ```
 
+## Topic Access Policy
+
+A topic has one access policy. CDK creates it as an `AWS::SNS::TopicPolicy` the first time a statement is added — by the `enforceSSL` default, by `allowServicePublish`, or by `topic.addToResourcePolicy(...)` — and every later statement joins that same policy. The build result returns it as `result.policy`, which CDK keeps private on `Topic`; it is `undefined` when the topic had no statements at build time.
+
+Use `allowServicePublish` to let an AWS service publish to the topic. The statement joins the topic's own policy, next to the `enforceSSL` statement:
+
+```ts
+createTopicBuilder()
+  .allowServicePublish("codestar-notifications.amazonaws.com", {
+    conditions: { StringEquals: { "aws:SourceAccount": Aws.ACCOUNT_ID } },
+  })
+  .build(stack, "Alerts");
+```
+
+`conditions` is optional; use one where the service supports it, to guard against the [confused deputy problem](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html). Integrations that wire themselves — EventBridge targets, S3 notifications, and [`@composurecdk/budgets`](../budgets/README.md) SNS subscribers — already add their statement to the topic's policy, so they need no `allowServicePublish`.
+
+Do not create another `TopicPolicy` for a topic built here: each policy resource replaces the topic's policy outright, so one of them is lost. [`topicPolicyConflictPolicy`](#topic-policy-conflict-policy) catches this at synth.
+
 ## Recommended Alarms
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

@@ -49,36 +49,33 @@ describe("createBudgetsTopicPolicies", () => {
 
     createBudgetsTopicPolicies(stack, "Budget", [topic]);
 
-    // The topic's own policy and the retained transitional policy both render
-    // the one shared document, so either order of application gives the same
-    // result.
     const template = Template.fromStack(stack);
-    template.resourceCountIs("AWS::SNS::TopicPolicy", 2);
-    template.allResourcesProperties("AWS::SNS::TopicPolicy", {
+    template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+    template.hasResourceProperties("AWS::SNS::TopicPolicy", {
       PolicyDocument: Match.objectLike({
         Statement: [EXISTING_STATEMENT, BUDGETS_STATEMENT],
       }),
     });
   });
 
-  it("keeps the transitional policy's logical id and retains it on removal", () => {
+  it("creates no policy of its own for a topic created in CDK", () => {
     const stack = newStack();
     const topic = new Topic(stack, "Alerts");
 
     const policies = createBudgetsTopicPolicies(stack, "Budget", [topic]);
 
-    const policy = policies[topic.node.path];
-    expect(policy.node.id).toBe(`BudgetTopicPolicy${topic.node.addr}`);
-    Template.fromStack(stack).hasResource("AWS::SNS::TopicPolicy", {
-      DeletionPolicy: "Retain",
-      UpdateReplacePolicy: "Retain",
+    expect(policies).toEqual({});
+    const template = Template.fromStack(stack);
+    template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+    template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+      PolicyDocument: Match.objectLike({ Statement: [BUDGETS_STATEMENT] }),
     });
   });
 
-  it("returns one policy per unique topic", () => {
+  it("returns one policy per unique imported topic", () => {
     const stack = newStack();
-    const a = new Topic(stack, "A");
-    const b = new Topic(stack, "B");
+    const a = Topic.fromTopicArn(stack, "A", "arn:aws:sns:us-east-1:123456789012:a");
+    const b = Topic.fromTopicArn(stack, "B", "arn:aws:sns:us-east-1:123456789012:b");
 
     const policies = createBudgetsTopicPolicies(stack, "Budget", [a, b, a]);
 
@@ -87,8 +84,9 @@ describe("createBudgetsTopicPolicies", () => {
 
   it("keeps policies distinct when topics in different scopes share a node id", () => {
     const stack = newStack();
-    const a = new Topic(new Construct(stack, "ScopeA"), "AlertsTopic");
-    const b = new Topic(new Construct(stack, "ScopeB"), "AlertsTopic");
+    const arn = "arn:aws:sns:us-east-1:123456789012:alerts";
+    const a = Topic.fromTopicArn(new Construct(stack, "ScopeA"), "AlertsTopic", arn);
+    const b = Topic.fromTopicArn(new Construct(stack, "ScopeB"), "AlertsTopic", arn);
 
     const policies = createBudgetsTopicPolicies(stack, "Budget", [a, b]);
 
@@ -106,22 +104,12 @@ describe("createBudgetsTopicPolicies", () => {
     const policies = createBudgetsTopicPolicies(stack, "Budget", [topic]);
 
     expect(Object.keys(policies)).toEqual([topic.node.path]);
+    expect(policies[topic.node.path].node.id).toBe(`BudgetTopicPolicy${topic.node.addr}`);
     const template = Template.fromStack(stack);
     template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
     template.hasResourceProperties("AWS::SNS::TopicPolicy", {
       PolicyDocument: Match.objectLike({ Statement: [BUDGETS_STATEMENT] }),
     });
     Annotations.fromStack(stack).hasWarning("*", Match.stringLikeRegexp("imported-topic-policy"));
-  });
-
-  it("warns when the topic's own policy cannot be found", () => {
-    const stack = newStack();
-    const topic = new Topic(stack, "Alerts");
-    topic.addToResourcePolicy = () => ({ statementAdded: true });
-
-    const policies = createBudgetsTopicPolicies(stack, "Budget", [topic]);
-
-    expect(policies).toEqual({});
-    Annotations.fromStack(stack).hasWarning("*", Match.stringLikeRegexp("topic-policy-not-found"));
   });
 });

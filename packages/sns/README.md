@@ -322,7 +322,7 @@ topicPolicyConflictPolicy(app); // or { onViolation: "warn" } to annotate instea
 
 The usual cause is a `new TopicPolicy(...)` for a topic built in CDK, alongside the policy CDK creates for the topic itself (for example, for the `enforceSSL` default). Add to the topic's own policy with `topic.addToResourcePolicy(...)` instead.
 
-Two policy resources that share one `PolicyDocument` object always render the same document, so they are not reported. The check matches topics by the resolved `Topics`/`TopicArn` value: a literal ARN matches across stacks, and a `Ref` matches within its stack.
+The check matches topics by the resolved `Topics`/`TopicArn` value: a literal ARN matches across stacks, and a `Ref` matches within its stack.
 
 ## Examples
 

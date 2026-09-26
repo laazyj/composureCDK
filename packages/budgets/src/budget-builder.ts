@@ -100,13 +100,14 @@ export interface BudgetBuilderResult {
   /** The `AWS::Budgets::Budget` construct. */
   budget: CfnBudget;
   /**
-   * `AWS::SNS::TopicPolicy` constructs the builder created for SNS topics
-   * referenced as notification subscribers, keyed by the topic's
-   * fully-qualified node path. The `budgets.amazonaws.com` publish
-   * statement itself is added to each topic's own policy; see
-   * {@link createBudgetsTopicPolicies} for what is created and why.
+   * `AWS::SNS::TopicPolicy` constructs the builder created for imported SNS
+   * topics referenced as notification subscribers, keyed by the topic's
+   * fully-qualified node path. For a topic created in CDK, the
+   * `budgets.amazonaws.com` publish statement is added to the topic's own
+   * policy and nothing is created here; see
+   * {@link createBudgetsTopicPolicies} for why.
    *
-   * `{}` when no SNS subscribers were configured, or `topicPolicy` is
+   * `{}` when no imported SNS topics were subscribed, or `topicPolicy` is
    * `false`.
    */
   topicPolicies: Record<string, TopicPolicy>;

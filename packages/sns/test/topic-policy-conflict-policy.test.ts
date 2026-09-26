@@ -93,7 +93,18 @@ describe("topicPolicyConflictPolicy", () => {
     expect(() => app.synth()).not.toThrow();
   });
 
-  it("allows policies that share one PolicyDocument", () => {
+  it("does not report a policy that names the same topic twice", () => {
+    const app = new App();
+    const stack = new Stack(app, "Stack");
+    const topic = Topic.fromTopicArn(stack, "Imported", IMPORTED_ARN);
+    const policy = new TopicPolicy(stack, "Twice", { topics: [topic, topic] });
+    policy.document.addStatements(publishStatement(topic));
+    topicPolicyConflictPolicy(app);
+
+    expect(() => Template.fromStack(stack)).not.toThrow();
+  });
+
+  it("reports policies even when they share one PolicyDocument", () => {
     const app = new App();
     const stack = new Stack(app, "Stack");
     const topic = new Topic(stack, "Alerts");
@@ -101,7 +112,7 @@ describe("topicPolicyConflictPolicy", () => {
     new TopicPolicy(stack, "Mirror", { topics: [topic], policyDocument: own.document });
     topicPolicyConflictPolicy(app);
 
-    expect(() => Template.fromStack(stack)).not.toThrow();
+    expect(() => Template.fromStack(stack)).toThrow(/already targets/);
   });
 
   it("warns instead of throwing in warn mode", () => {

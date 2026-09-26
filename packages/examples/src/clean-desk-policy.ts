@@ -13,7 +13,8 @@ import { APIGATEWAY_DISABLE_CLOUDWATCH_ROLE } from "aws-cdk-lib/cx-api";
 import { Bucket, CfnBucket, type BucketProps } from "aws-cdk-lib/aws-s3";
 import { Table, TableV2, type TableProps, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { Key, type KeyProps } from "aws-cdk-lib/aws-kms";
-import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
+import { CfnFunction } from "aws-cdk-lib/aws-lambda";
+import { LogGroup, RetentionDays, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
 import { RestApi, SpecRestApi } from "aws-cdk-lib/aws-apigateway";
 import { DatabaseCluster, type DatabaseClusterProps } from "@aws-cdk/aws-neptune-alpha";
@@ -280,13 +281,57 @@ function resolveLogsBucketInStack(
   return undefined;
 }
 
+const FUNCTION_LOG_GROUP_ID = "CleanDeskLogGroup";
+
+/**
+ * An {@link IAspect} that gives every Lambda function without a log group of
+ * its own one in the stack, so its logs are deleted with the stack.
+ *
+ * A function with no `LoggingConfig.LogGroup` writes to `/aws/lambda/<name>`,
+ * which Lambda creates on first invocation. That group is outside the
+ * template, so no removal policy reaches it and it outlives the stack. The
+ * functions this catches are the ones CDK creates for you: the
+ * `AwsCustomResource` provider, the S3 auto-delete provider, and any other
+ * helper a construct brings. Functions built by `@composurecdk/lambda` already
+ * have a log group and are left alone.
+ *
+ * The function references the new group, so CloudFormation creates the group
+ * first and deletes it last — after a custom resource's `onDelete` call, whose
+ * logs still have somewhere to go.
+ *
+ * Works on the L1 so it reaches raw `CfnResource` functions too: CDK's own
+ * `CustomResourceProvider` builds its handler that way, with no L2 and no
+ * logging option. The override sets only `LoggingConfig.LogGroup`, so any
+ * `LogFormat` the function already has is kept.
+ */
+class FunctionLogGroupAspect implements IAspect {
+  visit(node: IConstruct): void {
+    if (!CfnFunction.isCfnFunction(node)) return;
+    // Undefined on a raw `CfnResource`, which exposes no typed properties.
+    const existing = (node as Partial<CfnFunction>).loggingConfig as
+      CfnFunction.LoggingConfigProperty | undefined;
+    if (existing?.logGroup) return;
+
+    const scope = node.node.scope;
+    if (!scope || scope.node.tryFindChild(FUNCTION_LOG_GROUP_ID)) return;
+
+    const logGroup = new LogGroup(scope, FUNCTION_LOG_GROUP_ID, {
+      retention: RetentionDays.ONE_WEEK,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+    node.addPropertyOverride("LoggingConfig.LogGroup", logGroup.logGroupName);
+  }
+}
+
 /**
  * Registers {@link IPropertyInjector}s that set removal policies to
  * `RemovalPolicy.DESTROY` on all stateful construct types used in the
  * example stacks, and an {@link IAspect} that disables S3 server access
  * logging on source buckets before they are torn down (so destination
  * logs buckets can be emptied and deleted without racing in-flight log
- * deliveries).
+ * deliveries), and one that gives every Lambda function without a log
+ * group of its own one in the stack (so CDK's helper functions do not leave
+ * `/aws/lambda/*` groups behind).
  *
  * This ensures that every stateful resource created under `scope` — S3
  * buckets, CloudWatch log groups, API Gateway accounts / CloudWatch roles,
@@ -331,4 +376,5 @@ export function cleanDeskPolicy(scope: IConstruct): void {
   injectors.add(new KeyRemovalPolicyInjector());
 
   Aspects.of(scope).add(new DisableSourceLoggingOnDeleteAspect());
+  Aspects.of(scope).add(new FunctionLogGroupAspect());
 }

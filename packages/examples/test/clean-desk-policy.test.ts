@@ -5,6 +5,7 @@ import { Size } from "aws-cdk-lib";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Volume } from "aws-cdk-lib/aws-ec2";
+import { Code, Function as LambdaFunction, LoggingFormat, Runtime } from "aws-cdk-lib/aws-lambda";
 import { MockIntegration, RestApi, type RestApiProps } from "aws-cdk-lib/aws-apigateway";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
 import { buildExampleApp } from "../src/apps.js";
@@ -437,5 +438,84 @@ describe("cleanDeskPolicy", () => {
       );
 
     expect(retained).toEqual([]);
+  });
+
+  describe("function log groups", () => {
+    interface TemplateResource {
+      Type: string;
+      DeletionPolicy?: string;
+      Properties?: { LoggingConfig?: { LogGroup?: { Ref?: string } } };
+    }
+
+    /** The log group a function's `LoggingConfig` names, if it is in the template. */
+    function ownLogGroup(
+      fn: TemplateResource,
+      resources: Record<string, TemplateResource>,
+    ): TemplateResource | undefined {
+      const ref = fn.Properties?.LoggingConfig?.LogGroup?.Ref;
+      const logGroup = ref === undefined ? undefined : resources[ref];
+      return logGroup?.Type === "AWS::Logs::LogGroup" ? logGroup : undefined;
+    }
+
+    it("gives the S3 auto-delete provider a log group that is deleted with the stack", () => {
+      const template = buildWithPolicy((stack) => {
+        new Bucket(stack, "Bucket");
+      });
+      const resources = template.toJSON().Resources as Record<string, TemplateResource>;
+      const handlers = Object.values(resources).filter((r) => r.Type === "AWS::Lambda::Function");
+
+      expect(handlers).toHaveLength(1);
+      expect(handlers.map((fn) => ownLogGroup(fn, resources)?.DeletionPolicy)).toEqual(["Delete"]);
+    });
+
+    it("keeps a function's own log group and adds none", () => {
+      const template = buildWithPolicy((stack) => {
+        const logGroup = new LogGroup(stack, "Own", { retention: RetentionDays.ONE_WEEK });
+        new LambdaFunction(stack, "Fn", {
+          runtime: Runtime.NODEJS_22_X,
+          handler: "index.handler",
+          code: Code.fromInline("exports.handler = async () => {};"),
+          logGroup,
+        });
+      });
+
+      template.resourceCountIs("AWS::Logs::LogGroup", 1);
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        LoggingConfig: { LogGroup: { Ref: Match.stringLikeRegexp("^Own") } },
+      });
+    });
+
+    it("keeps a function's log format when adding the log group", () => {
+      const template = buildWithPolicy((stack) => {
+        new LambdaFunction(stack, "Fn", {
+          runtime: Runtime.NODEJS_22_X,
+          handler: "index.handler",
+          code: Code.fromInline("exports.handler = async () => {};"),
+          loggingFormat: LoggingFormat.JSON,
+        });
+      });
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        LoggingConfig: { LogFormat: "JSON", LogGroup: { Ref: Match.stringLikeRegexp("^Fn") } },
+      });
+    });
+
+    // The targeted tests above cannot see a helper function a new example
+    // brings in; this can. A function missing from it writes to an
+    // `/aws/lambda/*` group Lambda creates at runtime, which outlives the stack.
+    it("leaves no function across every example stack without a stack-owned log group", () => {
+      const unowned = buildExampleApp(exampleApp({ outdir: "cdk.out/clean-desk-log-groups" }))
+        .synth()
+        .stacks.flatMap(({ stackName, template }) => {
+          const resources =
+            (template as { Resources?: Record<string, TemplateResource> }).Resources ?? {};
+          return Object.entries(resources)
+            .filter(([, resource]) => resource.Type === "AWS::Lambda::Function")
+            .filter(([, fn]) => ownLogGroup(fn, resources) === undefined)
+            .map(([logicalId]) => `${stackName}/${logicalId}`);
+        });
+
+      expect(unowned).toEqual([]);
+    });
   });
 });

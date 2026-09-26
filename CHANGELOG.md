@@ -1,3 +1,27 @@
+## 0.10.3 (2026-09-26)
+
+### 🚀 Features
+
+- **bedrockagentcore:** add the runtime builder ([be86321](https://github.com/laazyj/composureCDK/commit/be86321))
+- **bedrockagentcore:** add the memory builder ([568c6a0](https://github.com/laazyj/composureCDK/commit/568c6a0))
+- **bedrockagentcore:** add the gateway builder ([67c59ab](https://github.com/laazyj/composureCDK/commit/67c59ab))
+- **bedrockagentcore:** add evaluators and online evaluation ([e2bf75e](https://github.com/laazyj/composureCDK/commit/e2bf75e))
+- **bedrockagentcore:** add session quota alarms ([204143c](https://github.com/laazyj/composureCDK/commit/204143c))
+- **budgets:** add topicPolicy(false) to opt out of the topic grant ([a60fe85](https://github.com/laazyj/composureCDK/commit/a60fe85))
+- **sns:** add topicPolicyConflictPolicy ([7237062](https://github.com/laazyj/composureCDK/commit/7237062))
+- **sns:** let the topic builder own its access policy ([7f85416](https://github.com/laazyj/composureCDK/commit/7f85416))
+- **xray:** add the Transaction Search builder ([#543](https://github.com/laazyj/composureCDK/issues/543))
+
+### 🩹 Fixes
+
+- **budgets:** add the Budgets publish statement to the topic's own policy ([#551](https://github.com/laazyj/composureCDK/issues/551))
+- **budgets:** keep the topic policy change within the aws-cdk-lib 2.93 floor ([257fee8](https://github.com/laazyj/composureCDK/commit/257fee8))
+- **ci:** skip coverage comment for cancelled runs ([9cf9ffd](https://github.com/laazyj/composureCDK/commit/9cf9ffd))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.10.2 (2026-09-25)
 
 ### 🚀 Features

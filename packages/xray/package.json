@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/xray",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "description": "Composable AWS X-Ray: account-level CloudWatch Transaction Search",
   "repository": {
     "type": "git",

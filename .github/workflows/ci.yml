@@ -3,8 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+  # No base-branch filter: it matches the base, so a stacked PR got no checks.
+  # See docs/ci.md#stacked-pull-requests.
   pull_request:
-    branches: [main]
   workflow_call:
     # Both inputs default to the full run, so `push`/`pull_request` are
     # unaffected — those events carry no inputs at all, and the expressions

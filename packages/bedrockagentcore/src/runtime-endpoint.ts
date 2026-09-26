@@ -1,4 +1,3 @@
-import { Duration } from "aws-cdk-lib";
 import {
   type IBedrockAgentRuntime,
   RuntimeEndpoint,
@@ -9,13 +8,14 @@ import { type ILogGroup, LogGroup, LogRetention } from "aws-cdk-lib/aws-logs";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { LOG_GROUP_DEFAULTS } from "@composurecdk/logs";
 import {
   type AgentCoreAlarmConfig,
   type AgentCoreMetricSource,
+  buildAgentCoreAlarms,
+  perMinute,
   runtimeAlarmSpecs,
-  resolveAgentCoreAlarms,
 } from "./alarms.js";
 
 /** The endpoint every runtime has, used when a caller names no qualifier. @internal */
@@ -43,10 +43,9 @@ export function runtimeEndpointMetrics(
   runtime: IBedrockAgentRuntime,
   endpointName: string,
 ): AgentCoreMetricSource {
-  return {
+  return perMinute({
     metric: (metricName, options) =>
       runtime.metric(metricName, {
-        period: Duration.minutes(1),
         ...options,
         dimensionsMap: {
           Operation: "InvokeAgentRuntime",
@@ -55,7 +54,7 @@ export function runtimeEndpointMetrics(
           ...options?.dimensionsMap,
         },
       }),
-  };
+  });
 }
 
 /**
@@ -81,12 +80,15 @@ export function buildEndpointObservability(
   });
   logRetention.node.addDependency(endpoint);
   const logGroup = LogGroup.fromLogGroupName(scope, `${id}LogGroup`, logGroupName);
-  const metrics = runtimeEndpointMetrics(runtime, endpointName);
   const subject = `AgentCore runtime endpoint ${runtime.agentRuntimeName}::${endpointName}`;
-  const alarms = createAlarms(scope, id, [
-    ...resolveAgentCoreAlarms(metrics, runtimeAlarmSpecs(subject), alarmConfig),
-    ...customAlarms.map((b) => b.resolve(metrics)),
-  ]);
+  const alarms = buildAgentCoreAlarms(
+    scope,
+    id,
+    runtimeEndpointMetrics(runtime, endpointName),
+    runtimeAlarmSpecs(subject),
+    alarmConfig,
+    customAlarms,
+  );
   return { logGroup, logRetention, alarms };
 }
 

@@ -1,9 +1,9 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Template } from "aws-cdk-lib/assertions";
-import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { assertCapabilitiesCovered, newStack } from "@composurecdk/cdk-testing";
-import { runtimeGrants } from "../src/grants.js";
-import { importedRuntime, RUNTIME_ARN } from "./fixtures.js";
+import { Memory } from "aws-cdk-lib/aws-bedrockagentcore";
+import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
+import { memoryGrants, runtimeGrants } from "../src/grants.js";
+import { callerRole, importedRuntime, RUNTIME_ARN } from "./fixtures.js";
 
 const CAPABILITIES = [
   ["invoke", "bedrock-agentcore:InvokeAgentRuntime"],
@@ -17,9 +17,7 @@ describe("runtimeGrants", () => {
 
   it.each(CAPABILITIES)("%s grants %s on the runtime and its endpoints", (capability, action) => {
     const stack = newStack();
-    const caller = new Role(stack, "Caller", {
-      assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
-    });
+    const caller = callerRole(stack);
 
     runtimeGrants[capability](importedRuntime(stack)).applyTo(caller, {});
 
@@ -30,5 +28,40 @@ describe("runtimeGrants", () => {
         ],
       },
     });
+  });
+});
+
+const MEMORY_CAPABILITIES = [
+  ["write", ["bedrock-agentcore:CreateEvent"]],
+  ["read", ["bedrock-agentcore:ListEvents", "bedrock-agentcore:RetrieveMemoryRecords"]],
+  ["readShortTerm", ["bedrock-agentcore:ListEvents"]],
+  ["readLongTerm", ["bedrock-agentcore:RetrieveMemoryRecords"]],
+  ["readWrite", ["bedrock-agentcore:CreateEvent", "bedrock-agentcore:RetrieveMemoryRecords"]],
+  ["delete", ["bedrock-agentcore:DeleteEvent", "bedrock-agentcore:DeleteMemoryRecord"]],
+] as const;
+
+describe("memoryGrants", () => {
+  it("covers every capability memoryGrants exposes", () => {
+    assertCapabilitiesCovered(memoryGrants, MEMORY_CAPABILITIES);
+  });
+
+  it.each(MEMORY_CAPABILITIES)("%s grants %j", (capability, actions) => {
+    const stack = newStack();
+    const memory = new Memory(stack, "Memory");
+    const caller = callerRole(stack);
+
+    memoryGrants[capability](memory).applyTo(caller, {});
+
+    for (const action of actions) expect(policyJson(stack)).toContain(action);
+  });
+
+  it("gives an agent no control-plane access", () => {
+    const stack = newStack();
+    const caller = callerRole(stack);
+
+    memoryGrants.readWrite(new Memory(stack, "Memory")).applyTo(caller, {});
+
+    const policy = JSON.stringify(Template.fromStack(stack).findResources("AWS::IAM::Policy"));
+    expect(policy).not.toMatch(/(Create|Get|Update|Delete)Memory"/);
   });
 });

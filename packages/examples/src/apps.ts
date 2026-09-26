@@ -1,4 +1,5 @@
 import { App } from "aws-cdk-lib";
+import { topicPolicyConflictPolicy } from "@composurecdk/sns";
 import { exampleApp } from "./app-context.js";
 import { cleanDeskPolicy } from "./clean-desk-policy.js";
 import { createAgentVolumeApp } from "./agent-volume-app.js";
@@ -23,6 +24,8 @@ import { createTaggedSystemApp } from "./tagged-system-app.js";
  */
 export function buildExampleApp(app = exampleApp()): App {
   cleanDeskPolicy(app);
+  // Fails synth if any example gives an SNS topic a second access policy.
+  topicPolicyConflictPolicy(app);
 
   createAgentVolumeApp(app);
   createCrudApiApp(app);

@@ -171,6 +171,30 @@ export function agentCoreAlarmSpecs(
   };
 }
 
+/** Controls the recommended alarms for a gateway. */
+export interface GatewayAlarmConfig extends AgentCoreAlarmConfig {
+  /**
+   * Alarm on p90 time spent in targets, in milliseconds. Opt-in.
+   *
+   * Metric: `TargetExecutionTime`, statistic p90. Threshold required.
+   */
+  targetExecutionTime?: AlarmConfig | false;
+}
+
+/** {@link agentCoreAlarmSpecs} plus the gateway's target execution time. */
+export function gatewayAlarmSpecs(
+  subject: string,
+): Record<Exclude<keyof GatewayAlarmConfig, "enabled">, ThresholdAlarmSpec> {
+  return {
+    ...agentCoreAlarmSpecs(subject),
+    targetExecutionTime: {
+      metricName: "TargetExecutionTime",
+      statistic: "p90",
+      describe: (t) => `p90 target execution time for ${subject} exceeds ${String(t)} ms.`,
+    },
+  };
+}
+
 /**
  * Defaults for a runtime endpoint's on-by-default alarms. User errors are
  * included because they count exceptions in the agent's own code.

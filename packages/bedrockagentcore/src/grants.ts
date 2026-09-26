@@ -1,4 +1,4 @@
-import type { IBedrockAgentRuntime, IMemory } from "aws-cdk-lib/aws-bedrockagentcore";
+import type { IBedrockAgentRuntime, IGateway, IMemory } from "aws-cdk-lib/aws-bedrockagentcore";
 import type { IGrantable } from "aws-cdk-lib/aws-iam";
 import { type Grant, grantVia, type Resolvable } from "@composurecdk/core";
 
@@ -10,6 +10,7 @@ const capability =
 
 const onRuntime = capability<IBedrockAgentRuntime>;
 const onMemory = capability<IMemory>;
+const onGateway = capability<IGateway>;
 
 /**
  * Consumer-side grant helpers for an AgentCore runtime. Pass one to a grantee
@@ -65,5 +66,16 @@ export const memoryGrants = {
   /** Delete events and memory records, e.g. for a data-erasure workflow. */
   delete: onMemory((memory, grantee) => {
     memory.grantDelete(grantee);
+  }),
+};
+
+/**
+ * Consumer-side grant helpers for an AgentCore gateway. Each delegates to the
+ * gateway's native `grant*` method (ADR-0013).
+ */
+export const gatewayGrants = {
+  /** Call the gateway's tools (`bedrock-agentcore:InvokeGateway`). */
+  invoke: onGateway((gateway, grantee) => {
+    gateway.grantInvoke(grantee);
   }),
 };

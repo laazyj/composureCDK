@@ -1,6 +1,6 @@
 # @composurecdk/bedrockagentcore
 
-Amazon Bedrock AgentCore for [ComposureCDK](../../README.md): agent runtimes and memory, with secure defaults, consumer-side grants and CloudWatch alarms.
+Amazon Bedrock AgentCore for [ComposureCDK](../../README.md): agent runtimes, memory and gateways, with secure defaults, consumer-side grants and CloudWatch alarms.
 
 It builds on the stable [`aws-cdk-lib/aws-bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html) module. Model access comes from [`@composurecdk/bedrock`](../bedrock/README.md).
 
@@ -91,9 +91,35 @@ Pass a customer managed key with `.kmsKey(...)` to meet Security Hub BedrockAgen
 
 Memory has no recommended alarms: AgentCore publishes memory metrics per API operation, without system-error or throttle series. Add alarms with `addAlarm()` on the operations you depend on, e.g. `Errors` for `CreateEvent`.
 
+## Gateways
+
+`createGatewayBuilder()` wraps `Gateway`. Where it differs from CDK:
+
+| Setting            | Default                                                              | Why                                                                                                                                      |
+| ------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Inbound auth       | `GatewayAuthorizer.usingAwsIam()`                                    | Meets Security Hub BedrockAgentCore.2 without the Cognito user pool CDK creates                                                          |
+| Service role trust | Conditioned on `aws:SourceAccount` and the gateway's `aws:SourceArn` | CDK's role trusts the service unconditionally ([confused deputy](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html)) |
+
+Pass a customer managed key with `.kmsKey(...)` to meet BedrockAgentCore.4.
+
+`addLambdaTarget(key, options)` takes the function as a `ref(...)`, and its tools are named `<key>___<tool>` for agents. Add any other target with `addTarget(key, (gateway, key) => gateway.addMcpServerTarget(key, { gatewayTargetName: key, ... }))`. CDK grants the service role what each target needs.
+
+```ts
+createGatewayBuilder()
+  .gatewayName("support-tools")
+  .addLambdaTarget("orders", {
+    lambdaFunction: ref<FunctionBuilderResult>("orders").get("function"),
+    toolSchema: ToolSchema.fromLocalAsset("tools/orders.json"),
+  });
+
+createRuntimeBuilder()
+  // …
+  .grant(gatewayGrants.invoke(ref<GatewayBuilderResult>("tools").get("gateway")));
+```
+
 ## Alarms
 
-Every alarm is on the `AWS/Bedrock-AgentCore` namespace with a 1-minute period. A runtime's alarms are created for each endpoint; custom alarms added with `addAlarm()` watch the `DEFAULT` endpoint.
+Runtimes and gateways share one set of recommended alarms; gateways add an opt-in `targetExecutionTime` (p90, in ms). Every alarm is on the `AWS/Bedrock-AgentCore` namespace with a 1-minute period. A runtime's alarms are created for each endpoint; custom alarms added with `addAlarm()` watch the `DEFAULT` endpoint.
 
 | Alarm          | Default                                                                   | Metric, statistic   |
 | -------------- | ------------------------------------------------------------------------- | ------------------- |

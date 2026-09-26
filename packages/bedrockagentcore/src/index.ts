@@ -3,8 +3,18 @@ export {
   RUNTIME_ALARM_DEFAULTS,
   type AgentCoreAlarmConfig,
   type AgentCoreMetricSource,
+  type GatewayAlarmConfig,
 } from "./alarms.js";
-export { memoryGrants, runtimeGrants } from "./grants.js";
+export {
+  createGatewayBuilder,
+  type GatewayBuilderProps,
+  type GatewayBuilderResult,
+  type GatewayLambdaTargetOptions,
+  type GatewayTargetFactory,
+  type IGatewayBuilder,
+} from "./gateway-builder.js";
+export { GATEWAY_DEFAULTS } from "./gateway-defaults.js";
+export { gatewayGrants, memoryGrants, runtimeGrants } from "./grants.js";
 export {
   createMemoryBuilder,
   type IMemoryBuilder,

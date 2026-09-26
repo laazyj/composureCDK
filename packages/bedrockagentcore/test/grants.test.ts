@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Template } from "aws-cdk-lib/assertions";
-import { Memory } from "aws-cdk-lib/aws-bedrockagentcore";
+import { Gateway, Memory } from "aws-cdk-lib/aws-bedrockagentcore";
 import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
-import { memoryGrants, runtimeGrants } from "../src/grants.js";
+import { gatewayGrants, memoryGrants, runtimeGrants } from "../src/grants.js";
 import { callerRole, importedRuntime, RUNTIME_ARN } from "./fixtures.js";
 
 const CAPABILITIES = [
@@ -63,5 +63,21 @@ describe("memoryGrants", () => {
 
     const policy = JSON.stringify(Template.fromStack(stack).findResources("AWS::IAM::Policy"));
     expect(policy).not.toMatch(/(Create|Get|Update|Delete)Memory"/);
+  });
+});
+
+describe("gatewayGrants", () => {
+  const GATEWAY_CAPABILITIES = [["invoke", "bedrock-agentcore:InvokeGateway"]] as const;
+
+  it("covers every capability gatewayGrants exposes", () => {
+    assertCapabilitiesCovered(gatewayGrants, GATEWAY_CAPABILITIES);
+  });
+
+  it.each(GATEWAY_CAPABILITIES)("%s grants %s", (capability, action) => {
+    const stack = newStack();
+
+    gatewayGrants[capability](new Gateway(stack, "Gateway")).applyTo(callerRole(stack), {});
+
+    expect(policyJson(stack)).toContain(action);
   });
 });

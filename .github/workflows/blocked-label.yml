@@ -2,8 +2,9 @@ name: Blocked label
 
 on:
   pull_request:
+    # No base-branch filter, for the same reason as ci.yml: a stacked PR must
+    # still get this check. See docs/ci.md#stacked-pull-requests.
     types: [opened, labeled, unlabeled, synchronize, reopened]
-    branches: [main]
 
 permissions:
   contents: read

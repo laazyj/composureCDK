@@ -173,18 +173,24 @@ jobs:
       # permission ceiling — even when the posting step could never run.
       #
       # if: always() — a threshold miss fails Test but reviewers still want the
-      # table showing which package dipped. The `conclusion != 'skipped'` guard
-      # is what always() costs us here: an earlier failure (typecheck, lint)
-      # skips Test, leaving no coverage-summary.json to merge, and these steps
-      # must stay quiet rather than fail a second time on the same root cause.
+      # table showing which package dipped. The guard on Test's conclusion is
+      # what always() costs us here: only a Test that ran to completion (pass
+      # or fail) leaves coverage-summary.json files to merge. An earlier failure
+      # (typecheck, lint) skips Test, and a newer push cancels it mid-run; in
+      # both cases these steps must stay quiet rather than fail a second time
+      # on the same root cause.
+      #
+      # id: coverage — the PR-number and upload steps key off this succeeding,
+      # so the artifact never ships without the table the comment posts.
       - name: Build coverage summary
-        if: always() && matrix.node-version == 24 && steps.test.conclusion != 'skipped'
+        id: coverage
+        if: always() && matrix.node-version == 24 && (steps.test.conclusion == 'success' || steps.test.conclusion == 'failure')
         run: npx nx coverage:summary
 
       # The workflow_run listener has no access to this run's PR context, so the
       # number travels with the artifact.
       - name: Record PR number
-        if: always() && matrix.node-version == 24 && steps.test.conclusion != 'skipped' && github.event_name == 'pull_request'
+        if: always() && steps.coverage.outcome == 'success' && github.event_name == 'pull_request'
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
@@ -192,7 +198,7 @@ jobs:
           printf '%s' "$PR_NUMBER" > coverage/pr-number.txt
 
       - name: Upload coverage summary
-        if: always() && matrix.node-version == 24 && steps.test.conclusion != 'skipped' && github.event_name == 'pull_request'
+        if: always() && steps.coverage.outcome == 'success' && github.event_name == 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-summary

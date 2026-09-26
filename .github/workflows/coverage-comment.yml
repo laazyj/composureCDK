@@ -35,15 +35,18 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      # The summary artifact is only uploaded when the Node 24 leg got far enough
-      # to run its tests and build a table. A cancelled run, an infra failure, or
-      # a failure in an earlier gate (lint, format, typecheck, cdk-floors) skips
-      # Test and leaves none.
+      # The summary artifact is only uploaded when the Node 24 leg ran its tests
+      # to completion and built a table. A cancelled run, an infra failure, or a
+      # failure in an earlier gate (lint, format, typecheck, cdk-floors) leaves
+      # none.
       #
       # That is a normal outcome, not a fault of this workflow: CI has already
       # reported the failure, and a hard failure here would report the same root
       # cause a second time as a separate red run. So the download is tolerated
-      # and the posting steps are gated on it — no artifact, no comment, green.
+      # and the posting steps are gated on the table actually being there — no
+      # table, no comment, green. Checking the file rather than just the
+      # download also covers an artifact uploaded without it, which ci.yml's
+      # guards should prevent but once shipped from a run cancelled mid-Test.
       #
       # Deliberately not gated on workflow_run.conclusion == 'success': a
       # coverage threshold miss fails Test but still uploads the table, and that
@@ -58,13 +61,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Report missing coverage summary
-        if: steps.download.outcome != 'success'
+        if: steps.download.outcome != 'success' || hashFiles('coverage-summary.md') == ''
         run: |
-          echo "::notice::No coverage-summary artifact on run ${{ github.event.workflow_run.id }} (${{ github.event.workflow_run.conclusion }}) — CI was cancelled or failed before the Node 24 Test step. Nothing to comment."
+          echo "::notice::No coverage table in the coverage-summary artifact on run ${{ github.event.workflow_run.id }} (${{ github.event.workflow_run.conclusion }}) — CI was cancelled or failed before the Node 24 Test step finished. Nothing to comment."
 
       - name: Read PR number
         id: pr
-        if: steps.download.outcome == 'success'
+        if: steps.download.outcome == 'success' && hashFiles('coverage-summary.md') != ''
         run: |
           number=$(cat pr-number.txt)
           case "$number" in
@@ -78,7 +81,7 @@ jobs:
       # header: coverage keys the comment so pushes update it in place rather
       # than appending one comment per push.
       - name: Post coverage comment
-        if: steps.download.outcome == 'success'
+        if: steps.download.outcome == 'success' && hashFiles('coverage-summary.md') != ''
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: coverage

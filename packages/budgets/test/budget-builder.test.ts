@@ -4,7 +4,12 @@ import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { newStack, testEnv } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
+import { compose, ref } from "@composurecdk/core";
+import {
+  createTopicBuilder,
+  type TopicBuilderResult,
+  topicPolicyConflictPolicy,
+} from "@composurecdk/sns";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBudgetBuilder } from "../src/budget-builder.js";
 import { email } from "../src/email.js";
@@ -216,7 +221,7 @@ describe("BudgetBuilder", () => {
   });
 
   describe("SNS subscribers", () => {
-    it("creates a topic policy granting budgets.amazonaws.com SNS:Publish", () => {
+    it("grants budgets.amazonaws.com SNS:Publish in the topic's own policy", () => {
       const stack = newStack();
       const topic = new Topic(stack, "AlertsTopic");
 
@@ -225,9 +230,10 @@ describe("BudgetBuilder", () => {
         .notifyOnActual(100, { sns: topic })
         .build(stack, "SnsBudget");
 
+      // The topic's own policy, plus the retained transitional policy sharing its document.
       const template = Template.fromStack(stack);
-      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
-      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 2);
+      template.allResourcesProperties("AWS::SNS::TopicPolicy", {
         PolicyDocument: Match.objectLike({
           Statement: Match.arrayWith([
             Match.objectLike({
@@ -251,7 +257,32 @@ describe("BudgetBuilder", () => {
         .build(stack, "DupSnsBudget");
 
       expect(Object.keys(result.topicPolicies)).toHaveLength(1);
-      Template.fromStack(stack).resourceCountIs("AWS::SNS::TopicPolicy", 1);
+      Template.fromStack(stack).resourceCountIs("AWS::SNS::TopicPolicy", 2);
+    });
+
+    it("keeps the enforceSSL statement of a createTopicBuilder topic (#551)", () => {
+      const stack = newStack();
+      topicPolicyConflictPolicy(stack);
+
+      compose(
+        {
+          alerts: createTopicBuilder().displayName("alerts"),
+          budget: createBudgetBuilder()
+            .budgetName("monthly")
+            .limit({ amount: 4, unit: "USD" })
+            .withRecommendedThresholds({ sns: ref<TopicBuilderResult>("alerts").get("topic") }),
+        },
+        { alerts: [], budget: ["alerts"] },
+      ).build(stack, "App");
+
+      Template.fromStack(stack).allResourcesProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [
+            Match.objectLike({ Sid: "AllowPublishThroughSSLOnly" }),
+            Match.objectLike({ Sid: "AllowBudgetsPublish" }),
+          ],
+        }),
+      });
     });
 
     it("resolves Resolvable<ITopic> subscribers via the build context", () => {

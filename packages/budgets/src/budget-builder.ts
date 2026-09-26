@@ -91,10 +91,11 @@ export interface BudgetBuilderResult {
   /** The `AWS::Budgets::Budget` construct. */
   budget: CfnBudget;
   /**
-   * `AWS::SNS::TopicPolicy` constructs created automatically for any SNS
-   * topic referenced as a notification subscriber, keyed by the topic's
-   * fully-qualified node path. Grants `budgets.amazonaws.com` permission
-   * to publish.
+   * `AWS::SNS::TopicPolicy` constructs the builder created for SNS topics
+   * referenced as notification subscribers, keyed by the topic's
+   * fully-qualified node path. The `budgets.amazonaws.com` publish
+   * statement itself is added to each topic's own policy; see
+   * {@link createBudgetsTopicPolicies} for what is created and why.
    *
    * `{}` when no SNS subscribers were configured.
    */
@@ -119,7 +120,7 @@ export interface BudgetBuilderResult {
  * Wraps the {@link CfnBudget} L1 construct (the CDK does not ship an L2
  * for Budgets) with well-architected defaults, helpers for the
  * percentage-threshold notification shape, and automatic
- * `AWS::SNS::TopicPolicy` wiring for SNS subscribers.
+ * `budgets.amazonaws.com` publish permission on SNS subscriber topics.
  *
  * The builder can also create the AWS-recommended `EstimatedCharges`
  * billing alarm; opt in via `recommendedAlarms`. For non-`us-east-1`

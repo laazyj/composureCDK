@@ -2,7 +2,7 @@
 
 AWS Budgets builder for [ComposureCDK](../../README.md).
 
-This package provides a fluent builder for `AWS::Budgets::Budget` with well-architected defaults, percentage-threshold notification helpers, and automatic `AWS::SNS::TopicPolicy` wiring for SNS subscribers. It wraps the CDK L1 [CfnBudget](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_budgets.CfnBudget.html) construct — there is no L2 for Budgets.
+This package provides a fluent builder for `AWS::Budgets::Budget` with well-architected defaults, percentage-threshold notification helpers, and automatic `budgets.amazonaws.com` publish permission on SNS subscriber topics. It wraps the CDK L1 [CfnBudget](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_budgets.CfnBudget.html) construct — there is no L2 for Budgets.
 
 ## Budget Builder
 
@@ -82,9 +82,14 @@ Exported as `BUDGET_DEFAULTS`.
 
 ## Automatic SNS Topic Policies
 
-When at least one notification subscriber is an SNS topic, the builder creates a matching `AWS::SNS::TopicPolicy` granting `SNS:Publish` to the `budgets.amazonaws.com` service principal. Without that policy, budget notifications to SNS silently fail to deliver — one of the most common footguns when wiring Budgets by hand.
+When at least one notification subscriber is an SNS topic, the builder grants `SNS:Publish` to the `budgets.amazonaws.com` service principal. Without that grant, budget notifications to SNS silently fail to deliver — one of the most common footguns when wiring Budgets by hand.
 
-The created `TopicPolicy` constructs are returned on `result.topicPolicies`, keyed by the topic's fully-qualified node path (unique within the CDK app).
+The statement is added to the topic's own access policy with `topic.addToResourcePolicy(...)`, next to any statement already there, such as the `enforceSSL` statement [`@composurecdk/sns`](../sns/README.md) adds by default. An SNS topic has exactly one access policy and every `AWS::SNS::TopicPolicy` replaces it, so a second policy resource would race the first. [`topicPolicyConflictPolicy`](../sns/README.md#topic-policy-conflict-policy) catches that at synth.
+
+`result.topicPolicies` holds the `TopicPolicy` constructs the builder creates, keyed by the topic's fully-qualified node path (unique within the CDK app):
+
+- **A topic created in CDK:** a transitional policy that shares the topic's own `PolicyDocument`, so both resources always render the same document. It sits at the logical id earlier versions used for a separate Budgets-only policy, and is retained on removal. Deleting that old resource would make CloudFormation reset the topic's policy after the update had written the merged one. This keeps the upgrade safe and will be removed in a later release; with its `Retain` policy in place by then, removing it resets nothing.
+- **An imported topic** (`Topic.fromTopicArn`): CDK cannot add to its policy, so the builder creates a standalone `TopicPolicy` as before. It replaces whatever policy the topic already has, and the builder emits a synth warning (`@composurecdk/budgets:imported-topic-policy`) saying so.
 
 ## Recommended Alarms
 

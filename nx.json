@@ -60,6 +60,7 @@
     },
     "lint": {
       "dependsOn": [
+        "^build",
         {
           "projects": ["@composurecdk/eslint-plugin"],
           "target": "build"

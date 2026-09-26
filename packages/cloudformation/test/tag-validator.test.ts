@@ -1,7 +1,19 @@
 import { describe, it, expect } from "vitest";
+import { CfnParameter } from "aws-cdk-lib";
+import { newStack } from "@composurecdk/cdk-testing";
 import { validateTag } from "../src/tag-validator.js";
 
 describe("validateTag", () => {
+  it("skips the character-set check for an unresolved token", () => {
+    const param = new CfnParameter(newStack(), "Env").valueAsString;
+    expect(() => {
+      validateTag("Env", param);
+    }).not.toThrow();
+    expect(() => {
+      validateTag(param, "prod");
+    }).not.toThrow();
+  });
+
   it("accepts a simple ASCII key/value pair", () => {
     expect(() => {
       validateTag("Project", "claude-rig");

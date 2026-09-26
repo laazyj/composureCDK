@@ -1,8 +1,15 @@
 import { describe, it, expect } from "vitest";
+import { CfnParameter } from "aws-cdk-lib";
+import { newStack } from "@composurecdk/cdk-testing";
 import { email } from "../src/email.js";
 import { constraints } from "../src/index.js";
 
 describe("email()", () => {
+  it("brands an unresolved token without validating it", () => {
+    const param = new CfnParameter(newStack(), "Email").valueAsString;
+    expect(email(param)).toBe(param);
+  });
+
   it("brands a syntactically valid address", () => {
     const value = email("ops@example.com");
     expect(value).toBe("ops@example.com");

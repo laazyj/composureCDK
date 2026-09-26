@@ -14,6 +14,7 @@ import { createCrudApiApp } from "../src/crud-api-app.js";
 import { createDynamoStreamProcessorApp } from "../src/dynamo-stream-processor-app.js";
 import { createMockApiApp } from "../src/mock-api-app.js";
 import { createNeptuneGraphApp } from "../src/neptune-graph-app.js";
+import { createOrderProcessorApp } from "../src/order-processor-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
 
 function restApi(stack: Stack, props: Partial<RestApiProps> = {}): void {
@@ -132,6 +133,74 @@ describe("cleanDeskPolicy", () => {
     // Deletion protection is the half a DeletionPolicy sweep cannot see.
     template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
       Replicas: Match.arrayWith([Match.objectLike({ DeletionProtectionEnabled: false })]),
+    });
+  });
+
+  describe("order-processor stack (Bedrock)", () => {
+    let template: Template;
+
+    beforeAll(() => {
+      const app = new App();
+      cleanDeskPolicy(app);
+      const { stack } = createOrderProcessorApp(app);
+      template = Template.fromStack(stack);
+    });
+
+    // The model invocation log group is the one Bedrock-built resource that
+    // defaults to RETAIN; it is an L2 `LogGroup`, so the LogGroup injector
+    // covers it without a Bedrock-specific one.
+    it("sets the invocation-logging and processor log groups to Delete", () => {
+      const logGroups = Object.values(
+        template.findResources("AWS::Logs::LogGroup") as Record<
+          string,
+          { DeletionPolicy?: string }
+        >,
+      );
+
+      expect(logGroups).toHaveLength(2);
+      expect(logGroups.map((logGroup) => logGroup.DeletionPolicy)).toEqual(["Delete", "Delete"]);
+    });
+
+    // The guardrail, its version and the application inference profile are
+    // L1s with no removal policy, so CloudFormation's default (Delete) applies.
+    // Fails if a builder starts retaining one, which would need an injector.
+    it("leaves the guardrail, its version and the inference profile on CloudFormation's default", () => {
+      for (const type of [
+        "AWS::Bedrock::Guardrail",
+        "AWS::Bedrock::GuardrailVersion",
+        "AWS::Bedrock::ApplicationInferenceProfile",
+      ]) {
+        const resources = Object.values(
+          template.findResources(type) as Record<string, { DeletionPolicy?: string }>,
+        );
+        expect(resources, type).toHaveLength(1);
+        expect(resources[0]?.DeletionPolicy, type).toBeUndefined();
+      }
+    });
+
+    // Invocation logging is account-wide per Region, so a torn-down stack
+    // must switch it off rather than leave Bedrock writing to a deleted log
+    // group with a deleted role.
+    it("turns account-wide model invocation logging off on delete", () => {
+      const [configuration] = Object.values(
+        template.findResources("Custom::AWS") as Record<
+          string,
+          { Properties: { Delete?: unknown } }
+        >,
+      );
+
+      expect(JSON.stringify(configuration.Properties.Delete)).toContain(
+        "DeleteModelInvocationLoggingConfiguration",
+      );
+    });
+
+    it("leaves nothing Retained", () => {
+      const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
+      const retained = Object.entries(resources)
+        .filter(([, resource]) => resource.DeletionPolicy === "Retain")
+        .map(([logicalId]) => logicalId);
+
+      expect(retained).toEqual([]);
     });
   });
 

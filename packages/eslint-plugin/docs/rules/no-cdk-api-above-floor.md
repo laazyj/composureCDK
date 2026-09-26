@@ -32,7 +32,7 @@ if (CfnResource.isCfnResource(node) && node.cfnResourceType === CfnAlarm.CFN_RES
 }
 ```
 
-`@composurecdk/cloudwatch` exposes this as an `isCfnAlarm` helper; see [ADR-0011](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0011-cross-component-relationship-guards.md) for the pattern.
+`@composurecdk/cloudwatch` does this internally, in its unexported `isCfnAlarm`; see [ADR-0011](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0011-cross-component-relationship-guards.md) for the pattern.
 
 ## The ban list
 

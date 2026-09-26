@@ -1,14 +1,19 @@
+import { Duration } from "aws-cdk-lib";
 import {
+  type Alarm,
   ComparisonOperator,
   type Metric,
   type MetricOptions,
   TreatMissingData,
 } from "aws-cdk-lib/aws-cloudwatch";
+import type { IConstruct } from "constructs";
 import {
   type AlarmConfig,
   type AlarmConfigDefaults,
   type AlarmDefinition,
+  type AlarmDefinitionBuilder,
   type AlarmMetric,
+  createAlarms,
   resolveAlarmConfig,
   type ResolvedAlarmConfig,
 } from "@composurecdk/cloudwatch";
@@ -111,6 +116,14 @@ export interface AgentCoreAlarmConfig {
   latency?: AlarmConfig | false;
 }
 
+/** `source`'s metrics on a 1-minute period, the interval AgentCore publishes at. */
+export function perMinute(source: AgentCoreMetricSource): AgentCoreMetricSource {
+  return {
+    metric: (metricName, options) =>
+      source.metric(metricName, { period: Duration.minutes(1), ...options }),
+  };
+}
+
 type AgentCoreAlarmKey = Exclude<keyof AgentCoreAlarmConfig, "enabled">;
 
 /**
@@ -201,4 +214,19 @@ export function resolveAgentCoreAlarms<K extends string>(
     const metric = source.metric(spec.metricName, { statistic: spec.statistic });
     return [toDefinition(key, metric, cfg, spec.describe(cfg.threshold))];
   });
+}
+
+/** Creates the recommended and custom alarms on `metrics`. */
+export function buildAgentCoreAlarms<K extends string>(
+  scope: IConstruct,
+  id: string,
+  metrics: AgentCoreMetricSource,
+  specs: Record<K, ThresholdAlarmSpec>,
+  config: (Partial<Record<K, AlarmConfig | false>> & { enabled?: boolean }) | false | undefined,
+  customAlarms: AlarmDefinitionBuilder<AgentCoreMetricSource>[],
+): Record<string, Alarm> {
+  return createAlarms(scope, id, [
+    ...resolveAgentCoreAlarms(metrics, specs, config),
+    ...customAlarms.map((b) => b.resolve(metrics)),
+  ]);
 }

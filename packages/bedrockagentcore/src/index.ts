@@ -4,7 +4,13 @@ export {
   type AgentCoreAlarmConfig,
   type AgentCoreMetricSource,
 } from "./alarms.js";
-export { runtimeGrants } from "./grants.js";
+export { memoryGrants, runtimeGrants } from "./grants.js";
+export {
+  createMemoryBuilder,
+  type IMemoryBuilder,
+  type MemoryBuilderProps,
+  type MemoryBuilderResult,
+} from "./memory-builder.js";
 export {
   createRuntimeBuilder,
   type IRuntimeBuilder,

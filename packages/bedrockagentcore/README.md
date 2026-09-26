@@ -1,6 +1,6 @@
 # @composurecdk/bedrockagentcore
 
-Amazon Bedrock AgentCore for [ComposureCDK](../../README.md): agent runtimes, with secure defaults, consumer-side grants and CloudWatch alarms.
+Amazon Bedrock AgentCore for [ComposureCDK](../../README.md): agent runtimes and memory, with secure defaults, consumer-side grants and CloudWatch alarms.
 
 It builds on the stable [`aws-cdk-lib/aws-bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html) module. Model access comes from [`@composurecdk/bedrock`](../bedrock/README.md).
 
@@ -65,7 +65,8 @@ Everything else is CDK's or the service's default: IAM (SigV4) inbound auth, a 1
 ```ts
 createRuntimeBuilder()
   // …
-  .grant(modelGrants.invoke(haiku, { requireGuardrail: guardrail }));
+  .grant(modelGrants.invoke(haiku, { requireGuardrail: guardrail }))
+  .grant(memoryGrants.readWrite(ref<MemoryBuilderResult>("memory").get("memory")));
 ```
 
 `addEndpoint(name, { version })` adds a version-pinned endpoint, each with its own log group and alarms. For a runtime built elsewhere, use `createRuntimeEndpointBuilder()`.
@@ -79,6 +80,16 @@ createFunctionBuilder().grant(
   runtimeGrants.invoke(ref<RuntimeBuilderResult>("agent").get("runtime")),
 );
 ```
+
+## Memory
+
+`createMemoryBuilder()` wraps `Memory` and keeps CDK's defaults: short-term memory only, with events kept for 90 days. Long-term strategies call a model to extract records, so add them with `.memoryStrategies([...])` as a design choice.
+
+Pass a customer managed key with `.kmsKey(...)` to meet Security Hub BedrockAgentCore.3.
+
+`memoryGrants` gives agents data-plane access only: `write`, `read`, `readShortTerm`, `readLongTerm`, `readWrite` and `delete`.
+
+Memory has no recommended alarms: AgentCore publishes memory metrics per API operation, without system-error or throttle series. Add alarms with `addAlarm()` on the operations you depend on, e.g. `Errors` for `CreateEvent`.
 
 ## Alarms
 

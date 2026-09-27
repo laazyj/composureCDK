@@ -1,5 +1,5 @@
 import type { Scope } from "eslint";
-import type { Identifier, MemberExpression } from "estree";
+import type { Identifier, ImportDeclaration, MemberExpression } from "estree";
 
 /**
  * Loose shape used to walk MemberExpression + TS-wrapper nodes uniformly.
@@ -12,6 +12,7 @@ interface WalkNode {
   type: string;
   object?: unknown;
   expression?: unknown;
+  callee?: unknown;
 }
 
 /**
@@ -42,24 +43,39 @@ export function unwrapWrappers<T>(expr: T): T {
  *
  * Returns `undefined` when a call or other expression breaks the chain:
  * `f().CfnAlarm` reads a runtime value rather than the imported binding, so no
- * rule that reasons about imports should fire on it.
+ * rule that reasons about imports should fire on it. `throughCalls` walks into
+ * a call's callee instead, for a rule that wants the import an instance was
+ * obtained from — `Annotations` in `Annotations.of(scope).addWarningV2`.
  */
-export function chainRoot(expr: MemberExpression["object"]): Identifier | undefined {
+export function chainRoot(
+  expr: MemberExpression["object"],
+  { throughCalls = false }: { throughCalls?: boolean } = {},
+): Identifier | undefined {
   let current = unwrapWrappers(expr) as unknown as WalkNode;
-  while (current.type === "MemberExpression") {
-    current = unwrapWrappers(current.object) as WalkNode;
+  while (
+    current.type === "MemberExpression" ||
+    (throughCalls && current.type === "CallExpression")
+  ) {
+    const next = current.type === "CallExpression" ? current.callee : current.object;
+    current = unwrapWrappers(next) as WalkNode;
   }
   return current.type === "Identifier" ? (current as unknown as Identifier) : undefined;
 }
 
+/** The import a name is bound by: its module specifier and the specifier node. */
+export interface ImportBinding {
+  source: string;
+  specifier: ImportDeclaration["specifiers"][number];
+}
+
 /**
- * The module specifier `name` was imported from, or `undefined` when it
- * resolves to anything else — a global, a local declaration, a parameter.
+ * The import `name` is bound by, or `undefined` when it resolves to anything
+ * else — a global, a local declaration, a parameter.
  *
  * Walks outward through the scope chain so a local that shadows an import name
  * wins, matching what the runtime would do.
  */
-export function importSourceOf(scope: Scope.Scope, name: string): string | undefined {
+export function importBindingOf(scope: Scope.Scope, name: string): ImportBinding | undefined {
   for (let current: Scope.Scope | null = scope; current !== null; current = current.upper) {
     const variable = current.set.get(name);
     if (variable === undefined) continue;
@@ -75,9 +91,17 @@ export function importSourceOf(scope: Scope.Scope, name: string): string | undef
     const parent = def.parent as { type: string; source?: { value?: unknown } };
     if (parent.type !== "ImportDeclaration") return undefined;
     const source = parent.source?.value;
-    return typeof source === "string" ? source : undefined;
+    return typeof source === "string" ? { source, specifier: def.node } : undefined;
   }
   return undefined;
+}
+
+/**
+ * The module specifier `name` was imported from, or `undefined` when it
+ * resolves to anything else — see {@link importBindingOf}.
+ */
+export function importSourceOf(scope: Scope.Scope, name: string): string | undefined {
+  return importBindingOf(scope, name)?.source;
 }
 
 /** True for `aws-cdk-lib` and any submodule of it. */

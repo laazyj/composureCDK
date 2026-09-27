@@ -92,6 +92,76 @@ ruleTester.run("no-cdk-api-above-floor", rule, {
         const ok = CfnAlarm.isCfnAlarm(node);
       `,
     },
+    {
+      name: "isCfn* at a floor that already has it",
+      code: `
+        import { CfnAlarm } from "aws-cdk-lib/aws-cloudwatch";
+        const ok = CfnAlarm.isCfnAlarm(node);
+      `,
+      options: [{ floor: "2.231.0" }],
+    },
+    {
+      name: "Match.stringLikeRegexp at a floor that already has it",
+      code: `
+        import { Match } from "aws-cdk-lib/assertions";
+        const m = Match.stringLikeRegexp("^a");
+      `,
+      options: [{ floor: "2.9.0" }],
+    },
+    {
+      name: "stringLikeRegexp on something that is not an aws-cdk-lib import",
+      code: `
+        import { Match } from "./my-matchers.js";
+        const m = Match.stringLikeRegexp("^a");
+      `,
+    },
+    {
+      name: "addWarningV2 at a floor that already has it",
+      code: `
+        import { Annotations } from "aws-cdk-lib";
+        Annotations.of(scope).addWarningV2("id", "message");
+      `,
+      options: [{ floor: "2.93.0" }],
+    },
+    {
+      // The portable shim: feature-detect on a value the rule cannot trace to
+      // the import, which is exactly what makes it safe below 2.93.0.
+      name: "addWarningV2 feature-detected on a local",
+      code: `
+        import { Annotations } from "aws-cdk-lib";
+        const annotations = Annotations.of(node);
+        if (typeof annotations.addWarningV2 === "function") annotations.addWarningV2("id", "m");
+      `,
+    },
+    {
+      name: "the core Annotations, which is not the assertions helper",
+      code: `
+        import { Annotations } from "aws-cdk-lib";
+        Annotations.of(scope).addWarning("message");
+      `,
+    },
+    {
+      name: "another export of aws-cdk-lib/assertions",
+      code: `
+        import { Template, Match } from "aws-cdk-lib/assertions";
+        Template.fromStack(stack).hasResourceProperties("T", { A: Match.anyValue() });
+      `,
+    },
+    {
+      name: "Annotations from aws-cdk-lib/assertions at a floor that already has it",
+      code: `
+        import { Annotations } from "aws-cdk-lib/assertions";
+        Annotations.fromStack(stack).hasNoWarning("*", "*");
+      `,
+      options: [{ floor: "2.10.0" }],
+    },
+    {
+      name: "a same-named export of an unrelated module",
+      code: `
+        import * as assertions from "./assertions.js";
+        const a = assertions.Annotations;
+      `,
+    },
   ],
   invalid: [
     {
@@ -181,6 +251,85 @@ ruleTester.run("no-cdk-api-above-floor", rule, {
       code: `
         import * as cdk from "aws-cdk-lib";
         const ok = cdk?.aws_cloudwatch.CfnAlarm.isCfnAlarm(node);
+      `,
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      name: "isCfn* at a floor below 2.231.0",
+      code: `
+        import { CfnAlarm } from "aws-cdk-lib/aws-cloudwatch";
+        const ok = CfnAlarm.isCfnAlarm(node);
+      `,
+      options: [{ floor: "2.230.0" }],
+      errors: [{ message: /in aws-cdk-lib 2\.231\.0, above the floor of 2\.230\.0 —/ }],
+    },
+    {
+      name: "Match.stringLikeRegexp below 2.9.0",
+      code: `
+        import { Match } from "aws-cdk-lib/assertions";
+        const m = Match.stringLikeRegexp("^a");
+      `,
+      options: [{ floor: "2.1.0" }],
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      // Floors compare numerically, not as strings: "2.10.0" < "2.9.0" as text.
+      name: "a floor whose minor has more digits than the entry's",
+      code: `
+        import { Annotations } from "aws-cdk-lib";
+        Annotations.of(scope).addWarningV2("id", "message");
+      `,
+      options: [{ floor: "2.10.0" }],
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      name: "addWarningV2 through the Annotations.of call, below 2.93.0",
+      code: `
+        import * as cdk from "aws-cdk-lib";
+        cdk.Annotations.of(scope).addWarningV2("id", "message");
+      `,
+      options: [{ floor: "2.92.0" }],
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      name: "a named import of Annotations from aws-cdk-lib/assertions",
+      code: `
+        import { Annotations, Match } from "aws-cdk-lib/assertions";
+        Annotations.fromStack(stack).hasNoWarning("*", Match.anyValue());
+      `,
+      options: [{ floor: "2.9.0" }],
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      // It still fails the floor's typecheck, so a type-only import counts.
+      name: "an aliased, type-only import of Annotations",
+      code: `
+        import type { Annotations as A } from "aws-cdk-lib/assertions";
+        let a: A;
+      `,
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      name: "Annotations off a `* as` assertions namespace",
+      code: `
+        import * as assertions from "aws-cdk-lib/assertions";
+        assertions.Annotations.fromStack(stack);
+      `,
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      name: "Annotations off the root's assertions re-export",
+      code: `
+        import { assertions } from "aws-cdk-lib";
+        assertions.Annotations.fromStack(stack);
+      `,
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      name: "Annotations off the whole-library namespace",
+      code: `
+        import * as cdk from "aws-cdk-lib";
+        cdk.assertions.Annotations.fromStack(stack);
       `,
       errors: [{ messageId: "aboveFloor" }],
     },

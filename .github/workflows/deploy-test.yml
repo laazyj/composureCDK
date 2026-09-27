@@ -1,6 +1,16 @@
 name: Deploy Test
 
 on:
+  # The release gate. A release branch is the only ref holding exactly what
+  # ships — version bumps and CHANGELOG.md included — so it is the only ref
+  # worth deploying: `main`'s HEAD is a different tree, and tag time is too
+  # late to gate anything. The result lands as a check on the release PR.
+  #
+  # Fires because release-prepare.yml pushes the branch authenticated with
+  # RELEASE_PR_TOKEN; a push made with the default GITHUB_TOKEN would not
+  # trigger it. See docs/ci.md#release_pr_token-required.
+  push:
+    branches: ["release/**"]
   workflow_dispatch:
     inputs:
       environment:
@@ -33,6 +43,16 @@ jobs:
   ci:
     name: CI
     uses: ./.github/workflows/ci.yml
+    # A pre-deploy sanity check, not a second full CI run. The deploy runs on
+    # Node 24 against the pinned aws-cdk-lib, so the other matrix legs (which
+    # exist to prove dual ESM/CJS resolution across runtimes, ADR-0007) and the
+    # floor shards (which pin aws-cdk-lib down to each package's declared
+    # minimum, ADR-0008) cannot say anything about whether these stacks deploy.
+    # The Node 24 leg still runs the whole verify chain — including `nx
+    # validate`, the synth + CloudFormation Validate pass that actually can.
+    with:
+      node-versions: "[24]"
+      skip-cdk-floors: true
 
   deploy-test:
     name: Deploy and Verify Examples
@@ -41,14 +61,17 @@ jobs:
     # Neptune DB instance provisioning alone is a >15 min long pole; 30 min
     # left too little slack for a clean deploy of the full example fleet.
     timeout-minutes: 45
-    environment: ${{ inputs.environment }}
+    # Same fallback as the concurrency group above: a `push` event carries no
+    # inputs, and losing the environment binding would silently drop the AWS
+    # role and region vars with it.
+    environment: ${{ inputs.environment || 'sandbox' }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
@@ -57,12 +80,12 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build
+        run: npx nx run-many -t build
         env:
           NX_DAEMON: false
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -99,6 +122,6 @@ jobs:
         run: node ../../scripts/smoke-test.mjs
 
       # Destroy runs in a separate sandbox-cleanup workflow (triggered by
-      # workflow_run on this workflow plus a nightly cron safety net). Keeping
+      # workflow_run on this workflow, plus a nightly cron safety net). Keeping
       # destroy off the critical path lets developer feedback land in ~10 min
       # instead of waiting for CloudFront propagation during teardown.

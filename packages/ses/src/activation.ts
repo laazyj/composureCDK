@@ -7,14 +7,6 @@ import { type IConstruct } from "constructs";
 import { runActivation } from "./activation-handler.js";
 
 /**
- * Node runtime for the provider Lambda. Constructed as a magic-string runtime
- * rather than the `Runtime.NODEJS_24_X` enum so adopting the latest LTS doesn't
- * pull the package's aws-cdk-lib floor up to whatever release introduced the
- * enum member (see cdk-floors.json).
- */
-const NODE_RUNTIME = new Runtime("nodejs24.x", RuntimeFamily.NODEJS, { supportsInlineCode: true });
-
-/**
  * The provider Lambda source. A rule set is inert until it is the account's
  * single **active** rule set — `ses:SetActiveReceiptRuleSet`, which has no
  * CloudFormation resource. The conditional-deactivate decision lives in the
@@ -49,8 +41,18 @@ export function activateReceiptRuleSet(
   id: string,
   ruleSet: IReceiptRuleSet,
 ): CustomResource {
+  // A magic-string runtime rather than the `Runtime.NODEJS_24_X` enum, so
+  // adopting the latest LTS doesn't pull the package's aws-cdk-lib floor up to
+  // whatever release introduced the enum member (see cdk-floors.json). Built
+  // here rather than at module scope because `Runtime`'s constructor appends to
+  // the shared `Runtime.ALL`: at module scope, merely importing this package
+  // would mutate CDK's state, and under the dual-package hazard (ADR-0007)
+  // the ESM and CommonJS copies would each append their own entry.
+  const runtime = new Runtime("nodejs24.x", RuntimeFamily.NODEJS, {
+    supportsInlineCode: true,
+  });
   const onEvent = new LambdaFunction(scope, `${id}Fn`, {
-    runtime: NODE_RUNTIME,
+    runtime,
     handler: "index.handler",
     code: Code.fromInline(HANDLER),
     timeout: Duration.minutes(1),

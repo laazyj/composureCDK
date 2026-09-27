@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
-import { CfnAlarm, CfnCompositeAlarm, type IAlarm } from "aws-cdk-lib/aws-cloudwatch";
+import { CfnAlarm, CfnCompositeAlarm } from "aws-cdk-lib/aws-cloudwatch";
 import { CfnBucket } from "aws-cdk-lib/aws-s3";
+import { fake } from "ts-fake";
 import {
   type AlarmMatchContext,
   type AlarmRuleScope,
@@ -63,14 +64,15 @@ describe("isCfnAlarm / isCfnCompositeAlarm", () => {
 });
 
 function ctx(overrides: Partial<AlarmMatchContext> = {}): AlarmMatchContext {
-  return {
-    alarm: undefined as IAlarm | undefined,
-    cfn: {} as CfnAlarm | CfnCompositeAlarm,
+  return fake<AlarmMatchContext>({
+    // Kept from the hand-rolled version so a predicate reading through
+    // `ctx.cfn` sees `undefined` rather than throwing on an absent member.
+    cfn: {},
     id: "Errors",
     path: "App/Stack/Service/Errors",
     isComposite: false,
     ...overrides,
-  };
+  });
 }
 
 describe("matchesOne", () => {

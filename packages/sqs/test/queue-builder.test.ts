@@ -2,22 +2,16 @@ import { describe, it, expect } from "vitest";
 import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { type IQueue, Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
+import { type IQueue, Queue, QueueEncryption, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { Key } from "aws-cdk-lib/aws-kms";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createQueueBuilder } from "../src/queue-builder.js";
+import type { QueueBuilderProps } from "../src/queue-props.js";
 import { setUntypedProp } from "./_helpers.js";
 
-function synthTemplate(
-  configureFn?: (builder: ReturnType<typeof createQueueBuilder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createQueueBuilder();
-  configureFn?.(builder);
-  builder.build(stack, "TestQueue");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(createQueueBuilder, "TestQueue");
 
 describe("QueueBuilder", () => {
   describe("build", () => {
@@ -31,7 +25,7 @@ describe("QueueBuilder", () => {
     });
 
     it("creates exactly one SQS queue", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::SQS::Queue", 1);
     });
@@ -46,9 +40,18 @@ describe("QueueBuilder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own QueueProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const _props: QueueBuilderProps = undefined as unknown as QueueProps;
+    });
+  });
+
   describe("secure defaults", () => {
     it("enables enforceSSL by default — deny on aws:SecureTransport=false", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SQS::QueuePolicy", {
         PolicyDocument: Match.objectLike({
@@ -64,7 +67,7 @@ describe("QueueBuilder", () => {
     });
 
     it("encrypts at rest with SQS_MANAGED by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SQS::Queue", {
         SqsManagedSseEnabled: true,
@@ -72,7 +75,7 @@ describe("QueueBuilder", () => {
     });
 
     it("enables long polling with a 20 second receive wait time by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SQS::Queue", {
         ReceiveMessageWaitTimeSeconds: 20,
@@ -80,13 +83,13 @@ describe("QueueBuilder", () => {
     });
 
     it("allows enforceSSL to be disabled via the fluent API", () => {
-      const template = synthTemplate((b) => b.enforceSSL(false));
+      const { template } = buildAndSynth((b) => b.enforceSSL(false));
 
       template.resourceCountIs("AWS::SQS::QueuePolicy", 0);
     });
 
     it("allows receiveMessageWaitTime to be overridden", () => {
-      const template = synthTemplate((b) => b.receiveMessageWaitTime(Duration.seconds(0)));
+      const { template } = buildAndSynth((b) => b.receiveMessageWaitTime(Duration.seconds(0)));
 
       template.hasResourceProperties("AWS::SQS::Queue", {
         ReceiveMessageWaitTimeSeconds: 0,
@@ -108,11 +111,36 @@ describe("QueueBuilder", () => {
         KmsMasterKeyId: Match.anyValue(),
       });
     });
+
+    it("infers SSE-KMS from a supplied master key", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      createQueueBuilder().encryptionMasterKey(key).build(stack, "TestQueue");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SQS::Queue", {
+        KmsMasterKeyId: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
+        SqsManagedSseEnabled: Match.absent(),
+      });
+    });
+
+    it("resolves a Resolvable master key from the build context", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      createQueueBuilder()
+        .encryptionMasterKey(ref<{ key: Key }, Key>("queueKey", (r) => r.key))
+        .build(stack, "TestQueue", { queueKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SQS::Queue", {
+        KmsMasterKeyId: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
+      });
+    });
   });
 
   describe("synthesised output", () => {
     it("creates a queue with the specified queue name", () => {
-      const template = synthTemplate((b) => b.queueName("orders"));
+      const { template } = buildAndSynth((b) => b.queueName("orders"));
 
       template.hasResourceProperties("AWS::SQS::Queue", {
         QueueName: "orders",
@@ -124,7 +152,7 @@ describe("QueueBuilder", () => {
       // runtime guard catches untyped (JavaScript) callers and points
       // them at the FIFO roles.
       expect(() =>
-        synthTemplate((b) => {
+        buildAndSynth((b) => {
           setUntypedProp(b, "fifo", true);
           b.queueName("orders.fifo");
         }),
@@ -146,7 +174,7 @@ describe("QueueBuilder", () => {
     });
 
     it("forwards the visibility timeout to the underlying CDK construct", () => {
-      const template = synthTemplate((b) => b.visibilityTimeout(Duration.seconds(120)));
+      const { template } = buildAndSynth((b) => b.visibilityTimeout(Duration.seconds(120)));
 
       template.hasResourceProperties("AWS::SQS::Queue", {
         VisibilityTimeout: 120,
@@ -236,30 +264,25 @@ describe("QueueBuilder", () => {
 
   describe("addAlarm", () => {
     it("creates a custom alarm using the supplied metric and threshold", () => {
-      const { result, template } = (() => {
-        const app = new App();
-        const stack = new Stack(app, "TestStack");
-        const result = createQueueBuilder()
-          .queueName("orders")
-          .addAlarm("highEmptyReceiveRate", (a) =>
-            a
-              .metric(
-                (queue) =>
-                  new Metric({
-                    namespace: "AWS/SQS",
-                    metricName: "NumberOfEmptyReceives",
-                    dimensionsMap: { QueueName: queue.queueName },
-                    statistic: "Sum",
-                    period: Duration.minutes(1),
-                  }),
-              )
-              .threshold(1000)
-              .greaterThan()
-              .description("Queue receiving an unusually high number of empty receives."),
-          )
-          .build(stack, "TestQueue");
-        return { result, template: Template.fromStack(stack) };
-      })();
+      const { result, template } = buildAndSynth((b) => {
+        b.queueName("orders");
+        b.addAlarm("highEmptyReceiveRate", (a) =>
+          a
+            .metric(
+              (queue) =>
+                new Metric({
+                  namespace: "AWS/SQS",
+                  metricName: "NumberOfEmptyReceives",
+                  dimensionsMap: { QueueName: queue.queueName },
+                  statistic: "Sum",
+                  period: Duration.minutes(1),
+                }),
+            )
+            .threshold(1000)
+            .greaterThan()
+            .description("Queue receiving an unusually high number of empty receives."),
+        );
+      });
 
       expect(result.alarms.highEmptyReceiveRate).toBeDefined();
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {

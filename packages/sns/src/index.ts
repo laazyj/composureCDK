@@ -3,6 +3,7 @@ export {
   type TopicBuilderProps,
   type TopicBuilderResult,
   type ITopicBuilder,
+  type AllowServicePublishOptions,
 } from "./topic-builder.js";
 export { topicGrants } from "./grants.js";
 export { TOPIC_DEFAULTS } from "./defaults.js";
@@ -15,3 +16,8 @@ export {
   type SubscriptionBuilderResult,
 } from "./subscription-builder.js";
 export { SUBSCRIPTION_DEFAULTS, type SubscriptionDefaults } from "./subscription-defaults.js";
+export {
+  topicPolicyConflictPolicy,
+  TOPIC_POLICY_CONFLICT_WARNING_ID,
+  type TopicPolicyConflictPolicyConfig,
+} from "./policies/topic-policy-conflict-policy.js";

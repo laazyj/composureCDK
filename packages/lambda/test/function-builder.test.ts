@@ -8,12 +8,16 @@ import {
   Architecture,
   Code,
   type Function as LambdaFunction,
+  type FunctionProps,
   LoggingFormat,
   Runtime,
   Tracing,
 } from "aws-cdk-lib/aws-lambda";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Vpc } from "aws-cdk-lib/aws-ec2";
+import { fake } from "ts-fake";
+import { buildFixture, newStack, tagsPerResource } from "@composurecdk/cdk-testing";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import {
@@ -21,18 +25,47 @@ import {
   createStatementBuilder,
   type RoleBuilderResult,
 } from "@composurecdk/iam";
-import { createFunctionBuilder } from "../src/function-builder.js";
+import { createFunctionBuilder, type FunctionBuilderProps } from "../src/function-builder.js";
 
-function synthTemplate(
-  configureFn: (builder: ReturnType<typeof createFunctionBuilder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createFunctionBuilder();
-  configureFn(builder);
-  builder.build(stack, "TestFunction");
-  return Template.fromStack(stack);
+const buildAndSynth = buildFixture(createFunctionBuilder, "TestFunction");
+
+const IMPORTED_LOG_GROUP_ARN = "arn:aws:logs:eu-west-2:111122223333:log-group:/aws/lambda/imported";
+
+/**
+ * What CDK's own code reads off `FunctionProps.logGroup` at runtime: the
+ * reference form the builder takes its ARN from, plus the two functions
+ * `toILogGroup` checks for before the `Function` construct will accept it.
+ *
+ * Declared here rather than taken from the prop, because the prop's member set
+ * is precisely what moves between CDK versions — `logGroupArn` at this
+ * package's floor, `logGroupRef` on current CDK — and neither end declares all
+ * three. Naming either end would tie the suite to it, which is the drift this
+ * fix exists to absorb.
+ */
+interface LogGroupRuntimeShape {
+  logGroupRef: { logGroupName: string; logGroupArn: string };
+  addStream: () => unknown;
+  grant: () => unknown;
 }
+
+/**
+ * A log group exposing only the reference form, as an imported one does on
+ * current CDK. This is the shape that, read through the L2's `logGroupArn`,
+ * yielded `undefined` and put it in the policy.
+ */
+const refOnlyLogGroup = fake<LogGroupRuntimeShape>({
+  logGroupRef: { logGroupName: "/aws/lambda/imported", logGroupArn: IMPORTED_LOG_GROUP_ARN },
+  addStream: () => ({}),
+  grant: () => ({}),
+}) as unknown as NonNullable<FunctionProps["logGroup"]>;
+
+/**
+ * A log group exposing no ARN in either form. No CDK version's prop type admits
+ * this, so it stands in for an untyped (JavaScript) caller — the only way to
+ * reach the builder's guard, and the reason that guard exists rather than the
+ * builder trusting the type.
+ */
+const arnlessLogGroup = fake<NonNullable<FunctionProps["logGroup"]>>();
 
 describe("FunctionBuilder", () => {
   describe("build", () => {
@@ -53,9 +86,18 @@ describe("FunctionBuilder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own FunctionProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const _props: FunctionBuilderProps = undefined as unknown as FunctionProps;
+    });
+  });
+
   describe("synthesised output", () => {
     it("creates a Lambda function with the specified runtime", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -69,7 +111,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with custom memory size", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -83,7 +125,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with custom timeout", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -97,7 +139,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with tracing enabled", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -111,7 +153,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with ARM64 architecture", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -125,7 +167,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with environment variables", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -144,7 +186,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with description", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -158,7 +200,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates exactly one Lambda function, one IAM role, and one LogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -171,7 +213,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates an execution role with the Lambda service principal", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -192,7 +234,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("creates a Lambda function with multiple configurations combined", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -222,7 +264,7 @@ describe("FunctionBuilder", () => {
 
   describe("secure defaults", () => {
     it("enables X-Ray active tracing by default", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -235,7 +277,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("enables JSON structured logging by default", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -248,7 +290,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("allows the user to override tracing", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -262,7 +304,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("allows the user to override logging format", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -278,7 +320,7 @@ describe("FunctionBuilder", () => {
 
   describe("logging", () => {
     it("creates a managed LogGroup by default", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -301,7 +343,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("applies RETAIN removal policy on the auto-created LogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -315,7 +357,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("applies TWO_YEARS retention on the auto-created LogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -328,7 +370,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("configures the Lambda function to use the auto-created LogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -379,21 +421,13 @@ describe("FunctionBuilder", () => {
         .build(stack, "TestFunction");
 
       const template = Template.fromStack(stack);
-      const fns = template.findResources("AWS::Lambda::Function") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      expect(Object.values(fns)[0]?.Properties.Tags).toEqual(
+      expect(tagsPerResource(template, "AWS::Lambda::Function")[0]).toEqual(
         expect.arrayContaining([
           { Key: "Owner", Value: "platform" },
           { Key: "Project", Value: "claude-rig" },
         ]),
       );
-      const logGroups = template.findResources("AWS::Logs::LogGroup") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      expect(Object.values(logGroups)[0]?.Properties.Tags).toEqual(
+      expect(tagsPerResource(template, "AWS::Logs::LogGroup")[0]).toEqual(
         expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
       );
     });
@@ -401,7 +435,7 @@ describe("FunctionBuilder", () => {
 
   describe("execution role", () => {
     it("attaches an inline LogsWriter policy scoped to the auto-created log group", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -428,8 +462,50 @@ describe("FunctionBuilder", () => {
       });
     });
 
+    it("scopes the LogsWriter policy to a log group that only exposes the CDK reference form", () => {
+      // CDK types FunctionProps.logGroup as logs.ILogGroupRef, where the ARN
+      // lives under `logGroupRef` rather than on the L2's `logGroupArn`. Read
+      // through the wrong member it came out `undefined`, and the policy
+      // resource with it: `Resource: ["undefined:log-stream:*"]`.
+      const { template } = buildAndSynth((b) =>
+        b
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}"))
+          .logGroup(refOnlyLogGroup),
+      );
+
+      template.hasResourceProperties("AWS::IAM::Role", {
+        Policies: Match.arrayWith([
+          Match.objectLike({
+            PolicyName: "LogsWriter",
+            PolicyDocument: Match.objectLike({
+              Statement: Match.arrayWith([
+                Match.objectLike({
+                  Resource: [IMPORTED_LOG_GROUP_ARN, `${IMPORTED_LOG_GROUP_ARN}:log-stream:*`],
+                }),
+              ]),
+            }),
+          }),
+        ]),
+      });
+    });
+
+    it("fails with a named error when the log group exposes no ARN at all", () => {
+      const stack = newStack();
+
+      expect(() =>
+        createFunctionBuilder()
+          .runtime(Runtime.NODEJS_22_X)
+          .handler("index.handler")
+          .code(Code.fromInline("exports.handler = async () => {}"))
+          .logGroup(arnlessLogGroup)
+          .build(stack, "TestFunction"),
+      ).toThrow(/exposes no ARN/);
+    });
+
     it("does not attach the AWSLambdaBasicExecutionRole managed policy by default", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -445,7 +521,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("does not grant logs:CreateLogGroup", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -471,7 +547,7 @@ describe("FunctionBuilder", () => {
     });
 
     it(".configureRole adds inline statements alongside LogsWriter", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -643,7 +719,7 @@ describe("FunctionBuilder", () => {
     });
 
     it("CDK still wires X-Ray permissions onto the explicit role when tracing is active", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b
           .runtime(Runtime.NODEJS_22_X)
           .handler("index.handler")
@@ -673,6 +749,94 @@ describe("FunctionBuilder", () => {
       const serialized = JSON.stringify(Object.values(roles));
       // CDK attaches AWSLambdaVPCAccessExecutionRole when a VPC is set.
       expect(serialized).toContain("AWSLambdaVPCAccessExecutionRole");
+    });
+  });
+
+  describe("environmentEncryption", () => {
+    /** The KmsKeyArn a function encrypted with `Key` (logical id `Key961B73FD`) renders. */
+    const KMS_KEY_ARN = { "Fn::GetAtt": ["Key961B73FD", "Arn"] };
+
+    it("passes a concrete key through to the function", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .environmentEncryption(key)
+        .build(stack, "TestFunction");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Lambda::Function", {
+        KmsKeyArn: KMS_KEY_ARN,
+      });
+    });
+
+    it("resolves a Resolvable key from the build context", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      createFunctionBuilder()
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"))
+        .environmentEncryption(ref<{ key: Key }, Key>("envKey", (r) => r.key))
+        .build(stack, "TestFunction", { envKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Lambda::Function", {
+        KmsKeyArn: KMS_KEY_ARN,
+      });
+    });
+  });
+
+  describe("environment", () => {
+    /** The arn a `Key` at logical id `EnvKey` renders. */
+    const KEY_ARN_TOKEN = { "Fn::GetAtt": ["EnvKeyCD7B3BF3", "Arn"] };
+
+    /** The minimum a function needs to synthesise, for the fixture's callback. */
+    const deployable = (b: ReturnType<typeof createFunctionBuilder>) =>
+      b
+        .runtime(Runtime.NODEJS_22_X)
+        .handler("index.handler")
+        .code(Code.fromInline("exports.handler = async () => {}"));
+
+    it("passes literal values through", () => {
+      const { template } = buildAndSynth((b) => deployable(b).environment({ LOG_LEVEL: "info" }));
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        Environment: { Variables: { LOG_LEVEL: "info" } },
+      });
+    });
+
+    it("adds no Environment when unset", () => {
+      const { template } = buildAndSynth(deployable);
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        Environment: Match.absent(),
+      });
+    });
+
+    // The rest build by hand, following `environmentEncryption` above: the
+    // referenced construct must live in the stack *and* be reachable through
+    // the build context, and `buildFixture` fixes its context before it makes
+    // the stack.
+    // Builds by hand, following `environmentEncryption` above: the referenced
+    // construct must live in the stack *and* be reachable through the build
+    // context, and `buildFixture` fixes its context before it makes the stack.
+    it("resolves a Resolvable value alongside a literal one", () => {
+      const stack = newStack();
+      const key = new Key(stack, "EnvKey");
+
+      deployable(createFunctionBuilder())
+        .environment({
+          KEY_ARN: ref("k", (r: { key: Key }) => r.key.keyArn),
+          LOG_LEVEL: "debug",
+        })
+        .build(stack, "TestFunction", { k: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Lambda::Function", {
+        Environment: { Variables: { KEY_ARN: KEY_ARN_TOKEN, LOG_LEVEL: "debug" } },
+      });
     });
   });
 

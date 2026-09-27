@@ -1,11 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import {
-  type IEventBus,
-  type IRule,
-  type IRuleTarget,
-  Rule,
-  type RuleProps,
-} from "aws-cdk-lib/aws-events";
+import { type IRule, type IRuleTarget, Rule, type RuleProps } from "aws-cdk-lib/aws-events";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -31,19 +25,24 @@ import { createRuleAlarms } from "./rule-alarms.js";
  */
 export interface RuleBuilderProps extends Omit<RuleProps, "targets" | "eventBus"> {
   /**
-   * The event bus the rule listens on. Accepts a concrete {@link IEventBus} or
-   * a {@link Ref} to another component's output. When omitted, the rule
+   * The event bus the rule listens on. Accepts a concrete bus or a
+   * {@link Ref} to another component's output. When omitted, the rule
    * attaches to the account default bus, matching CDK's `RuleProps.eventBus`
    * default.
+   *
+   * The inner type is read from CDK's own prop rather than named as
+   * `IEventBus`, so it tracks the `events.IEventBus` → `events.IEventBusRef`
+   * migration in either direction — see the note in this package's README.
    */
-  eventBus?: Resolvable<IEventBus>;
+  eventBus?: Resolvable<NonNullable<RuleProps["eventBus"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
    * By default, the builder creates recommended alarms with sensible
    * thresholds for every applicable metric. Individual alarms can be
-   * customized or disabled. Set to `false` to disable all alarms.
+   * customized or disabled. Set to `false` to disable the recommended
+   * alarms; custom alarms added via `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification methods
    * are user-specific. Access alarms from the build result or apply them
@@ -114,7 +113,7 @@ export type IRuleBuilder = IBuilder<RuleBuilderProps, RuleBuilder>;
 
 interface TargetEntry {
   key: string;
-  target: Resolvable<IRuleTarget>;
+  target: Resolvable<NonNullable<RuleProps["targets"]>[number]>;
 }
 
 class RuleBuilder implements Lifecycle<RuleBuilderResult> {
@@ -138,13 +137,16 @@ class RuleBuilder implements Lifecycle<RuleBuilderResult> {
   /**
    * Register a target to be attached to the rule at build time.
    *
-   * Accepts any concrete {@link IRuleTarget} (the lightweight helpers in
-   * `./targets/` produce these) or a {@link Resolvable} so targets that wire
-   * cross-component references can be declared at configuration time. The
-   * resolved target is exposed on {@link RuleBuilderResult.targets} under
-   * `key`.
+   * Accepts any concrete rule target (the lightweight helpers in `./targets/`
+   * produce these) or a {@link Resolvable} so targets that wire cross-component
+   * references can be declared at configuration time. The resolved target is
+   * exposed on {@link RuleBuilderResult.targets} under `key`.
+   *
+   * `targets` is lifted out of {@link RuleBuilderProps} onto this method, so
+   * the element type is read from CDK's own prop rather than named as
+   * `IRuleTarget` — the same rule the props interface follows (ADR-0018).
    */
-  addTarget(key: string, target: Resolvable<IRuleTarget>): this {
+  addTarget(key: string, target: Resolvable<NonNullable<RuleProps["targets"]>[number]>): this {
     if (this.#targets.some((t) => t.key === key)) {
       throw new Error(
         `RuleBuilder.addTarget: duplicate key "${key}". Each target must use a unique key.`,

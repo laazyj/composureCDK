@@ -2,7 +2,7 @@ import type { Duration } from "aws-cdk-lib";
 import {
   CaaTag,
   type HttpsRecordValue,
-  type RecordTarget,
+  type ARecordProps,
   type SvcbRecordValue,
 } from "aws-cdk-lib/aws-route53";
 import type { Resolvable } from "@composurecdk/core";
@@ -128,7 +128,7 @@ export interface SvcbRecordSpec extends RecordOptions {
 export interface AliasRecordSpec extends RecordOptions {
   readonly type: "ALIAS";
   readonly name: string;
-  readonly target: Resolvable<RecordTarget>;
+  readonly target: Resolvable<NonNullable<ARecordProps["target"]>>;
   /** `false` emits an A alias (default); `true` emits an AAAA alias. */
   readonly ipv6: boolean;
 }
@@ -418,7 +418,7 @@ export interface AliasRecordOptions extends RecordOptions {
  *
  * Pair with the alias-target helpers in `@composurecdk/route53` —
  * `cloudfrontAliasTarget`, `apiGatewayAliasTarget`, or
- * `apiGatewayDomainAliasTarget` — which return `Resolvable<RecordTarget>`.
+ * `apiGatewayDomainAliasTarget` — which return a resolvable record target.
  *
  * Because DNS permits only one record set per `(type, name)`, an `ALIAS`
  * cannot coexist with address-mode `A`/`AAAA` at the same name, and two
@@ -440,7 +440,7 @@ export interface AliasRecordOptions extends RecordOptions {
  */
 export function ALIAS(
   name: string,
-  target: Resolvable<RecordTarget>,
+  target: Resolvable<NonNullable<ARecordProps["target"]>>,
   options: AliasRecordOptions = {},
 ): AliasRecordSpec {
   const { ipv6 = false, ...rest } = options;

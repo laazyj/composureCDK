@@ -1,22 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Duration, Stack } from "aws-cdk-lib";
+import { Match } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
 
-function buildResult(
-  configureFn: (builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) => void,
-) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createDistributionBuilder();
-  configureFn(builder, stack);
-  const result = builder.build(stack, "TestDistribution");
-  return { result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(createDistributionBuilder, "TestDistribution");
 
 function withOrigin(builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) {
   const bucket = new Bucket(stack, "TestBucket");
@@ -26,7 +18,7 @@ function withOrigin(builder: ReturnType<typeof createDistributionBuilder>, stack
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates errorRate and originLatency alarms by default", () => {
-      const { result, template } = buildResult(withOrigin);
+      const { result, template } = buildAndSynth(withOrigin);
 
       expect(result.alarms.errorRate).toBeDefined();
       expect(result.alarms.originLatency).toBeDefined();
@@ -34,7 +26,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates errorRate alarm with threshold > 5%", () => {
-      const { template } = buildResult(withOrigin);
+      const { template } = buildAndSynth(withOrigin);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "5xxErrorRate",
@@ -50,7 +42,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates originLatency alarm with threshold > 5000ms", () => {
-      const { template } = buildResult(withOrigin);
+      const { template } = buildAndSynth(withOrigin);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "OriginLatency",
@@ -66,7 +58,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes DistributionId and Region=Global dimensions", () => {
-      const { template } = buildResult(withOrigin);
+      const { template } = buildAndSynth(withOrigin);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "5xxErrorRate",
@@ -75,7 +67,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes threshold justification in alarm descriptions", () => {
-      const { template } = buildResult(withOrigin);
+      const { template } = buildAndSynth(withOrigin);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "5xxErrorRate",
@@ -86,7 +78,7 @@ describe("recommended alarms", () => {
 
   describe("customization", () => {
     it("allows customizing errorRate alarm threshold", () => {
-      const { template } = buildResult((b, stack) => {
+      const { template } = buildAndSynth((b, stack) => {
         withOrigin(b, stack);
         b.recommendedAlarms({ errorRate: { threshold: 10 } });
       });
@@ -98,7 +90,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing originLatency threshold", () => {
-      const { template } = buildResult((b, stack) => {
+      const { template } = buildAndSynth((b, stack) => {
         withOrigin(b, stack);
         b.recommendedAlarms({ originLatency: { threshold: 3000 } });
       });
@@ -110,7 +102,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing evaluation periods", () => {
-      const { template } = buildResult((b, stack) => {
+      const { template } = buildAndSynth((b, stack) => {
         withOrigin(b, stack);
         b.recommendedAlarms({
           errorRate: { evaluationPeriods: 3, datapointsToAlarm: 2 },
@@ -125,7 +117,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing treat missing data", () => {
-      const { template } = buildResult((b, stack) => {
+      const { template } = buildAndSynth((b, stack) => {
         withOrigin(b, stack);
         b.recommendedAlarms({
           errorRate: { treatMissingData: TreatMissingData.BREACHING },
@@ -141,7 +133,7 @@ describe("recommended alarms", () => {
 
   describe("disabling alarms", () => {
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildResult((b, stack) => {
+      const { result, template } = buildAndSynth((b, stack) => {
         withOrigin(b, stack);
         b.recommendedAlarms(false);
       });
@@ -151,7 +143,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when enabled is false", () => {
-      const { result, template } = buildResult((b, stack) => {
+      const { result, template } = buildAndSynth((b, stack) => {
         withOrigin(b, stack);
         b.recommendedAlarms({ enabled: false });
       });
@@ -161,7 +153,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables individual alarms when set to false", () => {
-      const { result, template } = buildResult((b, stack) => {
+      const { result, template } = buildAndSynth((b, stack) => {
         withOrigin(b, stack);
         b.recommendedAlarms({ errorRate: false });
       });
@@ -172,7 +164,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables multiple individual alarms", () => {
-      const { result, template } = buildResult((b, stack) => {
+      const { result, template } = buildAndSynth((b, stack) => {
         withOrigin(b, stack);
         b.recommendedAlarms({ errorRate: false, originLatency: false });
       });
@@ -184,7 +176,7 @@ describe("recommended alarms", () => {
 
   describe("no default actions", () => {
     it("creates alarms with no alarm actions", () => {
-      const { template } = buildResult(withOrigin);
+      const { template } = buildAndSynth(withOrigin);
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "5xxErrorRate",
@@ -196,7 +188,7 @@ describe("recommended alarms", () => {
 
 describe("addAlarm", () => {
   it("creates a custom alarm alongside recommended alarms", () => {
-    const { result, template } = buildResult((b, stack) => {
+    const { result, template } = buildAndSynth((b, stack) => {
       withOrigin(b, stack);
       b.addAlarm("functionErrors", (alarm) =>
         alarm
@@ -233,7 +225,7 @@ describe("addAlarm", () => {
 
   it("throws on duplicate key with recommended alarm", () => {
     expect(() =>
-      buildResult((b, stack) => {
+      buildAndSynth((b, stack) => {
         withOrigin(b, stack);
         b.addAlarm("errorRate", (alarm) =>
           alarm

@@ -5,20 +5,18 @@ import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
-import { Source } from "aws-cdk-lib/aws-s3-deployment";
+import { type BucketDeploymentProps, Source } from "aws-cdk-lib/aws-s3-deployment";
+import { newStack } from "@composurecdk/cdk-testing";
 import { Ref, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBucketDeploymentBuilder } from "../src/bucket-deployment-builder.js";
+import type { BucketDeploymentBuilderProps } from "../src/bucket-deployment-props.js";
 import { BUCKET_DEPLOYMENT_DEFAULTS } from "../src/bucket-deployment-defaults.js";
-
-function createStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
 
 describe("BucketDeploymentBuilder", () => {
   describe("build", () => {
     it("returns a BucketDeploymentBuilderResult with a deployment property", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       const result = createBucketDeploymentBuilder()
@@ -31,7 +29,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("creates a BucketDeployment resource in the template", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       createBucketDeploymentBuilder()
@@ -44,7 +42,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("deploys to the specified destination bucket", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       createBucketDeploymentBuilder()
@@ -59,9 +57,18 @@ describe("BucketDeploymentBuilder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own BucketDeploymentProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const _props: BucketDeploymentBuilderProps = undefined as unknown as BucketDeploymentProps;
+    });
+  });
+
   describe("validation", () => {
     it("throws when no destination bucket is set", () => {
-      const stack = createStack();
+      const stack = newStack();
 
       expect(() =>
         createBucketDeploymentBuilder()
@@ -71,7 +78,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("throws when no sources are set", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       expect(() =>
@@ -80,7 +87,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("throws when sources array is empty", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       expect(() =>
@@ -94,7 +101,7 @@ describe("BucketDeploymentBuilder", () => {
 
   describe("Ref resolution", () => {
     it("resolves a Ref for destinationBucket", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       const bucketRef = Ref.to<{ bucket: Bucket }>("site").get("bucket");
@@ -108,7 +115,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("resolves a Ref for distribution", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
       const distribution = new Distribution(stack, "CDN", {
         defaultBehavior: {
@@ -131,7 +138,7 @@ describe("BucketDeploymentBuilder", () => {
 
   describe("distribution", () => {
     it("works without a distribution", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       const result = createBucketDeploymentBuilder()
@@ -143,7 +150,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("accepts a concrete distribution", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
       const distribution = new Distribution(stack, "CDN", {
         defaultBehavior: {
@@ -179,7 +186,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("does not apply distributionPaths when no distribution is set", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       createBucketDeploymentBuilder()
@@ -196,7 +203,7 @@ describe("BucketDeploymentBuilder", () => {
 
   describe("property overrides", () => {
     it("allows overriding distributionPaths", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
       const distribution = new Distribution(stack, "CDN", {
         defaultBehavior: {
@@ -215,7 +222,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("allows overriding prune", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       createBucketDeploymentBuilder()
@@ -231,7 +238,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("allows setting destinationKeyPrefix", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       createBucketDeploymentBuilder()
@@ -249,7 +256,7 @@ describe("BucketDeploymentBuilder", () => {
 
   describe("logging", () => {
     it("creates a managed LogGroup by default", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       createBucketDeploymentBuilder()
@@ -262,7 +269,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("returns the auto-created LogGroup in the build result", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       const result = createBucketDeploymentBuilder()
@@ -274,7 +281,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("applies RETAIN removal policy on the auto-created LogGroup", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       createBucketDeploymentBuilder()
@@ -290,7 +297,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("applies TWO_YEARS retention on the auto-created LogGroup", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
 
       createBucketDeploymentBuilder()
@@ -305,7 +312,7 @@ describe("BucketDeploymentBuilder", () => {
     });
 
     it("skips auto LogGroup when user provides their own", () => {
-      const stack = createStack();
+      const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");
       const userLogGroup = new LogGroup(stack, "UserLogGroup", {
         retention: RetentionDays.ONE_WEEK,

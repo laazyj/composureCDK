@@ -1,0 +1,40 @@
+{
+  "name": "@composurecdk/cdk-testing",
+  "version": "0.10.3",
+  "description": "Internal CDK-aware test helpers shared across the @composurecdk/* suites (stack fixtures, synthesised-policy JSON, type-level assignability guards).",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
+    "directory": "packages/cdk-testing"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [],
+  "author": "Jason Duffett (https://github.com/laazyj)",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@composurecdk/core": "*",
+    "@types/node": "^26.6.1",
+    "aws-cdk-lib": "^2.269.0",
+    "constructs": "^10.8.1",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.0"
+  },
+  "nx": {
+    "tags": [
+      "scope:testing"
+    ]
+  }
+}

@@ -1,47 +1,34 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { SecurityGroup, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
-import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { SecurityGroup, SubnetType, type Vpc } from "aws-cdk-lib/aws-ec2";
+import { Key } from "aws-cdk-lib/aws-kms";
 import {
   ClusterParameterGroup,
+  type DatabaseClusterProps,
   EngineVersion,
   InstanceType,
   ParameterGroupFamily,
 } from "@aws-cdk/aws-neptune-alpha";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createClusterBuilder, type IClusterBuilder } from "../src/cluster-builder.js";
+import { type ClusterBuilderProps, createClusterBuilder } from "../src/cluster-builder.js";
 import { clusterParameterGroupFamily } from "../src/cluster-parameter-group-defaults.js";
+import { isolatedVpc } from "./_helpers.js";
 
-/** Builds a VPC with isolated subnets — Neptune is VPC-only and needs no egress. */
-function isolatedVpc(stack: Stack): Vpc {
-  return new Vpc(stack, "Vpc", {
-    maxAzs: 2,
-    natGateways: 0,
-    subnetConfiguration: [
-      { name: "isolated", subnetType: SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
-    ],
-  });
-}
-
-function buildCluster(configure?: (b: IClusterBuilder) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const vpc = isolatedVpc(stack);
-  const builder = createClusterBuilder()
-    .vpc(vpc)
-    .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
-    .instanceType(InstanceType.R6G_LARGE);
-  configure?.(builder);
-  const result = builder.build(stack, "Graph");
-  return { app, stack, vpc, result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(createClusterBuilder, "Graph", {
+  seed: (b, stack) =>
+    void b
+      .vpc(isolatedVpc(stack))
+      .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+      .instanceType(InstanceType.R6G_LARGE),
+});
 
 describe("ClusterBuilder", () => {
   describe("build", () => {
     it("returns a result exposing every construct it creates", () => {
-      const { result } = buildCluster();
+      const { result } = buildAndSynth();
 
       expect(result.cluster).toBeDefined();
       expect(result.subnetGroup).toBeDefined();
@@ -50,13 +37,13 @@ describe("ClusterBuilder", () => {
     });
 
     it("creates exactly one Neptune cluster", () => {
-      const { template } = buildCluster();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::Neptune::DBCluster", 1);
     });
 
     it("applies well-architected defaults", () => {
-      const { template } = buildCluster();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::Neptune::DBCluster", {
         StorageEncrypted: true,
@@ -69,7 +56,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("retains the cluster on deletion by default", () => {
-      const { template } = buildCluster();
+      const { template } = buildAndSynth();
 
       template.hasResource("AWS::Neptune::DBCluster", {
         DeletionPolicy: "Retain",
@@ -78,7 +65,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("lets the user override a default", () => {
-      const { template } = buildCluster((b) => b.backupRetention(Duration.days(30)));
+      const { template } = buildAndSynth((b) => b.backupRetention(Duration.days(30)));
 
       template.hasResourceProperties("AWS::Neptune::DBCluster", {
         BackupRetentionPeriod: 30,
@@ -101,9 +88,18 @@ describe("ClusterBuilder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own DatabaseClusterProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const _props: ClusterBuilderProps = undefined as unknown as DatabaseClusterProps;
+    });
+  });
+
   describe("cluster parameter group", () => {
     it("auto-creates an audit-log-enabled cluster parameter group", () => {
-      const { template } = buildCluster();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::Neptune::DBClusterParameterGroup", {
         Parameters: { neptune_enable_audit_log: "1" },
@@ -111,7 +107,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("merges user parameters onto the audit-log default", () => {
-      const { template } = buildCluster((b) =>
+      const { template } = buildAndSynth((b) =>
         b.clusterParameters({ neptune_query_timeout: "120000" }),
       );
 
@@ -179,7 +175,7 @@ describe("ClusterBuilder", () => {
 
   describe("recommended alarms", () => {
     it("creates the provisioned alarm set by default (no serverless capacity alarm)", () => {
-      const { result } = buildCluster();
+      const { result } = buildAndSynth();
 
       expect(Object.keys(result.alarms).sort()).toEqual([
         "bufferCacheHitRatio",
@@ -190,7 +186,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("adds the serverless capacity alarm at 90% of maxCapacity for a serverless cluster", () => {
-      const { result, template } = buildCluster((b) =>
+      const { result, template } = buildAndSynth((b) =>
         b
           .instanceType(InstanceType.SERVERLESS)
           .serverlessScalingConfiguration({ minCapacity: 1, maxCapacity: 8 }),
@@ -204,14 +200,14 @@ describe("ClusterBuilder", () => {
     });
 
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildCluster((b) => b.recommendedAlarms(false));
+      const { result, template } = buildAndSynth((b) => b.recommendedAlarms(false));
 
       expect(result.alarms).toEqual({});
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
     });
 
     it("lets a single alarm be tuned and another disabled", () => {
-      const { result, template } = buildCluster((b) =>
+      const { result, template } = buildAndSynth((b) =>
         b.recommendedAlarms({ cpuUtilization: { threshold: 90 }, bufferCacheHitRatio: false }),
       );
 
@@ -223,7 +219,7 @@ describe("ClusterBuilder", () => {
     });
 
     it("supports custom alarms via addAlarm", () => {
-      const { result } = buildCluster((b) =>
+      const { result } = buildAndSynth((b) =>
         b.addAlarm("gremlinErrors", (a) =>
           a
             .metric((cluster) => cluster.metric("NumGremlinErrorsPerSec"))
@@ -234,78 +230,81 @@ describe("ClusterBuilder", () => {
 
       expect(result.alarms.gremlinErrors).toBeDefined();
     });
+
+    // Regression: disabling the recommended alarms must not drop custom alarms
+    // added via addAlarm() — see issue #305.
+    it("keeps a custom alarm when recommendedAlarms is false", () => {
+      const { result, template } = buildAndSynth((b) =>
+        b.recommendedAlarms(false).addAlarm("gremlinErrors", (a) =>
+          a
+            .metric((cluster) => cluster.metric("NumGremlinErrorsPerSec"))
+            .threshold(0)
+            .greaterThan(),
+        ),
+      );
+
+      expect(Object.keys(result.alarms)).toEqual(["gremlinErrors"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+
+    it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+      const { result, template } = buildAndSynth((b) =>
+        b.recommendedAlarms({ enabled: false }).addAlarm("gremlinErrors", (a) =>
+          a
+            .metric((cluster) => cluster.metric("NumGremlinErrorsPerSec"))
+            .threshold(0)
+            .greaterThan(),
+        ),
+      );
+
+      expect(Object.keys(result.alarms)).toEqual(["gremlinErrors"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
   });
 
-  describe("allowAccessFrom", () => {
-    it("opens the cluster port to the peer and grants IAM connect", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
+  describe("allowDefaultPortFrom", () => {
+    /** Builds a cluster whose port is opened to a peer SG, concrete or Ref-supplied. */
+    function buildWithPeer(byRef: boolean) {
+      const stack = newStack();
       const vpc = isolatedVpc(stack);
       const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
-      const peerRole = new Role(stack, "PeerRole", {
-        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
-      });
-      // A minimal IConnectable & IGrantable peer.
-      const peer = { connections: peerSg.connections, grantPrincipal: peerRole.grantPrincipal };
 
       createClusterBuilder()
         .vpc(vpc)
         .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
         .instanceType(InstanceType.R6G_LARGE)
-        .allowAccessFrom(peer)
-        .build(stack, "Graph");
+        .allowDefaultPortFrom(
+          byRef ? ref<{ securityGroup: SecurityGroup }>("peer").get("securityGroup") : peerSg,
+          "Bastion to Neptune",
+        )
+        .build(stack, "Graph", { peer: { securityGroup: peerSg } });
 
-      const template = Template.fromStack(stack);
+      return Template.fromStack(stack);
+    }
+
+    it("opens the cluster port to the peer's security group, and nothing else", () => {
+      const template = buildWithPeer(false);
+
       // Ingress on the cluster's port sourced from the peer SG. The port is a
       // CloudFormation token (the cluster's Port attribute), so match on the
       // protocol and the peer-SG source rather than a literal port number.
       template.hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
         IpProtocol: "tcp",
+        Description: "Bastion to Neptune",
         SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
       });
-      // IAM connect grant on the peer role (the alpha L2 grants the neptune-db
-      // data-plane action namespace).
-      template.hasResourceProperties("AWS::IAM::Policy", {
-        PolicyDocument: Match.objectLike({
-          Statement: Match.arrayWith([
-            Match.objectLike({ Action: Match.stringLikeRegexp("^neptune-db:") }),
-          ]),
-        }),
-      });
+      // The network rule is the whole of what the cluster builder writes for
+      // the peer; the matching `neptune-db:` grant now lives on the grantee
+      // (ADR-0013). The stack's only policy is the log-export plumbing's.
+      const policies = JSON.stringify(template.findResources("AWS::IAM::Policy"));
+      expect(policies).not.toContain("neptune-db:");
     });
 
-    it("opens only the network path (no IAM connect grant) when IAM auth is disabled", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
-      const vpc = isolatedVpc(stack);
-      const peerSg = new SecurityGroup(stack, "PeerSg", { vpc });
-      const peerRole = new Role(stack, "PeerRole", {
-        assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
-      });
-      const peer = { connections: peerSg.connections, grantPrincipal: peerRole.grantPrincipal };
-
-      createClusterBuilder()
-        .vpc(vpc)
-        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
-        .instanceType(InstanceType.R6G_LARGE)
-        .iamAuthentication(false)
-        .allowAccessFrom(peer)
-        .build(stack, "Graph");
-
-      const template = Template.fromStack(stack);
-      // Network path is still opened.
-      template.hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
+    it("resolves a Ref-supplied peer against the build context", () => {
+      buildWithPeer(true).hasResourceProperties("AWS::EC2::SecurityGroupIngress", {
         IpProtocol: "tcp",
         SourceSecurityGroupId: Match.objectLike({ "Fn::GetAtt": Match.arrayWith(["GroupId"]) }),
       });
-      // But no neptune-db connect grant is emitted — it would be inert.
-      const policies = Object.values(template.findResources("AWS::IAM::Policy"));
-      const hasConnectGrant = policies.some((p) => {
-        const doc = (p as { Properties?: { PolicyDocument?: { Statement?: unknown } } }).Properties
-          ?.PolicyDocument?.Statement;
-        return JSON.stringify(doc ?? []).includes("neptune-db:");
-      });
-      expect(hasConnectGrant).toBe(false);
     });
   });
 
@@ -329,6 +328,71 @@ describe("ClusterBuilder", () => {
           { "Fn::GetAtt": [stack.getLogicalId(sg.node.defaultChild as never), "GroupId"] },
         ]),
       });
+    });
+  });
+
+  describe("kmsKey", () => {
+    /** The KmsKeyId a cluster encrypted with `Key` (logical id `Key961B73FD`) renders. */
+    const KMS_KEY_ARN = { "Fn::GetAtt": ["Key961B73FD", "Arn"] };
+
+    it("passes a concrete key through to the cluster, alongside the storageEncrypted default", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = isolatedVpc(stack);
+      const key = new Key(stack, "Key");
+
+      createClusterBuilder()
+        .vpc(vpc)
+        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+        .instanceType(InstanceType.R6G_LARGE)
+        .kmsKey(key)
+        .build(stack, "Graph");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Neptune::DBCluster", {
+        KmsKeyId: KMS_KEY_ARN,
+        StorageEncrypted: true,
+      });
+    });
+
+    it("resolves a Resolvable key from the build context", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = isolatedVpc(stack);
+      const key = new Key(stack, "Key");
+
+      createClusterBuilder()
+        .vpc(vpc)
+        .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+        .instanceType(InstanceType.R6G_LARGE)
+        .kmsKey(ref<{ key: Key }, Key>("clusterKey", (r) => r.key))
+        .build(stack, "Graph", { clusterKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Neptune::DBCluster", {
+        KmsKeyId: KMS_KEY_ARN,
+        StorageEncrypted: true,
+      });
+    });
+
+    // The storageEncrypted default already agrees with a customer key, so there
+    // is nothing for a key to infer (contrast s3/sqs, where supplying a key has
+    // to flip a mutually exclusive encryption mode — ADR-0009). Turning
+    // encryption off while supplying a key is a contradiction only the caller
+    // can have meant, so it is left to CDK to reject.
+    it("does not reconcile an explicit storageEncrypted(false), so CDK rejects the mismatch", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const vpc = isolatedVpc(stack);
+      const key = new Key(stack, "Key");
+
+      expect(() =>
+        createClusterBuilder()
+          .vpc(vpc)
+          .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+          .instanceType(InstanceType.R6G_LARGE)
+          .storageEncrypted(false)
+          .kmsKey(key)
+          .build(stack, "Graph"),
+      ).toThrow(/KMS key supplied but storageEncrypted is false/);
     });
   });
 

@@ -1,6 +1,6 @@
 # ADR 0007: Dual ESM/CJS publishing as an enforced standard
 
-- **Status:** Accepted
+- **Status:** Accepted (scope amended 2026-09-18 — see [Amendment](#amendment-2026-09-18-eslint-plugin-joins-the-standard))
 - **Date:** 2026-05-14
 
 ## Context
@@ -20,7 +20,7 @@ standard.
 
 **Every publishable `@composurecdk/*` package ships both an ESM and a CommonJS
 build, produced by [`tshy`](https://github.com/isaacs/tshy). Regression
-enforcement runs as nx targets / npm scripts — locally first, with CI as a thin
+enforcement runs as nx targets — locally first, with CI as a thin
 executor of the same targets.**
 
 ### Build: `tshy`
@@ -49,17 +49,18 @@ Each package declares `engines.node: ">=20"`.
 
 ### Enforcement is local-first
 
-The enforcement mechanisms are nx targets / npm scripts, identical in shape to
+The enforcement mechanisms are nx targets, identical in shape to
 `build`/`lint`/`test`. CI runs the same targets — it is not where enforcement
-_lives_. A maintainer running `npm run verify` gets the exact gate CI runs.
+_lives_. A maintainer running `npx nx verify` gets the exact gate CI runs.
 
-| Mechanism                                             | What it catches                                                                                  | Feedback point                             |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| `composurecdk/no-cjs-incompatible-syntax` ESLint rule | `import.meta` / top-level `await` in `src/` — no CJS emit                                        | In-editor, instant                         |
-| `attw` + `publint` (`check:exports` nx target)        | Broken/masquerading exports, dual-package issues, packaging mistakes                             | `npm run check:exports` / `npm run verify` |
-| `@composurecdk/module-compat` consumption tests       | A package failing to resolve under `require()` or `import`, or the CJS `cdk synth` path breaking | `npm test` / `npm run verify`              |
-| husky `pre-push` hook                                 | Any of the above reaching GitHub                                                                 | Automatic, before push                     |
-| CI Node 20 + 24 matrix                                | Version-specific resolution breakage                                                             | CI (the one genuinely CI-only check)       |
+| Mechanism                                             | What it catches                                                                                  | Feedback point                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `composurecdk/no-cjs-incompatible-syntax` ESLint rule | `import.meta` / top-level `await` in `src/` — no CJS emit                                        | In-editor, instant                                   |
+| `composurecdk/no-realm-bound-instanceof` ESLint rule  | `instanceof` against an imported class in `src/` — realm-bound, silently false across the hazard | In-editor, instant                                   |
+| `attw` + `publint` (`check:exports` nx target)        | Broken/masquerading exports, dual-package issues, packaging mistakes                             | `npx nx run-many -t check:exports` / `npx nx verify` |
+| `@composurecdk/module-compat` consumption tests       | A package failing to resolve under `require()` or `import`, or the CJS `cdk synth` path breaking | `npx nx run-many -t test` / `npx nx verify`          |
+| husky `pre-push` hook                                 | Any of the above reaching GitHub                                                                 | Automatic, before push                               |
+| CI Node 20 + 24 matrix                                | Version-specific resolution breakage                                                             | CI (the one genuinely CI-only check)                 |
 
 ### Dual-package hazard
 
@@ -70,6 +71,15 @@ across the boundary. `COPY_STATE` and the lambda event-source brand already use
 used `value instanceof Ref`. It now brands every `Ref` with
 `Symbol.for("composurecdk.ref")` and `isRef` checks that brand (see
 [architecture.md](../architecture.md#ref)).
+
+`StatementBuilder` needed the same treatment later (#385), and it is the
+class most exposed to the hazard: a consumer constructs one and hands it back
+across a public API. Every exported class a consumer can pass **into** library
+code and that the library then **type-tests** needs a brand. As of #385 that is
+`Ref` and `StatementBuilder`. Errors are the remaining gap: a consumer's
+`catch (e) { e instanceof WildcardResourceError }` is realm-bound the same way,
+so the library's error classes set `name` and that — not `instanceof` — is the
+cross-realm-safe discriminator.
 
 ## Consequences
 
@@ -100,5 +110,40 @@ used `value instanceof Ref`. It now brands every `Ref` with
   across the supported Node range, and it does not fix the `ts-node`/Jest CJS
   case in issue #119.
 - **Enforcement in CI only.** Rejected — it makes the feedback loop a push away.
-  composureCDK's CI already just runs `npm run` scripts, so enforcement is
+  composureCDK's CI already just runs nx targets, so enforcement is
   implemented as nx targets that run locally and in CI alike.
+
+## Amendment (2026-09-18): `eslint-plugin` joins the standard
+
+The Decision above scoped dual publishing to _publishable_ packages and named
+`@composurecdk/eslint-plugin` as an exception, on the reasoning that it is
+`private` and consumed only by this workspace's own `eslint.config.mjs`.
+`@composurecdk/eslint-plugin` is now intended for publication
+(laazyj/composureCDK#465), and `SECURITY.md` already treats it as in-scope
+because "it ships to users and influences code that goes to production". The
+exception no longer holds.
+
+**`@composurecdk/eslint-plugin` builds with `tshy`, runs `check:exports`, and is
+registered in `DUAL_PACKAGES` — the same gate as every published package.** It
+stayed `private: true` until the release itself, so that the packaging was proven
+by the standing gate for as long as the decision took, rather than being
+discovered at the moment of publishing. It is published as of ADR-0019.
+
+The exception it was granted is exactly what let the defect in #465 survive:
+`eslint-plugin` hand-wrote the one `exports` map in the repo that no tool
+checked, and listed `types` after `import` — order-sensitive, and an error under
+`publint`. Nothing was broken (TypeScript resolved it anyway), but the
+declaration asserted something it did not mean. The fix worth keeping is not the
+key order; it is that the map is now generated by `tshy` and verified by
+`attw` + `publint`, so it cannot drift again.
+
+`@composurecdk/examples` (a CDK app, never a dependency) and
+`@composurecdk/module-compat` and `@composurecdk/cdk-testing` (workspace-internal
+test infrastructure) remain outside the standard.
+
+The CJS build changes nothing about how the flat config consumes the plugin. An
+ESM `import composurecdk from "@composurecdk/eslint-plugin"` still yields the
+default export; a CommonJS `require()` yields an object carrying `rules` and
+`configs` as own properties, which is itself a valid ESLint plugin — so
+`plugins: { composurecdk: require("@composurecdk/eslint-plugin") }` works
+without an interop dance.

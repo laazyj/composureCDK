@@ -33,6 +33,8 @@ const cdn = createDistributionBuilder().origin(
 compose({ site: createBucketBuilder(), cdn }, { site: [], cdn: ["site"] }).build(stack, "Website");
 ```
 
+`.certificate(...)` takes a `Ref` the same way, so an [`@composurecdk/acm`](../acm/README.md) certificate (issued in `us-east-1`) can be a component of the same system. Its inner type is read from CDK's own `DistributionProps.certificate` rather than pinned to `ICertificate`, so it accepts whatever the `aws-cdk-lib` you have installed accepts — including the broader [`acm.ICertificateRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_certificatemanager.ICertificateRef.html) where CDK has widened the prop.
+
 ## Secure Defaults
 
 `createDistributionBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
@@ -111,9 +113,52 @@ createDistributionBuilder()
 
 `destination` and `configure` cannot be combined — the destination bucket is user-managed and is not built by this builder.
 
+The `configure` callback receives the build context, so anything `IBucketBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the distribution.
+
 The config object replaces the default wholesale rather than merging with it. For example, `.accessLogs({ includeCookies: true })` does **not** preserve the default `prefix: "logs/"` — restate any default you want to keep.
 
 The auto-created logging bucket uses `DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES` from `@composurecdk/s3`: incomplete multipart uploads are aborted after 7 days and access log objects expire after 2 years (matching the default `LogGroup` retention so the audit window is consistent across log destinations). CloudFront never deletes its own logs, so this lifecycle is the only thing that bounds the bucket's growth.
+
+### Origin object-expiration guard
+
+An S3 lifecycle rule that expires **current** object versions deletes the very
+content the distribution serves. Nothing triggers it — no deployment, no drift —
+so the site keeps working until the objects reach the configured age and then
+starts returning 404s.
+
+The builder registers a suppressible synth-time warning
+(`ORIGIN_OBJECT_EXPIRATION_WARNING_ID`) when a bucket it takes as an origin
+carries such a rule:
+
+```ts
+createBucketBuilder().lifecycleRules([{ expiration: Duration.days(90) }]);
+// DistributionBuilder "cdn": origin bucket "Site/Site/Resource" has lifecycle
+// rule "…", which expires current object versions across the whole bucket …
+```
+
+The check is deliberately narrow, so it fires only on the unambiguous case:
+
+- **Warns** on an enabled rule with `expiration` or `expirationDate` and no
+  `prefix`, `tagFilters`, or object-size filter.
+- **Stays quiet** for a rule scoped to a prefix, tag, or size — that is a
+  considered act on a known subset, and the guard cannot tell whether the subset
+  is served. Scoping an expiry to a prefix that CloudFront does not serve is the
+  supported way to age content out of an origin bucket.
+- **Stays quiet** for `noncurrentVersionExpiration`, which only ever acts on
+  versions already superseded by a newer PUT or a delete marker and so can never
+  reach live content. This is what the `@composurecdk/s3` bucket defaults use.
+- **Stays quiet** when the relationship is unknowable: an imported origin
+  bucket, a bucket in another stack, or a non-S3 origin.
+
+Silence it with
+`Annotations.of(stack).acknowledgeWarning(ORIGIN_OBJECT_EXPIRATION_WARNING_ID)`.
+The acknowledgement must sit on an **ancestor** of the distribution — the stack
+is the natural place — because CDK matches acknowledgements against a node's
+ancestor paths, never its own.
+
+L1 property overrides are invisible to the guard:
+`cfnBucket.addPropertyOverride("LifecycleConfiguration.Rules", …)` is merged
+after Aspects run, so an expiry introduced that way is not seen.
 
 ## Recommended Alarms
 

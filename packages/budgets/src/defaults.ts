@@ -42,6 +42,14 @@ export const BUDGET_DEFAULTS = {
     actualPercent: 80,
     forecastedPercent: 100,
   },
+
+  /**
+   * Grant `budgets.amazonaws.com` `SNS:Publish` on SNS subscriber topics.
+   * Budgets cannot deliver to a topic whose access policy does not allow it.
+   *
+   * @see https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-sns-policy.html
+   */
+  topicPolicy: true,
 };
 
 /**

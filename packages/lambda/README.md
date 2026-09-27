@@ -49,6 +49,53 @@ const handler = createFunctionBuilder()
   .build(stack, "MyFunction");
 ```
 
+## Environment variables
+
+Each **value** in `.environment(...)` is independently `Resolvable`, so a variable can carry a sibling's output while the rest stay literal:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createRestApiBuilder, type RestApiBuilderResult } from "@composurecdk/apigateway";
+
+compose(
+  {
+    api: createRestApiBuilder().restApiName("Orders"),
+    worker: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("lambda"))
+      .environment({
+        API_URL: ref("api", (r: RestApiBuilderResult) => r.api.url),
+        LOG_LEVEL: "info",
+      }),
+  },
+  { api: [], worker: ["api"] },
+);
+```
+
+Per value rather than over the whole record, because mixing the two is the common case: wrapping the record would push every literal through the same `ref`, and through [`combine`](../core/README.md) as soon as two siblings are involved.
+
+## Environment variable encryption
+
+Lambda encrypts environment variables at rest with an AWS-managed key. `.environmentEncryption(...)` opts into a customer-managed one, and accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system rather than a construct created before `compose`:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createKeyBuilder, type KeyBuilderResult } from "@composurecdk/kms";
+
+compose(
+  {
+    envKey: createKeyBuilder().description("Encrypts the checkout handler's environment."),
+    checkout: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("lambda"))
+      .environmentEncryption(ref<KeyBuilderResult>("envKey").get("key")),
+  },
+  { envKey: [], checkout: ["envKey"] },
+);
+```
+
 ## Execution role
 
 By default, `createFunctionBuilder` creates an explicit IAM execution role with an inline `LogsWriter` policy scoped to the function's auto-created log group:
@@ -56,6 +103,8 @@ By default, `createFunctionBuilder` creates an explicit IAM execution role with 
 - `logs:CreateLogStream` and `logs:PutLogEvents` on the function's specific log group ARN.
 - No `logs:CreateLogGroup` (the builder pre-creates the group).
 - No `AWSLambdaBasicExecutionRole` managed policy — that policy grants the same actions on `*`, allowing a compromised function to write to any log group in the account.
+
+Supplying your own `logGroup` keeps that scoping: the ARN is read from wherever the `aws-cdk-lib` you have installed keeps it, so a log group in either the L2 or the reference form works. One that exposes no ARN at all fails the build by name rather than emitting an unscoped or malformed policy — reach for `.role()` or `.useCdkAutoRole()` if you need the builder to stay out of the role entirely.
 
 The role is exposed on the build result:
 
@@ -305,14 +354,67 @@ second `props` argument and exported as `DEFAULT_SQS_EVENT_SOURCE_PROPS`:
 | `reportBatchItemFailures` | `true`                      | A single poison message fails only its own record, not the whole batch. CDK defaults this `false`. |
 | `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                  |
 
-`dynamoEventSource` applies the same defaults plus `startingPosition`, exported
-as `DEFAULT_DYNAMO_EVENT_SOURCE_PROPS`:
+`dynamoEventSource` applies the same defaults plus `startingPosition` and
+`bisectBatchOnError`, exported as `DEFAULT_DYNAMO_EVENT_SOURCE_PROPS` (the shared
+`DEFAULT_STREAM_EVENT_SOURCE_PROPS`, which a future `kinesisEventSource` reuses):
 
-| Property                  | Default                     | Rationale                                                                                         |
-| ------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------- |
-| `startingPosition`        | `LATEST`                    | A newly-attached consumer reads from the stream tip, not the table's existing change history.     |
-| `reportBatchItemFailures` | `true`                      | A single poison record fails only its own record, not the whole batch. CDK defaults this `false`. |
-| `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                 |
+| Property                  | Default                     | Rationale                                                                                                            |
+| ------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `startingPosition`        | `LATEST`                    | A newly-attached consumer reads from the stream tip, not the source's existing change history.                       |
+| `reportBatchItemFailures` | `true`                      | A single poison record fails only its own record, not the whole batch. CDK defaults this `false`.                    |
+| `bisectBatchOnError`      | `true`                      | Split and retry a failing batch, isolating a poison record instead of blocking the shard. CDK defaults this `false`. |
+| `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                                    |
+
+`startingPosition` is optional on `dynamoEventSource` (the default supplies it) —
+unlike CDK's `DynamoEventSourceProps`, which requires it.
+
+### Failure handling (dead-letter queue)
+
+Bisecting isolates a poison record, but a record that never succeeds is still
+retried until the stream's 24 h retention window expires unless you bound
+`retryAttempts` / `maxRecordAge`. Bounding retries **without** a dead-letter
+destination drops those records silently — so for durable failure handling, set
+`onFailure` too. `dynamoEventSource` widens `onFailure` to accept a queue (or a
+`ref()` to a sibling [`createQueueBuilder("dlq")`](../sqs) result) and wraps it
+in an `SqsDlq` for you, resolving it alongside the table `ref` via `combine`:
+
+```ts
+.addEventSource(
+  "orders",
+  dynamoEventSource(ref("orders", (r) => r.table), {
+    retryAttempts: 3,
+    onFailure: ref("dlq", (r) => r.queue),
+  }),
+)
+```
+
+A queue is the common case, not the only one: `onFailure` accepts any
+`IEventSourceDlq` — concrete or behind a `ref()` — and passes it through
+unwrapped. An S3 failure destination, which captures the whole failed batch
+rather than just the record metadata a DLQ message carries, wires up the same
+way:
+
+```ts
+.addEventSource(
+  "orders",
+  dynamoEventSource(ref("orders", (r) => r.table), {
+    retryAttempts: 3,
+    onFailure: ref("failures", (r) => new S3OnFailureDestination(r.bucket)),
+  }),
+)
+```
+
+An S3 destination on a **DynamoDB stream** mapping needs **aws-cdk-lib ≥ 2.184.0**,
+above this package's [floor](../../docs/adr/0008-aws-cdk-lib-version-floors.md) of
+2.168.0. `DynamoEventSource` only opts into S3 destinations from that release;
+below it CDK rejects the pairing at synth with `S3 onFailure Destination is not
+supported for this event source`. The limit is CDK's, not this package's — a
+queue destination works at the floor.
+
+If retries or record-age are bounded but no `onFailure` destination is set, a
+suppressible synth-time warning (`STREAM_DLQ_WARNING_ID`) fires. Silence it —
+when dropping is intended — with
+`Annotations.of(scope).acknowledgeWarning(STREAM_DLQ_WARNING_ID)`.
 
 ### Cross-component invariants
 
@@ -326,8 +428,158 @@ today (the queue often arrives as an unresolved `ref()`); they are tracked in
 `kinesisEventSource` is still deferred — see
 [#120](https://github.com/laazyj/composureCDK/issues/120).
 
+## Deploy-time invocation: `.invokeOnDeploy()`
+
+Some work has to happen _as part of shipping the stack_, and its outcome has to
+gate the deployment: registering the release with an external service, calling
+the system you just deployed to prove it answers, seeding reference data through
+a service API. `.invokeOnDeploy()` invokes the function once during deployment
+and **fails the deployment if the function fails** — the stack rolls back and
+the handler's error message lands in the CloudFormation events.
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import { createFunctionBuilder } from "@composurecdk/lambda";
+
+compose(
+  {
+    register: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("register"))
+      .timeout(Duration.seconds(30))
+      .environment({ API_URL: "https://releases.example.com/v1/register" })
+      .invokeOnDeploy({ after: [ref("api", (r: RestApiBuilderResult) => r.api)] }),
+
+    api: createRestApiBuilder().restApiName("Orders"),
+  },
+  { api: [], register: ["api"] },
+).build(stack, "Release");
+```
+
+### What it is
+
+If you already write CDK custom resources, the whole mental model is one
+sentence: **it is CDK's
+[`triggers.Trigger`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.triggers-readme.html),
+with the synchronous invocation fixed and the wait and ordering derived from the
+function.** Everything below is detail on those defaults.
+
+Worth stating plainly, because the other two tools look right and are not.
+`custom_resources.Provider` wants a handler of yours that speaks the
+CloudFormation custom-resource protocol. `AwsCustomResource` runs one fixed SDK
+call with no handler of yours — and reaching for `Lambda.invoke` there
+[reports success when your handler fails](../custom-resources/README.md).
+`Trigger` is the one that invokes a plain handler and fails the stack on an
+error, and it is the least known of the three.
+
+It is a domain action on the function builder
+([ADR-0016](../../docs/adr/0016-domain-action-custom-resource.md)): you declare
+the intent, the builder owns the invocation semantics, the wait derivation, the
+execution-role ordering and the IAM. The custom resource is exposed on the build
+result as `deploymentTrigger`, so a sibling can be ordered against the call
+itself (`deploymentTrigger.executeBefore(...)`).
+
+Three things reach the template:
+
+- **A `Custom::Trigger`**, carrying the handler ARN, the invocation type, the
+  wait, and `ExecuteOnHandlerChange`.
+- **A trigger provider Lambda and its role** — one per stack, shared by every
+  `Trigger` in it, created by CDK rather than by this builder.
+- **An `AWS::Lambda::Version` of your function.** `Trigger` addresses the handler
+  by its `currentVersion`, so calling `.invokeOnDeploy()` publishes a version —
+  unconditionally, including under `executeOnHandlerChange: false`. That is the
+  re-invocation mechanism rather than an accident: the version ARN changes when
+  the function's code or configuration does, and that property change is what
+  CloudFormation acts on.
+
+### The handler must throw
+
+**A handler that returns an error rather than throwing does not fail the
+deployment.** Lambda considers an invocation that returns successful no matter
+what the payload says, so an HTTP-shaped `{ statusCode: 500 }` — or a caught
+error folded into the response — deploys green:
+
+```ts
+export const handler = async () => {
+  const response = await fetch(process.env.API_URL, { method: "POST" });
+  if (!response.ok) {
+    // Throw. Returning `{ statusCode: response.status }` here would deploy green.
+    throw new Error(`Registration failed: ${response.status} ${await response.text()}`);
+  }
+};
+```
+
+### Ordering
+
+The function's own execution role is always waited for, so the policies attached
+_to it_ by `.grant()` and `.configureRole()` exist before the handler runs —
+CloudFormation does not otherwise sequence those ahead of a custom resource, and
+the handler would race them.
+
+That covers the **identity** half of a grant, which is not always the whole
+grant. `grantDecrypt` on a KMS key, or a cross-account bucket grant, also writes
+a **resource** policy, and that half lives in the granting resource's own tree
+where this ordering does not reach. If the handler needs it at deploy time, name
+that resource in `after`.
+
+Everything else the call depends on goes in `after` as well. It takes any
+[`DependencySource`](../core/README.md#ordering-adddependencies) — the same
+shapes as `dependsOn` in
+[`@composurecdk/custom-resources`](../custom-resources/README.md).
+
+One caveat on "always": a role supplied with `.role(Role.fromRoleArn(...))`
+contributes no resources to the template, so there is nothing to sequence and
+the wait is a no-op. Nothing is lost — an imported role's policies were never
+this stack's to create — but do not read it as a guarantee that they are in
+place.
+
+### Defaults
+
+| Option                   | Default                          | Rationale                                                                                                                                                                                |
+| ------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| invocation type          | `RequestResponse` (not settable) | The deployment waits for the result. An asynchronous invocation returns before the work happens, reporting success whatever the handler did — the opposite of the point.                 |
+| `timeout`                | function `timeout` + 30s         | The deployment outlives the handler, so a handler that runs to its limit reports _its_ error ("Task timed out after …") instead of the deployment abandoning the call. Capped at 14m30s. |
+| `executeOnHandlerChange` | `true`                           | Re-invokes when the handler's code or configuration changes; a no-op on unrelated stack updates.                                                                                         |
+
+The derivation values are exported as `INVOKE_ON_DEPLOY_DEFAULTS`. With no
+function `timeout` set (or a token one), the wait falls back to 2 minutes,
+matching CDK's own `Trigger` default.
+
+Whenever the wait ends up at or below the function's own timeout, a suppressible
+warning fires under `INVOKE_ON_DEPLOY_TIMEOUT_WARNING_ID` — the deployment would
+stop waiting while the handler is still running, so a slow call fails the stack
+as an abandoned invocation rather than reporting the handler's error. That
+covers an explicit `timeout` set too low, and also a function timeout at or
+above the 14m30s cap, where the cap leaves no margin to add.
+
+The cap is not Lambda's 15-minute ceiling but CDK's trigger provider: that
+provider runs with a 15-minute Lambda timeout of its own and `Trigger` sets no
+`ServiceTimeout` on the custom resource, so a provider that dies mid-wait posts
+nothing back and CloudFormation is never told. The result is a **hung**
+deployment, not a failed one. `.invokeOnDeploy()` therefore **throws** on an
+explicit `timeout` above the cap rather than clamping it, and keeps 30s in hand
+on the derived path so the provider outlives the call it is waiting on.
+
+### What it does not do
+
+- **It does not invoke on every deployment.** With `executeOnHandlerChange: true`
+  the invocation re-runs when the handler changes; with `false` it runs only on
+  the stack's first deployment. CDK's `Trigger` offers no "always" mode.
+- **It does not invoke on stack deletion.** For teardown-time work, use
+  [`@composurecdk/custom-resources`](../custom-resources/README.md), which has
+  create/update/**delete** semantics.
+- **It creates no alarms.** The custom resource runs once per deployment, not
+  continuously; there is no steady-state signal to alarm on. Failures surface as
+  a failed deployment.
+- **It is not a general SDK-call escape hatch.** A call that has no
+  CloudFormation resource but needs no handler of yours belongs in
+  `createAwsCustomResourceBuilder()` — that builder invokes an AWS API directly,
+  no Lambda of yours involved.
+
 ## Examples
 
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with recommended alarms, custom alarms, and SNS alarm actions
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — Lambda split across stacks via `.withStacks()`, wired with `ref`
 - [OrderProcessorStack](../examples/src/order-processor-app.ts) — SQS queue wired to a Lambda consumer via `sqsEventSource`
+- [DynamoStreamProcessorStack](../examples/src/dynamo-stream-processor-app.ts) — DynamoDB stream wired to a Lambda consumer via `dynamoEventSource`, with bisect-on-error, bounded retries, and an `onFailure` SQS DLQ

@@ -1,9 +1,22 @@
-import { Aspects, CfnDeletionPolicy, PropertyInjectors, RemovalPolicy, Stack } from "aws-cdk-lib";
-import type { IAspect, IPropertyInjector } from "aws-cdk-lib";
+import {
+  Aspects,
+  CfnDeletionPolicy,
+  CfnResource,
+  Duration,
+  FeatureFlags,
+  PropertyInjectors,
+  RemovalPolicy,
+  Stack,
+} from "aws-cdk-lib";
+import type { IAspect, InjectionContext, IPropertyInjector } from "aws-cdk-lib";
+import { APIGATEWAY_DISABLE_CLOUDWATCH_ROLE } from "aws-cdk-lib/cx-api";
 import { Bucket, CfnBucket, type BucketProps } from "aws-cdk-lib/aws-s3";
-import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
+import { Table, TableV2, type TableProps, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
+import { Key, type KeyProps } from "aws-cdk-lib/aws-kms";
+import { CfnFunction } from "aws-cdk-lib/aws-lambda";
+import { LogGroup, RetentionDays, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
-import { RestApi, type RestApiProps } from "aws-cdk-lib/aws-apigateway";
+import { RestApi, SpecRestApi } from "aws-cdk-lib/aws-apigateway";
 import { DatabaseCluster, type DatabaseClusterProps } from "@aws-cdk/aws-neptune-alpha";
 import {
   AwsCustomResource,
@@ -49,15 +62,36 @@ class BucketRemovalPolicyInjector implements IPropertyInjector {
   }
 }
 
-/**
- * A {@link IPropertyInjector} that overrides `cloudWatchRoleRemovalPolicy`
- * to `RemovalPolicy.DESTROY` on a RestApi. The CDK RestApi uses a separate
- * prop for the Account / CloudWatch Role resources it creates internally.
- */
-class RestApiRemovalPolicyInjector implements IPropertyInjector {
-  readonly constructUniqueId = RestApi.PROPERTY_INJECTION_ID;
+/** The subset of `RestApiBaseProps` this injector reads and writes. */
+interface CloudWatchRoleProps {
+  readonly cloudWatchRole?: boolean;
+  readonly cloudWatchRoleRemovalPolicy?: RemovalPolicy;
+}
 
-  inject(originalProps: RestApiProps): RestApiProps {
+/**
+ * A {@link IPropertyInjector} that overrides `cloudWatchRoleRemovalPolicy` to
+ * `RemovalPolicy.DESTROY` on an API Gateway API, but only when that role is
+ * actually created. CDK uses a separate prop for the Account / CloudWatch Role
+ * resources the API creates internally.
+ *
+ * Both `RestApi` and `SpecRestApi` reject `cloudWatchRoleRemovalPolicy`
+ * outright when `cloudWatchRole` is false, and the role defaults to off once
+ * `@aws-cdk/aws-apigateway:disableCloudWatchRole` is set — which is CDK's
+ * recommended value, because the role is an account-wide singleton. Setting
+ * the removal policy unconditionally turned that flag into a synth failure, so
+ * the default is computed the same way CDK computes it.
+ */
+class CloudWatchRoleRemovalPolicyInjector<
+  Props extends CloudWatchRoleProps,
+> implements IPropertyInjector {
+  constructor(readonly constructUniqueId: string) {}
+
+  inject(originalProps: Props, context: InjectionContext): Props {
+    const cloudWatchRole =
+      originalProps.cloudWatchRole ??
+      !FeatureFlags.of(context.scope).isEnabled(APIGATEWAY_DISABLE_CLOUDWATCH_ROLE);
+    if (!cloudWatchRole) return originalProps;
+
     return { ...originalProps, cloudWatchRoleRemovalPolicy: RemovalPolicy.DESTROY };
   }
 }
@@ -75,6 +109,60 @@ class NeptuneClusterRemovalPolicyInjector implements IPropertyInjector {
 
   inject(originalProps: DatabaseClusterProps): DatabaseClusterProps {
     return { ...originalProps, removalPolicy: RemovalPolicy.DESTROY, deletionProtection: false };
+  }
+}
+
+/**
+ * A {@link IPropertyInjector} for DynamoDB `TableV2` tables that sets
+ * `removalPolicy` to `DESTROY` and `deletionProtection` to `false`. Like the
+ * Neptune injector, teardown of an ephemeral example table needs both flipped
+ * (the generic removal-policy injector only covers `removalPolicy`).
+ */
+class TableV2RemovalPolicyInjector implements IPropertyInjector {
+  readonly constructUniqueId = TableV2.PROPERTY_INJECTION_ID;
+
+  inject(originalProps: TablePropsV2): TablePropsV2 {
+    return { ...originalProps, removalPolicy: RemovalPolicy.DESTROY, deletionProtection: false };
+  }
+}
+
+/**
+ * A {@link IPropertyInjector} for classic DynamoDB `Table`s that sets
+ * `removalPolicy` to `DESTROY` and `deletionProtection` to `false`. The
+ * `TableV2` injector above keys on a different construct id, so the classic
+ * table used by the crud-api example needs its own.
+ */
+class TableRemovalPolicyInjector implements IPropertyInjector {
+  readonly constructUniqueId = Table.PROPERTY_INJECTION_ID;
+
+  inject(originalProps: TableProps): TableProps {
+    return { ...originalProps, removalPolicy: RemovalPolicy.DESTROY, deletionProtection: false };
+  }
+}
+
+/**
+ * A {@link IPropertyInjector} for KMS keys that sets `removalPolicy` to
+ * `DESTROY` and shortens the pending-deletion window to the AWS minimum.
+ *
+ * `@composurecdk/kms` defaults a key to `RETAIN` with the maximum 30-day
+ * window, which is right for real data and wrong for a sandbox: every CI
+ * deploy would leave behind a key that bills for a month after the stack it
+ * belonged to is gone.
+ *
+ * Seven days is as short as this gets — AWS enforces a 7-to-30 day waiting
+ * period on `ScheduleKeyDeletion` and there is no immediate-delete option, so
+ * a torn-down example's key still bills for a week. That is the floor, not a
+ * choice.
+ */
+class KeyRemovalPolicyInjector implements IPropertyInjector {
+  readonly constructUniqueId = Key.PROPERTY_INJECTION_ID;
+
+  inject(originalProps: KeyProps): KeyProps {
+    return {
+      ...originalProps,
+      removalPolicy: RemovalPolicy.DESTROY,
+      pendingWindow: Duration.days(7),
+    };
   }
 }
 
@@ -105,35 +193,52 @@ class NeptuneClusterRemovalPolicyInjector implements IPropertyInjector {
  */
 const DISABLE_LOGGING_CR_ID = "CleanDeskDisableLogging";
 
+/**
+ * Recognise an S3 bucket L2 by its L1's `cfnResourceType`.
+ *
+ * Deliberately not `instanceof Bucket`, which is realm-bound and is banned by
+ * the `composurecdk/no-realm-bound-instanceof` rule: an Aspect visits whatever
+ * is in the tree, including buckets built by another realm's copy of
+ * aws-cdk-lib (ADR-0007), and `instanceof` would silently skip those — leaving
+ * exactly the delete-order race this Aspect exists to prevent. Reading the L1's
+ * resource type is the jsii-safe idiom (ADR-0011).
+ */
+function asBucket(node: IConstruct): Bucket | undefined {
+  const l1 = node.node.defaultChild;
+  if (!CfnResource.isCfnResource(l1)) return undefined;
+  if (l1.cfnResourceType !== CfnBucket.CFN_RESOURCE_TYPE_NAME) return undefined;
+  return node as Bucket;
+}
+
 class DisableSourceLoggingOnDeleteAspect implements IAspect {
   visit(node: IConstruct): void {
-    if (!(node instanceof Bucket)) return;
+    const bucket = asBucket(node);
+    if (!bucket) return;
 
-    const cfn = node.node.defaultChild as CfnBucket | undefined;
-    if (!cfn) return;
+    const cfn = bucket.node.defaultChild as CfnBucket;
     if (cfn.cfnOptions.deletionPolicy !== CfnDeletionPolicy.DELETE) return;
 
     const logging = cfn.loggingConfiguration as CfnBucket.LoggingConfigurationProperty | undefined;
     if (!logging?.destinationBucketName) return;
 
-    const logsBucket = resolveLogsBucketInStack(node, logging.destinationBucketName);
+    const logsBucket = resolveLogsBucketInStack(bucket, logging.destinationBucketName);
     if (!logsBucket) return;
 
-    if (node.node.tryFindChild(DISABLE_LOGGING_CR_ID)) return;
+    if (bucket.node.tryFindChild(DISABLE_LOGGING_CR_ID)) return;
 
-    const disableLoggingCr = new AwsCustomResource(node, DISABLE_LOGGING_CR_ID, {
+    const disableLoggingCr = new AwsCustomResource(bucket, DISABLE_LOGGING_CR_ID, {
       resourceType: "Custom::DisableBucketLogging",
       onDelete: {
         service: "S3",
         action: "putBucketLogging",
         parameters: {
-          Bucket: node.bucketName,
+          Bucket: bucket.bucketName,
           BucketLoggingStatus: {},
         },
-        physicalResourceId: PhysicalResourceId.of(`${node.node.addr}-disable-logging`),
+        physicalResourceId: PhysicalResourceId.of(`${bucket.node.addr}-disable-logging`),
         ignoreErrorCodesMatching: "NoSuchBucket",
       },
-      policy: AwsCustomResourcePolicy.fromSdkCalls({ resources: [node.bucketArn] }),
+      policy: AwsCustomResourcePolicy.fromSdkCalls({ resources: [bucket.bucketArn] }),
       installLatestAwsSdk: false,
     });
 
@@ -143,7 +248,7 @@ class DisableSourceLoggingOnDeleteAspect implements IAspect {
     // CDK wires `autoDeleteObjects: true` as a child construct with id
     // "AutoDeleteObjectsCustomResource" — fragile if CDK renames it, but this
     // is sandbox-only and regressions surface at synth-time in the tests.
-    const sourceAutoDelete = node.node.tryFindChild("AutoDeleteObjectsCustomResource");
+    const sourceAutoDelete = bucket.node.tryFindChild("AutoDeleteObjectsCustomResource");
     if (sourceAutoDelete) {
       disableLoggingCr.node.addDependency(sourceAutoDelete);
     }
@@ -167,13 +272,55 @@ function resolveLogsBucketInStack(
   const destinationToken = JSON.stringify(stack.resolve(destinationBucketName));
 
   for (const candidate of stack.node.findAll()) {
-    if (!(candidate instanceof Bucket)) continue;
-    if (candidate === source) continue;
-    if (JSON.stringify(stack.resolve(candidate.bucketName)) === destinationToken) {
-      return candidate;
+    const bucket = asBucket(candidate);
+    if (!bucket || bucket === source) continue;
+    if (JSON.stringify(stack.resolve(bucket.bucketName)) === destinationToken) {
+      return bucket;
     }
   }
   return undefined;
+}
+
+const FUNCTION_LOG_GROUP_ID = "CleanDeskLogGroup";
+
+/**
+ * An {@link IAspect} that gives every Lambda function without a log group of
+ * its own one in the stack, so its logs are deleted with the stack.
+ *
+ * A function with no `LoggingConfig.LogGroup` writes to `/aws/lambda/<name>`,
+ * which Lambda creates on first invocation. That group is outside the
+ * template, so no removal policy reaches it and it outlives the stack. The
+ * functions this catches are the ones CDK creates for you: the
+ * `AwsCustomResource` provider, the S3 auto-delete provider, and any other
+ * helper a construct brings. Functions built by `@composurecdk/lambda` already
+ * have a log group and are left alone.
+ *
+ * The function references the new group, so CloudFormation creates the group
+ * first and deletes it last — after a custom resource's `onDelete` call, whose
+ * logs still have somewhere to go.
+ *
+ * Works on the L1 so it reaches raw `CfnResource` functions too: CDK's own
+ * `CustomResourceProvider` builds its handler that way, with no L2 and no
+ * logging option. The override sets only `LoggingConfig.LogGroup`, so any
+ * `LogFormat` the function already has is kept.
+ */
+class FunctionLogGroupAspect implements IAspect {
+  visit(node: IConstruct): void {
+    if (!CfnFunction.isCfnFunction(node)) return;
+    // Undefined on a raw `CfnResource`, which exposes no typed properties.
+    const existing = (node as Partial<CfnFunction>).loggingConfig as
+      CfnFunction.LoggingConfigProperty | undefined;
+    if (existing?.logGroup) return;
+
+    const scope = node.node.scope;
+    if (!scope || scope.node.tryFindChild(FUNCTION_LOG_GROUP_ID)) return;
+
+    const logGroup = new LogGroup(scope, FUNCTION_LOG_GROUP_ID, {
+      retention: RetentionDays.ONE_WEEK,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+    node.addPropertyOverride("LoggingConfig.LogGroup", logGroup.logGroupName);
+  }
 }
 
 /**
@@ -182,7 +329,9 @@ function resolveLogsBucketInStack(
  * example stacks, and an {@link IAspect} that disables S3 server access
  * logging on source buckets before they are torn down (so destination
  * logs buckets can be emptied and deleted without racing in-flight log
- * deliveries).
+ * deliveries), and one that gives every Lambda function without a log
+ * group of its own one in the stack (so CDK's helper functions do not leave
+ * `/aws/lambda/*` groups behind).
  *
  * This ensures that every stateful resource created under `scope` — S3
  * buckets, CloudWatch log groups, API Gateway accounts / CloudWatch roles,
@@ -197,10 +346,20 @@ function resolveLogsBucketInStack(
  * - `aws-cdk-lib/aws-logs.LogGroup`
  * - `aws-cdk-lib/aws-ec2.Volume`
  * - `aws-cdk-lib/aws-apigateway.RestApi` (Account + CloudWatch Role)
+ * - `aws-cdk-lib/aws-apigateway.SpecRestApi` (Account + CloudWatch Role)
  * - `@aws-cdk/aws-neptune-alpha.DatabaseCluster` (also clears `deletionProtection`)
+ * - `aws-cdk-lib/aws-dynamodb.TableV2` (also clears `deletionProtection`)
+ * - `aws-cdk-lib/aws-dynamodb.Table` (also clears `deletionProtection`)
+ * - `aws-cdk-lib/aws-kms.Key` (also shortens the pending-deletion window to
+ *   the 7-day AWS minimum)
+ *
+ * `@composurecdk/bedrock` needs no injector of its own: its model invocation
+ * log group is an L2 `LogGroup` (covered above), and the guardrail, guardrail
+ * version and application inference profile are L1s with no removal policy,
+ * so CloudFormation deletes them by default.
  *
  * If new stateful construct types are added to example stacks (e.g.
- * DynamoDB tables, SQS queues), add a corresponding injector here.
+ * SQS queues), add a corresponding injector here.
  *
  * @param scope - The scope to apply the policy to (typically an `App`).
  */
@@ -209,8 +368,13 @@ export function cleanDeskPolicy(scope: IConstruct): void {
   injectors.add(new BucketRemovalPolicyInjector());
   injectors.add(new RemovalPolicyInjector<LogGroupProps>(LogGroup.PROPERTY_INJECTION_ID));
   injectors.add(new RemovalPolicyInjector<VolumeProps>(Volume.PROPERTY_INJECTION_ID));
-  injectors.add(new RestApiRemovalPolicyInjector());
+  injectors.add(new CloudWatchRoleRemovalPolicyInjector(RestApi.PROPERTY_INJECTION_ID));
+  injectors.add(new CloudWatchRoleRemovalPolicyInjector(SpecRestApi.PROPERTY_INJECTION_ID));
   injectors.add(new NeptuneClusterRemovalPolicyInjector());
+  injectors.add(new TableV2RemovalPolicyInjector());
+  injectors.add(new TableRemovalPolicyInjector());
+  injectors.add(new KeyRemovalPolicyInjector());
 
   Aspects.of(scope).add(new DisableSourceLoggingOnDeleteAspect());
+  Aspects.of(scope).add(new FunctionLogGroupAspect());
 }

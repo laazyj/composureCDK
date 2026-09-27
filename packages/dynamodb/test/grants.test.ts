@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+
 import { Template } from "aws-cdk-lib/assertions";
 import { AttributeType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { tableGrants } from "../src/grants.js";
 
 function setup() {
-  const app = new App();
-  const stack = new Stack(app, "S");
+  const stack = newStack();
   const table = new Table(stack, "Table", {
     partitionKey: { name: "id", type: AttributeType.STRING },
   });
@@ -16,17 +16,19 @@ function setup() {
   return { stack, table, role };
 }
 
-// The granted actions land on the role's policy; asserting on the rendered
-// template keeps us decoupled from whether CDK emits a single action or an array.
-const policyJson = (stack: Stack) => JSON.stringify(Template.fromStack(stack).toJSON());
+const CAPABILITIES = [
+  ["read", ["dynamodb:GetItem"]],
+  ["write", ["dynamodb:PutItem"]],
+  ["readWrite", ["dynamodb:GetItem", "dynamodb:PutItem"]],
+  ["fullAccess", ["dynamodb:*"]],
+] as const;
 
 describe("tableGrants", () => {
-  it.each([
-    ["read", ["dynamodb:GetItem"]],
-    ["write", ["dynamodb:PutItem"]],
-    ["readWrite", ["dynamodb:GetItem", "dynamodb:PutItem"]],
-    ["fullAccess", ["dynamodb:*"]],
-  ] as const)("%s delegates to the matching native grant method", (capability, actions) => {
+  it("covers every capability tableGrants exposes", () => {
+    assertCapabilitiesCovered(tableGrants, CAPABILITIES);
+  });
+
+  it.each(CAPABILITIES)("%s delegates to the native grant method", (capability, actions) => {
     const { stack, table, role } = setup();
 
     tableGrants[capability](table).applyTo(role, {});

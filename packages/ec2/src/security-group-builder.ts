@@ -1,10 +1,4 @@
-import {
-  type IPeer,
-  type IVpc,
-  type Port,
-  SecurityGroup,
-  type SecurityGroupProps,
-} from "aws-cdk-lib/aws-ec2";
+import { type IPeer, type Port, SecurityGroup, type SecurityGroupProps } from "aws-cdk-lib/aws-ec2";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
@@ -110,19 +104,21 @@ class SecurityGroupBuilder implements Lifecycle<SecurityGroupBuilderResult> {
   props: Partial<SecurityGroupBuilderProps> = {};
   readonly #peerRules: PeerRuleSpec[] = [];
   readonly #selfIngress: SelfIngressSpec[] = [];
-  #vpc?: Resolvable<IVpc>;
+  #vpc?: Resolvable<NonNullable<SecurityGroupProps["vpc"]>>;
 
   /**
    * Sets the VPC the security group is created in.
    *
-   * Accepts a concrete {@link IVpc} or a {@link Ref} that resolves to one
-   * at build time — e.g. a sibling {@link IVpcBuilder} in the same
-   * composed system.
+   * Accepts a concrete VPC or a {@link Ref} that resolves to one at build
+   * time — e.g. a sibling {@link IVpcBuilder} in the same composed system.
+   *
+   * The accepted type is read from CDK's own prop rather than naming `IVpc`,
+   * so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
    *
    * @param vpc - The VPC or a Ref to one.
    * @returns This builder for chaining.
    */
-  vpc(vpc: Resolvable<IVpc>): this {
+  vpc(vpc: Resolvable<NonNullable<SecurityGroupProps["vpc"]>>): this {
     this.#vpc = vpc;
     return this;
   }

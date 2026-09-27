@@ -1,26 +1,18 @@
 {
   "name": "composurecdk",
   "description": "Composable, lifecycle-managed AWS infrastructure built on AWS CDK — monorepo for the @composurecdk/* packages.",
+  "engines": {
+    "npm": ">=11"
+  },
+  "nx": {
+    "includedScripts": []
+  },
   "scripts": {
-    "lint": "nx show projects > /dev/null 2>&1 && eslint .",
-    "lint:fix": "nx show projects > /dev/null 2>&1 && eslint --fix .",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "typecheck": "npx nx run-many -t typecheck",
-    "test": "npx nx run-many -t test",
-    "coverage:summary": "node scripts/coverage-summary.mjs",
-    "cdk-floors:apply": "node scripts/cdk-floors.mjs apply",
-    "cdk-floors:check": "node scripts/cdk-floors.mjs check",
-    "cdk-floors:enforce": "node scripts/cdk-floors.mjs enforce",
-    "cdk-floors:establish": "node scripts/cdk-floors.mjs establish",
-    "cdk-floor:validate": "node scripts/cdk-floor-validate.mjs",
-    "build": "npx nx run-many -t build",
-    "check:exports": "npx nx run-many -t check:exports",
-    "catalogue": "node scripts/gen-constraint-catalogue.mjs",
-    "catalogue:check": "node scripts/gen-constraint-catalogue.mjs --check",
-    "clean": "npx nx run-many -t clean && npx nx reset && rm -rf node_modules",
-    "verify": "npm run format:check && npm run build && npm run catalogue:check && npm run check:exports && npm run lint && npm run cdk-floors:check && npm run test",
-    "release:dryrun": "node scripts/release-dryrun.mjs",
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
+    "lint": "nx run-many -t lint",
+    "format": "nx prettier:write",
+    "verify": "nx verify",
     "prepare": "husky"
   },
   "repository": {
@@ -47,24 +39,26 @@
     "packages/*"
   ],
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,md,yaml,yml}": "prettier --write"
+    "*.{ts,tsx,js,jsx,json,md,yaml,yml}": "prettier --write",
+    ".github/workflows/*.yml": "npx nx actionlint --"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.18.3",
+    "@arethetypeswrong/cli": "^0.18.5",
     "@composurecdk/eslint-plugin": "*",
-    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
     "@eslint/js": "^10.0.1",
-    "@nx/eslint-plugin": "23.0.1",
-    "@nx/js": "23.0.1",
-    "@vitest/coverage-v8": "^4.1.8",
-    "eslint": "^10.4.1",
+    "@nx/eslint-plugin": "23.2.1",
+    "@nx/js": "23.2.1",
+    "@vitest/coverage-v8": "^5.0.1",
+    "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
+    "github-actionlint": "1.7.12",
     "husky": "^9.1.7",
-    "lint-staged": "^17.0.7",
-    "nx": "23.0.1",
-    "prettier": "^3.9.0",
-    "publint": "^0.3.21",
+    "lint-staged": "^17.5.1",
+    "nx": "23.2.1",
+    "prettier": "^3.9.7",
+    "publint": "^0.3.24",
     "tshy": "^4.1.3",
-    "typescript-eslint": "^8.61.0"
+    "typescript-eslint": "^8.70.0"
   }
 }

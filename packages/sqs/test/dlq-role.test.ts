@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { Queue } from "aws-cdk-lib/aws-sqs";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { createQueueBuilder } from "../src/queue-builder.js";
 import { DLQ_QUEUE_DEFAULTS } from "../src/dlq-defaults.js";
 import { DLQ_AGE_ALARM_RETENTION_RATIO } from "../src/dlq-alarm-defaults.js";
 import {
-  buildQueueStack,
   expectCopyPreservesCustomAlarms,
   expectSharedSecureDefaults,
   setUntypedProp,
@@ -14,9 +14,7 @@ import {
 
 const createDlqBuilder = () => createQueueBuilder("dlq");
 
-function buildResult(configureFn?: (builder: ReturnType<typeof createDlqBuilder>) => void) {
-  return buildQueueStack(createDlqBuilder, "OrdersDlq", configureFn);
-}
+const buildAndSynth = buildFixture(createDlqBuilder, "OrdersDlq");
 
 describe("DLQ defaults", () => {
   it("DLQ_QUEUE_DEFAULTS sets retentionPeriod to the SQS maximum of 14 days", () => {
@@ -27,7 +25,7 @@ describe("DLQ defaults", () => {
 describe('createQueueBuilder("dlq")', () => {
   describe("queue defaults", () => {
     it("applies a 14-day retention period", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SQS::Queue", {
         MessageRetentionPeriod: 14 * 24 * 60 * 60,
@@ -35,13 +33,13 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("still applies the shared secure defaults", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       expectSharedSecureDefaults(template);
     });
 
     it("allows retentionPeriod to be overridden via the fluent API", () => {
-      const { template } = buildResult((b) => b.retentionPeriod(Duration.days(4)));
+      const { template } = buildAndSynth((b) => b.retentionPeriod(Duration.days(4)));
 
       template.hasResourceProperties("AWS::SQS::Queue", {
         MessageRetentionPeriod: 4 * 24 * 60 * 60,
@@ -49,7 +47,7 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("creates a standard (non-FIFO) queue", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SQS::Queue", { FifoQueue: Match.absent() });
     });
@@ -72,7 +70,7 @@ describe('createQueueBuilder("dlq")', () => {
 
     it("throws when a FIFO-only prop is smuggled onto the dlq role", () => {
       expect(() =>
-        buildResult((b) => {
+        buildAndSynth((b) => {
           setUntypedProp(b, "fifo", true);
         }),
       ).toThrow(
@@ -83,7 +81,7 @@ describe('createQueueBuilder("dlq")', () => {
 
   describe("recommended alarms", () => {
     it("creates the inverted DLQ alarm set by default", () => {
-      const { result, template } = buildResult();
+      const { result, template } = buildAndSynth();
 
       expect(result.alarms.approximateNumberOfMessagesVisible).toBeDefined();
       expect(result.alarms.approximateAgeOfOldestMessage).toBeDefined();
@@ -92,7 +90,7 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("alarms on any visible message (> 0)", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "ApproximateNumberOfMessagesVisible",
@@ -105,7 +103,7 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("alarms when the oldest message reaches 75% of the default retention", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "ApproximateAgeOfOldestMessage",
@@ -114,7 +112,7 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("scales the age threshold to an overridden retention period", () => {
-      const { template } = buildResult((b) => b.retentionPeriod(Duration.days(4)));
+      const { template } = buildAndSynth((b) => b.retentionPeriod(Duration.days(4)));
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "ApproximateAgeOfOldestMessage",
@@ -123,7 +121,7 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("an explicit age threshold wins over the retention-derived default", () => {
-      const { template } = buildResult((b) =>
+      const { template } = buildAndSynth((b) =>
         b.recommendedAlarms({ approximateAgeOfOldestMessage: { threshold: 3600 } }),
       );
 
@@ -157,7 +155,7 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("allows overriding the visible-messages threshold", () => {
-      const { template } = buildResult((b) =>
+      const { template } = buildAndSynth((b) =>
         b.recommendedAlarms({ approximateNumberOfMessagesVisible: { threshold: 5 } }),
       );
 
@@ -168,7 +166,7 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("allows disabling individual DLQ alarms", () => {
-      const { result, template } = buildResult((b) =>
+      const { result, template } = buildAndSynth((b) =>
         b.recommendedAlarms({
           approximateNumberOfMessagesVisible: false,
           approximateAgeOfOldestMessage: false,
@@ -180,7 +178,7 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("allows opting back into the in-flight alarm, inheriting the shared baseline", () => {
-      const { template, result } = buildResult((b) =>
+      const { template, result } = buildAndSynth((b) =>
         b.recommendedAlarms({ approximateNumberOfMessagesNotVisible: {} }),
       );
 
@@ -192,7 +190,7 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("disables all recommended alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildResult((b) => b.recommendedAlarms(false));
+      const { result, template } = buildAndSynth((b) => b.recommendedAlarms(false));
 
       expect(Object.keys(result.alarms)).toHaveLength(0);
       template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
@@ -205,10 +203,10 @@ describe('createQueueBuilder("dlq")', () => {
     });
 
     it("preserves the role across .copy() — the copy keeps the DLQ alarm set", () => {
-      const { result, template } = buildQueueStack(
+      const { result, template } = buildFixture(
         () => createQueueBuilder("dlq").copy(),
         "OrdersDlq",
-      );
+      )();
 
       expect(result.alarms.approximateNumberOfMessagesVisible).toBeDefined();
       template.hasResourceProperties("AWS::SQS::Queue", {

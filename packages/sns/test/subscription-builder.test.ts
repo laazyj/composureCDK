@@ -9,6 +9,7 @@ import {
 } from "aws-cdk-lib/aws-sns-subscriptions";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
 import { Queue } from "aws-cdk-lib/aws-sqs";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { compose, ref } from "@composurecdk/core";
 import { createTopicBuilder } from "../src/topic-builder.js";
 import {
@@ -17,16 +18,10 @@ import {
 } from "../src/subscription-builder.js";
 import type { TopicBuilderResult } from "../src/topic-builder.js";
 
-function buildEmail() {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const topic = new Topic(stack, "Topic");
-  const result = createSubscriptionBuilder()
-    .topic(topic)
-    .subscription(new EmailSubscription("ops@example.com"))
-    .build(stack, "Sub");
-  return { stack, topic, result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(createSubscriptionBuilder, "Sub", {
+  seed: (b, stack) =>
+    void b.topic(new Topic(stack, "Topic")).subscription(new EmailSubscription("ops@example.com")),
+});
 
 function makeLambdaHandler(stack: Stack, id = "Handler") {
   return new LambdaFunction(stack, id, {
@@ -39,14 +34,14 @@ function makeLambdaHandler(stack: Stack, id = "Handler") {
 describe("SubscriptionBuilder", () => {
   describe("build", () => {
     it("returns a SubscriptionBuilderResult with the subscription", () => {
-      const { result } = buildEmail();
+      const { result } = buildAndSynth();
 
       expect(result).toBeDefined();
       expect(result.subscription).toBeDefined();
     });
 
     it("creates exactly one SNS subscription", () => {
-      const { template } = buildEmail();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::SNS::Subscription", 1);
     });
@@ -77,7 +72,7 @@ describe("SubscriptionBuilder", () => {
 
   describe("synthesised output", () => {
     it("creates an email subscription with the expected protocol and endpoint", () => {
-      const { template } = buildEmail();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SNS::Subscription", {
         Protocol: "email",

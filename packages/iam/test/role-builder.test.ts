@@ -5,21 +5,20 @@ import {
   type IPrincipal,
   ManagedPolicy,
   PolicyStatement,
+  type RoleProps,
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { compose, type Lifecycle, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createRoleBuilder } from "../src/role-builder.js";
+import { createRoleBuilder, type RoleBuilderProps } from "../src/role-builder.js";
 import { createStatementBuilder, WildcardResourceError } from "../src/statement-builder.js";
+import { asForeignRealm } from "./foreign-realm.js";
 
-function synth(configureFn?: (builder: ReturnType<typeof createRoleBuilder>) => void): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createRoleBuilder().assumedBy(new ServicePrincipal("lambda.amazonaws.com"));
-  configureFn?.(builder);
-  builder.build(stack, "TestRole");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(
+  () => createRoleBuilder().assumedBy(new ServicePrincipal("lambda.amazonaws.com")),
+  "TestRole",
+);
 
 describe("RoleBuilder", () => {
   describe("build", () => {
@@ -43,21 +42,30 @@ describe("RoleBuilder", () => {
     });
 
     it("creates exactly one IAM role", () => {
-      const template = synth();
+      const { template } = buildAndSynth();
       template.resourceCountIs("AWS::IAM::Role", 1);
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own RoleProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const _props: RoleBuilderProps = undefined as unknown as RoleProps;
     });
   });
 
   describe("defaults", () => {
     it("caps max session duration at one hour by default", () => {
-      const template = synth();
+      const { template } = buildAndSynth();
       template.hasResourceProperties("AWS::IAM::Role", {
         MaxSessionDuration: 3600,
       });
     });
 
     it("applies the trust policy from assumedBy", () => {
-      const template = synth();
+      const { template } = buildAndSynth();
       template.hasResourceProperties("AWS::IAM::Role", {
         AssumeRolePolicyDocument: Match.objectLike({
           Statement: Match.arrayWith([
@@ -72,7 +80,7 @@ describe("RoleBuilder", () => {
     });
 
     it("allows the caller to override maxSessionDuration", () => {
-      const template = synth((b) => b.maxSessionDuration(Duration.hours(4)));
+      const { template } = buildAndSynth((b) => b.maxSessionDuration(Duration.hours(4)));
       template.hasResourceProperties("AWS::IAM::Role", {
         MaxSessionDuration: 14400,
       });
@@ -81,7 +89,7 @@ describe("RoleBuilder", () => {
 
   describe("addInlinePolicyStatements", () => {
     it("embeds the statements in the Role as a truly inline policy", () => {
-      const template = synth((b) =>
+      const { template } = buildAndSynth((b) =>
         b.addInlinePolicyStatements("StopEC2", [
           new PolicyStatement({
             actions: ["ec2:StopInstances"],
@@ -110,7 +118,7 @@ describe("RoleBuilder", () => {
     });
 
     it("accepts StatementBuilders and resolves them at build time", () => {
-      const template = synth((b) =>
+      const { template } = buildAndSynth((b) =>
         b.addInlinePolicyStatements("StopEC2", [
           createStatementBuilder()
             .allow()
@@ -125,6 +133,31 @@ describe("RoleBuilder", () => {
       });
     });
 
+    // A StatementBuilder is public API the consumer constructs and hands back
+    // in, so under the dual ESM/CJS build (ADR-0007) the realm boundary can sit
+    // directly across this call. `instanceof` misses such a builder, which both
+    // skips the wildcard guard below and hands CDK an unbuilt object.
+    it("builds StatementBuilders that came from another realm", () => {
+      const { template } = buildAndSynth((b) =>
+        b.addInlinePolicyStatements("StopEC2", [
+          asForeignRealm(
+            createStatementBuilder().allow().actions(["ec2:StopInstances"]).resources(["*"]),
+          ).allowWildcardResources(true),
+        ]),
+      );
+
+      template.hasResourceProperties("AWS::IAM::Role", {
+        Policies: Match.arrayWith([
+          Match.objectLike({
+            PolicyName: "StopEC2",
+            PolicyDocument: Match.objectLike({
+              Statement: Match.arrayWith([Match.objectLike({ Action: "ec2:StopInstances" })]),
+            }),
+          }),
+        ]),
+      });
+    });
+
     it("propagates StatementBuilder wildcard errors at build time", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
@@ -132,6 +165,20 @@ describe("RoleBuilder", () => {
         .assumedBy(new ServicePrincipal("lambda.amazonaws.com"))
         .addInlinePolicyStatements("TooBroad", [
           createStatementBuilder().allow().actions(["ec2:DescribeInstances"]).resources(["*"]),
+        ]);
+
+      expect(() => builder.build(stack, "TestRole")).toThrow(WildcardResourceError);
+    });
+
+    it("still enforces the wildcard guard on a StatementBuilder from another realm", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const builder = createRoleBuilder()
+        .assumedBy(new ServicePrincipal("lambda.amazonaws.com"))
+        .addInlinePolicyStatements("TooBroad", [
+          asForeignRealm(
+            createStatementBuilder().allow().actions(["ec2:DescribeInstances"]).resources(["*"]),
+          ),
         ]);
 
       expect(() => builder.build(stack, "TestRole")).toThrow(WildcardResourceError);
@@ -216,7 +263,7 @@ describe("RoleBuilder", () => {
   describe("permissions boundary", () => {
     it("attaches a permissions boundary resolved from a concrete managed policy", () => {
       const boundary = ManagedPolicy.fromAwsManagedPolicyName("PowerUserAccess");
-      const template = synth((b) => b.permissionsBoundary(boundary));
+      const { template } = buildAndSynth((b) => b.permissionsBoundary(boundary));
 
       template.hasResourceProperties("AWS::IAM::Role", {
         PermissionsBoundary: Match.objectLike({

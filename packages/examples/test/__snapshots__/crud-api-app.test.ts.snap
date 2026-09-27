@@ -1,0 +1,1494 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`crud-api-app > matches the expected synthesised template 1`] = `
+{
+  "Outputs": {
+    "CrudApiAppapiEndpointF1E1FE29": {
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "CrudApiAppapi10BB4639",
+            },
+            ".execute-api.",
+            {
+              "Ref": "AWS::Region",
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix",
+            },
+            "/",
+            {
+              "Ref": "CrudApiAppapiDeploymentStageprod63E3B455",
+            },
+            "/",
+          ],
+        ],
+      },
+    },
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "AWSCDKTriggerCustomResourceProviderCustomResourceProviderHandler97BECD91": {
+      "DependsOn": [
+        "AWSCDKTriggerCustomResourceProviderCustomResourceProviderRoleE18FAF0A",
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "<asset-hash>.zip",
+        },
+        "Handler": "__entrypoint__.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "AWSCDKTriggerCustomResourceProviderCustomResourceProviderRoleE18FAF0A",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs24.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "AWSCDKTriggerCustomResourceProviderCustomResourceProviderRoleE18FAF0A": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:\${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+        ],
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "lambda:InvokeFunction",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "CrudApiAppseedCatalogue2B5BB9AA",
+                              "Arn",
+                            ],
+                          },
+                          ":*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "Inline",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CrudApiAppapi10BB4639": {
+      "Properties": {
+        "Description": "Minimal REST API backed directly by DynamoDB - no Lambda in the request path",
+        "Name": "CrudApi",
+      },
+      "Type": "AWS::ApiGateway::RestApi",
+    },
+    "CrudApiAppapiAccessLogsEBB08D31": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiAppapiAccount5B690490": {
+      "DeletionPolicy": "Retain",
+      "DependsOn": [
+        "CrudApiAppapi10BB4639",
+      ],
+      "Properties": {
+        "CloudWatchRoleArn": {
+          "Fn::GetAtt": [
+            "CrudApiAppapiCloudWatchRole810E208F",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::ApiGateway::Account",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiAppapiClientErrorAlarmC27B35AB": {
+      "Properties": {
+        "AlarmDescription": "REST API client error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/api/client-error",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "CrudApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "CrudApiAppapiDeploymentStageprod63E3B455",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "4XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppapiCloudWatchRole810E208F": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "apigateway.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiAppapiDeploymentBBBA8FB46bdd15762d310f6d375bee5fc720052b": {
+      "DependsOn": [
+        "CrudApiAppapigadgetsidDELETE7DABC736",
+        "CrudApiAppapigadgetsidGETD2E65655",
+        "CrudApiAppapigadgetsidPUTC8C63FA8",
+        "CrudApiAppapigadgetsid63850498",
+        "CrudApiAppapigadgetsGET3F9B2891",
+        "CrudApiAppapigadgetsPOSTD967DB14",
+        "CrudApiAppapigadgets8FBAE8D7",
+      ],
+      "Metadata": {
+        "aws:cdk:do-not-refactor": true,
+      },
+      "Properties": {
+        "Description": "Minimal REST API backed directly by DynamoDB - no Lambda in the request path",
+        "RestApiId": {
+          "Ref": "CrudApiAppapi10BB4639",
+        },
+      },
+      "Type": "AWS::ApiGateway::Deployment",
+    },
+    "CrudApiAppapiDeploymentStageprod63E3B455": {
+      "DependsOn": [
+        "CrudApiAppapiAccount5B690490",
+      ],
+      "Properties": {
+        "AccessLogSetting": {
+          "DestinationArn": {
+            "Fn::GetAtt": [
+              "CrudApiAppapiAccessLogsEBB08D31",
+              "Arn",
+            ],
+          },
+          "Format": "{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","user":"$context.identity.user","caller":"$context.identity.caller","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}",
+        },
+        "DeploymentId": {
+          "Ref": "CrudApiAppapiDeploymentBBBA8FB46bdd15762d310f6d375bee5fc720052b",
+        },
+        "MethodSettings": [
+          {
+            "DataTraceEnabled": false,
+            "HttpMethod": "*",
+            "LoggingLevel": "INFO",
+            "ResourcePath": "/*",
+          },
+        ],
+        "RestApiId": {
+          "Ref": "CrudApiAppapi10BB4639",
+        },
+        "StageName": "prod",
+        "TracingEnabled": true,
+      },
+      "Type": "AWS::ApiGateway::Stage",
+    },
+    "CrudApiAppapiLatencyAlarmC04E2904": {
+      "Properties": {
+        "AlarmDescription": "REST API p90 latency is elevated. Threshold: >= 2500ms in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/api/latency",
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "CrudApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "CrudApiAppapiDeploymentStageprod63E3B455",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "ExtendedStatistic": "p90",
+        "MetricName": "Latency",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Threshold": 2500,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppapiRole2A0BD7DD": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "apigateway.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "Assumed by API Gateway to call DynamoDB directly for the gadgets table",
+        "MaxSessionDuration": 3600,
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CrudApiAppapiRoleDefaultPolicyF4DCF573": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "dynamodb:BatchGetItem",
+                "dynamodb:Query",
+                "dynamodb:GetItem",
+                "dynamodb:Scan",
+                "dynamodb:ConditionCheckItem",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:DescribeTable",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CrudApiApptableE9F135F3",
+                    "Arn",
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CrudApiApptableKeyAA33ABA6",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CrudApiApptableE9F135F3",
+                    "Arn",
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CrudApiAppapiRoleDefaultPolicyF4DCF573",
+        "Roles": [
+          {
+            "Ref": "CrudApiAppapiRole2A0BD7DD",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CrudApiAppapiServerErrorAlarmA175324C": {
+      "Properties": {
+        "AlarmDescription": "REST API server error rate is elevated. Threshold: > 5% of requests in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/api/server-error",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "ApiName",
+            "Value": "CrudApi",
+          },
+          {
+            "Name": "Stage",
+            "Value": {
+              "Ref": "CrudApiAppapiDeploymentStageprod63E3B455",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "5XXError",
+        "Namespace": "AWS/ApiGateway",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.05,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppapigadgets8FBAE8D7": {
+      "Properties": {
+        "ParentId": {
+          "Fn::GetAtt": [
+            "CrudApiAppapi10BB4639",
+            "RootResourceId",
+          ],
+        },
+        "PathPart": "gadgets",
+        "RestApiId": {
+          "Ref": "CrudApiAppapi10BB4639",
+        },
+      },
+      "Type": "AWS::ApiGateway::Resource",
+    },
+    "CrudApiAppapigadgetsGET3F9B2891": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "GET",
+        "Integration": {
+          "Credentials": {
+            "Fn::GetAtt": [
+              "CrudApiAppapiRole2A0BD7DD",
+              "Arn",
+            ],
+          },
+          "IntegrationHttpMethod": "POST",
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{
+  "gadgets": [
+    #foreach($item in $input.path('$.Items'))
+    { "id": "$item.id.S", "name": "$item.name.S", "description": "$item.description.S" }#if($foreach.hasNext),#end
+    #end
+  ]
+}",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": {
+              "Fn::Join": [
+                "",
+                [
+                  "{"TableName":"",
+                  {
+                    "Ref": "CrudApiApptableE9F135F3",
+                  },
+                  ""}",
+                ],
+              ],
+            },
+          },
+          "Type": "AWS",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":dynamodb:action/Scan",
+              ],
+            ],
+          },
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "CrudApiAppapigadgets8FBAE8D7",
+        },
+        "RestApiId": {
+          "Ref": "CrudApiAppapi10BB4639",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "CrudApiAppapigadgetsPOSTD967DB14": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "POST",
+        "Integration": {
+          "Credentials": {
+            "Fn::GetAtt": [
+              "CrudApiAppapiRole2A0BD7DD",
+              "Arn",
+            ],
+          },
+          "IntegrationHttpMethod": "POST",
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{ "id": "$context.requestId" }",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": {
+              "Fn::Join": [
+                "",
+                [
+                  "{"TableName":"",
+                  {
+                    "Ref": "CrudApiApptableE9F135F3",
+                  },
+                  "","Item":{"id":{"S":"$context.requestId"},"name":{"S":"$input.path('$.name')"},"description":{"S":"$input.path('$.description')"}}}",
+                ],
+              ],
+            },
+          },
+          "Type": "AWS",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":dynamodb:action/PutItem",
+              ],
+            ],
+          },
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "CrudApiAppapigadgets8FBAE8D7",
+        },
+        "RestApiId": {
+          "Ref": "CrudApiAppapi10BB4639",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "CrudApiAppapigadgetsid63850498": {
+      "Properties": {
+        "ParentId": {
+          "Ref": "CrudApiAppapigadgets8FBAE8D7",
+        },
+        "PathPart": "{id}",
+        "RestApiId": {
+          "Ref": "CrudApiAppapi10BB4639",
+        },
+      },
+      "Type": "AWS::ApiGateway::Resource",
+    },
+    "CrudApiAppapigadgetsidDELETE7DABC736": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "DELETE",
+        "Integration": {
+          "Credentials": {
+            "Fn::GetAtt": [
+              "CrudApiAppapiRole2A0BD7DD",
+              "Arn",
+            ],
+          },
+          "IntegrationHttpMethod": "POST",
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{ "id": "$input.params('id')", "deleted": true }",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": {
+              "Fn::Join": [
+                "",
+                [
+                  "{"TableName":"",
+                  {
+                    "Ref": "CrudApiApptableE9F135F3",
+                  },
+                  "","Key":{"id":{"S":"$input.params('id')"}}}",
+                ],
+              ],
+            },
+          },
+          "Type": "AWS",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":dynamodb:action/DeleteItem",
+              ],
+            ],
+          },
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "CrudApiAppapigadgetsid63850498",
+        },
+        "RestApiId": {
+          "Ref": "CrudApiAppapi10BB4639",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "CrudApiAppapigadgetsidGETD2E65655": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "GET",
+        "Integration": {
+          "Credentials": {
+            "Fn::GetAtt": [
+              "CrudApiAppapiRole2A0BD7DD",
+              "Arn",
+            ],
+          },
+          "IntegrationHttpMethod": "POST",
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{
+  "id": "$input.path('$.Item.id.S')",
+  "name": "$input.path('$.Item.name.S')",
+  "description": "$input.path('$.Item.description.S')"
+}",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": {
+              "Fn::Join": [
+                "",
+                [
+                  "{"TableName":"",
+                  {
+                    "Ref": "CrudApiApptableE9F135F3",
+                  },
+                  "","Key":{"id":{"S":"$input.params('id')"}},"ConsistentRead":true}",
+                ],
+              ],
+            },
+          },
+          "Type": "AWS",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":dynamodb:action/GetItem",
+              ],
+            ],
+          },
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "CrudApiAppapigadgetsid63850498",
+        },
+        "RestApiId": {
+          "Ref": "CrudApiAppapi10BB4639",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "CrudApiAppapigadgetsidPUTC8C63FA8": {
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "PUT",
+        "Integration": {
+          "Credentials": {
+            "Fn::GetAtt": [
+              "CrudApiAppapiRole2A0BD7DD",
+              "Arn",
+            ],
+          },
+          "IntegrationHttpMethod": "POST",
+          "IntegrationResponses": [
+            {
+              "ResponseTemplates": {
+                "application/json": "{ "id": "$input.params('id')", "updated": true }",
+              },
+              "StatusCode": "200",
+            },
+          ],
+          "PassthroughBehavior": "NEVER",
+          "RequestTemplates": {
+            "application/json": {
+              "Fn::Join": [
+                "",
+                [
+                  "{"TableName":"",
+                  {
+                    "Ref": "CrudApiApptableE9F135F3",
+                  },
+                  "","Item":{"id":{"S":"$input.params('id')"},"name":{"S":"$input.path('$.name')"},"description":{"S":"$input.path('$.description')"}}}",
+                ],
+              ],
+            },
+          },
+          "Type": "AWS",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":dynamodb:action/PutItem",
+              ],
+            ],
+          },
+        },
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+          },
+        ],
+        "ResourceId": {
+          "Ref": "CrudApiAppapigadgetsid63850498",
+        },
+        "RestApiId": {
+          "Ref": "CrudApiAppapi10BB4639",
+        },
+      },
+      "Type": "AWS::ApiGateway::Method",
+    },
+    "CrudApiAppseedCatalogue2B5BB9AA": {
+      "DependsOn": [
+        "CrudApiAppseedCatalogueExecutionRoleDefaultPolicy80086B5B",
+        "CrudApiAppseedCatalogueExecutionRoleC352F68A",
+      ],
+      "Properties": {
+        "Code": {
+          "ZipFile": "
+const SEED = [
+  { name: "widget", description: "reference gadget seeded at deploy time" },
+  { name: "sprocket", description: "reference gadget seeded at deploy time" },
+];
+
+exports.handler = async () => {
+  const url = process.env.API_URL + "gadgets";
+  for (const gadget of SEED) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(gadget),
+    });
+    if (!response.ok) {
+      throw new Error(
+        "Seeding " + gadget.name + " failed: " + response.status + " " + (await response.text()),
+      );
+    }
+  }
+};
+",
+        },
+        "Environment": {
+          "Variables": {
+            "API_URL": {
+              "Fn::Join": [
+                "",
+                [
+                  "https://",
+                  {
+                    "Ref": "CrudApiAppapi10BB4639",
+                  },
+                  ".execute-api.",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  ".",
+                  {
+                    "Ref": "AWS::URLSuffix",
+                  },
+                  "/",
+                  {
+                    "Ref": "CrudApiAppapiDeploymentStageprod63E3B455",
+                  },
+                  "/",
+                ],
+              ],
+            },
+            "LOG_LEVEL": "info",
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "CrudApiAppseedCatalogueLogGroup2411D5E4",
+          },
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "CrudApiAppseedCatalogueExecutionRoleC352F68A",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 30,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CrudApiAppseedCatalogueCurrentVersionAAB7FB9Dfe6536a22e0e8ec7897716b49e9e84c0": {
+      "Metadata": {
+        "aws:cdk:do-not-refactor": true,
+      },
+      "Properties": {
+        "FunctionName": {
+          "Ref": "CrudApiAppseedCatalogue2B5BB9AA",
+        },
+      },
+      "Type": "AWS::Lambda::Version",
+    },
+    "CrudApiAppseedCatalogueDeploymentTrigger": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "CrudApiAppapiAccount5B690490",
+        "CrudApiAppapiCloudWatchRole810E208F",
+        "CrudApiAppapigadgetsidDELETE7DABC736",
+        "CrudApiAppapigadgetsidGETD2E65655",
+        "CrudApiAppapigadgetsidPUTC8C63FA8",
+        "CrudApiAppapigadgetsid63850498",
+        "CrudApiAppapigadgetsGET3F9B2891",
+        "CrudApiAppapigadgetsPOSTD967DB14",
+        "CrudApiAppapigadgets8FBAE8D7",
+        "CrudApiAppapiDeploymentBBBA8FB46bdd15762d310f6d375bee5fc720052b",
+        "CrudApiAppapiDeploymentStageprod63E3B455",
+        "CrudApiAppapi10BB4639",
+        "CrudApiAppapiAccessLogsEBB08D31",
+        "CrudApiAppapiClientErrorAlarmC27B35AB",
+        "CrudApiAppapiLatencyAlarmC04E2904",
+        "CrudApiAppapiServerErrorAlarmA175324C",
+        "CrudApiAppseedCatalogueExecutionRoleDefaultPolicy80086B5B",
+        "CrudApiAppseedCatalogueExecutionRoleC352F68A",
+      ],
+      "Properties": {
+        "ExecuteOnHandlerChange": true,
+        "HandlerArn": {
+          "Ref": "CrudApiAppseedCatalogueCurrentVersionAAB7FB9Dfe6536a22e0e8ec7897716b49e9e84c0",
+        },
+        "InvocationType": "RequestResponse",
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "AWSCDKTriggerCustomResourceProviderCustomResourceProviderHandler97BECD91",
+            "Arn",
+          ],
+        },
+        "Timeout": "60000",
+      },
+      "Type": "Custom::Trigger",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "CrudApiAppseedCatalogueDurationAlarmD82E4F2F": {
+      "Properties": {
+        "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 27000ms (90% of 30000ms timeout).",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/seed-catalogue/duration",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "CrudApiAppseedCatalogue2B5BB9AA",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Threshold": 27000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppseedCatalogueErrorsAlarmF10D99C7": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/seed-catalogue/errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "CrudApiAppseedCatalogue2B5BB9AA",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppseedCatalogueExecutionRoleC352F68A": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "CrudApiAppseedCatalogueLogGroup2411D5E4",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "CrudApiAppseedCatalogueLogGroup2411D5E4",
+                              "Arn",
+                            ],
+                          },
+                          ":log-stream:*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "LogsWriter",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CrudApiAppseedCatalogueExecutionRoleDefaultPolicy80086B5B": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CrudApiAppseedCatalogueExecutionRoleDefaultPolicy80086B5B",
+        "Roles": [
+          {
+            "Ref": "CrudApiAppseedCatalogueExecutionRoleC352F68A",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CrudApiAppseedCatalogueLogGroup2411D5E4": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiAppseedCatalogueThrottlesAlarmF700C4F4": {
+      "Properties": {
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/seed-catalogue/throttles",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "CrudApiAppseedCatalogue2B5BB9AA",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiApptableE9F135F3": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S",
+          },
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "DeletionProtectionEnabled": true,
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH",
+          },
+        ],
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true,
+        },
+        "SSESpecification": {
+          "KMSMasterKeyId": {
+            "Fn::GetAtt": [
+              "CrudApiApptableKeyAA33ABA6",
+              "Arn",
+            ],
+          },
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+        },
+      },
+      "Type": "AWS::DynamoDB::Table",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiApptableKeyAA33ABA6": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "Description": "Encrypts the gadgets table at rest.",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Statement": [
+            {
+              "Action": "kms:*",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PendingWindowInDays": 30,
+      },
+      "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiApptableKeyAlias38A49B89": {
+      "Properties": {
+        "AliasName": "alias/composurecdk-examples/crud-api/gadgets",
+        "TargetKeyId": {
+          "Fn::GetAtt": [
+            "CrudApiApptableKeyAA33ABA6",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::KMS::Alias",
+    },
+    "CrudApiApptableReadThrottleEventsAlarm91003BFE": {
+      "Properties": {
+        "AlarmDescription": "DynamoDB table read requests are being throttled, indicating a hot partition or insufficient read capacity. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/table/read-throttle-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": {
+              "Ref": "CrudApiApptableE9F135F3",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ReadThrottleEvents",
+        "Namespace": "AWS/DynamoDB",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiApptableSystemErrorsAlarm01ED213E": {
+      "Properties": {
+        "AlarmDescription": "DynamoDB table is returning server-side (HTTP 500) errors, summed across the core data-plane operations. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/table/system-errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "EvaluationPeriods": 1,
+        "Metrics": [
+          {
+            "Expression": "getitem + batchgetitem + query + scan + putitem + updateitem + deleteitem + batchwriteitem + transactgetitems + transactwriteitems",
+            "Id": "expr_1",
+            "Label": "Sum of errors across all operations",
+            "ReturnData": true,
+          },
+          {
+            "Id": "getitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "GetItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "batchgetitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "BatchGetItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "query",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "Query",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "scan",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "Scan",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "putitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "PutItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "updateitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "UpdateItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "deleteitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "DeleteItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "batchwriteitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "BatchWriteItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "transactgetitems",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "TransactGetItems",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "transactwriteitems",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "TransactWriteItems",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "CrudApiApptableE9F135F3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+        ],
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiApptableWriteThrottleEventsAlarm17FF6B7E": {
+      "Properties": {
+        "AlarmDescription": "DynamoDB table write requests are being throttled, indicating a hot partition or insufficient write capacity. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/table/write-throttle-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": {
+              "Ref": "CrudApiApptableE9F135F3",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "WriteThrottleEvents",
+        "Namespace": "AWS/DynamoDB",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

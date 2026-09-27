@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { App, SecretValue, Stack } from "aws-cdk-lib";
+import { SecretValue, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
 import {
@@ -8,13 +8,8 @@ import {
   MailFromBehaviorOnMxFailure,
 } from "aws-cdk-lib/aws-ses";
 import { ref } from "@composurecdk/core";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import { createEmailIdentityBuilder } from "../src/email-identity-builder.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack", {
-    env: { account: "111111111111", region: "us-east-1" },
-  });
-}
 
 function newZone(stack: Stack, id = "Zone"): PublicHostedZone {
   return new PublicHostedZone(stack, id, { zoneName: "example.com" });
@@ -22,7 +17,7 @@ function newZone(stack: Stack, id = "Zone"): PublicHostedZone {
 
 describe("EmailIdentityBuilder", () => {
   it("verifies a domain with Easy DKIM by default", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { emailIdentity, dkim } = createEmailIdentityBuilder()
       .domain("ask.example.com")
       .build(stack, "MailIdentity");
@@ -36,7 +31,7 @@ describe("EmailIdentityBuilder", () => {
   });
 
   it("verifies an email address", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createEmailIdentityBuilder().email("info@example.com").build(stack, "MailIdentity");
     Template.fromStack(stack).hasResourceProperties("AWS::SES::EmailIdentity", {
       EmailIdentity: "info@example.com",
@@ -44,7 +39,7 @@ describe("EmailIdentityBuilder", () => {
   });
 
   it("verifies a public hosted zone and auto-publishes DKIM", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { emailIdentity } = createEmailIdentityBuilder()
       .publicHostedZone(newZone(stack))
       .build(stack, "MailIdentity");
@@ -54,7 +49,7 @@ describe("EmailIdentityBuilder", () => {
   });
 
   it("accepts a non-default Easy DKIM signing key length", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createEmailIdentityBuilder()
       .domain("example.com")
       .easyDkim(EasyDkimSigningKeyLength.RSA_2048_BIT)
@@ -65,7 +60,7 @@ describe("EmailIdentityBuilder", () => {
   });
 
   it("publishes Easy DKIM as three absolute CNAMEs", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { dkimRecords } = createEmailIdentityBuilder()
       .domain("ask.example.com")
       .publishDkim(newZone(stack))
@@ -77,7 +72,7 @@ describe("EmailIdentityBuilder", () => {
   });
 
   it("publishes BYODKIM as a single TXT record", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createEmailIdentityBuilder()
       .domain("ask.example.com")
       .byoDkim({
@@ -96,7 +91,7 @@ describe("EmailIdentityBuilder", () => {
   });
 
   it("defaults MAIL FROM to reject on MX failure", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createEmailIdentityBuilder()
       .domain("example.com")
       .mailFromDomain("mail.example.com")
@@ -110,7 +105,7 @@ describe("EmailIdentityBuilder", () => {
   });
 
   it("respects an explicit MAIL FROM behaviour", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createEmailIdentityBuilder()
       .domain("example.com")
       .mailFromDomain("mail.example.com")
@@ -139,7 +134,7 @@ describe("EmailIdentityBuilder", () => {
   });
 
   it("copies configured state independently", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const base = createEmailIdentityBuilder().domain("example.com").publishDkim(newZone(stack));
     const copy = base.copy();
     const { dkimRecords } = copy.build(stack, "MailIdentity");
@@ -148,14 +143,14 @@ describe("EmailIdentityBuilder", () => {
 
   describe("validation", () => {
     it("throws when no identity is set", () => {
-      const stack = newStack();
+      const stack = newStack({ env: testEnv("us-east-1") });
       expect(() => createEmailIdentityBuilder().build(stack, "MailIdentity")).toThrow(
         /set an identity with \.domain\(\), \.email\(\), or \.publicHostedZone\(\)/,
       );
     });
 
     it("throws when publishing DKIM for an email identity", () => {
-      const stack = newStack();
+      const stack = newStack({ env: testEnv("us-east-1") });
       const builder = createEmailIdentityBuilder()
         .email("info@example.com")
         .publishDkim(newZone(stack));
@@ -163,7 +158,7 @@ describe("EmailIdentityBuilder", () => {
     });
 
     it("throws when publishing DKIM over a public hosted zone", () => {
-      const stack = newStack();
+      const stack = newStack({ env: testEnv("us-east-1") });
       const zone = newZone(stack);
       const builder = createEmailIdentityBuilder().publicHostedZone(zone).publishDkim(zone);
       expect(() => builder.build(stack, "MailIdentity")).toThrow(
@@ -172,7 +167,7 @@ describe("EmailIdentityBuilder", () => {
     });
 
     it("throws when publishing BYODKIM without a public key", () => {
-      const stack = newStack();
+      const stack = newStack({ env: testEnv("us-east-1") });
       const builder = createEmailIdentityBuilder()
         .domain("example.com")
         .byoDkim({ selector: "sel", privateKey: SecretValue.unsafePlainText("private") })

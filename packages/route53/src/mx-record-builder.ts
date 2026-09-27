@@ -1,4 +1,4 @@
-import { MxRecord, type MxRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
+import { MxRecord, type MxRecordProps } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -14,10 +14,13 @@ import { MX_RECORD_DEFAULTS } from "./defaults.js";
  *
  * Extends the CDK {@link MxRecordProps} but replaces `zone` with a
  * {@link Resolvable} so it can be wired from composed components.
+ *
+ * `zone` reads its inner type from CDK's own prop rather than naming
+ * `IHostedZone`, so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
  */
 export interface MxRecordBuilderProps extends Omit<MxRecordProps, "zone"> {
   /** The hosted zone in which to create the record. */
-  zone?: Resolvable<IHostedZone>;
+  zone?: Resolvable<NonNullable<MxRecordProps["zone"]>>;
 }
 
 /**

@@ -22,6 +22,124 @@ const api = createRestApiBuilder()
 
 Every [RestApiProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.RestApiProps.html) property is available as a fluent setter on the builder.
 
+### Integrations
+
+`addMethod` accepts any CDK [Integration](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.Integration.html) — `LambdaIntegration`, `MockIntegration`, `HttpIntegration`, or `AwsIntegration` to call an AWS service directly with no Lambda in the request path. To wire an integration to a sibling builder (e.g. a DynamoDB table's name and an IAM role for API Gateway to assume), assemble it with `ref`/`combine` so the integration resolves once its dependencies are built:
+
+- [**CrudApiStack**](../examples/src/crud-api-app.ts) — a complete CRUD REST API wired straight to DynamoDB via `AwsIntegration` and VTL mapping templates (`Scan`/`PutItem`/`GetItem`/`DeleteItem`), with the credentials role assembled from sibling builders using `combine` and granted via consumer-side `tableGrants`. Start here for the `AwsIntegration` → DynamoDB pattern.
+
+## Spec REST API Builder
+
+`createSpecRestApiBuilder` builds a [SpecRestApi](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.SpecRestApi.html) — a REST API whose resources, methods and integrations come entirely from an OpenAPI specification rather than from `addResource`/`addMethod` calls. Every [SpecRestApiProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.SpecRestApiProps.html) property is a fluent setter, and the same secure defaults, access logging and recommended alarms apply as for `createRestApiBuilder`.
+
+```ts
+const api = createSpecRestApiBuilder()
+  .restApiName("PetStore")
+  .apiDefinition(ApiDefinition.fromInline(petstoreSpec))
+  .build(stack, "PetStoreApi");
+```
+
+### Specs that reference sibling resources
+
+A model-first spec — a Smithy or OpenAPI export, or a hand-written document — usually names the resources its integrations call: the ARN of the Lambda to invoke, the role API Gateway assumes to invoke it. Those values do not exist while the builder is being configured. They exist only once the siblings have been built.
+
+`apiDefinition` therefore accepts a `Resolvable<ApiDefinition>` — a concrete definition, or a `ref`/`combine` that produces one at build time. For the common shape of that — an inline document whose placeholders stand for sibling resources — `inlineSpecDefinition` is the whole wiring in one call:
+
+```ts
+compose(
+  {
+    handler: createFunctionBuilder().handler("index.handler").code(code),
+
+    // The role API Gateway assumes to invoke the handler — an ordinary
+    // sibling, wired with a consumer-side grant (ADR-0013).
+    gatewayRole: createServiceRoleBuilder("apigateway.amazonaws.com").grant(
+      functionGrants.invoke(ref("handler", (r: FunctionBuilderResult) => r.function)),
+    ),
+
+    api: createSpecRestApiBuilder()
+      .restApiName("PetStore")
+      .apiDefinition(
+        inlineSpecDefinition(petstoreSpec, {
+          "${PetFunction.Arn}": ref(
+            "handler",
+            (r: FunctionBuilderResult) => r.function.functionArn,
+          ),
+          "${ApiGatewayRole.Arn}": ref("gatewayRole", (r: RoleBuilderResult) => r.role.roleArn),
+        }),
+      ),
+  },
+  { handler: [], gatewayRole: ["handler"], api: ["handler", "gatewayRole"] },
+);
+```
+
+The specification stays declarative, the API stays inside `compose`, and [OpenApiPetstoreStack](../examples/src/openapi-petstore-app.ts) is the same thing as a deployable stack.
+
+No placeholder syntax is imposed — keys are replaced literally, so `${Function.Arn}`, `{{functionArn}}` and `__FUNCTION_ARN__` all work, and all of them are matched in a single pass so declaration order cannot matter. A key that appears nowhere in the document throws, since it is nearly always a typo. Note the reverse is undetectable without a syntax to scan for: a placeholder **in the document** that you never map is substituted by nothing and deploys verbatim.
+
+`inlineSpecDefinition` is `combine` + `substituteSpec` + `ApiDefinition.fromInline` in one call. Both halves are exported, so anything it does not cover composes from the parts — an asset- or bucket-backed definition, a substitution that is not a string replacement, or a document completed some other way, each passed to the same `apiDefinition` ([ADR-0015](../../docs/adr/0015-combine-multi-ref-combinator.md)):
+
+```ts
+// The same thing, written out
+.apiDefinition(
+  combine({ handler: ref<FunctionBuilderResult>("handler") }, ({ handler }) =>
+    ApiDefinition.fromInline(
+      substituteSpec(petstoreSpec, { "${PetFunction.Arn}": handler.function.functionArn }),
+    ),
+  ),
+)
+```
+
+Two things to know either way:
+
+- **Reach for the account, region or partition via `Aws.*`.** A transform receives the build context, not a construct scope, so `Stack.of(scope)` is not available to it — see [Resolvable](../../docs/architecture.md#resolvable). `Aws.PARTITION` and `Aws.REGION` need no scope and resolve correctly inside the API body.
+- **An inline body is embedded in the CloudFormation template.** A large generated specification counts against the template size limit; load it from S3 with `ApiDefinition.fromBucket` if it grows (at the cost of the in-process substitution shown here).
+
+## Invoke grants
+
+To let a principal call an IAM-authorized API (`authorizationType: AuthorizationType.IAM`), `restApiGrants` provides a consumer-side grant helper — the mirror of DynamoDB's `tableGrants`. Declare it on the **grantee** (the caller), pointing at the API via a `ref`, exactly as you would any other grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)):
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createRestApiBuilder,
+  restApiGrants,
+  type RestApiBuilderResult,
+} from "@composurecdk/apigateway";
+import { createRoleBuilder } from "@composurecdk/iam";
+
+compose(
+  {
+    api: createRestApiBuilder().restApiName("Internal"),
+    caller: createRoleBuilder()
+      .assumedBy(principal)
+      .grant(restApiGrants.invoke(ref("api", (r: RestApiBuilderResult) => r.api))),
+  },
+  { api: [], caller: ["api"] }, // caller → api; the grant edge follows the data flow
+);
+```
+
+`restApiGrants.invoke(api)` adds `execute-api:Invoke` on the API's `arnForExecuteApi()` (all methods, paths, and stages). `IRestApi` is implemented by both `RestApi` and `SpecRestApi`, so the same helper serves either builder's result.
+
+Unlike most resources, `IRestApi` exposes no native `grant*` method to delegate to — the grant is assembled from the single `execute-api:Invoke` action plus the construct's own ARN builder ([ADR-0013 addendum](../../docs/adr/0013-consumer-side-grants.md#addendum-2026-07-24-resources-with-no-native-grant-method)).
+
+### Scoping the grant
+
+Pass a `RestApiInvokeScope` to narrow the ARN to a specific method, path, and/or stage; each field defaults to `*`:
+
+```ts
+// Only GET /items on the prod stage
+restApiGrants.invoke(
+  ref("api", (r: RestApiBuilderResult) => r.api),
+  {
+    method: "GET",
+    path: "/items",
+    stage: "prod",
+  },
+);
+```
+
+Each field is independent, so any subset yields a partial wildcard — `{ method: "GET" }` allows `GET` on any path and stage, `{ path: "/items" }` allows any method on `/items`. Paths themselves accept `*` (e.g. `{ path: "/items/*" }`), matching the `arn:…:execute-api:…:<api>/<stage>/<method>/<path>` structure.
+
 ## Secure Defaults
 
 `createRestApiBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
@@ -164,5 +282,7 @@ for (const alarm of Object.values(result.alarms)) {
 
 ## Examples
 
+- [CrudApiStack](../examples/src/crud-api-app.ts) — CRUD REST API backed directly by DynamoDB via `AwsIntegration`, with no Lambda in the request path
 - [MockApiStack](../examples/src/mock-api-app.ts) — CRUD REST API with mock integrations and recommended alarms with custom thresholds
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`, wired with `ref`
+- [OpenApiPetstoreStack](../examples/src/openapi-petstore-app.ts) — spec-driven REST API whose Lambda integration is resolved into the OpenAPI document at build time

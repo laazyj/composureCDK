@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { fake } from "ts-fake";
 import { Builder, COPY_STATE, type IBuilder } from "../src/builder.js";
 import { assertCopyPreservesState } from "../src/testing.js";
 
@@ -38,11 +39,11 @@ class WithoutCopyState {
   }
 }
 
-interface BuildResult {
+interface ItemsSnapshot {
   items: readonly string[];
 }
 
-function buildResult(b: IBuilder<Props, WithAccumulator | WithoutCopyState>): BuildResult {
+function snapshotItems(b: IBuilder<Props, WithAccumulator | WithoutCopyState>): ItemsSnapshot {
   return { items: [...b.items()] };
 }
 
@@ -57,7 +58,7 @@ describe("assertCopyPreservesState", () => {
         mutate: (b) => {
           b.add("after-copy");
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).not.toThrow();
@@ -73,7 +74,7 @@ describe("assertCopyPreservesState", () => {
         mutate: (b) => {
           b.add("after-copy");
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).toThrow(/COPY_STATE/);
@@ -89,7 +90,7 @@ describe("assertCopyPreservesState", () => {
         mutate: () => {
           /* no-op */
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).toThrow(/mutate.*did not change/);
@@ -106,7 +107,7 @@ describe("assertCopyPreservesState", () => {
         mutate: (b) => {
           b.name("changed");
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).toThrow(/mutate.*did not change/);
@@ -124,7 +125,7 @@ describe("assertCopyPreservesState", () => {
       },
       build: (b) => {
         seen.push(b);
-        return buildResult(b);
+        return snapshotItems(b);
       },
       inspect: (r) => r.items,
     });
@@ -133,24 +134,22 @@ describe("assertCopyPreservesState", () => {
   });
 
   it("fails with a clear error when the builder lacks .copy()", () => {
-    const noCopyBuilder = {
-      props: {} as Partial<Props>,
-      add() {
-        return this;
-      },
-      items: () => [] as readonly string[],
-    };
+    // Only `items()` is spelled out — `build` reads it. The point of the fake
+    // is the member it lacks: `.copy()`.
+    const noCopyBuilder = fake<IBuilder<Props, WithAccumulator>>({
+      items: () => [],
+    });
 
     expect(() => {
       assertCopyPreservesState({
-        factory: () => noCopyBuilder as unknown as IBuilder<Props, WithAccumulator>,
+        factory: () => noCopyBuilder,
         configure: () => {
           /* no-op */
         },
         mutate: () => {
           /* no-op */
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: (r) => r.items,
       });
     }).toThrow(/no `\.copy\(\)` method/);
@@ -169,7 +168,7 @@ describe("assertCopyPreservesState", () => {
         mutate: () => {
           /* no-op — forces the "did not change" failure path */
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: () => circular,
       });
     }).toThrow(/\[object Object\]/);
@@ -193,7 +192,7 @@ describe("assertCopyPreservesState", () => {
         mutate: (b) => {
           b.add("after-copy");
         },
-        build: buildResult,
+        build: snapshotItems,
         inspect: () => states[call++],
       });
     }).not.toThrow();

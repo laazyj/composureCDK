@@ -7,8 +7,11 @@
  */
 export const DUAL_PACKAGES = [
   { name: "@composurecdk/core", probe: "compose" },
+  { name: "@composurecdk/eslint-plugin", probe: "rules" },
   { name: "@composurecdk/acm", probe: "createCertificateBuilder" },
   { name: "@composurecdk/apigateway", probe: "createRestApiBuilder" },
+  { name: "@composurecdk/bedrock", probe: "createModelAlarmBuilder" },
+  { name: "@composurecdk/bedrockagentcore", probe: "createRuntimeBuilder" },
   { name: "@composurecdk/budgets", probe: "createBudgetBuilder" },
   { name: "@composurecdk/cloudformation", probe: "createStackBuilder" },
   { name: "@composurecdk/cloudfront", probe: "createDistributionBuilder" },
@@ -19,6 +22,7 @@ export const DUAL_PACKAGES = [
   { name: "@composurecdk/ec2", probe: "createInstanceBuilder" },
   { name: "@composurecdk/events", probe: "createRuleBuilder" },
   { name: "@composurecdk/iam", probe: "createRoleBuilder" },
+  { name: "@composurecdk/kms", probe: "createKeyBuilder" },
   { name: "@composurecdk/lambda", probe: "createFunctionBuilder" },
   { name: "@composurecdk/logs", probe: "createLogGroupBuilder" },
   { name: "@composurecdk/neptune", probe: "createClusterBuilder" },
@@ -27,4 +31,5 @@ export const DUAL_PACKAGES = [
   { name: "@composurecdk/ses", probe: "createEmailIdentityBuilder" },
   { name: "@composurecdk/sns", probe: "createTopicBuilder" },
   { name: "@composurecdk/sqs", probe: "createQueueBuilder" },
+  { name: "@composurecdk/xray", probe: "createTransactionSearchBuilder" },
 ] as const;

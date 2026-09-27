@@ -5,7 +5,6 @@ import {
   type FunctionAssociation,
   type FunctionEventType,
   FunctionRuntime,
-  type IOrigin,
 } from "aws-cdk-lib/aws-cloudfront";
 import type { IConstruct } from "constructs";
 import { resolve } from "@composurecdk/core";
@@ -37,7 +36,7 @@ export interface ResolveBehaviorsInput {
   context: Record<string, object>;
 
   /** The already-resolved default origin. */
-  defaultOrigin: IOrigin;
+  defaultOrigin: BehaviorOptions["origin"];
 
   /** User-provided default-behavior config (may be undefined). */
   defaultBehavior: DefaultBehaviorConfig | undefined;

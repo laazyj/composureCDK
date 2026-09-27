@@ -1,24 +1,81 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "plugins": ["./tools/package-targets.mjs"],
+  "namedInputs": {
+    "sharedGlobals": [
+      {
+        "runtime": "node --version"
+      }
+    ],
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "production": [
+      "default",
+      "!{projectRoot}/test/**/*",
+      "!{projectRoot}/README.md",
+      "!{projectRoot}/vitest.config.ts"
+    ]
+  },
   "targetDefaults": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["{projectRoot}/dist"],
-      "cache": true
+      "cache": true,
+      "inputs": ["production", "^production"]
     },
     "typecheck": {
       "dependsOn": ["^build", "build"],
-      "cache": true
+      "cache": true,
+      "inputs": ["default", "^production"]
     },
     "test": {
       "dependsOn": ["^build", "typecheck"],
       "outputs": ["{projectRoot}/coverage"],
-      "cache": true
+      "cache": true,
+      "inputs": ["default", "^production"]
+    },
+    "test:watch": {
+      "dependsOn": ["^build"]
     },
     "check:exports": {
       "dependsOn": ["build"],
-      "inputs": ["{projectRoot}/dist/**/*", "{projectRoot}/package.json"],
+      "inputs": [
+        "production",
+        {
+          "externalDependencies": ["@arethetypeswrong/cli", "publint"]
+        }
+      ],
       "cache": true
+    },
+    "validate": {
+      "dependsOn": ["build"],
+      "inputs": [
+        "production",
+        "^production",
+        {
+          "externalDependencies": ["aws-cdk"]
+        }
+      ],
+      "outputs": ["{projectRoot}/cdk.out"],
+      "cache": true
+    },
+    "lint": {
+      "dependsOn": [
+        "^build",
+        {
+          "projects": ["@composurecdk/eslint-plugin"],
+          "target": "build"
+        }
+      ],
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/eslint.config.mjs",
+        "{workspaceRoot}/packages/eslint-plugin/src/**/*",
+        {
+          "externalDependencies": ["eslint", "typescript-eslint", "@typescript-eslint/parser"]
+        }
+      ]
     },
     "test:update": {
       "dependsOn": ["^build", "typecheck"],
@@ -34,7 +91,7 @@
     "version": {
       "conventionalCommits": true,
       "fallbackCurrentVersionResolver": "disk",
-      "preVersionCommand": "npm run verify",
+      "preVersionCommand": "nx verify",
       "git": {
         "commit": false,
         "tag": false,
@@ -57,5 +114,6 @@
       "pattern": "v{version}"
     }
   },
-  "analytics": false
+  "analytics": false,
+  "cacheDirectory": ".nx/cache"
 }

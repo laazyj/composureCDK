@@ -1,9 +1,4 @@
-import {
-  ARecord,
-  type ARecordProps,
-  type IHostedZone,
-  type RecordTarget,
-} from "aws-cdk-lib/aws-route53";
+import { ARecord, type ARecordProps } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -20,6 +15,10 @@ import { A_RECORD_DEFAULTS } from "./defaults.js";
  * Extends the CDK {@link ARecordProps} but replaces `zone` and `target` with
  * {@link Resolvable} variants so they can be wired from other components in a
  * composed system via {@link ref}.
+ *
+ * Both read their inner type from CDK's own prop rather than naming
+ * `IHostedZone` / `RecordTarget`, so they keep tracking the installed
+ * `aws-cdk-lib` (ADR-0018).
  */
 export interface ARecordBuilderProps extends Omit<ARecordProps, "zone" | "target"> {
   /**
@@ -27,14 +26,14 @@ export interface ARecordBuilderProps extends Omit<ARecordProps, "zone" | "target
    * so a zone produced by a composed {@link createHostedZoneBuilder} can be
    * wired in via {@link ref}.
    */
-  zone?: Resolvable<IHostedZone>;
+  zone?: Resolvable<NonNullable<ARecordProps["zone"]>>;
 
   /**
    * The record target. Accepts a {@link Resolvable} so alias targets derived
    * from composed components (e.g. a CloudFront distribution) can be wired in
    * via {@link ref} or the helpers in `./alias-targets.js`.
    */
-  target?: Resolvable<RecordTarget>;
+  target?: Resolvable<NonNullable<ARecordProps["target"]>>;
 }
 
 /**

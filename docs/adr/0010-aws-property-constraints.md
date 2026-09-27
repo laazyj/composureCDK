@@ -45,7 +45,7 @@ Two axes had to be decided: **where the constraint catalogue lives**, and **how/
 - A shared fragment graduates to `cloudformation`'s `char-sets` only once a _second_ property needs it — promotion is a one-line move plus an import change, with no builder API change and no dependency inversion (arrows only point service → cloudformation).
 - `validateTag` keeps its public signature; `taggedBuilder` and all callers are untouched. The empty-key and reserved-`aws:`-prefix rules remain tag-specific and bespoke.
 - Branded types (`AlarmName`, `Email`) remain valid where compile-time guarantees matter; they layer over `validateString` rather than competing with it. Migrating them is deferred.
-- A holistic synth-time Aspect keyed by CFN resource type (catching raw CDK and late-added constructs) remains a complementary, opt-in follow-up. When built it should consume a registry or CFN-spec-generated map, not import each package.
+- A holistic synth-time Aspect keyed by CFN resource type (catching raw CDK and late-added constructs) remains a complementary, opt-in follow-up. When built it should consume a registry or CFN-spec-generated map, not import each package. Built as `templateTextPolicy` — see [ADR-0017](0017-template-text-policy.md).
 
 ## Alternatives considered
 

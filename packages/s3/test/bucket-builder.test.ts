@@ -2,20 +2,15 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, RemovalPolicy, Stack, Tags } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
+import { Key } from "aws-cdk-lib/aws-kms";
+import { Bucket, BucketEncryption, type BucketProps } from "aws-cdk-lib/aws-s3";
+import { buildFixture, newStack, tagsPerResource } from "@composurecdk/cdk-testing";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createBucketBuilder } from "../src/bucket-builder.js";
+import { createBucketBuilder, type BucketBuilderProps } from "../src/bucket-builder.js";
+import { DEFAULT_BUCKET_LIFECYCLE_RULES } from "../src/defaults.js";
 
-function synthTemplate(
-  configureFn: (builder: ReturnType<typeof createBucketBuilder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createBucketBuilder();
-  configureFn(builder);
-  builder.build(stack, "TestBucket");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(createBucketBuilder, "TestBucket");
 
 /**
  * Whether the installed aws-cdk-lib renders tags onto `AWS::CloudWatch::Alarm`.
@@ -37,6 +32,16 @@ function alarmsAreTaggable(): boolean {
     Template.fromStack(probe).findResources("AWS::CloudWatch::Alarm"),
   )[0] as { Properties?: { Tags?: unknown } } | undefined;
   return probed?.Properties?.Tags !== undefined;
+}
+
+/** A resource, or one of its lifecycle rules, as rendered into a synthesised template. */
+type Synthesised = Record<string, unknown>;
+
+/** Lifecycle rules on a synthesised bucket, or `[]` when it declares none. */
+function lifecycleRulesOf(bucket: { Properties: Synthesised }): Synthesised[] {
+  const lifecycle = bucket.Properties.LifecycleConfiguration as
+    { Rules?: Synthesised[] } | undefined;
+  return lifecycle?.Rules ?? [];
 }
 
 /** Disables access logging so tests that don't need it get a single-bucket template. */
@@ -107,15 +112,24 @@ describe("BucketBuilder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own BucketProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const _props: BucketBuilderProps = undefined as unknown as BucketProps;
+    });
+  });
+
   describe("synthesised output", () => {
     it("creates exactly one S3 bucket when access logging is disabled", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.resourceCountIs("AWS::S3::Bucket", 1);
     });
 
     it("creates a bucket with a custom name", () => {
-      const template = synthTemplate((b) => withoutLogging(b).bucketName("my-custom-bucket"));
+      const { template } = buildAndSynth((b) => withoutLogging(b).bucketName("my-custom-bucket"));
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         BucketName: "my-custom-bucket",
@@ -125,7 +139,7 @@ describe("BucketBuilder", () => {
 
   describe("secure defaults", () => {
     it("blocks all public access by default", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         PublicAccessBlockConfiguration: {
@@ -138,7 +152,7 @@ describe("BucketBuilder", () => {
     });
 
     it("enables S3-managed encryption by default", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         BucketEncryption: {
@@ -154,7 +168,7 @@ describe("BucketBuilder", () => {
     });
 
     it("enforces SSL by default", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.hasResourceProperties("AWS::S3::BucketPolicy", {
         PolicyDocument: {
@@ -171,7 +185,7 @@ describe("BucketBuilder", () => {
     });
 
     it("enables versioning by default", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         VersioningConfiguration: {
@@ -181,7 +195,7 @@ describe("BucketBuilder", () => {
     });
 
     it("retains the bucket on stack deletion by default", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.hasResource("AWS::S3::Bucket", {
         DeletionPolicy: "Retain",
@@ -190,14 +204,14 @@ describe("BucketBuilder", () => {
     });
 
     it("allows the user to disable versioning", () => {
-      const template = synthTemplate((b) => withoutLogging(b).versioned(false));
+      const { template } = buildAndSynth((b) => withoutLogging(b).versioned(false));
 
       // When versioned is false, CDK does not emit VersioningConfiguration
       template.hasResourceProperties("AWS::S3::Bucket", {});
     });
 
     it("aborts incomplete multipart uploads after 7 days by default", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         LifecycleConfiguration: {
@@ -212,7 +226,7 @@ describe("BucketBuilder", () => {
     });
 
     it("expires noncurrent object versions after 365 days by default", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         LifecycleConfiguration: {
@@ -226,8 +240,36 @@ describe("BucketBuilder", () => {
       });
     });
 
+    /**
+     * Regression guard for #440. `noncurrentVersionExpiration` acts only on versions
+     * already superseded by a newer PUT or a delete marker, so it can never remove
+     * live content. A current-version `expiration` rule can: on a bucket serving a
+     * CloudFront origin it would delete the objects still being served, needing no
+     * deployment to fire. The two assertions above use `Match.arrayWith`, which
+     * tolerates extra rules — only asserting absence catches one being added here.
+     */
+    it("adds no current-version expiration rule by default", () => {
+      const { template } = buildAndSynth((b) => withoutLogging(b));
+      const bucket = Object.values(template.findResources("AWS::S3::Bucket"))[0] as {
+        Properties: Synthesised;
+      };
+
+      for (const rule of lifecycleRulesOf(bucket)) {
+        expect(rule.ExpirationInDays).toBeUndefined();
+        expect(rule.ExpirationDate).toBeUndefined();
+      }
+    });
+
+    /** Pins the same intent at the source, so it survives the synth assertion being relaxed. */
+    it("declares no current-version expiration in DEFAULT_BUCKET_LIFECYCLE_RULES", () => {
+      for (const rule of DEFAULT_BUCKET_LIFECYCLE_RULES) {
+        expect(rule.expiration).toBeUndefined();
+        expect(rule.expirationDate).toBeUndefined();
+      }
+    });
+
     it("allows the user to replace the default lifecycle rules", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withoutLogging(b).lifecycleRules([{ id: "CustomExpire", expiration: Duration.days(30) }]),
       );
 
@@ -246,13 +288,13 @@ describe("BucketBuilder", () => {
 
   describe("access logging", () => {
     it("creates an access logging bucket by default", () => {
-      const template = synthTemplate((b) => b.bucketName("main"));
+      const { template } = buildAndSynth((b) => b.bucketName("main"));
 
       template.resourceCountIs("AWS::S3::Bucket", 2);
     });
 
     it("configures server access logs on the main bucket with the default prefix", () => {
-      const template = synthTemplate((b) => b.bucketName("main"));
+      const { template } = buildAndSynth((b) => b.bucketName("main"));
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         LoggingConfiguration: {
@@ -263,7 +305,7 @@ describe("BucketBuilder", () => {
     });
 
     it("allows the user to override the access logs prefix", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.bucketName("main").serverAccessLogs({ prefix: "custom/" }),
       );
 
@@ -276,7 +318,7 @@ describe("BucketBuilder", () => {
     });
 
     it("creates no logging bucket when access logging is disabled", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.resourceCountIs("AWS::S3::Bucket", 1);
     });
@@ -311,15 +353,21 @@ describe("BucketBuilder", () => {
       });
     });
 
-    it("disables versioning on the auto-created logging bucket", () => {
-      const template = synthTemplate((b) => b.bucketName("main"));
+    /**
+     * Load-bearing for the 2-year expiry below, not merely a cost preference: the
+     * access-log rule set carries no `noncurrentVersionExpiration`, so on a versioned
+     * bucket `ExpirationInDays` would write delete markers instead of deleting, and
+     * every log object would be retained indefinitely.
+     */
+    it("leaves the auto-created logging bucket unversioned, so its expiry deletes", () => {
+      const { template } = buildAndSynth((b) => b.bucketName("main"));
 
       const logBucket = findLogBucket(template);
       expect(logBucket.Properties.VersioningConfiguration).toBeUndefined();
     });
 
     it("disables access logging on the auto-created logging bucket", () => {
-      const template = synthTemplate((b) => b.bucketName("main"));
+      const { template } = buildAndSynth((b) => b.bucketName("main"));
 
       // Only the main bucket should have a LoggingConfiguration
       const bucketsWithLogging = template.findResources("AWS::S3::Bucket", {
@@ -331,7 +379,7 @@ describe("BucketBuilder", () => {
     });
 
     it("applies secure defaults to the auto-created logging bucket", () => {
-      const template = synthTemplate((b) => b.bucketName("main"));
+      const { template } = buildAndSynth((b) => b.bucketName("main"));
 
       const logBucket = findLogBucket(template);
       expect(logBucket.Properties.PublicAccessBlockConfiguration).toEqual({
@@ -344,17 +392,15 @@ describe("BucketBuilder", () => {
     });
 
     it("expires access log objects after 2 years on the auto-created logging bucket", () => {
-      const template = synthTemplate((b) => b.bucketName("main"));
+      const { template } = buildAndSynth((b) => b.bucketName("main"));
 
       const buckets = template.findResources("AWS::S3::Bucket", {
         Properties: {
           LoggingConfiguration: Match.absent(),
         },
       });
-      const logBucket = Object.values(buckets)[0] as {
-        Properties: { LifecycleConfiguration?: { Rules: Record<string, unknown>[] } };
-      };
-      const rules = logBucket.Properties.LifecycleConfiguration?.Rules ?? [];
+      const logBucket = Object.values(buckets)[0] as { Properties: Synthesised };
+      const rules = lifecycleRulesOf(logBucket);
 
       const expirationRule = rules.find((r) => r.ExpirationInDays !== undefined);
       expect(expirationRule).toBeDefined();
@@ -388,7 +434,7 @@ describe("BucketBuilder", () => {
 
   describe("serverAccessLogs configure callback", () => {
     it("applies user-supplied lifecycle rules to the auto-created logging bucket", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.bucketName("main").serverAccessLogs({
           configure: (sub) =>
             sub.lifecycleRules([{ id: "ShortLogs", expiration: Duration.days(30) }]),
@@ -396,15 +442,13 @@ describe("BucketBuilder", () => {
       );
 
       const logBucket = findLogBucket(template);
-      const lifecycle = logBucket.Properties.LifecycleConfiguration as
-        { Rules: Record<string, unknown>[] } | undefined;
-      const rules = lifecycle?.Rules ?? [];
+      const rules = lifecycleRulesOf(logBucket);
       expect(rules).toHaveLength(1);
       expect(rules[0]).toMatchObject({ Id: "ShortLogs", ExpirationInDays: 30 });
     });
 
     it("allows the configure callback to override the removal policy", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.bucketName("main").serverAccessLogs({
           configure: (sub) => sub.removalPolicy(RemovalPolicy.DESTROY),
         }),
@@ -414,7 +458,7 @@ describe("BucketBuilder", () => {
     });
 
     it("allows the configure callback to override encryption on the logging bucket", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.bucketName("main").serverAccessLogs({
           configure: (sub) => sub.encryption(BucketEncryption.KMS_MANAGED),
         }),
@@ -429,11 +473,37 @@ describe("BucketBuilder", () => {
         encryption.ServerSideEncryptionConfiguration[0].ServerSideEncryptionByDefault.SSEAlgorithm,
       ).toBe("aws:kms");
     });
+
+    it("configure callback can reach a sibling component through a ref", () => {
+      const stack = newStack();
+      const key = new Key(stack, "LogsKey");
+
+      createBucketBuilder()
+        .bucketName("main")
+        .serverAccessLogs({
+          configure: (sub) => sub.encryptionKey(ref<{ key: Key }>("logsKey").get("key")),
+        })
+        .build(stack, "TestBucket", { logsKey: { key } });
+
+      const encryption = findLogBucket(Template.fromStack(stack)).Properties.BucketEncryption as {
+        ServerSideEncryptionConfiguration: {
+          ServerSideEncryptionByDefault: { SSEAlgorithm: string; KMSMasterKeyID: unknown };
+        }[];
+      };
+      const byDefault =
+        encryption.ServerSideEncryptionConfiguration[0].ServerSideEncryptionByDefault;
+      expect(byDefault.SSEAlgorithm).toBe("aws:kms");
+      expect(byDefault.KMSMasterKeyID).toMatchObject({
+        "Fn::GetAtt": [expect.stringContaining("LogsKey"), "Arn"],
+      });
+    });
   });
 
   describe("autoDeleteObjects", () => {
     it("enables autoDeleteObjects when removalPolicy is DESTROY", () => {
-      const template = synthTemplate((b) => withoutLogging(b).removalPolicy(RemovalPolicy.DESTROY));
+      const { template } = buildAndSynth((b) =>
+        withoutLogging(b).removalPolicy(RemovalPolicy.DESTROY),
+      );
 
       template.hasResource("AWS::S3::Bucket", {
         DeletionPolicy: "Delete",
@@ -444,13 +514,13 @@ describe("BucketBuilder", () => {
     });
 
     it("does not enable autoDeleteObjects when removalPolicy is RETAIN", () => {
-      const template = synthTemplate((b) => withoutLogging(b));
+      const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.resourceCountIs("Custom::S3AutoDeleteObjects", 0);
     });
 
     it("respects explicit autoDeleteObjects(false) with DESTROY policy", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withoutLogging(b).removalPolicy(RemovalPolicy.DESTROY).autoDeleteObjects(false),
       );
 
@@ -460,15 +530,11 @@ describe("BucketBuilder", () => {
 
   describe("tagging", () => {
     it("applies builder tags to the primary bucket", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withoutLogging(b).tag("Project", "claude-rig").tag("Owner", "platform"),
       );
 
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      const tags = Object.values(buckets)[0]?.Properties.Tags ?? [];
+      const tags = tagsPerResource(template, "AWS::S3::Bucket")[0];
       expect(tags).toEqual(
         expect.arrayContaining([
           { Key: "Project", Value: "claude-rig" },
@@ -478,14 +544,11 @@ describe("BucketBuilder", () => {
     });
 
     it("does not crash when a sibling result field is undefined", () => {
-      const template = synthTemplate((b) => withoutLogging(b).tag("Project", "claude-rig"));
+      const { template } = buildAndSynth((b) => withoutLogging(b).tag("Project", "claude-rig"));
 
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      expect(Object.keys(buckets)).toHaveLength(1);
-      expect(Object.values(buckets)[0]?.Properties.Tags).toEqual(
+      const bucketTags = tagsPerResource(template, "AWS::S3::Bucket");
+      expect(bucketTags).toHaveLength(1);
+      expect(bucketTags[0]).toEqual(
         expect.arrayContaining([{ Key: "Project", Value: "claude-rig" }]),
       );
     });
@@ -497,14 +560,10 @@ describe("BucketBuilder", () => {
 
       const template = Template.fromStack(stack);
       // Both buckets — the primary and the auto-created access-logs sibling — carry the tag.
-      const buckets = template.findResources("AWS::S3::Bucket");
-      expect(Object.keys(buckets)).toHaveLength(2);
-      for (const resource of Object.values(buckets) as {
-        Properties: { Tags?: { Key: string; Value: string }[] };
-      }[]) {
-        expect(resource.Properties.Tags).toEqual(
-          expect.arrayContaining([{ Key: "Project", Value: "claude-rig" }]),
-        );
+      const bucketTags = tagsPerResource(template, "AWS::S3::Bucket");
+      expect(bucketTags).toHaveLength(2);
+      for (const tags of bucketTags) {
+        expect(tags).toEqual(expect.arrayContaining([{ Key: "Project", Value: "claude-rig" }]));
       }
     });
 
@@ -527,34 +586,27 @@ describe("BucketBuilder", () => {
         .build(stack, "TestBucket");
 
       const template = Template.fromStack(stack);
-      const alarms = template.findResources("AWS::CloudWatch::Alarm");
-      expect(Object.keys(alarms).length).toBeGreaterThan(0);
-      const taggable = alarmsAreTaggable();
-      for (const resource of Object.values(alarms) as {
-        Properties: { Tags?: { Key: string; Value: string }[] };
-      }[]) {
-        if (taggable) {
-          expect(resource.Properties.Tags).toEqual(
-            expect.arrayContaining([{ Key: "Owner", Value: "platform" }]),
-          );
-        } else {
-          // Below aws-cdk-lib 2.138.0 the L1 carries no Tags; the builder's
-          // tags are silently dropped rather than breaking synth.
-          expect(resource.Properties.Tags).toBeUndefined();
+      const alarmTags = tagsPerResource(template, "AWS::CloudWatch::Alarm");
+      expect(alarmTags.length).toBeGreaterThan(0);
+      if (alarmsAreTaggable()) {
+        for (const tags of alarmTags) {
+          expect(tags).toEqual(expect.arrayContaining([{ Key: "Owner", Value: "platform" }]));
         }
+      } else {
+        // Below aws-cdk-lib 2.138.0 the L1 carries no Tags; the builder's tags
+        // are silently dropped rather than breaking synth. Absent is the whole
+        // assertion here, so it goes through a matcher rather than the helper,
+        // which normalises absent tags to an empty array.
+        template.allResourcesProperties("AWS::CloudWatch::Alarm", { Tags: Match.absent() });
       }
     });
 
     it("supports the .tags({...}) shorthand", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         withoutLogging(b).tags({ Owner: "platform", Environment: "prod" }),
       );
 
-      const buckets = template.findResources("AWS::S3::Bucket") as Record<
-        string,
-        { Properties: { Tags?: { Key: string; Value: string }[] } }
-      >;
-      const tags = Object.values(buckets)[0]?.Properties.Tags ?? [];
+      const tags = tagsPerResource(template, "AWS::S3::Bucket")[0];
       expect(tags).toEqual(
         expect.arrayContaining([
           { Key: "Owner", Value: "platform" },
@@ -586,6 +638,56 @@ describe("BucketBuilder", () => {
         build: (b) => b.build(new Stack(new App(), "S"), "Bucket"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
+    });
+  });
+
+  describe("encryptionKey", () => {
+    /** The SSE-KMS rule a bucket encrypted with `Key` (logical id `Key961B73FD`) renders. */
+    const SSE_KMS_WITH_KEY = {
+      BucketEncryption: {
+        ServerSideEncryptionConfiguration: [
+          {
+            ServerSideEncryptionByDefault: {
+              SSEAlgorithm: "aws:kms",
+              KMSMasterKeyID: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
+            },
+          },
+        ],
+      },
+    };
+
+    it("infers SSE-KMS from a supplied key", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      createBucketBuilder().serverAccessLogs(false).encryptionKey(key).build(stack, "TestBucket");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::S3::Bucket", SSE_KMS_WITH_KEY);
+    });
+
+    it("resolves a Resolvable key from the build context", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      createBucketBuilder()
+        .serverAccessLogs(false)
+        .encryptionKey(ref<{ key: Key }, Key>("bucketKey", (r) => r.key))
+        .build(stack, "TestBucket", { bucketKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::S3::Bucket", SSE_KMS_WITH_KEY);
+    });
+
+    it("does not override an explicitly configured encryption mode, so CDK rejects a mismatch", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      expect(() =>
+        createBucketBuilder()
+          .serverAccessLogs(false)
+          .encryption(BucketEncryption.KMS_MANAGED)
+          .encryptionKey(key)
+          .build(stack, "TestBucket"),
+      ).toThrow(/encryptionKey is specified, so 'encryption' must be set to KMS/);
     });
   });
 });

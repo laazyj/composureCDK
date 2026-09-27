@@ -1,18 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { AnyPrincipal, Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Topic } from "aws-cdk-lib/aws-sns";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBudgetBuilder } from "../src/budget-builder.js";
 import { email } from "../src/email.js";
 import type { NotifySubscribers } from "../src/notifications.js";
-
-function newStack(): Stack {
-  const app = new App();
-  return new Stack(app, "TestStack");
-}
 
 describe("BudgetBuilder", () => {
   describe("build", () => {
@@ -215,13 +212,12 @@ describe("BudgetBuilder", () => {
       // If this line ever stops being a type error, the branded-Email
       // constraint has regressed and runtime is the only remaining net.
       // @ts-expect-error — bare string is not assignable to Email.
-      const subscribers: NotifySubscribers = { emails: ["bare@example.com"] };
-      void subscribers;
+      const _subscribers: NotifySubscribers = { emails: ["bare@example.com"] };
     });
   });
 
   describe("SNS subscribers", () => {
-    it("creates a topic policy granting budgets.amazonaws.com SNS:Publish", () => {
+    it("grants budgets.amazonaws.com SNS:Publish in the topic's own policy", () => {
       const stack = newStack();
       const topic = new Topic(stack, "AlertsTopic");
 
@@ -230,9 +226,10 @@ describe("BudgetBuilder", () => {
         .notifyOnActual(100, { sns: topic })
         .build(stack, "SnsBudget");
 
+      // The topic's own policy, plus the retained transitional policy sharing its document.
       const template = Template.fromStack(stack);
-      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
-      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 2);
+      template.allResourcesProperties("AWS::SNS::TopicPolicy", {
         PolicyDocument: Match.objectLike({
           Statement: Match.arrayWith([
             Match.objectLike({
@@ -256,7 +253,52 @@ describe("BudgetBuilder", () => {
         .build(stack, "DupSnsBudget");
 
       expect(Object.keys(result.topicPolicies)).toHaveLength(1);
-      Template.fromStack(stack).resourceCountIs("AWS::SNS::TopicPolicy", 1);
+      Template.fromStack(stack).resourceCountIs("AWS::SNS::TopicPolicy", 2);
+    });
+
+    it("leaves the topic's policy alone with topicPolicy(false)", () => {
+      const stack = newStack();
+      const topic = new Topic(stack, "AlertsTopic");
+
+      const result = createBudgetBuilder()
+        .limit({ amount: 50 })
+        .topicPolicy(false)
+        .notifyOnActual(100, { sns: topic })
+        .build(stack, "NoPolicyBudget");
+
+      expect(result.topicPolicies).toEqual({});
+      Template.fromStack(stack).resourceCountIs("AWS::SNS::TopicPolicy", 0);
+    });
+
+    it("keeps the statements already in the topic's policy (#551)", () => {
+      const stack = newStack();
+      // Stands in for createTopicBuilder()'s enforceSSL statement, which CDK
+      // only wires from 2.178.0, above this package's floor.
+      const topic = new Topic(stack, "AlertsTopic");
+      topic.addToResourcePolicy(
+        new PolicyStatement({
+          sid: "Existing",
+          effect: Effect.DENY,
+          principals: [new AnyPrincipal()],
+          actions: ["sns:Publish"],
+          resources: [topic.topicArn],
+        }),
+      );
+
+      createBudgetBuilder()
+        .budgetName("monthly")
+        .limit({ amount: 4, unit: "USD" })
+        .withRecommendedThresholds({ sns: topic })
+        .build(stack, "Budget");
+
+      Template.fromStack(stack).allResourcesProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [
+            Match.objectLike({ Sid: "Existing" }),
+            Match.objectLike({ Sid: "AllowBudgetsPublish" }),
+          ],
+        }),
+      });
     });
 
     it("resolves Resolvable<ITopic> subscribers via the build context", () => {
@@ -430,11 +472,7 @@ describe("BudgetBuilder", () => {
             alarm.metric(billingMetric).threshold(800).greaterThan(),
           );
         },
-        build: (b) =>
-          b.build(
-            new Stack(new App(), "S", { env: { account: "123456789012", region: "us-east-1" } }),
-            "Budget",
-          ),
+        build: (b) => b.build(newStack({ env: testEnv("us-east-1") }, "S"), "Budget"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });

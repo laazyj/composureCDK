@@ -7,7 +7,8 @@ declare const emailBrand: unique symbol;
  * subscriber. Construct via {@link email}; the brand prevents bare
  * strings from being passed where an `Email` is required, ensuring the
  * value has been syntactically validated and length-checked against
- * AWS Budgets' per-subscriber limit.
+ * AWS Budgets' per-subscriber limit. A value holding an unresolved CDK token
+ * is branded unchecked (ADR-0010 rule 6).
  */
 export type Email = string & { readonly [emailBrand]: true };
 

@@ -38,6 +38,10 @@ import { createStackBuilder, type StackBuilderResult } from "./stack-builder.js"
  */
 export function singleStack(builder?: Lifecycle<StackBuilderResult>): StackStrategy {
   const stackBuilder = builder ?? createStackBuilder();
+  // The stack is the container components are built *into*, so it is created
+  // before any component context exists — the strategy callback is handed only
+  // (scope, id) and there is nothing here to forward.
+  // eslint-disable-next-line composurecdk/lifecycle-build-must-forward-context -- root build: no enclosing component context exists
   return coreSingleStack((scope, id) => stackBuilder.build(scope, id).stack);
 }
 
@@ -81,5 +85,7 @@ export function groupedStacks(
   builder?: Lifecycle<StackBuilderResult>,
 ): StackStrategy {
   const stackBuilder = builder ?? createStackBuilder();
+  // Root build: see the note in singleStack above.
+  // eslint-disable-next-line composurecdk/lifecycle-build-must-forward-context -- root build: no enclosing component context exists
   return coreGroupedStacks(classify, (scope, id) => stackBuilder.build(scope, id).stack);
 }

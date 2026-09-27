@@ -1,10 +1,10 @@
 {
   "name": "@composurecdk/cloudformation",
-  "version": "0.9.0",
+  "version": "0.10.3",
   "description": "Composable CloudFormation stack builder and stack assignment strategies",
   "repository": {
     "type": "git",
-    "url": "https://github.com/laazyj/composureCDK",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
     "directory": "packages/cloudformation"
   },
   "files": [
@@ -12,14 +12,6 @@
     "README.md",
     "LICENSE"
   ],
-  "scripts": {
-    "clean": "rm -rf dist .tshy .tshy-build",
-    "build": "tshy",
-    "typecheck": "tsc --noEmit",
-    "check:exports": "attw --pack . --profile node16 && publint",
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest"
-  },
   "keywords": [
     "aws",
     "cdk",
@@ -46,16 +38,17 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/core": "^0.9.0",
+    "@composurecdk/core": "^0.10.0",
     "aws-cdk-lib": "^2.1.0",
     "constructs": "^10.0.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
-    "aws-cdk-lib": "^2.258.1",
-    "constructs": "^10.6.0",
+    "@composurecdk/cdk-testing": "*",
+    "@types/node": "^26.6.1",
+    "aws-cdk-lib": "^2.269.0",
+    "constructs": "^10.8.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^5.0.0"
   },
   "exports": {
     "./package.json": "./package.json",

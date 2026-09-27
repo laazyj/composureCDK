@@ -1,46 +1,37 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Key } from "aws-cdk-lib/aws-kms";
+import { CfnResourcePolicy, ResourcePolicy, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Construct } from "constructs";
+import { TEST_ACCOUNT, buildFixture, newStack, testEnv } from "@composurecdk/cdk-testing";
+import { ref } from "@composurecdk/core";
 import { createHostedZoneBuilder } from "../src/hosted-zone-builder.js";
 import {
   QUERY_LOGGING_LOG_GROUP_NAME_PREFIX,
+  QUERY_LOGGING_RESOURCE_POLICY_ID,
   QUERY_LOGGING_RESOURCE_POLICY_NAME,
 } from "../src/defaults.js";
 
-const USER_OWNED_ARN = "arn:aws:logs:us-east-1:111122223333:log-group:/custom/zone-logs";
+const USER_OWNED_ARN = `arn:aws:logs:us-east-1:${TEST_ACCOUNT}:log-group:/custom/zone-logs`;
 
-function newStack(stackProps: { region?: string } = {}): Stack {
-  const app = new App();
-  return new Stack(app, "TestStack", {
-    env: stackProps.region ? { account: "111122223333", region: stackProps.region } : undefined,
-  });
-}
-
-function synthInUsEast1(
-  configure: (b: ReturnType<typeof createHostedZoneBuilder>) => void,
-): Template {
-  const stack = newStack({ region: "us-east-1" });
-  const builder = createHostedZoneBuilder();
-  configure(builder);
-  builder.build(stack, "TestZone");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(createHostedZoneBuilder, "TestZone", {
+  stackProps: { env: testEnv("us-east-1") },
+});
 
 describe("HostedZoneBuilder", () => {
   it("throws when zoneName is not set", () => {
-    const stack = newStack({ region: "us-east-1" });
+    const stack = newStack({ env: testEnv("us-east-1") });
     expect(() => createHostedZoneBuilder().build(stack, "TestZone")).toThrow(/requires a zoneName/);
   });
 
   it("returns a HostedZoneBuilderResult with a hostedZone property", () => {
-    const stack = newStack({ region: "us-east-1" });
+    const stack = newStack({ env: testEnv("us-east-1") });
     const result = createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone");
     expect(result.hostedZone).toBeDefined();
   });
 
   it("synthesises a Route53 hosted zone with the provided zone name", () => {
-    const template = synthInUsEast1((b) => b.zoneName("example.com"));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com"));
     template.resourceCountIs("AWS::Route53::HostedZone", 1);
     template.hasResourceProperties("AWS::Route53::HostedZone", {
       Name: "example.com.",
@@ -48,7 +39,7 @@ describe("HostedZoneBuilder", () => {
   });
 
   it("forwards the comment property", () => {
-    const template = synthInUsEast1((b) => {
+    const { template } = buildAndSynth((b) => {
       b.zoneName("example.com");
       b.comment("primary customer domain");
     });
@@ -60,7 +51,7 @@ describe("HostedZoneBuilder", () => {
 
 describe("HostedZoneBuilder query logging", () => {
   it("auto-creates a log group with secure defaults when queryLogging is left at its default", () => {
-    const template = synthInUsEast1((b) => b.zoneName("example.com"));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com"));
 
     template.resourceCountIs("AWS::Logs::LogGroup", 1);
     template.hasResourceProperties("AWS::Logs::LogGroup", {
@@ -71,7 +62,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("wires the auto-created log group ARN into the hosted zone via Fn::GetAtt", () => {
-    const template = synthInUsEast1((b) => b.zoneName("example.com"));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com"));
 
     template.hasResourceProperties("AWS::Route53::HostedZone", {
       QueryLoggingConfig: {
@@ -83,7 +74,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("creates exactly one shared resource policy with a wildcard ARN even for multiple zones", () => {
-    const stack = newStack({ region: "us-east-1" });
+    const stack = newStack({ env: testEnv("us-east-1") });
     createHostedZoneBuilder().zoneName("example.com").build(stack, "ZoneA");
     createHostedZoneBuilder().zoneName("example.net").build(stack, "ZoneB");
     const template = Template.fromStack(stack);
@@ -112,8 +103,28 @@ describe("HostedZoneBuilder query logging", () => {
     expect(policy).toMatch(/aws:SourceAccount/);
   });
 
+  it("dedups on the policy's L1 type, not instanceof", () => {
+    const stack = newStack({ env: testEnv("us-east-1") });
+
+    // Stands in for the dual-package hazard (ADR-0007): a policy built by
+    // another realm's copy of aws-cdk-lib fails `instanceof ResourcePolicy`
+    // here, while its L1 still reports AWS::Logs::ResourcePolicy. An
+    // `instanceof` dedup would miss it and rebuild at the same construct id,
+    // failing synth.
+    const settled = new Construct(stack, QUERY_LOGGING_RESOURCE_POLICY_ID);
+    new CfnResourcePolicy(settled, "Resource", {
+      policyName: QUERY_LOGGING_RESOURCE_POLICY_NAME,
+      policyDocument: "{}",
+    });
+    expect(settled instanceof ResourcePolicy).toBe(false);
+
+    createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone");
+
+    Template.fromStack(stack).resourceCountIs("AWS::Logs::ResourcePolicy", 1);
+  });
+
   it("user-supplied logGroupArn wins and skips auto-creation", () => {
-    const stack = newStack({ region: "eu-west-2" });
+    const stack = newStack({ env: testEnv("eu-west-2") });
     createHostedZoneBuilder()
       .zoneName("example.com")
       .queryLogging({ logGroupArn: USER_OWNED_ARN })
@@ -128,7 +139,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("rejects combining configure and logGroupArn in the same call", () => {
-    const stack = newStack({ region: "us-east-1" });
+    const stack = newStack({ env: testEnv("us-east-1") });
     expect(() =>
       createHostedZoneBuilder()
         .zoneName("example.com")
@@ -138,7 +149,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("configure callback can override retention without breaking the shared policy", () => {
-    const template = synthInUsEast1((b) =>
+    const { template } = buildAndSynth((b) =>
       b
         .zoneName("example.com")
         .queryLogging({ configure: (lg) => lg.retention(RetentionDays.ONE_YEAR) }),
@@ -151,8 +162,24 @@ describe("HostedZoneBuilder query logging", () => {
     template.resourceCountIs("AWS::Logs::ResourcePolicy", 1);
   });
 
+  it("configure callback can reach a sibling component through a ref", () => {
+    const stack = newStack({ env: testEnv("us-east-1") });
+    const key = new Key(stack, "LogsKey");
+
+    createHostedZoneBuilder()
+      .zoneName("example.com")
+      .queryLogging({
+        configure: (lg) => lg.encryptionKey(ref<{ key: Key }>("logsKey").get("key")),
+      })
+      .build(stack, "TestZone", { logsKey: { key } });
+
+    Template.fromStack(stack).hasResourceProperties("AWS::Logs::LogGroup", {
+      KmsKeyId: { "Fn::GetAtt": [Match.stringLikeRegexp("LogsKey"), "Arn"] },
+    });
+  });
+
   it("disabled with queryLogging(false) creates no log group, no resource policy, no QueryLoggingConfig", () => {
-    const stack = newStack({ region: "eu-west-2" });
+    const stack = newStack({ env: testEnv("eu-west-2") });
     createHostedZoneBuilder().zoneName("example.com").queryLogging(false).build(stack, "TestZone");
     const template = Template.fromStack(stack);
 
@@ -165,7 +192,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("errors with three remediations when stack region is not us-east-1", () => {
-    const stack = newStack({ region: "us-west-2" });
+    const stack = newStack({ env: testEnv("us-west-2") });
     expect(() =>
       createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone"),
     ).toThrow(/Route 53 accepts DNS query logs only in us-east-1/);
@@ -210,8 +237,8 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("warns rather than errors when a user-supplied ARN points outside us-east-1", () => {
-    const stack = newStack({ region: "us-east-1" });
-    const wrongRegionArn = "arn:aws:logs:eu-west-1:111122223333:log-group:/aws/route53/example.com";
+    const stack = newStack({ env: testEnv("us-east-1") });
+    const wrongRegionArn = `arn:aws:logs:eu-west-1:${TEST_ACCOUNT}:log-group:/aws/route53/example.com`;
     createHostedZoneBuilder()
       .zoneName("example.com")
       .queryLogging({ logGroupArn: wrongRegionArn })
@@ -229,7 +256,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("exposes the auto-created log group on the build result and undefined when disabled or BYO", () => {
-    const stack = newStack({ region: "us-east-1" });
+    const stack = newStack({ env: testEnv("us-east-1") });
     const auto = createHostedZoneBuilder().zoneName("a.example.com").build(stack, "Auto");
     expect(auto.queryLogGroup).toBeDefined();
 
@@ -247,14 +274,14 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("strips the trailing dot from a fully-qualified zoneName when forming the log-group name", () => {
-    const template = synthInUsEast1((b) => b.zoneName("example.com."));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com."));
     template.hasResourceProperties("AWS::Logs::LogGroup", {
       LogGroupName: `${QUERY_LOGGING_LOG_GROUP_NAME_PREFIX}/example.com`,
     });
   });
 
   it("hosted zone is wired to depend on the shared resource policy", () => {
-    const stack = newStack({ region: "us-east-1" });
+    const stack = newStack({ env: testEnv("us-east-1") });
     createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone");
     const template = Template.fromStack(stack);
     const hostedZones = template.findResources("AWS::Route53::HostedZone");
@@ -265,7 +292,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("warns when configure renames the log group outside the shared prefix", () => {
-    const stack = newStack({ region: "us-east-1" });
+    const stack = newStack({ env: testEnv("us-east-1") });
     createHostedZoneBuilder()
       .zoneName("example.com")
       .queryLogging({ configure: (lg) => lg.logGroupName("/custom/route53-logs") })

@@ -10,7 +10,7 @@
  * - `apply` writes each package's `peerDependencies.aws-cdk-lib` from the
  *   manifest. Run it after editing `cdk-floors.json`.
  * - `check` asserts every package.json matches the manifest, exiting non-zero
- *   on drift. Cheap; wired into the main CI job and `npm run verify`.
+ *   on drift. Cheap; wired into the main CI job and `npx nx verify`.
  * - `enforce` pins aws-cdk-lib to a declared floor (via a temporary npm
  *   `overrides`, which forces every copy in the tree, not just the hoisted
  *   one) on a from-scratch install, asserts the floor actually bound, then
@@ -91,7 +91,7 @@ function apply() {
       `  ${pkg.padEnd(16)} aws-cdk-lib ^${floor}${extras.length > 0 ? ` + ${extras.join(", ")}` : ""}`,
     );
   }
-  console.log("\nApplied to package.json files (run `npm run format` to normalise).");
+  console.log("\nApplied to package.json files (run `npx nx prettier:write` to normalise).");
 }
 
 /** Asserts each package.json peer range matches the manifest; non-zero on drift. */
@@ -115,7 +115,7 @@ function check() {
   }
   if (mismatches.length > 0) {
     console.error(
-      `cdk-floors check failed — run \`npm run cdk-floors:apply\`:\n${mismatches.join("\n")}`,
+      `cdk-floors check failed — run \`npx nx cdk-floors:apply\`:\n${mismatches.join("\n")}`,
     );
     process.exit(1);
   }
@@ -159,15 +159,29 @@ function resolvedVersionFor(pkgName, dep = "aws-cdk-lib") {
 }
 
 /**
- * For each target floor: temporarily force aws-cdk-lib to that floor via npm
- * `overrides` on a from-scratch install (overrides only bind on a clean tree),
- * assert a package in the group actually resolves the floor, then run that
- * group's unit suite. With no arg, runs every floor; with a floor arg or
- * `CDK_FLOORS_FLOOR`, just that one (a CI matrix shard).
- *
- * Mutates package.json / package-lock.json / node_modules. They are restored
- * on completion and on SIGINT/SIGTERM, so a local run never leaves a stray
- * `overrides` entry or a floor-pinned install behind.
+ * Reinstalls node_modules after a floor run, returning whether it worked.
+ * `npm ci` first (exact lockfile), falling back to `npm install`: npm 10
+ * rejects our npm 11-generated lockfile, the clash `ci.yml` avoids by pinning.
+ */
+function reinstall() {
+  for (const mode of ["ci", "install"]) {
+    try {
+      execFileSync("npm", [mode, "--no-audit", "--no-fund"], { cwd: REPO_ROOT, stdio: "inherit" });
+      return true;
+    } catch {
+      console.error(`  npm ${mode} failed`);
+    }
+  }
+  return false;
+}
+
+/**
+ * For each target floor: pin aws-cdk-lib to it via a temporary npm `overrides`
+ * on a from-scratch install (they only bind on a clean tree), assert the pin
+ * bound, then run that floor group's unit suite. No arg runs every floor; a
+ * floor arg or `CDK_FLOORS_FLOOR` runs one (a CI matrix shard). Mutates
+ * package.json / package-lock.json / node_modules, restoring them on
+ * completion and on SIGINT/SIGTERM — and saying so loudly if it cannot.
  */
 function enforce() {
   const requested = process.env.CDK_FLOORS_FLOOR ?? process.argv[3];
@@ -220,6 +234,7 @@ function enforce() {
   process.on("SIGTERM", onSignal);
 
   let exitCode = 0;
+  let restored = true;
   try {
     for (const [floor, group] of targets) {
       console.log(`\n=== Enforcing aws-cdk-lib@${floor} for ${group.length} package(s) ===`);
@@ -241,7 +256,14 @@ function enforce() {
       // installs the locked (latest) version regardless of the override.
       rmSync(NODE_MODULES, { recursive: true, force: true });
       rmSync(LOCK, { force: true });
-      execFileSync("npm", ["install", "--no-audit", "--no-fund", "--legacy-peer-deps"], {
+      // No --legacy-peer-deps: the `overrides` above already force the floor
+      // past every package's declared peer range, and the flag additionally
+      // suppresses *peer installation* — which silently drops any dependency
+      // that declares its runtime requirements as peers. vitest >= 5 moved
+      // `vite` from a dependency to a peer, so under the flag every suite here
+      // died at startup with "Cannot find package 'vite'". The pin is asserted
+      // by the hard gate below, so nothing is lost by letting peers resolve.
+      execFileSync("npm", ["install", "--no-audit", "--no-fund"], {
         cwd: REPO_ROOT,
         stdio: "inherit",
       });
@@ -278,22 +300,27 @@ function enforce() {
   } finally {
     restoreManifest();
     if (mutated && local) {
-      console.log("\nRestoring workspace (npm ci) …");
-      execFileSync("npm", ["ci", "--no-audit", "--no-fund"], { cwd: REPO_ROOT, stdio: "inherit" });
-      // A failed floor build leaves a `.tshy-build` dir behind, which would
-      // break the next `npm run lint`; clear tshy intermediates so the
-      // restored tree is clean.
+      // Before the reinstall, which can fail: stale tshy dirs break the next lint.
       for (const entry of readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
         rmSync(join(PACKAGES_DIR, entry.name, ".tshy"), { recursive: true, force: true });
         rmSync(join(PACKAGES_DIR, entry.name, ".tshy-build"), { recursive: true, force: true });
       }
+      console.log("\nRestoring workspace …");
+      restored = reinstall();
+      restoreManifest(); // `npm install` rewrites the lockfile; put the committed one back.
     }
   }
 
   if (exitCode === 0) {
     console.log(
       "\ncdk-floors enforce passed (every package's unit suite ran against its declared floor)",
+    );
+  }
+  if (!restored) {
+    console.error(
+      "\n⚠ node_modules is still pinned to a floor — neither `npm ci` nor `npm install` " +
+        "restored it. Fix the install and re-run one before trusting a local test run.",
     );
   }
   process.exit(exitCode);

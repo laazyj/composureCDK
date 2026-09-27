@@ -3,7 +3,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { findStackResources, pollUntil, resolveLambdaLogGroup } from "./_helpers.mjs";
+import { findStackResources, resolveLambdaLogGroup, waitForLogEvents } from "./_helpers.mjs";
 
 const STACK = "ComposureCDK-DualFunctionStack";
 
@@ -64,28 +64,14 @@ export default {
       );
     }
 
-    // Poll the log group for events emitted by this invocation. The invoke
+    // Poll the log group for events emitted by this invocation — the invoke
     // API's --log-type Tail returns runtime-captured stdout, which doesn't
-    // prove the execution role's CloudWatch Logs permissions — only events
-    // landing in the log group do.
-    const logsSeen = await pollUntil(
-      () => {
-        const { events } = aws(
-          "logs",
-          "filter-log-events",
-          "--log-group-name",
-          logGroup,
-          "--start-time",
-          String(invokeStartMs - 5_000),
-          "--max-items",
-          "1",
-          "--output",
-          "json",
-        );
-        return events && events.length > 0;
-      },
-      { timeoutMs: 30_000, intervalMs: 2_000 },
-    );
+    // prove the execution role's CloudWatch Logs permissions.
+    const logsSeen = await waitForLogEvents(aws, {
+      logGroup,
+      sinceMs: invokeStartMs,
+      timeoutMs: 30_000,
+    });
 
     if (logsSeen) {
       pass(`${logGroup} — execution role wrote logs`);

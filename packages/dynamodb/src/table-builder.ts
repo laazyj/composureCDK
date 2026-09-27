@@ -1,7 +1,7 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type ITable, Table, TableEncryption, type TableProps } from "aws-cdk-lib/aws-dynamodb";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TableAlarmConfig } from "./table-alarm-config.js";
@@ -13,13 +13,31 @@ import { TABLE_DEFAULTS } from "./defaults.js";
  *
  * Extends the CDK {@link TableProps} with additional builder-specific options.
  */
-export interface TableBuilderProps extends TableProps {
+export interface TableBuilderProps extends Omit<TableProps, "encryptionKey"> {
+  /**
+   * The customer-managed KMS key used to encrypt the table at rest.
+   *
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
+   *
+   * Supplying a key implies `TableEncryption.CUSTOMER_MANAGED`: the
+   * `AWS_MANAGED` default is mutually exclusive with a customer key, so
+   * `build()` drops it rather than making you set both (ADR-0009).
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction
+   * (ADR-0018) — see the table in `@composurecdk/kms`'s README.
+   */
+  encryptionKey?: Resolvable<NonNullable<TableProps["encryptionKey"]>>;
+
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
    * By default, the builder creates recommended alarms with sensible
    * thresholds for server-side errors and read/write throttling. Individual
-   * alarms can be customized or disabled. Set to `false` to disable all alarms.
+   * alarms can be customized or disabled. Set to `false` to disable the
+   * recommended alarms; custom alarms added via `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification methods are
    * user-specific. Access alarms from the build result or use an `afterBuild`
@@ -107,10 +125,13 @@ class TableBuilder implements Lifecycle<TableBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string): TableBuilderResult {
-    const { recommendedAlarms: alarmConfig, ...tableProps } = this.props;
+  build(scope: IConstruct, id: string, context?: Record<string, object>): TableBuilderResult {
+    const { recommendedAlarms: alarmConfig, encryptionKey, ...tableProps } = this.props;
 
-    const mergedProps = mergeTableDefaults(tableProps);
+    const mergedProps = mergeTableDefaults({
+      ...tableProps,
+      ...(encryptionKey !== undefined ? { encryptionKey: resolve(encryptionKey, context) } : {}),
+    });
 
     const table = new Table(scope, id, mergedProps);
 

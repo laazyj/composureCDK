@@ -1,50 +1,72 @@
 {
   "name": "@composurecdk/eslint-plugin",
-  "version": "0.9.0",
+  "version": "0.10.3",
   "description": "Internal ESLint plugin encoding ComposureCDK architectural invariants (tagged builders, lifecycle context, builder copy state).",
-  "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/laazyj/composureCDK",
+    "url": "git+https://github.com/laazyj/composureCDK.git",
     "directory": "packages/eslint-plugin"
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
   },
   "files": [
     "dist",
-    "README.md"
+    "docs",
+    "README.md",
+    "LICENSE"
   ],
-  "scripts": {
-    "clean": "rm -rf dist",
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "keywords": [],
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin",
+    "aws-cdk",
+    "composurecdk",
+    "static-analysis",
+    "architecture"
+  ],
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "tshy": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": "./src/index.ts"
+    }
+  },
   "peerDependencies": {
     "eslint": "^10.0.0"
   },
   "devDependencies": {
-    "@types/estree": "^1.0.6",
-    "@types/node": "^25.9.3",
-    "@typescript-eslint/parser": "^8.58.0",
-    "eslint": "^10.4.1",
+    "@types/estree": "^1.0.9",
+    "@types/node": "^26.6.1",
+    "@typescript-eslint/parser": "^8.70.0",
+    "eslint": "^10.10.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^5.0.0"
   },
   "nx": {
     "tags": [
       "scope:tooling"
     ]
-  }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    }
+  },
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "module": "./dist/esm/index.js"
 }

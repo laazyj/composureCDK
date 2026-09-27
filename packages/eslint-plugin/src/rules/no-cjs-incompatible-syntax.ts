@@ -8,14 +8,15 @@ const FUNCTION_TYPES = new Set([
 ]);
 
 /**
- * Flags syntax in library `src/` that cannot be emitted to CommonJS:
- * `import.meta`, top-level `await`, and top-level `for await…of`. All are
- * valid ESM but have no CJS equivalent, so `tsc` (and tshy's CommonJS
- * dialect) errors on them.
+ * Flags syntax with no CommonJS equivalent: `import.meta`, top-level `await` and
+ * top-level `for await…of`.
  *
- * Every `@composurecdk/*` package is dual-published (ESM + CJS) — see
- * ADR-0007. Catching these at lint time gives an in-editor error before any
- * build runs, rather than waiting for the per-dialect compile to fail.
+ * These packages are published as both ECMAScript and CommonJS modules from one
+ * source. All three constructs are valid ESM that the CommonJS compile cannot
+ * emit, so each one breaks half the build. Reporting them as you type beats
+ * discovering it when the second dialect compiles.
+ *
+ * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-cjs-incompatible-syntax.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
   meta: {
@@ -27,11 +28,11 @@ export const rule: Rule.RuleModule = {
     schema: [],
     messages: {
       importMeta:
-        "`import.meta` cannot be emitted to CommonJS. Every package is dual-published (ADR-0007) — " +
-        "avoid `import.meta` in library `src/`.",
+        "`import.meta` has no CommonJS equivalent, so it breaks the CommonJS half of a " +
+        "dual-published build. Take the value from a parameter or a caller instead.",
       topLevelAwait:
-        "Top-level `await` cannot be emitted to CommonJS. Every package is dual-published (ADR-0007) — " +
-        "move the `await` inside an async function.",
+        "Top-level `await` has no CommonJS equivalent, so it breaks the CommonJS half of a " +
+        "dual-published build. Move the `await` inside an async function.",
     },
   },
   create(ctx) {

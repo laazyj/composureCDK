@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+
 import { Template } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
+import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { functionGrants } from "../src/grants.js";
 
 function setup() {
-  const app = new App();
-  const stack = new Stack(app, "S");
+  const stack = newStack();
   const fn = new LambdaFunction(stack, "Fn", {
     runtime: Runtime.NODEJS_22_X,
     handler: "index.handler",
@@ -20,13 +20,17 @@ function setup() {
   return { stack, fn, role };
 }
 
-const policyJson = (stack: Stack) => JSON.stringify(Template.fromStack(stack).toJSON());
+const CAPABILITIES = [
+  ["invoke", "lambda:InvokeFunction"],
+  ["invokeUrl", "lambda:InvokeFunctionUrl"],
+] as const;
 
 describe("functionGrants", () => {
-  it.each([
-    ["invoke", "lambda:InvokeFunction"],
-    ["invokeUrl", "lambda:InvokeFunctionUrl"],
-  ] as const)("%s delegates to the matching native grant method", (capability, action) => {
+  it("covers every capability functionGrants exposes", () => {
+    assertCapabilitiesCovered(functionGrants, CAPABILITIES);
+  });
+
+  it.each(CAPABILITIES)("%s delegates to the native grant method", (capability, action) => {
     const { stack, fn, role } = setup();
 
     functionGrants[capability](fn).applyTo(role, {});

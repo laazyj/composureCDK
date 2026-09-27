@@ -1,6 +1,7 @@
-import { App, Stack } from "aws-cdk-lib";
+import { Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import type { IQueue } from "aws-cdk-lib/aws-sqs";
+import { newStack } from "@composurecdk/cdk-testing";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import type { QueueBuilderResult } from "../src/queue-builder.js";
@@ -16,20 +17,6 @@ interface BuildableQueue {
  */
 export function setUntypedProp(builder: unknown, key: string, value: unknown): void {
   (builder as Record<string, (value: unknown) => unknown>)[key](value);
-}
-
-/** Builds a queue builder into a fresh stack and returns the synth artefacts. */
-export function buildQueueStack<B extends BuildableQueue>(
-  factory: () => B,
-  id: string,
-  configureFn?: (builder: B) => void,
-): { stack: Stack; result: QueueBuilderResult; template: Template } {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = factory();
-  configureFn?.(builder);
-  const result = builder.build(stack, id);
-  return { stack, result, template: Template.fromStack(stack) };
 }
 
 /**
@@ -85,7 +72,7 @@ export function expectCopyPreservesCustomAlarms(factory: () => CopyableQueueBuil
           .greaterThan(),
       );
     },
-    build: (b) => b.build(new Stack(new App(), "S"), "Queue"),
+    build: (b) => b.build(newStack(), "Queue"),
     inspect: (r) => Object.keys(r.alarms).sort(),
   });
 }

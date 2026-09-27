@@ -1,4 +1,4 @@
-import type { IEventBus, IRuleTarget } from "aws-cdk-lib/aws-events";
+import type { IRuleTarget } from "aws-cdk-lib/aws-events";
 import { EventBus as EventBusTarget, type EventBusProps } from "aws-cdk-lib/aws-events-targets";
 import { isRef, type Resolvable } from "@composurecdk/core";
 
@@ -12,9 +12,13 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * `deadLetterQueue`. Note: bus targets do **not** support retry policy
  * configuration, per CDK's {@link EventBusProps} (it intentionally does not
  * extend the retry base).
+ *
+ * `bus` reads its type from CDK's own target constructor rather than
+ * naming `IEventBus`, so it keeps tracking the installed `aws-cdk-lib`
+ * (ADR-0018).
  */
 export function eventBusTarget(
-  bus: Resolvable<IEventBus>,
+  bus: Resolvable<ConstructorParameters<typeof EventBusTarget>[0]>,
   props?: EventBusProps,
 ): Resolvable<IRuleTarget> {
   if (isRef(bus)) return bus.map((resolved) => new EventBusTarget(resolved, props));

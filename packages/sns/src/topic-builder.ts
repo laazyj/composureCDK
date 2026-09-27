@@ -1,9 +1,18 @@
+import { CfnResource } from "aws-cdk-lib";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import {
+  Effect,
+  PolicyStatement,
+  type PolicyStatementProps,
+  ServicePrincipal,
+} from "aws-cdk-lib/aws-iam";
+import {
+  CfnTopicPolicy,
   type ITopic,
   type ITopicSubscription,
   Subscription,
   Topic,
+  type TopicPolicy,
   type TopicProps,
 } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
@@ -20,13 +29,32 @@ import { applySubscriptionDefaults } from "./subscription-defaults.js";
  *
  * Extends the CDK {@link TopicProps} with additional builder-specific options.
  */
-export interface TopicBuilderProps extends TopicProps {
+export interface TopicBuilderProps extends Omit<TopicProps, "masterKey"> {
+  /**
+   * The customer-managed KMS key used for server-side encryption of messages
+   * at rest.
+   *
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
+   *
+   * SNS has no service-managed encryption option, so a topic is unencrypted at
+   * rest until a key is supplied. There is nothing for this to conflict with —
+   * it is the only encryption prop on a topic.
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction
+   * (ADR-0018) — see the table in `@composurecdk/kms`'s README.
+   */
+  masterKey?: Resolvable<NonNullable<TopicProps["masterKey"]>>;
+
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
    * By default, the builder creates recommended alarms with sensible
    * thresholds for every applicable metric. Individual alarms can be
-   * customized or disabled. Set to `false` to disable all alarms.
+   * customized or disabled. Set to `false` to disable the recommended
+   * alarms; custom alarms added via `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification
    * methods are user-specific. Access alarms from the build result
@@ -67,6 +95,16 @@ export interface TopicBuilderResult {
    * Always present — `{}` when no subscriptions were added.
    */
   subscriptions: Record<string, Subscription>;
+
+  /**
+   * The topic's own access policy, which CDK keeps private on `Topic`. Add
+   * to it rather than creating another `TopicPolicy` — see the README's
+   * "Topic Access Policy" section.
+   *
+   * `undefined` when the topic had no policy statements at build time; a
+   * policy CDK creates later is not reflected here.
+   */
+  policy?: TopicPolicy;
 }
 
 /**
@@ -96,6 +134,21 @@ export interface TopicBuilderResult {
  */
 export type ITopicBuilder = ITaggedBuilder<TopicBuilderProps, TopicBuilder>;
 
+/** Options for {@link ITopicBuilder.allowServicePublish}. */
+export interface AllowServicePublishOptions {
+  /**
+   * Conditions on the statement — typically `aws:SourceAccount`, to guard
+   * against the
+   * {@link https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html | confused deputy problem}.
+   */
+  conditions?: PolicyStatementProps["conditions"];
+}
+
+interface ServicePublisher {
+  service: string;
+  options: AllowServicePublishOptions;
+}
+
 interface SubscriptionEntry {
   key: string;
   subscription: Resolvable<ITopicSubscription>;
@@ -105,6 +158,7 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
   props: Partial<TopicBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ITopic>[] = [];
   readonly #subscriptions: SubscriptionEntry[] = [];
+  readonly #servicePublishers: ServicePublisher[] = [];
 
   addAlarm(
     key: string,
@@ -141,21 +195,45 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
     return this;
   }
 
+  /**
+   * Allow an AWS service principal (e.g. `"budgets.amazonaws.com"`) to
+   * publish to the topic. The statement joins the topic's own access policy
+   * at build time — see the README's "Topic Access Policy" section.
+   */
+  allowServicePublish(service: string, options: AllowServicePublishOptions = {}): this {
+    this.#servicePublishers.push({ service, options });
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: TopicBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
     target.#subscriptions.push(...this.#subscriptions);
+    target.#servicePublishers.push(...this.#servicePublishers);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): TopicBuilderResult {
-    const { recommendedAlarms: alarmConfig, ...topicProps } = this.props;
+    const { recommendedAlarms: alarmConfig, masterKey, ...topicProps } = this.props;
 
-    const mergedProps = {
+    const mergedProps: TopicProps = {
       ...TOPIC_DEFAULTS,
       ...topicProps,
-    } as TopicBuilderProps;
+      ...(masterKey !== undefined ? { masterKey: resolve(masterKey, context) } : {}),
+    };
 
     const topic = new Topic(scope, id, mergedProps);
+
+    for (const { service, options } of this.#servicePublishers) {
+      topic.addToResourcePolicy(
+        new PolicyStatement({
+          effect: Effect.ALLOW,
+          principals: [new ServicePrincipal(service)],
+          actions: ["sns:Publish"],
+          resources: [topic.topicArn],
+          conditions: options.conditions,
+        }),
+      );
+    }
 
     const alarms = createTopicAlarms(scope, id, topic, alarmConfig, this.#customAlarms);
 
@@ -174,8 +252,25 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
       });
     }
 
-    return { topic, alarms, subscriptions };
+    return { topic, alarms, subscriptions, policy: findTopicPolicy(topic) };
   }
+}
+
+/**
+ * The access policy CDK creates for `topic`, which `Topic` keeps private.
+ *
+ * CDK builds it as the child `"Policy"`; that id feeds the policy's logical
+ * id, so CDK cannot rename it without replacing the resource in every
+ * deployed stack.
+ */
+function findTopicPolicy(topic: Topic): TopicPolicy | undefined {
+  const child = topic.node.tryFindChild("Policy");
+  const cfn = child?.node.defaultChild;
+  return cfn !== undefined &&
+    CfnResource.isCfnResource(cfn) &&
+    cfn.cfnResourceType === CfnTopicPolicy.CFN_RESOURCE_TYPE_NAME
+    ? (child as TopicPolicy)
+    : undefined;
 }
 
 /**

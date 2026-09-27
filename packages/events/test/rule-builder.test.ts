@@ -1,15 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { EventBus, Schedule } from "aws-cdk-lib/aws-events";
+import { EventBus, type RuleProps, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
+import { newStack } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
-import { createRuleBuilder } from "../src/rule-builder.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
+import { createRuleBuilder, type RuleBuilderProps } from "../src/rule-builder.js";
 
 function makeFn(stack: Stack, id = "Handler"): LambdaFn {
   return new LambdaFn(stack, id, {
@@ -147,8 +144,22 @@ describe("RuleBuilder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own RuleProps accepts, bar targets (type-level guard)", () => {
+      // Every re-declared prop must widen what CDK takes, never narrow it:
+      // pinning `eventBus` to `IEventBus` rejected a bus CDK itself takes,
+      // once CDK widened `RuleProps.eventBus` to `IEventBusRef` in 2.235.0.
+      // Asserted over the whole interface so a prop re-declared later — CDK
+      // has widened `role` the same way — cannot reintroduce the narrowing.
+      // Structural assignment ignores `targets`, which is lifted onto
+      // `addTarget`; that setter reads its element type from `RuleProps` under
+      // the same rule (ADR-0018), so it is covered there rather than exempt.
+      const _props: RuleBuilderProps = undefined as unknown as RuleProps;
+    });
+  });
+
   describe("eventBus", () => {
-    it("resolves a Resolvable<IEventBus> from the compose context", () => {
+    it("resolves a Resolvable event bus from the compose context", () => {
       const stack = newStack();
       const fn = makeFn(stack);
       const bus = new EventBus(stack, "Bus", { eventBusName: "my-bus" });

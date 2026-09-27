@@ -1,22 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Duration } from "aws-cdk-lib";
+import { Match } from "aws-cdk-lib/assertions";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { Topic } from "aws-cdk-lib/aws-sns";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { createTopicBuilder } from "../src/topic-builder.js";
+import { resolveTopicAlarmDefinitions } from "../src/topic-alarms.js";
 
-function buildResult(configureFn?: (builder: ReturnType<typeof createTopicBuilder>) => void) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createTopicBuilder();
-  configureFn?.(builder);
-  const result = builder.build(stack, "TestTopic");
-  return { result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(createTopicBuilder, "TestTopic");
 
 describe("recommended alarms", () => {
   describe("defaults", () => {
     it("creates all four recommended alarms by default", () => {
-      const { result, template } = buildResult();
+      const { result, template } = buildAndSynth();
 
       expect(result.alarms.numberOfNotificationsFailed).toBeDefined();
       expect(result.alarms.numberOfNotificationsFilteredOutInvalidAttributes).toBeDefined();
@@ -26,7 +22,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates numberOfNotificationsRedrivenToDlq alarm with threshold > 0", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "NumberOfNotificationsRedrivenToDlq",
@@ -43,7 +39,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates numberOfNotificationsFailedToRedriveToDlq alarm with threshold > 0", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "NumberOfNotificationsFailedToRedriveToDlq",
@@ -54,7 +50,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates numberOfNotificationsFailed alarm with threshold > 0", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "NumberOfNotificationsFailed",
@@ -70,7 +66,7 @@ describe("recommended alarms", () => {
     });
 
     it("creates numberOfNotificationsFilteredOutInvalidAttributes alarm with threshold > 0", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "NumberOfNotificationsFilteredOut-InvalidAttributes",
@@ -86,7 +82,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes TopicName dimension", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "NumberOfNotificationsFailed",
@@ -95,7 +91,7 @@ describe("recommended alarms", () => {
     });
 
     it("includes threshold justification in alarm descriptions", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "NumberOfNotificationsFailed",
@@ -106,7 +102,7 @@ describe("recommended alarms", () => {
 
   describe("customization", () => {
     it("allows customizing numberOfNotificationsFailed alarm threshold", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({ numberOfNotificationsFailed: { threshold: 5 } });
       });
 
@@ -117,7 +113,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing evaluation periods", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({
           numberOfNotificationsFailed: { evaluationPeriods: 3, datapointsToAlarm: 2 },
         });
@@ -131,7 +127,7 @@ describe("recommended alarms", () => {
     });
 
     it("allows customizing treat missing data", () => {
-      const { template } = buildResult((b) => {
+      const { template } = buildAndSynth((b) => {
         b.recommendedAlarms({
           numberOfNotificationsFailed: { treatMissingData: TreatMissingData.BREACHING },
         });
@@ -146,7 +142,7 @@ describe("recommended alarms", () => {
 
   describe("disabling alarms", () => {
     it("disables all alarms when recommendedAlarms is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms(false);
       });
 
@@ -155,7 +151,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables all alarms when enabled is false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ enabled: false });
       });
 
@@ -164,7 +160,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables individual alarms when set to false", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({ numberOfNotificationsFailed: false });
       });
 
@@ -174,7 +170,7 @@ describe("recommended alarms", () => {
     });
 
     it("disables multiple individual alarms", () => {
-      const { result, template } = buildResult((b) => {
+      const { result, template } = buildAndSynth((b) => {
         b.recommendedAlarms({
           numberOfNotificationsFailed: false,
           numberOfNotificationsFilteredOutInvalidAttributes: false,
@@ -193,7 +189,7 @@ describe("recommended alarms", () => {
 
   describe("no default actions", () => {
     it("creates alarms with no alarm actions", () => {
-      const { template } = buildResult();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         MetricName: "NumberOfNotificationsFailed",
@@ -205,7 +201,7 @@ describe("recommended alarms", () => {
 
 describe("addAlarm", () => {
   it("creates a custom alarm alongside recommended alarms", () => {
-    const { result, template } = buildResult((b) => {
+    const { result, template } = buildAndSynth((b) => {
       b.addAlarm("numberOfMessagesPublished", (alarm) =>
         alarm
           .metric(
@@ -232,7 +228,7 @@ describe("addAlarm", () => {
 
   it("throws on duplicate key with recommended alarm", () => {
     expect(() =>
-      buildResult((b) => {
+      buildAndSynth((b) => {
         b.addAlarm("numberOfNotificationsFailed", (alarm) =>
           alarm
             .metric(
@@ -248,5 +244,55 @@ describe("addAlarm", () => {
         );
       }),
     ).toThrow(/Duplicate alarm key "numberOfNotificationsFailed"/);
+  });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  function customAlarm(builder: ReturnType<typeof createTopicBuilder>) {
+    return builder.addAlarm("numberOfMessagesPublished", (alarm) =>
+      alarm
+        .metric(
+          (topic) =>
+            new Metric({
+              namespace: "AWS/SNS",
+              metricName: "NumberOfMessagesPublished",
+              dimensionsMap: { TopicName: topic.topicName },
+              statistic: "Sum",
+              period: Duration.minutes(1),
+            }),
+        )
+        .threshold(10000)
+        .greaterThanOrEqual()
+        .description("Topic receiving unusually high message volume"),
+    );
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    const { result, template } = buildAndSynth((b) => {
+      customAlarm(b.recommendedAlarms(false));
+    });
+
+    expect(result.alarms.numberOfMessagesPublished).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["numberOfMessagesPublished"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildAndSynth((b) => {
+      customAlarm(b.recommendedAlarms({ enabled: false }));
+    });
+
+    expect(result.alarms.numberOfMessagesPublished).toBeDefined();
+    expect(Object.keys(result.alarms)).toEqual(["numberOfMessagesPublished"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+});
+
+describe("resolveTopicAlarmDefinitions", () => {
+  it("returns no definitions when explicitly disabled", () => {
+    const stack = newStack();
+    const topic = new Topic(stack, "Topic");
+
+    expect(resolveTopicAlarmDefinitions(topic, { enabled: false })).toEqual([]);
   });
 });

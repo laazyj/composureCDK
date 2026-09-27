@@ -1,6 +1,6 @@
 # ADR 0002: Policies — cross-cutting helpers applied to a construct subtree
 
-- **Status:** Accepted
+- **Status:** Accepted (§5 amended by [ADR-0017](0017-template-text-policy.md))
 - **Date:** 2026-04-23
 
 ## Context

@@ -18,17 +18,33 @@ Every [BucketProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_
 
 `createBucketBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
 
-| Property            | Default                          | Rationale                                                                                             |
-| ------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `serverAccessLogs`  | `{ prefix: "logs/" }`            | Auto-creates a logging bucket for the server access log audit trail under the `logs/` prefix.         |
-| `blockPublicAccess` | `BLOCK_ALL`                      | Prevents public access unless explicitly required.                                                    |
-| `encryption`        | `S3_MANAGED`                     | Enables server-side encryption with S3-managed keys (SSE-S3).                                         |
-| `enforceSSL`        | `true`                           | Requires SSL/TLS for all requests to the bucket.                                                      |
-| `versioned`         | `true`                           | Protects against accidental deletions and supports rollback.                                          |
-| `removalPolicy`     | `RETAIN`                         | Retains the bucket on stack deletion to prevent data loss.                                            |
-| `lifecycleRules`    | `DEFAULT_BUCKET_LIFECYCLE_RULES` | Aborts incomplete multipart uploads after 7 days and expires noncurrent object versions after 1 year. |
+| Property            | Default                          | Rationale                                                                                                    |
+| ------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `serverAccessLogs`  | `{ prefix: "logs/" }`            | Auto-creates a logging bucket for the server access log audit trail under the `logs/` prefix.                |
+| `blockPublicAccess` | `BLOCK_ALL`                      | Prevents public access unless explicitly required.                                                           |
+| `encryption`        | `S3_MANAGED`                     | Enables server-side encryption with S3-managed keys (SSE-S3). Yields to SSE-KMS when `encryptionKey` is set. |
+| `enforceSSL`        | `true`                           | Requires SSL/TLS for all requests to the bucket.                                                             |
+| `versioned`         | `true`                           | Protects against accidental deletions and supports rollback.                                                 |
+| `removalPolicy`     | `RETAIN`                         | Retains the bucket on stack deletion to prevent data loss.                                                   |
+| `lifecycleRules`    | `DEFAULT_BUCKET_LIFECYCLE_RULES` | Aborts incomplete multipart uploads after 7 days and expires noncurrent object versions after 1 year.        |
 
 These defaults are guided by the [AWS Well-Architected Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-at-rest.html).
+
+### Customer-managed encryption keys
+
+`.encryptionKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+
+```ts
+compose(
+  {
+    bucketKey: createKeyBuilder().description("Encrypts the archive bucket at rest."),
+    archive: createBucketBuilder().encryptionKey(ref<KeyBuilderResult>("bucketKey").get("key")),
+  },
+  { bucketKey: [], archive: ["bucketKey"] },
+);
+```
+
+Supplying a key switches `encryption` from the `S3_MANAGED` default to `BucketEncryption.KMS` — the two are mutually exclusive, so the default yields rather than making you set both ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)).
 
 The defaults are exported as `BUCKET_DEFAULTS` for visibility and testing:
 
@@ -86,6 +102,8 @@ createBucketBuilder().serverAccessLogs({ destination: myBucket, prefix: "x/" });
 ```
 
 `destination` and `configure` cannot be combined — the destination bucket is user-managed and is not built by this builder.
+
+The `configure` callback receives the build context, so anything `IBucketBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the bucket.
 
 ## Recommended Alarms
 
@@ -209,7 +227,7 @@ const deploy = createBucketDeploymentBuilder()
   .build(stack, "Deploy");
 ```
 
-The `destinationBucket` and `distribution` methods accept `Ref` values for cross-component wiring:
+The `destinationBucket` and `distribution` methods accept `Ref` values for cross-component wiring. Each reads what it accepts from CDK's own `BucketDeploymentProps` rather than pinning an interface, so it accepts whatever your installed `aws-cdk-lib` accepts — `distribution` is already the broader [`cloudfront.IDistributionRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudfront.IDistributionRef.html) there.
 
 ```ts
 import { compose, ref } from "@composurecdk/core";

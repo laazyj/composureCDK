@@ -1,3 +1,309 @@
+## 0.10.3 (2026-09-26)
+
+### 🚀 Features
+
+- **bedrockagentcore:** add the runtime builder ([be86321](https://github.com/laazyj/composureCDK/commit/be86321))
+- **bedrockagentcore:** add the memory builder ([568c6a0](https://github.com/laazyj/composureCDK/commit/568c6a0))
+- **bedrockagentcore:** add the gateway builder ([67c59ab](https://github.com/laazyj/composureCDK/commit/67c59ab))
+- **bedrockagentcore:** add evaluators and online evaluation ([e2bf75e](https://github.com/laazyj/composureCDK/commit/e2bf75e))
+- **bedrockagentcore:** add session quota alarms ([204143c](https://github.com/laazyj/composureCDK/commit/204143c))
+- **budgets:** add topicPolicy(false) to opt out of the topic grant ([a60fe85](https://github.com/laazyj/composureCDK/commit/a60fe85))
+- **sns:** add topicPolicyConflictPolicy ([7237062](https://github.com/laazyj/composureCDK/commit/7237062))
+- **sns:** let the topic builder own its access policy ([7f85416](https://github.com/laazyj/composureCDK/commit/7f85416))
+- **xray:** add the Transaction Search builder ([#543](https://github.com/laazyj/composureCDK/issues/543))
+
+### 🩹 Fixes
+
+- **budgets:** add the Budgets publish statement to the topic's own policy ([#551](https://github.com/laazyj/composureCDK/issues/551))
+- **budgets:** keep the topic policy change within the aws-cdk-lib 2.93 floor ([257fee8](https://github.com/laazyj/composureCDK/commit/257fee8))
+- **ci:** skip coverage comment for cancelled runs ([9cf9ffd](https://github.com/laazyj/composureCDK/commit/9cf9ffd))
+
+### 💀 Thank You
+
+- Jason Duffett
+
+## 0.10.2 (2026-09-25)
+
+### 🚀 Features
+
+- **bedrock:** add model grants, profiles and alarms ([e9ab369](https://github.com/laazyj/composureCDK/commit/e9ab369))
+- **bedrock:** add model invocation logging builder ([602c1dd](https://github.com/laazyj/composureCDK/commit/602c1dd))
+- **bedrock:** add guardrails and require them on model grants ([65a77b6](https://github.com/laazyj/composureCDK/commit/65a77b6))
+- **bedrock:** add application inference profiles ([1def3c7](https://github.com/laazyj/composureCDK/commit/1def3c7))
+- **examples:** triage order notes with a Bedrock model ([9c32e92](https://github.com/laazyj/composureCDK/commit/9c32e92))
+- **examples:** log the order processor's model invocations ([82708d9](https://github.com/laazyj/composureCDK/commit/82708d9))
+- **examples:** apply a guardrail to the order processor's model calls ([958edc3](https://github.com/laazyj/composureCDK/commit/958edc3))
+- **examples:** tag the order processor's model usage by profile ([dca4d62](https://github.com/laazyj/composureCDK/commit/dca4d62))
+
+### 🩹 Fixes
+
+- **cloudwatch:** give nested-stack alarms a literal default name ([#525](https://github.com/laazyj/composureCDK/issues/525))
+- **examples:** raise order queue visibility to 3 minutes ([d5c9322](https://github.com/laazyj/composureCDK/commit/d5c9322))
+- **lint:** ignore tshy's build intermediates ([7dd3bc3](https://github.com/laazyj/composureCDK/commit/7dd3bc3))
+
+### 💀 Thank You
+
+- Jason Duffett
+
+## 0.10.1 (2026-09-21)
+
+### 🚀 Features
+
+- record a decision for every in-scope CDK feature flag ([d93129c](https://github.com/laazyj/composureCDK/commit/d93129c))
+- ⚠️ **eslint-plugin:** split the preset into four tiers ([#491](https://github.com/laazyj/composureCDK/pull/491))
+- **eslint-plugin:** add assumeNeverInstalledAsADependency to no-realm-bound-instanceof ([#494](https://github.com/laazyj/composureCDK/pull/494), [#450](https://github.com/laazyj/composureCDK/issues/450))
+- ⚠️ **eslint-plugin:** publish the package ([#496](https://github.com/laazyj/composureCDK/pull/496))
+- **examples:** set cross-stack reference strength explicitly to weak ([#412](https://github.com/laazyj/composureCDK/pull/412))
+- **examples:** seed the CRUD catalogue at deploy time ([e593eb6](https://github.com/laazyj/composureCDK/commit/e593eb6))
+- **lambda:** invoke a function during deployment with .invokeOnDeploy() ([c1d47ef](https://github.com/laazyj/composureCDK/commit/c1d47ef))
+- **lambda:** widen environment values to Resolvable ([af720d4](https://github.com/laazyj/composureCDK/commit/af720d4))
+
+### 🩹 Fixes
+
+- measure cdk-flags no-effect verdicts honestly ([22f1ff6](https://github.com/laazyj/composureCDK/commit/22f1ff6))
+- **cloudformation:** preserve stack-level tags ([890fc5c](https://github.com/laazyj/composureCDK/commit/890fc5c))
+- **eslint-plugin:** make rule messages actionable for consumers ([#495](https://github.com/laazyj/composureCDK/pull/495))
+- **examples:** stop cleanDeskPolicy retaining API Gateway roles ([#501](https://github.com/laazyj/composureCDK/pull/501))
+
+### ⚠️ Breaking Changes
+
+- **eslint-plugin:** publish the package ([#496](https://github.com/laazyj/composureCDK/pull/496))
+  @composurecdk/eslint-plugin is now published. Its rule
+  names, messages, preset names, option names and default severities are
+  public API from this release."
+  M docs/adr/0007-dual-esm-cjs-publishing.md
+  M docs/ci.md
+  M packages/eslint-plugin/README.md
+  M packages/eslint-plugin/package.json
+- **eslint-plugin:** split the preset into four tiers ([#491](https://github.com/laazyj/composureCDK/pull/491))
+  `configs.recommended` no longer enables
+  lifecycle-build-must-forward-context, no-typescript-private-modifier,
+  redeclared-prop-must-track-cdk-type or no-cjs-incompatible-syntax. Extend
+  `libraryAuthor` and `dualPublishing` alongside it to keep them.
+  - refactor(lint): scope the examples to the recommended tier
+    The examples are CDK applications: they publish nothing, emit no `.d.ts`
+    anyone compiles against, and ship one module format. They were taking
+    all four tiers plus a rule override silencing
+    lifecycle-build-must-forward-context across the whole package.
+    Give them the one tier that describes them, and delete the override. The
+    other rules were inert there anyway — no Builder imports, no
+    stringConstraint calls, no import.meta, and the single isCfn* use is the
+    portable guard the floor rule allows.
+  - refactor(lint): scope cdk-testing to the tiers that describe it
+    It is built by plain `tsc` to one format, so the dual-publishing rules
+    do not apply. The rest do: 17 packages compile against its `.d.ts`, and
+    since their `test` target depends on `^build`, its code also runs under
+    every one of their aws-cdk-lib floors — it declares none itself but
+    inherits the strictest of theirs."
+    A docs/adr/0019-lint-rules-as-public-contract.md
+    M docs/adr/README.md
+    M eslint.config.mjs
+    M packages/eslint-plugin/README.md
+    M packages/eslint-plugin/docs/rules/builder-must-be-tagged.md
+    M packages/eslint-plugin/docs/rules/builder-must-implement-copy-state.md
+    M packages/eslint-plugin/docs/rules/constraint-metadata-required.md
+    M packages/eslint-plugin/docs/rules/lifecycle-build-context-required.md
+    M packages/eslint-plugin/docs/rules/lifecycle-build-must-forward-context.md
+    M packages/eslint-plugin/docs/rules/no-cdk-api-above-floor.md
+    M packages/eslint-plugin/docs/rules/no-cjs-incompatible-syntax.md
+    M packages/eslint-plugin/docs/rules/no-realm-bound-instanceof.md
+    M packages/eslint-plugin/docs/rules/no-typescript-private-modifier.md
+    M packages/eslint-plugin/docs/rules/redeclared-prop-must-track-cdk-type.md
+    A packages/eslint-plugin/src/configs/presets.ts
+    D packages/eslint-plugin/src/configs/recommended.ts
+    M packages/eslint-plugin/src/index.ts
+    A packages/eslint-plugin/test/configs/presets.test.ts
+    D packages/eslint-plugin/test/configs/recommended.test.ts
+    M packages/eslint-plugin/test/docs.test.ts
+
+### 💀 Thank You
+
+- Jason Duffett
+
+## 0.10.0 (2026-09-19)
+
+### 🚀 Features
+
+- **cdk-testing:** add private shared test-helper package ([2720ed8](https://github.com/laazyj/composureCDK/commit/2720ed8))
+- **cdk-testing:** add buildFixture, the Tier B build-and-synthesise helper ([dc02651](https://github.com/laazyj/composureCDK/commit/dc02651))
+- **cloudformation:** check AWS::CloudFront::Function functionCode by default ([#415](https://github.com/laazyj/composureCDK/pull/415), [#414](https://github.com/laazyj/composureCDK/issues/414))
+- **cloudformation:** check AWS::CloudFront::KeyValueStore comment by default ([#417](https://github.com/laazyj/composureCDK/pull/417), [#416](https://github.com/laazyj/composureCDK/issues/416))
+- **cloudfront:** warn on bucket-wide expiry on an origin bucket ([#443](https://github.com/laazyj/composureCDK/pull/443), [#440](https://github.com/laazyj/composureCDK/issues/440))
+- **ec2:** make InstanceBuilder a grantee builder ([#487](https://github.com/laazyj/composureCDK/pull/487), [#486](https://github.com/laazyj/composureCDK/issues/486))
+- **eslint-plugin:** flag a re-declared prop that pins a CDK interface ([bb4c581](https://github.com/laazyj/composureCDK/commit/bb4c581))
+- **eslint-plugin:** add no-typescript-private-modifier ([#490](https://github.com/laazyj/composureCDK/pull/490))
+- ⚠️ **neptune:** migrate cluster access to consumer-side grants ([#420](https://github.com/laazyj/composureCDK/pull/420), [#372](https://github.com/laazyj/composureCDK/issues/372))
+
+### 🩹 Fixes
+
+- ship LICENSE with every published package ([2a4568a](https://github.com/laazyj/composureCDK/commit/2a4568a))
+- **apigateway:** read apiDefinition type from CDK's own prop ([c2c31fb](https://github.com/laazyj/composureCDK/commit/c2c31fb))
+- **ci:** install peer deps in cdk-floors enforce ([ba5c90c](https://github.com/laazyj/composureCDK/commit/ba5c90c))
+- **dynamodb:** read encryptionKey and encryption types from CDK's own props ([6f90b9d](https://github.com/laazyj/composureCDK/commit/6f90b9d))
+- **ec2:** read cross-component prop types from CDK's own props ([b3c1a7a](https://github.com/laazyj/composureCDK/commit/b3c1a7a))
+- **eslint-plugin:** make configs.recommended a real flat config ([#484](https://github.com/laazyj/composureCDK/pull/484), [#480](https://github.com/laazyj/composureCDK/issues/480))
+- **events:** accept every log group CDK's own CloudWatchLogGroup target takes ([86a4a09](https://github.com/laazyj/composureCDK/commit/86a4a09))
+- **events:** read every target helper's resource type from CDK's own constructor ([#451](https://github.com/laazyj/composureCDK/pull/451))
+- **iam:** read assumedBy and permissionsBoundary types from CDK's own props ([dfe4d35](https://github.com/laazyj/composureCDK/commit/dfe4d35))
+- **lambda:** read role and stream onFailure types from CDK's own props ([455bed0](https://github.com/laazyj/composureCDK/commit/455bed0))
+- **lambda:** read the log group ARN from wherever the installed CDK keeps it ([#436](https://github.com/laazyj/composureCDK/issues/436))
+- **neptune:** read securityGroups and vpc types from CDK's own props ([7499d25](https://github.com/laazyj/composureCDK/commit/7499d25))
+- **route53:** accept every role CDK's own delegation record takes ([8e79294](https://github.com/laazyj/composureCDK/commit/8e79294))
+- **route53:** read alias-target resource types from CDK's own constructors ([#452](https://github.com/laazyj/composureCDK/pull/452))
+- **s3:** accept every distribution CDK's own BucketDeploymentProps takes ([f7fa645](https://github.com/laazyj/composureCDK/commit/f7fa645))
+- **ses:** read the receipt rule action type from CDK's own prop ([f7f2317](https://github.com/laazyj/composureCDK/commit/f7f2317))
+- **ses:** read action and zone types from CDK's own props ([6d752ac](https://github.com/laazyj/composureCDK/commit/6d752ac))
+- **ses:** build the provider Runtime inside the function ([b484385](https://github.com/laazyj/composureCDK/commit/b484385))
+- **sns:** read TopicBuilderProps.masterKey type from CDK's own prop ([ddc8e0c](https://github.com/laazyj/composureCDK/commit/ddc8e0c))
+- **sqs:** read encryptionMasterKey type from CDK's own prop ([7feaf82](https://github.com/laazyj/composureCDK/commit/7feaf82))
+
+### 🔥 Performance
+
+- **nx:** exclude test files from dependents' build inputs ([#474](https://github.com/laazyj/composureCDK/pull/474), [#467](https://github.com/laazyj/composureCDK/issues/467))
+
+### ⚠️ Breaking Changes
+
+- **neptune:** migrate cluster access to consumer-side grants ([#420](https://github.com/laazyj/composureCDK/pull/420), [#372](https://github.com/laazyj/composureCDK/issues/372))
+  `allowAccessFrom(peer)` and the exported `ClusterAccessor`
+  type are removed. Declare the two halves separately — the network path on
+  the cluster, the IAM grant on the grantee:
+  ```ts
+  // Before
+  graph: createClusterBuilder().allowAccessFrom(
+    ref<InstanceBuilderResult>("bastion").get("instance"),
+  ),
+  // { graph: ["network", "bastion"] }
+  // After
+  graph: createClusterBuilder().allowDefaultPortFrom(
+    ref<SecurityGroupBuilderResult>("bastionSg").get("securityGroup"),
+  ),
+  bastionRole: createServiceRoleBuilder("ec2.amazonaws.com").grant(
+    clusterGrants.connect(ref<ClusterBuilderResult>("graph").get("cluster")),
+  ),
+  // { graph: ["network", "bastionSg"], bastionRole: ["graph"] }
+  ```
+  `allowDefaultPortFrom` takes a plain `IConnectable` — prefer the peer's
+  security group over the peer itself, since naming a compute component
+  makes the cluster depend on it. The IAM grant must go on a builder that
+  accepts grants, so where the old call granted a construct that owns a role
+  (an EC2 instance), give that construct an explicit role component and put
+  the grant there. Deployed permissions are unchanged — the same
+  `neptune-db:*` and the same ingress rule — only the logical IDs move. With
+  `.iamAuthentication(false)` the network rule is the whole grant: drop the
+  `clusterGrants.connect` call, which the alpha L2 rejects at synth rather
+  than emitting an inert policy.
+
+### 💀 Thank You
+
+- Claude
+- Jason Duffett
+
+## 0.9.5 (2026-08-21)
+
+### 🚀 Features
+
+- **cloudformation:** add templateTextPolicy, an opt-in guard for template text ([14df9b8](https://github.com/laazyj/composureCDK/commit/14df9b8))
+- **eslint-plugin:** ban realm-bound instanceof in dual-published source ([#404](https://github.com/laazyj/composureCDK/pull/404))
+
+### 🩹 Fixes
+
+- **cloudformation:** keep the policy tests inside the 2.1.0 CDK floor ([7bed666](https://github.com/laazyj/composureCDK/commit/7bed666))
+- **cloudfront:** read certificate and keyValueStore types from CDK's own props ([#411](https://github.com/laazyj/composureCDK/pull/411), [#402](https://github.com/laazyj/composureCDK/issues/402))
+- **events:** read RuleBuilderProps.eventBus type from CDK's own prop ([#410](https://github.com/laazyj/composureCDK/pull/410), [#401](https://github.com/laazyj/composureCDK/issues/401))
+
+### 💀 Thank You
+
+- Claude
+- Jason Duffett
+
+## 0.9.4 (2026-08-15)
+
+### 🚀 Features
+
+- **eslint-plugin:** add lifecycle-build-must-forward-context ([#398](https://github.com/laazyj/composureCDK/pull/398))
+- **examples:** encrypt the crud-api table with a composed customer-managed key ([#383](https://github.com/laazyj/composureCDK/pull/383))
+- **kms:** add @composurecdk/kms and widen key-consuming props to Resolvable ([#375](https://github.com/laazyj/composureCDK/pull/375), [#373](https://github.com/laazyj/composureCDK/issues/373))
+- **lambda:** widen environmentEncryption to Resolvable so a composed CMK can be referenced ([#387](https://github.com/laazyj/composureCDK/pull/387), [#379](https://github.com/laazyj/composureCDK/issues/379))
+- **neptune:** widen kmsKey to Resolvable so a composed CMK can be referenced ([#389](https://github.com/laazyj/composureCDK/pull/389), [#380](https://github.com/laazyj/composureCDK/issues/380))
+- **route53:** add consumer-side hostedZoneGrants.delegation ([#376](https://github.com/laazyj/composureCDK/pull/376), [#374](https://github.com/laazyj/composureCDK/issues/374))
+- **route53:** add a CrossAccountZoneDelegationRecord builder ([#381](https://github.com/laazyj/composureCDK/pull/381), [#378](https://github.com/laazyj/composureCDK/issues/378))
+
+### 🩹 Fixes
+
+- **apigateway:** forward the build context to the access-log sub-builder ([#396](https://github.com/laazyj/composureCDK/pull/396))
+- **cloudfront:** pass the build context to the access-log sub-builder ([#395](https://github.com/laazyj/composureCDK/pull/395))
+- **ec2:** pass the build context to the flow-log and endpoint sub-builders ([#393](https://github.com/laazyj/composureCDK/pull/393))
+- **iam:** brand StatementBuilder so the wildcard guard survives a realm crossing ([#392](https://github.com/laazyj/composureCDK/pull/392), [#385](https://github.com/laazyj/composureCDK/issues/385))
+- **route53:** pass the build context to the query-log sub-builder ([#390](https://github.com/laazyj/composureCDK/pull/390))
+- **route53:** dedup the shared query-logging policy by L1 type, not instanceof ([#391](https://github.com/laazyj/composureCDK/pull/391), [#381](https://github.com/laazyj/composureCDK/issues/381), [#384](https://github.com/laazyj/composureCDK/issues/384))
+- **s3:** pass the build context to the access-log sub-builder ([#394](https://github.com/laazyj/composureCDK/pull/394))
+- **scripts:** restore the workspace after a local cdk-floors enforce ([#367](https://github.com/laazyj/composureCDK/pull/367))
+
+### 💀 Thank You
+
+- Jason Duffett
+
+## 0.9.3 (2026-08-04)
+
+### 🚀 Features
+
+- **apigateway:** accept a resolvable apiDefinition on the spec REST API builder ([#356](https://github.com/laazyj/composureCDK/pull/356), [#355](https://github.com/laazyj/composureCDK/issues/355))
+- **apigateway:** add inlineSpecDefinition for placeholder-bearing specs ([#358](https://github.com/laazyj/composureCDK/pull/358), [#355](https://github.com/laazyj/composureCDK/issues/355))
+- **ci:** comment on issues a release addressed ([#346](https://github.com/laazyj/composureCDK/pull/346), [#123](https://github.com/laazyj/composureCDK/issues/123))
+
+### 🩹 Fixes
+
+- strip non-ASCII from descriptions emitted into templates ([#351](https://github.com/laazyj/composureCDK/pull/351), [#336](https://github.com/laazyj/composureCDK/issues/336))
+
+### 💀 Thank You
+
+- Jason Duffett
+
+## 0.9.2 (2026-07-27)
+
+### 🚀 Features
+
+- **lambda:** harden dynamo stream event source failure handling ([3436376](https://github.com/laazyj/composureCDK/commit/3436376))
+
+### 🩹 Fixes
+
+- **examples:** address PR feedback on dynamo stream example ([5f3bea6](https://github.com/laazyj/composureCDK/commit/5f3bea6))
+- **examples:** make the dynamo stream smoke check survive LATEST ([ec8477b](https://github.com/laazyj/composureCDK/commit/ec8477b))
+
+### 💀 Thank You
+
+- Claude
+- Claude Opus 4.8
+- Jason Duffett
+
+## 0.9.1 (2026-07-25)
+
+### 🚀 Features
+
+- **apigateway:** add restApiGrants.invoke consumer-side grant helper ([#327](https://github.com/laazyj/composureCDK/pull/327), [#326](https://github.com/laazyj/composureCDK/issues/326))
+- **custom-resources:** add AwsCustomResource builder ([#294](https://github.com/laazyj/composureCDK/pull/294), [#280](https://github.com/laazyj/composureCDK/issues/280))
+- **eslint:** forbid aws-cdk-lib and sibling imports in core ([#297](https://github.com/laazyj/composureCDK/pull/297))
+- **eslint:** enforce package boundaries via nx project graph ([00f4d8b](https://github.com/laazyj/composureCDK/commit/00f4d8b))
+- **examples:** add Dynamo backed CRUD API example with combine + consumer-side grants ([#302](https://github.com/laazyj/composureCDK/pull/302))
+- **ses:** receiving-side builders (new @composurecdk/ses) ([#301](https://github.com/laazyj/composureCDK/pull/301), [#279](https://github.com/laazyj/composureCDK/issues/279))
+
+### 🩹 Fixes
+
+- **acm:** keep custom alarms when recommended alarms are disabled ([#319](https://github.com/laazyj/composureCDK/pull/319))
+- **apigateway:** keep custom alarms when recommended alarms are disabled ([#320](https://github.com/laazyj/composureCDK/pull/320))
+- **dynamodb:** keep custom alarms when recommended alarms are disabled ([#316](https://github.com/laazyj/composureCDK/pull/316))
+- **ec2:** keep custom alarms when recommended alarms are disabled ([#322](https://github.com/laazyj/composureCDK/pull/322))
+- **events:** keep custom alarms when recommended alarms are disabled ([#318](https://github.com/laazyj/composureCDK/pull/318))
+- **lambda:** keep custom alarms when recommended alarms are disabled ([#317](https://github.com/laazyj/composureCDK/pull/317))
+- **neptune:** keep custom alarms when recommended alarms are disabled ([#321](https://github.com/laazyj/composureCDK/pull/321))
+- **s3:** keep custom alarms when recommended alarms are disabled ([#315](https://github.com/laazyj/composureCDK/pull/315))
+- **sns:** keep custom alarms when recommended alarms are disabled ([#313](https://github.com/laazyj/composureCDK/pull/313))
+- **sqs:** keep custom alarms when recommended alarms are disabled ([#314](https://github.com/laazyj/composureCDK/pull/314))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.9.0 (2026-07-09)
 
 ### 🚀 Features

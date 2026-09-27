@@ -1,27 +1,29 @@
-import { type IFunction } from "aws-cdk-lib/aws-lambda";
 import { type IReceiptRuleAction } from "aws-cdk-lib/aws-ses";
-import { Lambda, type LambdaInvocationType } from "aws-cdk-lib/aws-ses-actions";
-import { type ITopic } from "aws-cdk-lib/aws-sns";
+import { Lambda, type LambdaProps } from "aws-cdk-lib/aws-ses-actions";
 import { combine, type Ref, type Resolvable } from "@composurecdk/core";
 
-/** Options for {@link lambdaAction}. */
-export interface LambdaActionOptions {
-  /**
-   * Whether SES invokes the function asynchronously (`Event`) or waits for the
-   * response (`RequestResponse`). Defaults to CDK's default, `Event`.
-   */
-  readonly invocationType?: LambdaInvocationType;
+/**
+ * Options for {@link lambdaAction} — every CDK {@link LambdaProps} field
+ * except `function`, which is the helper's positional argument.
+ *
+ * `topic` reads its inner type from CDK's own prop rather than naming
+ * `ITopic`, so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
+ */
+export interface LambdaActionOptions extends Omit<LambdaProps, "function" | "topic"> {
   /** SNS topic notified when the function is invoked. */
-  readonly topic?: Resolvable<ITopic>;
+  readonly topic?: Resolvable<NonNullable<LambdaProps["topic"]>>;
 }
 
 /**
  * Invokes a Lambda function for the received mail. The function and the
  * notification topic each accept a {@link Resolvable}, so they can wire to
  * sibling components via `ref()`.
+ *
+ * `fn` reads its inner type from CDK's own prop rather than naming
+ * `IFunction`, so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
  */
 export function lambdaAction(
-  fn: Resolvable<IFunction>,
+  fn: Resolvable<LambdaProps["function"]>,
   options: LambdaActionOptions = {},
 ): Ref<IReceiptRuleAction> {
   const { invocationType, topic } = options;

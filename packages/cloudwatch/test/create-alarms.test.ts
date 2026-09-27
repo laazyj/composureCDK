@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { App, Duration, NestedStack, Stack } from "aws-cdk-lib";
 import {
   ComparisonOperator,
   MathExpression,
@@ -34,6 +34,16 @@ describe("createAlarms", () => {
 
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
     expect(Object.keys(result)).toEqual(["errors", "throttles"]);
+  });
+
+  it("gives alarms in a nested stack a literal default name", () => {
+    const nested = new NestedStack(new Stack(new App(), "TestStack"), "Nested");
+
+    createAlarms(nested, "Fn", [makeDefinition({ key: "errors" })]);
+
+    Template.fromStack(nested).hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmName: "test-stack/nested/fn/errors",
+    });
   });
 
   it("returns record with correct keys", () => {

@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { type Lifecycle } from "@composurecdk/core";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { AttributeType } from "aws-cdk-lib/aws-dynamodb";
+import { AttributeType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { createTableBuilder, type ITableBuilder } from "../src/table-builder.js";
 import { createTableV2Builder, type ITableV2Builder } from "../src/table-v2-builder.js";
+import { resolveTableAlarmDefinitions } from "../src/table-alarms.js";
 
 const PK = { name: "pk", type: AttributeType.STRING };
 
@@ -26,7 +27,11 @@ describe.each(builders)("$name table alarms", ({ create }) => {
   } {
     const app = new App();
     const stack = new Stack(app, "TestStack");
-    const builder = create().partitionKey(PK);
+    // `partitionKey` is optional on TableProps but required on TablePropsV2, so
+    // the two setters differ and TS 7 mis-pairs them across the union. Setters
+    // mutate in place, so annotate up front and discard the return value.
+    const builder: AnyTableBuilder = create();
+    builder.partitionKey(PK);
     configureFn?.(builder);
     // `builder` is a union of the two builder types, so `.build()` is a union of
     // two call signatures. typescript-eslint's project service can intermittently
@@ -139,5 +144,50 @@ describe.each(builders)("$name table alarms", ({ create }) => {
         ComparisonOperator: "GreaterThanThreshold",
       });
     });
+
+    // Regression: disabling the recommended alarms must not drop custom alarms
+    // added via addAlarm() — see issue #305.
+    it("keeps a custom alarm when recommendedAlarms is false", () => {
+      const { result, template } = build((b) => {
+        b.recommendedAlarms(false);
+        b.addAlarm("userErrors", (a) =>
+          a
+            .metric((table) => table.metricUserErrors({ period: Duration.minutes(5) }))
+            .threshold(5)
+            .greaterThan()
+            .description("Table is returning client-side (HTTP 400) errors."),
+        );
+      });
+
+      expect(result.alarms.userErrors).toBeDefined();
+      expect(Object.keys(result.alarms)).toEqual(["userErrors"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+
+    it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+      const { result, template } = build((b) => {
+        b.recommendedAlarms({ enabled: false });
+        b.addAlarm("userErrors", (a) =>
+          a
+            .metric((table) => table.metricUserErrors({ period: Duration.minutes(5) }))
+            .threshold(5)
+            .greaterThan()
+            .description("Table is returning client-side (HTTP 400) errors."),
+        );
+      });
+
+      expect(result.alarms.userErrors).toBeDefined();
+      expect(Object.keys(result.alarms)).toEqual(["userErrors"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+  });
+});
+
+describe("resolveTableAlarmDefinitions", () => {
+  it("returns no definitions when explicitly disabled", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const table = new Table(stack, "Table", { partitionKey: PK });
+
+    expect(resolveTableAlarmDefinitions(table, { enabled: false })).toEqual([]);
   });
 });

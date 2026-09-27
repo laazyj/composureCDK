@@ -27,6 +27,20 @@ Every [TopicProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s
 
 These defaults are guided by the [AWS SNS Security Best Practices](https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html#enforce-encryption-data-in-transit).
 
+### Encryption at rest
+
+SNS has no service-managed encryption option — a topic is unencrypted at rest until a KMS key is supplied. `.masterKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+
+```ts
+compose(
+  {
+    topicKey: createKeyBuilder().description("Encrypts the alerts topic at rest."),
+    alerts: createTopicBuilder().masterKey(ref<KeyBuilderResult>("topicKey").get("key")),
+  },
+  { topicKey: [], alerts: ["topicKey"] },
+);
+```
+
 The defaults are exported as `TOPIC_DEFAULTS` for visibility and testing:
 
 ```ts
@@ -38,6 +52,24 @@ import { TOPIC_DEFAULTS } from "@composurecdk/sns";
 ```ts
 const topic = createTopicBuilder().topicName("my-topic").enforceSSL(false).build(stack, "MyTopic");
 ```
+
+## Topic Access Policy
+
+A topic has one access policy. CDK creates it as an `AWS::SNS::TopicPolicy` the first time a statement is added — by the `enforceSSL` default, by `allowServicePublish`, or by `topic.addToResourcePolicy(...)` — and every later statement joins that same policy. The build result returns it as `result.policy`, which CDK keeps private on `Topic`; it is `undefined` when the topic had no statements at build time.
+
+Use `allowServicePublish` to let an AWS service publish to the topic. The statement joins the topic's own policy, next to the `enforceSSL` statement:
+
+```ts
+createTopicBuilder()
+  .allowServicePublish("codestar-notifications.amazonaws.com", {
+    conditions: { StringEquals: { "aws:SourceAccount": Aws.ACCOUNT_ID } },
+  })
+  .build(stack, "Alerts");
+```
+
+`conditions` is optional; use one where the service supports it, to guard against the [confused deputy problem](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html). Integrations that wire themselves — EventBridge targets, S3 notifications, and [`@composurecdk/budgets`](../budgets/README.md) SNS subscribers — already add their statement to the topic's policy, so they need no `allowServicePublish`.
+
+Do not create another `TopicPolicy` for a topic built here: each policy resource replaces the topic's policy outright, so one of them is lost. [`topicPolicyConflictPolicy`](#topic-policy-conflict-policy) catches this at synth.
 
 ## Recommended Alarms
 
@@ -215,9 +247,33 @@ const system = compose(
 
 ### Subscription reliability
 
-Attaching a dead-letter queue is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)). Pass a queue to the `ITopicSubscription` constructor (e.g. `new EmailSubscription("ops@example.com", { deadLetterQueue: dlq })`); the builder does not create a DLQ automatically because the queue resource needs to be caller-owned.
+Attaching a dead-letter queue is the primary reliability control for SNS subscriptions ([AWS Well-Architected — Reliability Pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html), [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html)). Pass a queue to the `ITopicSubscription` constructor (e.g. `new EmailSubscription("ops@example.com", { deadLetterQueue: dlq })`).
 
-The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached.
+**Neither builder creates a DLQ for you.** A dead-letter queue is a separate, billable queue that needs an owner — a DLQ nobody drains is just a slower way to lose messages — so it is declared as a sibling and referenced, which also gets it ComposureCDK's dead-letter defaults (14-day retention) and depth alarm:
+
+```ts
+const system = compose(
+  {
+    orders: createQueueBuilder(),
+    ordersDlq: createQueueBuilder("dlq"),
+
+    orderEvents: createTopicBuilder().addSubscription(
+      "orders",
+      combine(
+        { orders: ref<QueueBuilderResult>("orders"), dlq: ref<QueueBuilderResult>("ordersDlq") },
+        ({ orders, dlq }) => new SqsSubscription(orders.queue, { deadLetterQueue: dlq.queue }),
+      ),
+    ),
+  },
+  { orders: [], ordersDlq: [], orderEvents: ["orders", "ordersDlq"] },
+);
+```
+
+CDK's `Subscription` construct adds the queue policy that lets `sns.amazonaws.com` write to the DLQ (scoped to the topic ARN), so no extra grant is needed.
+
+The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached. Pair them with the DLQ's own depth alarm — that pair is what turns an undelivered notification into a page.
+
+[`ComposureCDK-OrderProcessorStack`](../examples/src/order-processor-app.ts) deploys this shape end to end and its [smoke test](../examples/test/smoke/order-processor.smoke.mjs) proves the delivery path against live AWS.
 
 ## Subscription Defaults
 
@@ -252,7 +308,24 @@ createSubscriptionBuilder()
   .build(stack, "OrdersToQueue");
 ```
 
+## Topic Policy Conflict Policy
+
+An SNS topic has exactly one access policy. Every `AWS::SNS::TopicPolicy` and `AWS::SNS::TopicInlinePolicy` replaces it outright, so when two target the same topic, whichever CloudFormation applies last wins and the other's statements disappear. CloudFormation gives no error or warning, and the order can change between deployments.
+
+`topicPolicyConflictPolicy` catches this at synth. It installs a CDK Aspect over a scope and fails synth when a second policy resource targets a topic that already has one:
+
+```ts
+import { topicPolicyConflictPolicy } from "@composurecdk/sns";
+
+topicPolicyConflictPolicy(app); // or { onViolation: "warn" } to annotate instead
+```
+
+The usual cause is a `new TopicPolicy(...)` for a topic built in CDK, alongside the policy CDK creates for the topic itself (for example, for the `enforceSSL` default). Add to the topic's own policy with `topic.addToResourcePolicy(...)` instead.
+
+Two policy resources that share one `PolicyDocument` object always render the same document, so they are not reported. The check matches topics by the resolved `Topics`/`TopicArn` value: a literal ARN matches across stacks, and a `Ref` matches within its stack.
+
 ## Examples
 
+- [OrderProcessorStack](../examples/src/order-processor-app.ts) — SNS → SQS fan-out with a dead-letter queue on the subscription
 - [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with TopicBuilder for alarm actions
 - [StaticWebsiteStack](../examples/src/static-website/app.ts) — Static website with TopicBuilder for alarm actions

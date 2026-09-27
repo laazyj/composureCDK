@@ -1,15 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { newStack } from "@composurecdk/cdk-testing";
 import { createRuleBuilder } from "../src/rule-builder.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
 
 function makeFn(stack: Stack): LambdaFn {
   return new LambdaFn(stack, "Handler", {
@@ -177,5 +174,50 @@ describe("RuleBuilder recommended alarms", () => {
       MetricName: "RetryInvocationAttempts",
       Threshold: 10,
     });
+  });
+
+  // Regression: disabling the recommended alarms must not drop custom alarms
+  // added via addAlarm() — see issue #305.
+  function buildWithCustomAlarm(disable: false | { enabled: false }) {
+    const stack = newStack();
+    const fn = makeFn(stack);
+
+    const result = createRuleBuilder()
+      .schedule(Schedule.rate(Duration.minutes(15)))
+      .addTarget("h", new LambdaFunction(fn))
+      .recommendedAlarms(disable)
+      .addAlarm("retryAttempts", (alarm) =>
+        alarm
+          .metric(
+            (rule) =>
+              new Metric({
+                namespace: "AWS/Events",
+                metricName: "RetryInvocationAttempts",
+                dimensionsMap: { RuleName: rule.ruleName },
+                statistic: "Sum",
+                period: Duration.minutes(1),
+              }),
+          )
+          .threshold(10)
+          .greaterThan()
+          .description("Targets are being undersized; retries are climbing."),
+      )
+      .build(stack, "TestRule");
+
+    return { result, template: Template.fromStack(stack) };
+  }
+
+  it("keeps a custom alarm when recommendedAlarms is false", () => {
+    const { result, template } = buildWithCustomAlarm(false);
+
+    expect(Object.keys(result.alarms)).toEqual(["retryAttempts"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+
+  it("keeps a custom alarm when recommendedAlarms is disabled via enabled:false", () => {
+    const { result, template } = buildWithCustomAlarm({ enabled: false });
+
+    expect(Object.keys(result.alarms)).toEqual(["retryAttempts"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
   });
 });

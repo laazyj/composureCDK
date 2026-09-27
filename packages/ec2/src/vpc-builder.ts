@@ -28,6 +28,10 @@ export type FlowLogsConfig =
        * Customize the auto-created LogGroup sub-builder. Receives a builder
        * pre-seeded with the well-architected log retention/removal defaults
        * from {@link createLogGroupBuilder}.
+       *
+       * The callback receives the build context, so anything
+       * `ILogGroupBuilder` accepts as a `Resolvable` can be a `ref` to a
+       * sibling component. Declare that component as a dependency.
        */
       configure?: (b: ILogGroupBuilder) => ILogGroupBuilder;
     };
@@ -92,10 +96,10 @@ const DEFAULT_FLOW_LOG_KEY = "DefaultFlowLog";
 class VpcBuilder implements Lifecycle<VpcBuilderResult> {
   props: Partial<VpcBuilderProps> = {};
 
-  build(scope: IConstruct, id: string): VpcBuilderResult {
+  build(scope: IConstruct, id: string, context?: Record<string, object>): VpcBuilderResult {
     const { flowLogs: flowLogsConfig, ...vpcProps } = this.props;
 
-    const { flowLogsLogGroup, flowLogProps } = resolveFlowLogs(scope, id, flowLogsConfig);
+    const { flowLogsLogGroup, flowLogProps } = resolveFlowLogs(scope, id, flowLogsConfig, context);
 
     // CDK accepts `availabilityZones` or `maxAzs`, but not both. When the user
     // pins AZs explicitly, the default `maxAzs` must yield to their intent;
@@ -128,6 +132,7 @@ function resolveFlowLogs(
   scope: IConstruct,
   id: string,
   cfg: FlowLogsConfig | undefined,
+  context?: Record<string, object>,
 ): { flowLogsLogGroup?: LogGroup; flowLogProps: Pick<VpcProps, "flowLogs"> } {
   if (cfg === false) {
     return { flowLogProps: {} };
@@ -151,7 +156,11 @@ function resolveFlowLogs(
   if (cfg?.configure) {
     subBuilder = cfg.configure(subBuilder);
   }
-  const flowLogsLogGroup = subBuilder.build(scope, `${id}FlowLogsLogGroup`).logGroup;
+  // Pass the build context down: `ILogGroupBuilder` widens `encryptionKey` to a
+  // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
+  // KMS key. Without the context that ref resolves against an empty record and
+  // throws "component not found".
+  const flowLogsLogGroup = subBuilder.build(scope, `${id}FlowLogsLogGroup`, context).logGroup;
 
   return {
     flowLogsLogGroup,

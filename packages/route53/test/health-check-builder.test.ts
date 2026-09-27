@@ -1,28 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
-import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
+import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
+import { buildFixture, newStack, testEnv } from "@composurecdk/cdk-testing";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createHealthCheckBuilder } from "../src/health-check-builder.js";
 
-const ENV_US_EAST_1 = { account: "123456789012", region: "us-east-1" };
-
-function buildInUsEast1(
-  configureFn?: (builder: ReturnType<typeof createHealthCheckBuilder>) => void,
-) {
-  const app = new App();
-  const stack = new Stack(app, "TestStack", { env: ENV_US_EAST_1 });
-  const builder = createHealthCheckBuilder().type(HealthCheckType.HTTPS).fqdn("api.example.com");
-  configureFn?.(builder);
-  const result = builder.build(stack, "ApiHealthCheck");
-  return { app, stack, result, template: Template.fromStack(stack) };
-}
+const buildAndSynth = buildFixture(
+  () => createHealthCheckBuilder().type(HealthCheckType.HTTPS).fqdn("api.example.com"),
+  "ApiHealthCheck",
+  { stackProps: { env: testEnv("us-east-1") } },
+);
 
 describe("createHealthCheckBuilder", () => {
   describe("defaults", () => {
     it("creates a Route 53 health check with merged AWS-recommended defaults", () => {
-      const { result, template } = buildInUsEast1();
+      const { result, template } = buildAndSynth();
 
       expect(result.healthCheck).toBeDefined();
       template.hasResourceProperties("AWS::Route53::HealthCheck", {
@@ -37,14 +31,13 @@ describe("createHealthCheckBuilder", () => {
     });
 
     it("requires a type", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack", { env: ENV_US_EAST_1 });
+      const stack = newStack({ env: testEnv("us-east-1") });
       const builder = createHealthCheckBuilder().fqdn("api.example.com");
       expect(() => builder.build(stack, "ApiHealthCheck")).toThrow(/requires a type/);
     });
 
     it("user overrides take precedence over defaults", () => {
-      const { template } = buildInUsEast1((b) => {
+      const { template } = buildAndSynth((b) => {
         b.failureThreshold(5).measureLatency(false);
       });
 
@@ -58,22 +51,12 @@ describe("createHealthCheckBuilder", () => {
   });
 
   describe("region warning", () => {
-    function buildInRegion(
+    // `stackProps: {}` replaces the fixture's default env rather than merging,
+    // which is how an environment-agnostic stack is spelled.
+    const buildInRegion = (
       region: string | undefined,
       configureFn?: (builder: ReturnType<typeof createHealthCheckBuilder>) => void,
-    ) {
-      const app = new App();
-      const stack =
-        region === undefined
-          ? new Stack(app, "TestStack")
-          : new Stack(app, "TestStack", { env: { account: "123456789012", region } });
-      const builder = createHealthCheckBuilder()
-        .type(HealthCheckType.HTTPS)
-        .fqdn("api.example.com");
-      configureFn?.(builder);
-      builder.build(stack, "ApiHealthCheck");
-      return stack;
-    }
+    ) => buildAndSynth(configureFn, { stackProps: region ? { env: testEnv(region) } : {} }).stack;
 
     it("emits a warning when the stack is outside us-east-1", () => {
       const stack = buildInRegion("eu-west-1");
@@ -136,7 +119,8 @@ describe("createHealthCheckBuilder", () => {
             a.metric(connectionTimeMetric).threshold(3000).greaterThan(),
           );
         },
-        build: (b) => b.build(new Stack(new App(), "S", { env: ENV_US_EAST_1 }), "HealthCheck"),
+        build: (b) =>
+          b.build(new Stack(new App(), "S", { env: testEnv("us-east-1") }), "HealthCheck"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });

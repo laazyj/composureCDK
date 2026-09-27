@@ -118,6 +118,59 @@ Concretely, for the first instance (`FunctionBuilder` + SQS event source):
   "> 2 consumers" bar ADR-0002 set for its own promotion, this ADR stands alone
   until a second cross-component instance exercises the pattern.
 
+## Amendment (2026-09-05): deferred pair discovery
+
+The second instance — CloudFront's origin object-expiration guard
+(laazyj/composureCDK#440, `@composurecdk/cloudfront`) — exercises the pattern and
+extends it in one respect, so this ADR is amended rather than superseded.
+
+**A guard may discover its pair at synth as well as read its value there, by
+correlating the two L1s through the template's own references.**
+
+The SQS case above could close over a known `(function, queue)` pair at `build()`
+because `SqsEventSource.queue` is a public getter; only the _value_ was withheld.
+For a CloudFront origin, the sibling itself is out of reach:
+`S3BucketOrigin.withOriginAccessControl()` is declared as returning a bare
+`IOrigin`, and only the unexported `S3BucketOriginWithOAC` subclass holds the
+bucket. Recovering it at `build()` would mean casting into a CDK internal —
+barred by §2 here and by `composurecdk/no-realm-bound-instanceof` under
+[ADR-0007](0007-dual-esm-cjs-publishing.md). The bucket builder is no help
+either: it runs first and is never told it became an origin.
+
+At synth the linkage is nonetheless present, because CloudFormation has to
+express it. Resolving the distribution's L1 yields
+`origins[].domainName === { "Fn::GetAtt": [<bucketLogicalId>, …] }`, which is
+matched against `Stack.getLogicalId()` of each `CfnBucket` in the stack. Two
+consequences of that mechanism are worth stating:
+
+- **It is wiring-agnostic.** The correlation is on the rendered reference, not on
+  the origin class, so a bucket reached through a custom `HttpOrigin` is guarded
+  identically. This is a gain over closing over a typed pair.
+- **It confines itself to one stack, for free.** A cross-stack origin renders as
+  an import rather than a `GetAtt`, so no pair is found and the guard stays
+  silent — §6 satisfied without a special case.
+
+Everything else in the Decision is unchanged: registered inside `build()` so
+using the builder is the opt-in; scalar L1 reads only, adding no CloudFormation
+edge; warns suppressibly under a stable exported id; silent whenever the
+relationship is not knowable.
+
+Two boundaries this instance clarifies:
+
+- **A guard predicate should be narrow enough that a hit is unambiguous.** This
+  one ignores any expiry scoped by prefix, tag, or object size, because it cannot
+  tell whether the scoped subset is served. A guard that warns on arguable
+  configurations gets acknowledged wholesale, and is then absent for the case it
+  existed to catch.
+- **Aspects cannot see L1 property overrides.** `addPropertyOverride` is merged
+  during `toCloudFormation()`, after `invokeAspects`, so a value introduced that
+  way is invisible to any guard. Guarding the escape hatch would need a
+  rendered-template check (`@composurecdk/cloudformation`'s
+  `templateTextPolicy`); it is deliberately out of scope.
+
+With two instances, the "> 2 consumers" bar for promoting the pattern into
+`architecture.md` is approached but not met; it stays here until a third.
+
 ## Alternatives considered
 
 - **Surface the value on the producer's result (`resolvedProps`, #122/#198).**

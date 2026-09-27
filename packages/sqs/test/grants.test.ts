@@ -1,27 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+
 import { Template } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Queue } from "aws-cdk-lib/aws-sqs";
+import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { queueGrants } from "../src/grants.js";
 
 function setup() {
-  const app = new App();
-  const stack = new Stack(app, "S");
+  const stack = newStack();
   const queue = new Queue(stack, "Queue");
   const role = new Role(stack, "Role", { assumedBy: new ServicePrincipal("lambda.amazonaws.com") });
   return { stack, queue, role };
 }
 
-const policyJson = (stack: Stack) => JSON.stringify(Template.fromStack(stack).toJSON());
+const CAPABILITIES = [
+  ["consume", ["sqs:ReceiveMessage", "sqs:DeleteMessage"]],
+  ["send", ["sqs:SendMessage"]],
+  ["purge", ["sqs:PurgeQueue"]],
+] as const;
 
 describe("queueGrants", () => {
-  it.each([
-    ["consume", ["sqs:ReceiveMessage", "sqs:DeleteMessage"]],
-    ["send", ["sqs:SendMessage"]],
-    ["purge", ["sqs:PurgeQueue"]],
-  ] as const)("%s delegates to the matching native grant method", (capability, actions) => {
+  it("covers every capability queueGrants exposes", () => {
+    assertCapabilitiesCovered(queueGrants, CAPABILITIES);
+  });
+
+  it.each(CAPABILITIES)("%s delegates to the native grant method", (capability, actions) => {
     const { stack, queue, role } = setup();
 
     queueGrants[capability](queue).applyTo(role, {});

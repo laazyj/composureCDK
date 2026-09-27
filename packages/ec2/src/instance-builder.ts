@@ -1,15 +1,15 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import {
-  type CfnVolumeAttachment,
-  Instance,
-  type IKeyPair,
-  type ISecurityGroup,
-  type IVpc,
-  type InstanceProps,
-} from "aws-cdk-lib/aws-ec2";
-import { type IRole } from "aws-cdk-lib/aws-iam";
+import { type CfnVolumeAttachment, Instance, type InstanceProps } from "aws-cdk-lib/aws-ec2";
+import { type IGrantable } from "aws-cdk-lib/aws-iam";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import {
+  COPY_STATE,
+  type Grant,
+  GrantQueue,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { InstanceAlarmConfig } from "./instance-alarm-config.js";
@@ -38,6 +38,10 @@ import {
  * etc.) are passed through with their CDK types unchanged because they are
  * almost always constructed inline rather than referenced from another
  * component.
+ *
+ * Each re-declared prop reads its inner type from CDK's own prop rather than
+ * naming an interface, so it keeps tracking the installed `aws-cdk-lib` as CDK
+ * moves its prop types (ADR-0018).
  */
 export interface InstanceBuilderProps extends Omit<
   InstanceProps,
@@ -46,43 +50,44 @@ export interface InstanceBuilderProps extends Omit<
   /**
    * IAM role assumed by the instance via its instance profile.
    *
-   * Accepts a concrete {@link IRole} or a {@link Ref} that resolves to one
-   * at build time, e.g. a sibling `RoleBuilder` in the same composed system.
+   * Accepts a concrete role or a {@link Ref} that resolves to one at build
+   * time, e.g. a sibling `RoleBuilder` in the same composed system.
    *
    * @default - CDK creates a role and attaches `AmazonSSMManagedInstanceCore`,
    *   driven by the `ssmSessionPermissions: true` default in
    *   {@link INSTANCE_DEFAULTS}.
    */
-  role?: Resolvable<IRole>;
+  role?: Resolvable<NonNullable<InstanceProps["role"]>>;
 
   /**
    * Key pair to associate with the instance.
    *
-   * Accepts a concrete {@link IKeyPair} or a {@link Ref} that resolves to
-   * one at build time.
+   * Accepts a concrete key pair or a {@link Ref} that resolves to one at
+   * build time.
    *
    * @default - no key pair is associated; SSM Session Manager is the
    *   recommended access path.
    */
-  keyPair?: Resolvable<IKeyPair>;
+  keyPair?: Resolvable<NonNullable<InstanceProps["keyPair"]>>;
 
   /**
    * Primary security group for the instance.
    *
-   * Accepts a concrete {@link ISecurityGroup} or a {@link Ref} that resolves
-   * to one at build time. Additional security groups can be attached via
+   * Accepts a concrete security group or a {@link Ref} that resolves to one
+   * at build time. Additional security groups can be attached via
    * `instance.addSecurityGroup()` after build.
    *
    * @default - CDK creates a security group allowing all outbound traffic.
    */
-  securityGroup?: Resolvable<ISecurityGroup>;
+  securityGroup?: Resolvable<NonNullable<InstanceProps["securityGroup"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
    * By default, the builder creates recommended alarms with sensible
    * thresholds for every applicable metric. Individual alarms can be
-   * customized or disabled. Set to `false` to disable all alarms.
+   * customized or disabled. Set to `false` to disable the recommended
+   * alarms; custom alarms added via `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification methods
    * are user-specific. Access alarms from the build result or use an
@@ -151,6 +156,10 @@ export interface InstanceBuilderResult {
  * customized or disabled via the `recommendedAlarms` property. Custom
  * alarms can be added via the {@link addAlarm} method.
  *
+ * The instance is a grantee: {@link IInstanceBuilder.grant | .grant()} takes
+ * the capability helpers resource packages expose, and the permissions land on
+ * whichever role the instance runs as (ADR-0013).
+ *
  * @see https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ec2-readme.html
  *
  * @example
@@ -167,20 +176,55 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
   props: Partial<InstanceBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Instance>[] = [];
   readonly #volumeAttachments: PendingVolumeAttachment[] = [];
-  #vpc?: Resolvable<IVpc>;
+  readonly #grants = new GrantQueue<IGrantable>();
+  #vpc?: Resolvable<NonNullable<InstanceProps["vpc"]>>;
 
   /**
    * Sets the VPC the instance will be launched into.
    *
-   * Accepts a concrete {@link IVpc} or a {@link Ref} that resolves to one
-   * at build time. This is how cross-component wiring works — e.g., to a
-   * sibling {@link IVpcBuilder} in the same composed system.
+   * Accepts a concrete VPC or a {@link Ref} that resolves to one at build
+   * time. This is how cross-component wiring works — e.g., to a sibling
+   * {@link IVpcBuilder} in the same composed system.
    *
    * @param vpc - The VPC or a Ref to one.
    * @returns This builder for chaining.
    */
-  vpc(vpc: Resolvable<IVpc>): this {
+  vpc(vpc: Resolvable<NonNullable<InstanceProps["vpc"]>>): this {
     this.#vpc = vpc;
+    return this;
+  }
+
+  /**
+   * Grant this instance's role access to a resource built by a sibling
+   * component.
+   *
+   * An EC2 {@link Instance} is an `IGrantable` — it exposes its role as
+   * `grantPrincipal` — so the grant routes onto whichever role the instance
+   * ends up with: an external {@link InstanceBuilderProps.role | role}, the
+   * role of a supplied `instanceProfile`, or the role CDK creates when neither
+   * is given. Declaring it here keeps the dependency edge pointing from the
+   * instance to the resource, rather than making the resource depend on its
+   * own consumer. Each {@link Grant} comes from a resource package's
+   * capability helper and is applied during {@link build}.
+   *
+   * The instance therefore needs no separate role component just to hold a
+   * grant; where one already exists for other reasons, granting on either the
+   * instance or that role has the same effect.
+   *
+   * @see ADR-0013
+   *
+   * @example
+   * ```ts
+   * createInstanceBuilder()
+   *   .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+   *   .grant(clusterGrants.connect(ref<ClusterBuilderResult>("graph").get("cluster")));
+   * ```
+   *
+   * @param grants - The grants to apply once the instance exists.
+   * @returns This builder for chaining.
+   */
+  grant(...grants: Grant<IGrantable>[]): this {
+    this.#grants.add(...grants);
     return this;
   }
 
@@ -238,9 +282,14 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
     target.#vpc = this.#vpc;
     target.#customAlarms.push(...this.#customAlarms);
     target.#volumeAttachments.push(...this.#volumeAttachments);
+    this.#grants.copyInto(target.#grants);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): InstanceBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context: Record<string, object> = {},
+  ): InstanceBuilderResult {
     const resolvedVpc = this.#vpc ? resolve(this.#vpc, context) : undefined;
 
     if (!resolvedVpc) {
@@ -267,6 +316,7 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
     } as InstanceProps;
 
     const instance = new Instance(scope, id, mergedProps);
+    this.#grants.applyTo(instance, context);
 
     const instanceAlarms = createInstanceAlarms(
       scope,
@@ -300,8 +350,9 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
  * This is the entry point for defining an EC2 instance component. The
  * returned builder exposes every {@link InstanceBuilderProps} property as a
  * fluent setter/getter, plus {@link IInstanceBuilder.vpc | .vpc()} for
- * cross-component VPC wiring with Ref support. It implements
- * {@link Lifecycle} for use with {@link compose}.
+ * cross-component VPC wiring with Ref support and
+ * {@link IInstanceBuilder.grant | .grant()} for consumer-side IAM grants. It
+ * implements {@link Lifecycle} for use with {@link compose}.
  *
  * @returns A fluent builder for an AWS EC2 instance.
  *

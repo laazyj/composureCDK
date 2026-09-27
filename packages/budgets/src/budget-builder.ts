@@ -82,6 +82,15 @@ export interface BudgetBuilderProps {
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html
    */
   recommendedAlarms?: BudgetAlarmConfig | false;
+  /**
+   * Whether to grant `budgets.amazonaws.com` `SNS:Publish` on the SNS
+   * topics this budget notifies. Set to `false` when you manage those
+   * topics' access policies yourself; Budgets cannot deliver to a topic
+   * whose policy does not allow it.
+   *
+   * @default true
+   */
+  topicPolicy?: boolean;
 }
 
 /**
@@ -91,12 +100,14 @@ export interface BudgetBuilderResult {
   /** The `AWS::Budgets::Budget` construct. */
   budget: CfnBudget;
   /**
-   * `AWS::SNS::TopicPolicy` constructs created automatically for any SNS
-   * topic referenced as a notification subscriber, keyed by the topic's
-   * fully-qualified node path. Grants `budgets.amazonaws.com` permission
-   * to publish.
+   * `AWS::SNS::TopicPolicy` constructs the builder created for SNS topics
+   * referenced as notification subscribers, keyed by the topic's
+   * fully-qualified node path. The `budgets.amazonaws.com` publish
+   * statement itself is added to each topic's own policy; see
+   * {@link createBudgetsTopicPolicies} for what is created and why.
    *
-   * `{}` when no SNS subscribers were configured.
+   * `{}` when no SNS subscribers were configured, or `topicPolicy` is
+   * `false`.
    */
   topicPolicies: Record<string, TopicPolicy>;
   /**
@@ -119,7 +130,7 @@ export interface BudgetBuilderResult {
  * Wraps the {@link CfnBudget} L1 construct (the CDK does not ship an L2
  * for Budgets) with well-architected defaults, helpers for the
  * percentage-threshold notification shape, and automatic
- * `AWS::SNS::TopicPolicy` wiring for SNS subscribers.
+ * `budgets.amazonaws.com` publish permission on SNS subscriber topics.
  *
  * The builder can also create the AWS-recommended `EstimatedCharges`
  * billing alarm; opt in via `recommendedAlarms`. For non-`us-east-1`
@@ -237,7 +248,11 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
   }
 
   build(scope: IConstruct, id: string, context: Record<string, object> = {}): BudgetBuilderResult {
-    const { recommendedAlarms: alarmConfig, ...budgetProps } = this.props;
+    const {
+      recommendedAlarms: alarmConfig,
+      topicPolicy = BUDGET_DEFAULTS.topicPolicy,
+      ...budgetProps
+    } = this.props;
 
     const budgetType = budgetProps.budgetType ?? BUDGET_DEFAULTS.budgetType;
     const timeUnit = budgetProps.timeUnit ?? BUDGET_DEFAULTS.timeUnit;
@@ -280,7 +295,7 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
 
     const budget = new CfnBudget(scope, id, cfnProps);
 
-    const topicPolicies = createBudgetsTopicPolicies(scope, id, snsTopics);
+    const topicPolicies = topicPolicy ? createBudgetsTopicPolicies(scope, id, snsTopics) : {};
     const alarms = buildBudgetAlarms(
       scope,
       id,

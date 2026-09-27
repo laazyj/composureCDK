@@ -338,6 +338,8 @@ api.addMethod(
 
 Internally, the builder stores the `Resolvable<T>` as-is. At build time, it calls `resolve(value, context)`, which either returns the concrete value unchanged or evaluates the `Ref`.
 
+A `.map()` transform receives only the build context — not the scope the component builds into — so `Stack.of(scope)` is not available inside one. Where a transform needs the account, region or partition, use the scope-free pseudo-parameter tokens (`Aws.ACCOUNT_ID`, `Aws.REGION`, `Aws.PARTITION`), which resolve at synth wherever they end up.
+
 `resolve` distinguishes a `Ref` from a concrete value via the `isRef` guard. `isRef` recognises a `Ref` by a `Symbol.for("composurecdk.ref")` brand rather than `instanceof` — because packages are published dual ESM/CJS ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)), the ESM and CommonJS copies of `@composurecdk/core` can both load in one process, and `instanceof` is realm-bound. The `Symbol.for(...)` brand is shared across realms, so a `Ref` minted by either copy is still recognised.
 
 ### Combining refs — one consumer, many dependencies
@@ -410,7 +412,22 @@ class MyBuilder implements Lifecycle<MyResult> {
 }
 ```
 
-This is the only change required. The builder does not need to know whether it received a concrete value or a `Ref` — `resolve` handles both uniformly.
+The builder does not need to know whether it received a concrete value or a `Ref` — `resolve` handles both uniformly.
+
+#### Builders that delegate to a sub-builder
+
+A builder can also be a _conduit_ for someone else's refs: it holds no `Resolvable` of its own, but builds a sub-builder that does — typically one exposed to the caller through a `configure` callback. Such a builder must still accept `context` and **pass it on**:
+
+```typescript
+// The sub-builder resolves its own Resolvables against whatever context it is
+// given. Omit the third argument and it resolves against `{}`, so any ref the
+// caller supplied through `configure` throws "component not found in context".
+const logGroup = subBuilder.build(scope, `${id}Logs`, context).logGroup;
+```
+
+Thread `context` through any helper function in between — that is where the call usually lives, and where it is easiest to forget. The `composurecdk/lifecycle-build-must-forward-context` lint rule enforces this at the call site; its sibling `lifecycle-build-context-required` only checks the declaration, and cannot see a resolvable that lives one delegation away.
+
+A builder that neither holds a `Resolvable` nor builds a sub-builder needs none of this — `build(scope, id)` stays correct and is the right signature for it.
 
 ## Policies
 
@@ -437,7 +454,7 @@ alarmActionsPolicy(app, {
 
 ### Design rationale
 
-- **Single-domain policies live in their package** under `src/policies/`, co-located with the detection logic and types they rely on (e.g. `alarmActionsPolicy` in `@composurecdk/cloudwatch`). Pan-domain policies that span services stay in `packages/examples/` until ≥ 2 of them justify a dedicated `@composurecdk/policies` package.
+- **Single-domain policies live in their package** under `src/policies/`, co-located with the detection logic and types they rely on (e.g. `alarmActionsPolicy` in `@composurecdk/cloudwatch`). Pan-domain policies that span services stay in `packages/examples/` until ≥ 2 of them justify a dedicated `@composurecdk/policies` package — unless the policy is keyed by CloudFormation resource-type _string_ and so imports no service package at all, in which case it lives in `@composurecdk/cloudformation` (e.g. `templateTextPolicy`). See [ADR-0017](adr/0017-template-text-policy.md).
 - **Named with a `<noun>Policy` suffix** to signal a scope-wide side effect applied at setup, distinct from builders and factories.
 
 See [ADR-0002](adr/0002-policies.md).

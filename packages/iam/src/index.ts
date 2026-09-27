@@ -14,6 +14,7 @@ export {
 export { createServiceRoleBuilder } from "./service-role-builder.js";
 export {
   createStatementBuilder,
+  isStatementBuilder,
   StatementBuilder,
   WildcardResourceError,
 } from "./statement-builder.js";

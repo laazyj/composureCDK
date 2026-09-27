@@ -8,23 +8,17 @@ import {
   type ITable,
   StreamViewType,
   TableEncryption,
+  type TableProps,
 } from "aws-cdk-lib/aws-dynamodb";
 import { Key } from "aws-cdk-lib/aws-kms";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createTableBuilder } from "../src/table-builder.js";
+import { createTableBuilder, type TableBuilderProps } from "../src/table-builder.js";
 
 const PK = { name: "pk", type: AttributeType.STRING };
 
-function synthTemplate(
-  configureFn?: (builder: ReturnType<typeof createTableBuilder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createTableBuilder().partitionKey(PK);
-  configureFn?.(builder);
-  builder.build(stack, "TestTable");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(() => createTableBuilder().partitionKey(PK), "TestTable");
 
 describe("TableBuilder", () => {
   describe("build", () => {
@@ -38,7 +32,7 @@ describe("TableBuilder", () => {
     });
 
     it("creates exactly one DynamoDB table", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::DynamoDB::Table", 1);
     });
@@ -72,9 +66,18 @@ describe("TableBuilder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own TableProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const _props: TableBuilderProps = undefined as unknown as TableProps;
+    });
+  });
+
   describe("secure defaults", () => {
     it("uses on-demand (PAY_PER_REQUEST) billing by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::DynamoDB::Table", {
         BillingMode: "PAY_PER_REQUEST",
@@ -82,7 +85,7 @@ describe("TableBuilder", () => {
     });
 
     it("encrypts at rest with an AWS-managed KMS key by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::DynamoDB::Table", {
         SSESpecification: { SSEEnabled: true },
@@ -90,7 +93,7 @@ describe("TableBuilder", () => {
     });
 
     it("enables point-in-time recovery by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::DynamoDB::Table", {
         PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true },
@@ -98,7 +101,7 @@ describe("TableBuilder", () => {
     });
 
     it("enables deletion protection by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::DynamoDB::Table", {
         DeletionProtectionEnabled: true,
@@ -106,7 +109,7 @@ describe("TableBuilder", () => {
     });
 
     it("allows deletion protection to be disabled via the fluent API", () => {
-      const template = synthTemplate((b) => b.deletionProtection(false));
+      const { template } = buildAndSynth((b) => b.deletionProtection(false));
 
       template.hasResourceProperties("AWS::DynamoDB::Table", {
         DeletionProtectionEnabled: false,
@@ -116,7 +119,7 @@ describe("TableBuilder", () => {
 
   describe("billingMode yields to provisioned capacity (ADR-0009)", () => {
     it("switches to provisioned billing when read/write capacity is set", () => {
-      const template = synthTemplate((b) => b.readCapacity(5).writeCapacity(5));
+      const { template } = buildAndSynth((b) => b.readCapacity(5).writeCapacity(5));
 
       // The on-demand default is dropped, so CDK falls back to PROVISIONED.
       // PROVISIONED is the CFN default for BillingMode, so CDK omits the
@@ -128,7 +131,7 @@ describe("TableBuilder", () => {
     });
 
     it("honours an explicit PAY_PER_REQUEST override", () => {
-      const template = synthTemplate((b) => b.billingMode(BillingMode.PAY_PER_REQUEST));
+      const { template } = buildAndSynth((b) => b.billingMode(BillingMode.PAY_PER_REQUEST));
 
       template.hasResourceProperties("AWS::DynamoDB::Table", {
         BillingMode: "PAY_PER_REQUEST",
@@ -150,8 +153,22 @@ describe("TableBuilder", () => {
       });
     });
 
+    it("resolves a Resolvable encryptionKey from the build context", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      createTableBuilder()
+        .partitionKey(PK)
+        .encryptionKey(ref<{ key: Key }, Key>("tableKey", (r) => r.key))
+        .build(stack, "TestTable", { tableKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::DynamoDB::Table", {
+        SSESpecification: { SSEEnabled: true, SSEType: "KMS", KMSMasterKeyId: Match.anyValue() },
+      });
+    });
+
     it("allows falling back to the free AWS-owned key", () => {
-      const template = synthTemplate((b) => b.encryption(TableEncryption.DEFAULT));
+      const { template } = buildAndSynth((b) => b.encryption(TableEncryption.DEFAULT));
 
       // The AWS-owned key (CDK's TableEncryption.DEFAULT) synthesises as
       // SSEEnabled: false — DynamoDB still encrypts, just with the free key.
@@ -163,7 +180,7 @@ describe("TableBuilder", () => {
 
   describe("synthesised output", () => {
     it("creates a table with the specified name and key schema", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.tableName("orders").sortKey({ name: "sk", type: AttributeType.NUMBER }),
       );
 
@@ -177,7 +194,7 @@ describe("TableBuilder", () => {
     });
 
     it("forwards the stream view type to the underlying CDK construct", () => {
-      const template = synthTemplate((b) => b.stream(StreamViewType.NEW_IMAGE));
+      const { template } = buildAndSynth((b) => b.stream(StreamViewType.NEW_IMAGE));
 
       template.hasResourceProperties("AWS::DynamoDB::Table", {
         StreamSpecification: { StreamViewType: "NEW_IMAGE" },

@@ -1,6 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { type IConnectable, type ISecurityGroup, type IVpc } from "aws-cdk-lib/aws-ec2";
-import { type IGrantable } from "aws-cdk-lib/aws-iam";
+import { type IConnectable } from "aws-cdk-lib/aws-ec2";
 import {
   ClusterParameterGroup,
   DatabaseCluster,
@@ -22,15 +21,6 @@ import type { NeptuneClusterAlarmConfig } from "./cluster-alarm-config.js";
 import { createClusterAlarms } from "./cluster-alarms.js";
 
 /**
- * A principal that can be granted access to a Neptune cluster via
- * {@link IClusterBuilder.allowAccessFrom}. Must be both an {@link IConnectable}
- * (so its security group can be opened to the cluster's port) and an
- * {@link IGrantable} (so it can be granted IAM `connect`). EC2 instances,
- * Lambda functions, and Fargate tasks all satisfy this.
- */
-export type ClusterAccessor = IConnectable & IGrantable;
-
-/**
  * Configuration properties for the Neptune cluster builder.
  *
  * Extends the CDK {@link DatabaseClusterProps} but lifts the
@@ -40,20 +30,54 @@ export type ClusterAccessor = IConnectable & IGrantable;
  *
  * - `vpc` is supplied via the dedicated {@link IClusterBuilder.vpc | .vpc()}
  *   method (it is required).
- * - `securityGroups` accepts `Resolvable<ISecurityGroup>` entries.
+ * - `securityGroups` accepts `Resolvable` entries.
+ * - `kmsKey` accepts a `Resolvable` key.
  *
  * It also adds builder-specific options for the auto-created cluster
  * parameter group and recommended alarms.
+ *
+ * Each re-declared prop reads its inner type from CDK's own prop rather than
+ * naming an interface, so it keeps tracking the installed `aws-cdk-lib` as CDK
+ * moves its prop types (ADR-0018).
  */
-export interface ClusterBuilderProps extends Omit<DatabaseClusterProps, "vpc" | "securityGroups"> {
+export interface ClusterBuilderProps extends Omit<
+  DatabaseClusterProps,
+  "vpc" | "securityGroups" | "kmsKey"
+> {
   /**
-   * Security groups to attach to the cluster. Accepts concrete
-   * {@link ISecurityGroup}s or {@link Ref}s that resolve to them at build
-   * time (e.g. a sibling `SecurityGroupBuilder`).
+   * Security groups to attach to the cluster. Accepts concrete security
+   * groups or {@link Ref}s that resolve to them at build time (e.g. a sibling
+   * `SecurityGroupBuilder`).
    *
    * @default - CDK creates a security group for the cluster.
    */
-  securityGroups?: readonly Resolvable<ISecurityGroup>[];
+  securityGroups?: readonly Resolvable<
+    NonNullable<DatabaseClusterProps["securityGroups"]>[number]
+  >[];
+
+  /**
+   * The customer-managed KMS key used to encrypt the cluster's storage at
+   * rest.
+   *
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
+   *
+   * The builder already sets `storageEncrypted: true`, so this selects a
+   * customer-managed key in place of the AWS-managed Neptune key rather than
+   * turning encryption on. Both the key and the encryption setting are fixed
+   * at creation — Neptune cannot encrypt an existing unencrypted cluster, nor
+   * rotate to a different key, without a snapshot restore.
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction —
+   * see the table in `@composurecdk/kms`'s README.
+   *
+   * @default - the AWS-managed key for Neptune (`aws/rds`).
+   *
+   * @see https://docs.aws.amazon.com/neptune/latest/userguide/encrypt.html
+   */
+  kmsKey?: Resolvable<NonNullable<DatabaseClusterProps["kmsKey"]>>;
 
   /**
    * Parameters to set on the auto-created cluster parameter group, merged
@@ -70,7 +94,8 @@ export interface ClusterBuilderProps extends Omit<DatabaseClusterProps, "vpc" | 
    *
    * By default the builder creates recommended alarms with sensible
    * thresholds for every applicable metric. Individual alarms can be
-   * customized or disabled. Set to `false` to disable all alarms.
+   * customized or disabled. Set to `false` to disable the recommended
+   * alarms; custom alarms added via `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification methods
    * are user-specific. Access alarms from the build result or use an
@@ -107,6 +132,11 @@ export interface ClusterBuilderResult {
    * configured — apply them via the result or an `afterBuild` hook.
    */
   alarms: Record<string, Alarm>;
+}
+
+interface AccessSpec {
+  readonly peer: Resolvable<IConnectable>;
+  readonly description?: string;
 }
 
 /**
@@ -146,39 +176,44 @@ export type IClusterBuilder = ITaggedBuilder<ClusterBuilderProps, ClusterBuilder
 class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
   props: Partial<ClusterBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IDatabaseCluster>[] = [];
-  readonly #accessors: Resolvable<ClusterAccessor>[] = [];
-  #vpc?: Resolvable<IVpc>;
+  readonly #access: AccessSpec[] = [];
+  #vpc?: Resolvable<NonNullable<DatabaseClusterProps["vpc"]>>;
 
   /**
-   * Sets the VPC the cluster runs in. Required. Accepts a concrete
-   * {@link IVpc} or a {@link Ref} that resolves to one at build time — the
-   * standard cross-component wiring path (e.g. to a sibling `VpcBuilder`).
+   * Sets the VPC the cluster runs in. Required. Accepts a concrete VPC or a
+   * {@link Ref} that resolves to one at build time — the standard
+   * cross-component wiring path (e.g. to a sibling `VpcBuilder`).
    *
    * @param vpc - The VPC or a Ref to one.
    * @returns This builder for chaining.
    */
-  vpc(vpc: Resolvable<IVpc>): this {
+  vpc(vpc: Resolvable<NonNullable<DatabaseClusterProps["vpc"]>>): this {
     this.#vpc = vpc;
     return this;
   }
 
   /**
-   * Grants a principal both network and IAM access to the cluster in a single
-   * declaration. At build time this applies
-   * `cluster.connections.allowDefaultPortFrom(peer)` (opening the cluster's
-   * port to the peer's security group) and `cluster.grantConnect(peer)`
-   * (granting the IAM `connect` action required by the cluster's
-   * IAM-authentication default).
+   * Opens the cluster's port to `peer` via CDK's
+   * `cluster.connections.allowDefaultPortFrom(peer)` — ingress on the
+   * cluster's security group from the peer's, and the matching egress back on
+   * the peer's.
    *
-   * Accepts a concrete {@link ClusterAccessor} or a {@link Ref} to one, so the
-   * grant can be declared inside `compose()` rather than wired up in an
-   * `afterBuild` hook.
+   * This is the **network** half of reaching the cluster. Because IAM
+   * authentication is on by default, the peer's principal also needs the
+   * data-plane grant, declared on that principal's own builder:
+   * `role.grant(clusterGrants.connect(ref("graph", (r) => r.cluster)))` — the
+   * consumer-side shape every grant in the library follows (ADR-0013).
    *
-   * @param peer - The principal to grant access to, or a Ref to one.
+   * Accepts a concrete {@link IConnectable} (a `SecurityGroup`, an `Instance`,
+   * a `Function` in a VPC, …) or a {@link Ref} to one, so the rule can be
+   * declared inside `compose()` rather than wired up in an `afterBuild` hook.
+   *
+   * @param peer - The connectable to open the port to, or a Ref to one.
+   * @param description - Optional description recorded on the ingress rule.
    * @returns This builder for chaining.
    */
-  allowAccessFrom(peer: Resolvable<ClusterAccessor>): this {
-    this.#accessors.push(peer);
+  allowDefaultPortFrom(peer: Resolvable<IConnectable>, description?: string): this {
+    this.#access.push({ peer, description });
     return this;
   }
 
@@ -205,7 +240,7 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
   [COPY_STATE](target: ClusterBuilder): void {
     target.#vpc = this.#vpc;
     target.#customAlarms.push(...this.#customAlarms);
-    target.#accessors.push(...this.#accessors);
+    target.#access.push(...this.#access);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): ClusterBuilderResult {
@@ -219,6 +254,7 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
     const {
       recommendedAlarms: alarmConfig,
       securityGroups: resolvableSgs,
+      kmsKey,
       clusterParameters,
       clusterParameterGroup: userParameterGroup,
       ...clusterProps
@@ -255,19 +291,13 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
       vpc: resolvedVpc,
       clusterParameterGroup,
       ...(securityGroups ? { securityGroups } : {}),
+      ...(kmsKey !== undefined ? { kmsKey: resolve(kmsKey, context) } : {}),
     } as DatabaseClusterProps;
 
     const cluster = new DatabaseCluster(scope, id, mergedProps);
 
-    for (const resolvable of this.#accessors) {
-      const peer = resolve(resolvable, context);
-      cluster.connections.allowDefaultPortFrom(peer);
-      // The IAM `connect` grant is only meaningful when IAM authentication is
-      // enabled (the default). If a user has turned it off, opening the
-      // network path is the whole grant — a grantConnect policy would be inert.
-      if (mergedProps.iamAuthentication !== false) {
-        cluster.grantConnect(peer);
-      }
+    for (const rule of this.#access) {
+      cluster.connections.allowDefaultPortFrom(resolve(rule.peer, context), rule.description);
     }
 
     const alarms = createClusterAlarms(
@@ -290,7 +320,7 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
  * This is the entry point for defining a Neptune component. The returned
  * builder exposes every {@link ClusterBuilderProps} property as a fluent
  * setter/getter, plus {@link IClusterBuilder.vpc | .vpc()} and
- * {@link IClusterBuilder.allowAccessFrom | .allowAccessFrom()} for
+ * {@link IClusterBuilder.allowDefaultPortFrom | .allowDefaultPortFrom()} for
  * cross-component wiring with Ref support. It implements {@link Lifecycle}
  * for use with {@link compose}.
  *

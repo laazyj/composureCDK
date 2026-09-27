@@ -90,6 +90,30 @@ ref<FunctionBuilderResult>("handler")
 ref<FunctionBuilderResult>("handler", (r) => new LambdaIntegration(r.function));
 ```
 
+## Ordering: `addDependencies`
+
+`compose()` decides the order components _build_; CloudFormation decides the order resources _deploy_, and it only orders B after A when B's template references A. Where no such reference exists — an SDK call whose parameters are hardcoded strings, a Lambda invoked during deployment — the edge has to be declared.
+
+`addDependencies(target, sources, context)` is that seam. Each source is a concrete construct, a `ref` to one construct inside a sibling's result, or a `ref` to the whole sibling:
+
+```ts
+import { addDependencies, ref } from "@composurecdk/core";
+
+addDependencies(
+  trigger,
+  [
+    queue, // a construct you already hold
+    ref("api", (r: RestApiBuilderResult) => r.api), // one construct out of a sibling
+    ref<SeedBuilderResult>("seed"), // every construct that sibling built
+  ],
+  context,
+);
+```
+
+A construct-level dependency already covers that construct's own children, so naming one is enough whenever what you need sits under it — ordering against a `RestApi` also orders against its deployment and stage. Naming the component instead also reaches its _peers_: an API's access log group, a queue's dead-letter queue.
+
+It backs `dependsOn` in [`@composurecdk/custom-resources`](../custom-resources/README.md) and `after` in [`@composurecdk/lambda`](../lambda/README.md)'s `.invokeOnDeploy()`, so both spell ordering the same way.
+
 ## Examples
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`

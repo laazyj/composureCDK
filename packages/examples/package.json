@@ -1,47 +1,41 @@
 {
   "name": "@composurecdk/examples",
-  "version": "0.9.0",
+  "version": "0.10.3",
   "description": "Example applications exercising the ComposureCDK public API",
   "private": true,
-  "scripts": {
-    "clean": "rm -rf dist cdk.out",
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:update": "vitest run --update",
-    "test:watch": "vitest",
-    "cdk": "cdk",
-    "deploy": "cdk deploy",
-    "synth": "cdk synth"
-  },
   "author": "Jason Duffett (https://github.com/laazyj)",
   "license": "MIT",
   "type": "module",
   "dependencies": {
     "@aws-cdk/aws-neptune-alpha": "2.257.0-alpha.0",
-    "aws-cdk-lib": "^2.258.1",
-    "constructs": "^10.6.0"
+    "aws-cdk-lib": "^2.269.0",
+    "constructs": "^10.8.1"
   },
   "peerDependencies": {
-    "@composurecdk/apigateway": "^0.9.0",
-    "@composurecdk/cloudformation": "^0.9.0",
-    "@composurecdk/cloudwatch": "^0.9.0",
-    "@composurecdk/cloudfront": "^0.9.0",
-    "@composurecdk/core": "^0.9.0",
-    "@composurecdk/ec2": "^0.9.0",
-    "@composurecdk/events": "^0.9.0",
-    "@composurecdk/lambda": "^0.9.0",
-    "@composurecdk/neptune": "^0.9.0",
-    "@composurecdk/route53": "^0.9.0",
-    "@composurecdk/s3": "^0.9.0",
-    "@composurecdk/sns": "^0.9.0",
-    "@composurecdk/sqs": "^0.9.0"
+    "@composurecdk/apigateway": "^0.10.0",
+    "@composurecdk/bedrock": "^0.10.0",
+    "@composurecdk/cloudformation": "^0.10.0",
+    "@composurecdk/cloudwatch": "^0.10.0",
+    "@composurecdk/cloudfront": "^0.10.0",
+    "@composurecdk/core": "^0.10.0",
+    "@composurecdk/dynamodb": "^0.10.0",
+    "@composurecdk/ec2": "^0.10.0",
+    "@composurecdk/iam": "^0.10.0",
+    "@composurecdk/kms": "^0.10.0",
+    "@composurecdk/events": "^0.10.0",
+    "@composurecdk/lambda": "^0.10.0",
+    "@composurecdk/neptune": "^0.10.0",
+    "@composurecdk/route53": "^0.10.0",
+    "@composurecdk/s3": "^0.10.0",
+    "@composurecdk/sns": "^0.10.0",
+    "@composurecdk/sqs": "^0.10.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
-    "aws-cdk": "^2.1126.0",
+    "@composurecdk/cdk-testing": "*",
+    "@types/node": "^26.6.1",
+    "aws-cdk": "^2.1142.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^5.0.0"
   },
   "nx": {
     "tags": [

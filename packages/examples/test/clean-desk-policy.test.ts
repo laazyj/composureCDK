@@ -5,15 +5,29 @@ import { Size } from "aws-cdk-lib";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Volume } from "aws-cdk-lib/aws-ec2";
-import { MockIntegration, RestApi } from "aws-cdk-lib/aws-apigateway";
+import { Code, Function as LambdaFunction, LoggingFormat, Runtime } from "aws-cdk-lib/aws-lambda";
+import { MockIntegration, RestApi, type RestApiProps } from "aws-cdk-lib/aws-apigateway";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
+import { buildExampleApp } from "../src/apps.js";
+import { exampleApp } from "../src/app-context.js";
 import { createAgentVolumeApp } from "../src/agent-volume-app.js";
+import { createCrudApiApp } from "../src/crud-api-app.js";
+import { createDynamoStreamProcessorApp } from "../src/dynamo-stream-processor-app.js";
 import { createMockApiApp } from "../src/mock-api-app.js";
 import { createNeptuneGraphApp } from "../src/neptune-graph-app.js";
+import { createOrderProcessorApp } from "../src/order-processor-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
 
-function buildWithPolicy(buildFn: (stack: Stack) => void): Template {
-  const app = new App();
+function restApi(stack: Stack, props: Partial<RestApiProps> = {}): void {
+  const api = new RestApi(stack, "Api", { restApiName: "TestApi", ...props });
+  api.root.addMethod("GET", new MockIntegration());
+}
+
+function buildWithPolicy(
+  buildFn: (stack: Stack) => void,
+  context?: Record<string, unknown>,
+): Template {
+  const app = new App({ context });
   cleanDeskPolicy(app);
   const stack = new Stack(app, "TestStack");
   buildFn(stack);
@@ -73,6 +87,131 @@ describe("cleanDeskPolicy", () => {
     });
   });
 
+  it("sets the crud-api stack's table to Delete and clears deletion protection", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createCrudApiApp(app);
+    const template = Template.fromStack(stack);
+
+    template.hasResource("AWS::DynamoDB::Table", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+    template.hasResourceProperties("AWS::DynamoDB::Table", {
+      DeletionProtectionEnabled: false,
+    });
+  });
+
+  it("sets the crud-api stack's KMS key to Delete with the 7-day minimum window", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createCrudApiApp(app);
+    const template = Template.fromStack(stack);
+
+    template.hasResource("AWS::KMS::Key", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+    // 7 days is the AWS minimum for ScheduleKeyDeletion — there is no
+    // immediate delete, so a torn-down sandbox key still bills for a week.
+    template.hasResourceProperties("AWS::KMS::Key", { PendingWindowInDays: 7 });
+  });
+
+  it("sets all resources to Delete in the dynamo-stream-processor stack", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createDynamoStreamProcessorApp(app);
+    const template = Template.fromStack(stack);
+    const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
+
+    // Covers the DLQ (already Delete by default) and the table, whose stream —
+    // and the event source mapping consuming it — go with the table itself.
+    const retainedResources = Object.entries(resources)
+      .filter(([, resource]) => resource.DeletionPolicy === "Retain")
+      .map(([logicalId]) => logicalId);
+
+    expect(retainedResources).toEqual([]);
+    // Deletion protection is the half a DeletionPolicy sweep cannot see.
+    template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
+      Replicas: Match.arrayWith([Match.objectLike({ DeletionProtectionEnabled: false })]),
+    });
+  });
+
+  describe("order-processor stack (Bedrock)", () => {
+    let template: Template;
+
+    beforeAll(() => {
+      const app = new App();
+      cleanDeskPolicy(app);
+      const { stack } = createOrderProcessorApp(app);
+      template = Template.fromStack(stack);
+    });
+
+    // The model invocation log group is the one Bedrock-built resource that
+    // defaults to RETAIN; it is an L2 `LogGroup`, so the LogGroup injector
+    // covers it without a Bedrock-specific one.
+    it("sets the invocation-logging and processor log groups to Delete", () => {
+      const logGroups = template.findResources("AWS::Logs::LogGroup") as Record<
+        string,
+        { DeletionPolicy?: string }
+      >;
+      // Named by logical id: the policy adds log groups of its own (one per
+      // helper function), so a count would break whenever that changes.
+      const deletionPolicies = [
+        "OrderProcessorinvocationLoggingLogGroup",
+        "OrderProcessorprocessorLogGroup",
+      ]
+        .map((prefix) =>
+          Object.entries(logGroups).find(([logicalId]) => logicalId.startsWith(prefix)),
+        )
+        .map((entry) => entry?.[1].DeletionPolicy);
+
+      expect(deletionPolicies).toEqual(["Delete", "Delete"]);
+    });
+
+    // The guardrail, its version and the application inference profile are
+    // L1s with no removal policy, so CloudFormation's default (Delete) applies.
+    // Fails if a builder starts retaining one, which would need an injector.
+    it("leaves the guardrail, its version and the inference profile on CloudFormation's default", () => {
+      for (const type of [
+        "AWS::Bedrock::Guardrail",
+        "AWS::Bedrock::GuardrailVersion",
+        "AWS::Bedrock::ApplicationInferenceProfile",
+      ]) {
+        const resources = Object.values(
+          template.findResources(type) as Record<string, { DeletionPolicy?: string }>,
+        );
+        expect(resources, type).toHaveLength(1);
+        expect(resources[0]?.DeletionPolicy, type).toBeUndefined();
+      }
+    });
+
+    // Invocation logging is account-wide per Region, so a torn-down stack
+    // must switch it off rather than leave Bedrock writing to a deleted log
+    // group with a deleted role.
+    it("turns account-wide model invocation logging off on delete", () => {
+      const [configuration] = Object.values(
+        template.findResources("Custom::AWS") as Record<
+          string,
+          { Properties: { Delete?: unknown } }
+        >,
+      );
+
+      expect(JSON.stringify(configuration.Properties.Delete)).toContain(
+        "DeleteModelInvocationLoggingConfiguration",
+      );
+    });
+
+    it("leaves nothing Retained", () => {
+      const resources = template.toJSON().Resources as Record<string, { DeletionPolicy?: string }>;
+      const retained = Object.entries(resources)
+        .filter(([, resource]) => resource.DeletionPolicy === "Retain")
+        .map(([logicalId]) => logicalId);
+
+      expect(retained).toEqual([]);
+    });
+  });
+
   it("overrides LogGroup removal policy to DESTROY", () => {
     const template = buildWithPolicy((stack) => {
       new LogGroup(stack, "LG", { retention: RetentionDays.ONE_WEEK });
@@ -85,15 +224,43 @@ describe("cleanDeskPolicy", () => {
   });
 
   it("overrides RestApi Account and CloudWatch Role removal policy to DESTROY", () => {
-    const template = buildWithPolicy((stack) => {
-      const api = new RestApi(stack, "Api", { restApiName: "TestApi" });
-      api.root.addMethod("GET", new MockIntegration());
-    });
+    const template = buildWithPolicy(restApi);
 
     template.hasResource("AWS::ApiGateway::Account", {
       DeletionPolicy: "Delete",
       UpdateReplacePolicy: "Delete",
     });
+  });
+
+  // Without the guard these throw at synth: "'cloudWatchRole' must be enabled
+  // for 'cloudWatchRoleRemovalPolicy' to be applied."
+  it("still synthesises when the feature flag disables the CloudWatch Role", () => {
+    const template = buildWithPolicy(restApi, {
+      "@aws-cdk/aws-apigateway:disableCloudWatchRole": true,
+    });
+
+    template.resourceCountIs("AWS::ApiGateway::Account", 0);
+  });
+
+  it("still synthesises when the caller disables the CloudWatch Role", () => {
+    const template = buildWithPolicy((stack) => {
+      restApi(stack, { cloudWatchRole: false });
+    });
+
+    template.resourceCountIs("AWS::ApiGateway::Account", 0);
+  });
+
+  // The flag only supplies the default, so an explicit `true` still wins and
+  // the removal policy still has to be applied.
+  it("overrides the removal policy when the caller re-enables the role", () => {
+    const template = buildWithPolicy(
+      (stack) => {
+        restApi(stack, { cloudWatchRole: true });
+      },
+      { "@aws-cdk/aws-apigateway:disableCloudWatchRole": true },
+    );
+
+    template.hasResource("AWS::ApiGateway::Account", { DeletionPolicy: "Delete" });
   });
 
   it("does not affect stacks without the policy", () => {
@@ -259,6 +426,103 @@ describe("cleanDeskPolicy", () => {
       const mockApiTemplate = Template.fromStack(stack);
 
       mockApiTemplate.resourceCountIs("Custom::DisableBucketLogging", 0);
+    });
+  });
+  // The injector registry is hand-maintained, and a construct type missing from
+  // it fails silently — the stack just leaves resources behind on teardown.
+  // This is the assertion that catches that: it swept up the SpecRestApi gap
+  // (an orphaned ApiGateway Account and CloudWatch Role in the petstore stack)
+  // that the per-type tests above could not see.
+  it("leaves nothing Retained across every example stack", () => {
+    const retained = buildExampleApp(exampleApp({ outdir: "cdk.out/clean-desk-sweep" }))
+      .synth()
+      .stacks.flatMap(({ stackName, template }) =>
+        Object.entries(
+          (template as { Resources?: Record<string, { DeletionPolicy?: string }> }).Resources ?? {},
+        )
+          .filter(([, resource]) => resource.DeletionPolicy === "Retain")
+          .map(([logicalId]) => `${stackName}/${logicalId}`),
+      );
+
+    expect(retained).toEqual([]);
+  });
+
+  describe("function log groups", () => {
+    interface TemplateResource {
+      Type: string;
+      DeletionPolicy?: string;
+      Properties?: { LoggingConfig?: { LogGroup?: { Ref?: string } } };
+    }
+
+    /** The log group a function's `LoggingConfig` names, if it is in the template. */
+    function ownLogGroup(
+      fn: TemplateResource,
+      resources: Record<string, TemplateResource>,
+    ): TemplateResource | undefined {
+      const ref = fn.Properties?.LoggingConfig?.LogGroup?.Ref;
+      const logGroup = ref === undefined ? undefined : resources[ref];
+      return logGroup?.Type === "AWS::Logs::LogGroup" ? logGroup : undefined;
+    }
+
+    it("gives the S3 auto-delete provider a log group that is deleted with the stack", () => {
+      const template = buildWithPolicy((stack) => {
+        new Bucket(stack, "Bucket");
+      });
+      const resources = template.toJSON().Resources as Record<string, TemplateResource>;
+      const handlers = Object.values(resources).filter((r) => r.Type === "AWS::Lambda::Function");
+
+      expect(handlers).toHaveLength(1);
+      expect(handlers.map((fn) => ownLogGroup(fn, resources)?.DeletionPolicy)).toEqual(["Delete"]);
+    });
+
+    it("keeps a function's own log group and adds none", () => {
+      const template = buildWithPolicy((stack) => {
+        const logGroup = new LogGroup(stack, "Own", { retention: RetentionDays.ONE_WEEK });
+        new LambdaFunction(stack, "Fn", {
+          runtime: Runtime.NODEJS_22_X,
+          handler: "index.handler",
+          code: Code.fromInline("exports.handler = async () => {};"),
+          logGroup,
+        });
+      });
+
+      template.resourceCountIs("AWS::Logs::LogGroup", 1);
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        LoggingConfig: { LogGroup: { Ref: Match.stringLikeRegexp("^Own") } },
+      });
+    });
+
+    it("keeps a function's log format when adding the log group", () => {
+      const template = buildWithPolicy((stack) => {
+        new LambdaFunction(stack, "Fn", {
+          runtime: Runtime.NODEJS_22_X,
+          handler: "index.handler",
+          code: Code.fromInline("exports.handler = async () => {};"),
+          loggingFormat: LoggingFormat.JSON,
+        });
+      });
+
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        LoggingConfig: { LogFormat: "JSON", LogGroup: { Ref: Match.stringLikeRegexp("^Fn") } },
+      });
+    });
+
+    // The targeted tests above cannot see a helper function a new example
+    // brings in; this can. A function missing from it writes to an
+    // `/aws/lambda/*` group Lambda creates at runtime, which outlives the stack.
+    it("leaves no function across every example stack without a stack-owned log group", () => {
+      const unowned = buildExampleApp(exampleApp({ outdir: "cdk.out/clean-desk-log-groups" }))
+        .synth()
+        .stacks.flatMap(({ stackName, template }) => {
+          const resources =
+            (template as { Resources?: Record<string, TemplateResource> }).Resources ?? {};
+          return Object.entries(resources)
+            .filter(([, resource]) => resource.Type === "AWS::Lambda::Function")
+            .filter(([, fn]) => ownLogGroup(fn, resources) === undefined)
+            .map(([logicalId]) => `${stackName}/${logicalId}`);
+        });
+
+      expect(unowned).toEqual([]);
     });
   });
 });

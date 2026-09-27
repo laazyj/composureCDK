@@ -6,3 +6,4 @@ export {
 } from "./string-constraint.js";
 export { charSets } from "./char-sets.js";
 export { type ConstraintNamespace } from "./namespace.js";
+export { validateTemplateText, sanitizeTemplateText, transliterate } from "./template-text.js";

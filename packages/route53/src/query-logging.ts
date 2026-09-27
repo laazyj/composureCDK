@@ -1,6 +1,6 @@
-import { Annotations, Aws, Stack, Token } from "aws-cdk-lib";
+import { Annotations, Aws, CfnResource, Stack, Token } from "aws-cdk-lib";
 import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { type LogGroup, ResourcePolicy } from "aws-cdk-lib/aws-logs";
+import { CfnResourcePolicy, type LogGroup, ResourcePolicy } from "aws-cdk-lib/aws-logs";
 import type { IConstruct } from "constructs";
 import { createLogGroupBuilder, type ILogGroupBuilder } from "@composurecdk/logs";
 import {
@@ -36,6 +36,10 @@ export type QueryLoggingConfig =
        * {@link createLogGroupBuilder} are merged in at `build()` time and
        * are overridable by anything set on the builder here. Cannot be
        * combined with {@link logGroupArn}.
+       *
+       * The callback receives the build context, so anything
+       * `ILogGroupBuilder` accepts as a `Resolvable` can be a `ref` to a
+       * sibling component. Declare that component as a dependency.
        */
       configure?: (b: ILogGroupBuilder) => ILogGroupBuilder;
 
@@ -77,6 +81,7 @@ export function resolveQueryLogging(
   id: string,
   zoneName: string,
   cfg: QueryLoggingConfig | undefined,
+  context?: Record<string, object>,
 ): ResolvedQueryLogging {
   if (cfg === false) return {};
 
@@ -99,7 +104,11 @@ export function resolveQueryLogging(
     subBuilder = cfg.configure(subBuilder);
   }
 
-  const queryLogGroup = subBuilder.build(scope, `${id}QueryLogs`).logGroup;
+  // Pass the build context down: `ILogGroupBuilder` widens `encryptionKey` to a
+  // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
+  // KMS key. Without the context that ref resolves against an empty record and
+  // throws "component not found".
+  const queryLogGroup = subBuilder.build(scope, `${id}QueryLogs`, context).logGroup;
   warnIfLogGroupNameOutsidePrefix(scope, id, subBuilder.logGroupName());
 
   return {
@@ -115,8 +124,8 @@ function stripTrailingDot(name: string): string {
 
 function ensureSharedResourcePolicy(scope: IConstruct): ResourcePolicy {
   const stack = Stack.of(scope);
-  const existing = stack.node.tryFindChild(QUERY_LOGGING_RESOURCE_POLICY_ID);
-  if (existing instanceof ResourcePolicy) return existing;
+  const existing = findExistingResourcePolicy(stack);
+  if (existing) return existing;
 
   return new ResourcePolicy(stack, QUERY_LOGGING_RESOURCE_POLICY_ID, {
     resourcePolicyName: QUERY_LOGGING_RESOURCE_POLICY_NAME,
@@ -135,6 +144,25 @@ function ensureSharedResourcePolicy(scope: IConstruct): ResourcePolicy {
       }),
     ],
   });
+}
+
+/**
+ * Find the shared query-logging policy an earlier hosted zone already created
+ * on this stack, identified by its L1's `cfnResourceType`.
+ *
+ * Deliberately not `instanceof ResourcePolicy`, which is realm-bound: the
+ * `ResourcePolicy` class an earlier zone constructed can be a different class
+ * object from the one this module imported, so the dedup is skipped and the
+ * rebuild fails synth on a duplicate construct id. Same hazard, same jsii-safe
+ * idiom, and the same reasoning spelled out in full as
+ * {@link findExistingLogGroup} in `cross-account-delegation-provider-logging.ts`.
+ */
+function findExistingResourcePolicy(stack: Stack): ResourcePolicy | undefined {
+  const existing = stack.node.tryFindChild(QUERY_LOGGING_RESOURCE_POLICY_ID);
+  const l1 = existing?.node.defaultChild;
+  if (!CfnResource.isCfnResource(l1)) return undefined;
+  if (l1.cfnResourceType !== CfnResourcePolicy.CFN_RESOURCE_TYPE_NAME) return undefined;
+  return existing as ResourcePolicy;
 }
 
 function errorIfStackNotUsEast1(scope: IConstruct): void {

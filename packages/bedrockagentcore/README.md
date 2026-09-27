@@ -1,0 +1,189 @@
+# @composurecdk/bedrockagentcore
+
+Amazon Bedrock AgentCore for [ComposureCDK](../../README.md): agent runtimes, memory, gateways and evaluations, with secure defaults, consumer-side grants and CloudWatch alarms.
+
+It builds on the stable [`aws-cdk-lib/aws-bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html) module. Model access comes from [`@composurecdk/bedrock`](../bedrock/README.md).
+
+```ts
+import { AgentCoreRuntime, AgentRuntimeArtifact } from "aws-cdk-lib/aws-bedrockagentcore";
+import { FoundationModelIdentifier } from "aws-cdk-lib/aws-bedrock";
+import { compose, ref } from "@composurecdk/core";
+import { inferenceProfile, modelGrants } from "@composurecdk/bedrock";
+import { createVpcBuilder, type VpcBuilderResult } from "@composurecdk/ec2";
+import { createRuntimeBuilder } from "@composurecdk/bedrockagentcore";
+
+const haiku = inferenceProfile.global(
+  FoundationModelIdentifier.ANTHROPIC_CLAUDE_HAIKU_4_5_20251001_V1_0,
+);
+
+compose(
+  {
+    network: createVpcBuilder(),
+    agent: createRuntimeBuilder()
+      .runtimeName("support_agent")
+      .agentRuntimeArtifact(
+        AgentRuntimeArtifact.fromCodeAsset({
+          path: "agent",
+          runtime: AgentCoreRuntime.PYTHON_3_13,
+          entrypoint: ["main.py"],
+        }),
+      )
+      .vpc(ref<VpcBuilderResult>("network").get("vpc"))
+      .environmentVariables({ MODEL_ID: haiku.profileId })
+      .grant(modelGrants.invoke(haiku))
+      .addEndpoint("prod", { version: "1" }),
+  },
+  { network: [], agent: ["network"] },
+);
+```
+
+## Sources for the defaults
+
+AWS's [recommended alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) do not cover AgentCore. The defaults here come from:
+
+- [Security Hub's AgentCore controls](https://docs.aws.amazon.com/securityhub/latest/userguide/bedrockagentcore-controls.html) (BedrockAgentCore.1–7), the only per-resource configuration rules AWS publishes.
+- The [Well-Architected Agentic AI Lens](https://docs.aws.amazon.com/wellarchitected/latest/agentic-ai-lens/agentic-ai-lens.html), for tracing and monitoring.
+- The [AgentCore Developer Guide](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/), for metrics, quotas and runtime security practices.
+
+AWS publishes no AgentCore thresholds, so each threshold is this library's choice. Alarms with no universal baseline are opt-in and need a threshold.
+
+## Runtimes
+
+`createRuntimeBuilder()` wraps `Runtime`. Where it differs from CDK:
+
+| Setting                      | Default                                                                              | Why                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Network                      | **None:** call `.vpc(…)`, or pass `RuntimeNetworkConfiguration.usingPublicNetwork()` | Public networking fails Security Hub BedrockAgentCore.1 (High)                     |
+| VPC security group           | Outbound HTTPS only, from `@composurecdk/ec2`                                        | CDK's allows all outbound traffic                                                  |
+| `tracingEnabled`             | `true`                                                                               | Agentic AI Lens AGENTOPS05-BP01                                                    |
+| Endpoint log group retention | The `@composurecdk/logs` default, set on the service's log group                     | The service creates it with no retention and keeps it after the runtime is deleted |
+
+A VPC-mode runtime needs interface endpoints for ECR (`ecr.api`, `ecr.dkr`) and CloudWatch Logs, and an S3 gateway endpoint, unless its subnets have a NAT route. See [VPC configuration](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-vpc.html).
+
+Everything else is CDK's or the service's default: IAM (SigV4) inbound auth, a 15-minute idle session timeout, an 8-hour maximum lifetime, and CDK's execution role. That role can pull the artifact and write logs, traces and metrics. The agent's own access is granted with `.grant(...)`:
+
+```ts
+createRuntimeBuilder()
+  // …
+  .grant(modelGrants.invoke(haiku, { requireGuardrail: guardrail }))
+  .grant(memoryGrants.readWrite(ref<MemoryBuilderResult>("memory").get("memory")));
+```
+
+`addEndpoint(name, { version })` adds a version-pinned endpoint, each with its own log group and alarms. For a runtime built elsewhere, use `createRuntimeEndpointBuilder()`.
+
+### Invoking a runtime
+
+`runtimeGrants.invoke` grants `bedrock-agentcore:InvokeAgentRuntime` on the runtime and its endpoints. `runtimeGrants.invokeForUser` grants `InvokeAgentRuntimeForUser`, which lets the caller name the user; grant it only to callers that need it.
+
+```ts
+createFunctionBuilder().grant(
+  runtimeGrants.invoke(ref<RuntimeBuilderResult>("agent").get("runtime")),
+);
+```
+
+## Memory
+
+`createMemoryBuilder()` wraps `Memory` and keeps CDK's defaults: short-term memory only, with events kept for 90 days. Long-term strategies call a model to extract records, so add them with `.memoryStrategies([...])` as a design choice.
+
+Pass a customer managed key with `.kmsKey(...)` to meet Security Hub BedrockAgentCore.3.
+
+`memoryGrants` gives agents data-plane access only: `write`, `read`, `readShortTerm`, `readLongTerm`, `readWrite` and `delete`.
+
+Memory has no recommended alarms: AgentCore publishes memory metrics per API operation, without system-error or throttle series. Add alarms with `addAlarm()` on the operations you depend on, e.g. `Errors` for `CreateEvent`.
+
+## Gateways
+
+`createGatewayBuilder()` wraps `Gateway`. Where it differs from CDK:
+
+| Setting            | Default                                                              | Why                                                                                                                                      |
+| ------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Inbound auth       | `GatewayAuthorizer.usingAwsIam()`                                    | Meets Security Hub BedrockAgentCore.2 without the Cognito user pool CDK creates                                                          |
+| Service role trust | Conditioned on `aws:SourceAccount` and the gateway's `aws:SourceArn` | CDK's role trusts the service unconditionally ([confused deputy](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html)) |
+
+Pass a customer managed key with `.kmsKey(...)` to meet BedrockAgentCore.4.
+
+`addLambdaTarget(key, options)` takes the function as a `ref(...)`, and its tools are named `<key>___<tool>` for agents. Add any other target with `addTarget(key, (gateway, key) => gateway.addMcpServerTarget(key, { gatewayTargetName: key, ... }))`. CDK grants the service role what each target needs.
+
+```ts
+createGatewayBuilder()
+  .gatewayName("support-tools")
+  .addLambdaTarget("orders", {
+    lambdaFunction: ref<FunctionBuilderResult>("orders").get("function"),
+    toolSchema: ToolSchema.fromLocalAsset("tools/orders.json"),
+  });
+
+createRuntimeBuilder()
+  // …
+  .grant(gatewayGrants.invoke(ref<GatewayBuilderResult>("tools").get("gateway")));
+```
+
+## Evaluations
+
+`createEvaluatorBuilder()` builds a custom evaluator. An LLM-as-a-judge evaluator takes its model as a `@composurecdk/bedrock` target, and the result returns it as `judge`. Built-in evaluators are not resources; select them with `EvaluatorSelector.builtin(...)`.
+
+`createOnlineEvaluationBuilder()` scores a sample of an agent's traces, at the service's default 10%. It is created enabled. Its execution role can read the traces and write results, but has **no model access**: CDK's role would allow `bedrock:InvokeModel` on every model in every Region. Grant each judge explicitly:
+
+```ts
+compose(
+  {
+    tone: createEvaluatorBuilder()
+      .evaluatorName("tone")
+      .level(EvaluationLevel.TRACE)
+      .llmAsAJudge({ model: haiku, instructions, ratingScale }),
+    quality: createOnlineEvaluationBuilder()
+      .onlineEvaluationConfigName("support_quality")
+      .dataSource(
+        ref<RuntimeBuilderResult>("agent").map((r) =>
+          DataSourceConfig.fromAgentRuntimeEndpoint(r.runtime),
+        ),
+      )
+      .evaluators([
+        EvaluatorSelector.builtin(BuiltinEvaluator.HELPFULNESS),
+        ref<EvaluatorBuilderResult>("tone").get("selector"),
+      ])
+      .grant(modelGrants.invoke(haiku)),
+  },
+  { tone: [], quality: ["agent", "tone"] },
+);
+```
+
+Score alarms are opt-in. Each fires when an evaluator's hourly average score is below the threshold in 2 of 3 hours, and is keyed by the evaluator's metric name in `Bedrock-AgentCore/Evaluations`:
+
+```ts
+createOnlineEvaluationBuilder().recommendedAlarms({
+  scores: { "Builtin.Helpfulness": { threshold: 0.5 } },
+});
+```
+
+Online evaluation needs [CloudWatch Transaction Search](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Transaction-Search.html) enabled in the account (#543), and an agent instrumented with ADOT.
+
+## Alarms
+
+Runtimes and gateways share one set of recommended alarms; gateways add an opt-in `targetExecutionTime` (p90, in ms). Every alarm is on the `AWS/Bedrock-AgentCore` namespace with a 1-minute period. A runtime's alarms are created for each endpoint; custom alarms added with `addAlarm()` watch the `DEFAULT` endpoint.
+
+| Alarm          | Default                                                                   | Metric, statistic   |
+| -------------- | ------------------------------------------------------------------------- | ------------------- |
+| `systemErrors` | On: > 0 in 3 of 5 minutes                                                 | `SystemErrors`, Sum |
+| `throttles`    | On: > 0 in 3 of 5 minutes                                                 | `Throttles`, Sum    |
+| `userErrors`   | Runtimes: on, > 0 in 3 of 5 minutes. Gateways: opt-in, threshold required | `UserErrors`, Sum   |
+| `latency`      | Opt-in, threshold required (in ms)                                        | `Latency`, p90      |
+
+An exception in the agent's own code is counted in a runtime's `UserErrors`, not `SystemErrors`, so the user-error alarm is what catches a failing agent. It also counts callers' mistakes, such as an unknown session.
+
+```ts
+createRuntimeBuilder().recommendedAlarms({
+  latency: { threshold: 30_000 },
+  throttles: false,
+});
+```
+
+### Session quotas
+
+`ActiveSessionCount` covers the whole account and Region, so its alarms come from one `createSessionQuotaAlarmBuilder()` per account and Region, not from each runtime. Each alarm is opt-in and needs the account's quota from Service Quotas, because quotas vary by Region and can be raised. It fires at 80% of the quota unless `thresholdPercent` says otherwise.
+
+```ts
+createSessionQuotaAlarmBuilder().recommendedAlarms({
+  runtime: { quota: 2500 },
+  browser: { quota: 1000 },
+});
+```

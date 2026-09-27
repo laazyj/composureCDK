@@ -111,6 +111,8 @@ Each alarm receives an explicit, hierarchical name of the form `${stackName}/${k
 
 Per-alarm overrides go through [`alarmName()`][alarm-name-src] — a validating constructor for the branded [`AlarmName`][alarm-name-src] type — and cross-cutting decoration through [alarmNamePolicy](#alarmnamepolicy). The default fallback lives in [`defaultAlarmName`][default-alarm-name-src].
 
+A name holding an unresolved CDK token (e.g. a `CfnParameter` value) is not validated, since its value is only known at deploy. `joinAlarmName` keeps such a segment verbatim rather than kebab-casing it, so the token still resolves.
+
 [alarm-name-src]: ./src/alarm-name.ts
 [default-alarm-name-src]: ./src/default-alarm-name.ts
 

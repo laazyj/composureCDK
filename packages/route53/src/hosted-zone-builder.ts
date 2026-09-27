@@ -70,7 +70,7 @@ export type IHostedZoneBuilder = ITaggedBuilder<HostedZoneBuilderProps, HostedZo
 class HostedZoneBuilder implements Lifecycle<HostedZoneBuilderResult> {
   props: Partial<HostedZoneBuilderProps> = {};
 
-  build(scope: IConstruct, id: string): HostedZoneBuilderResult {
+  build(scope: IConstruct, id: string, context?: Record<string, object>): HostedZoneBuilderResult {
     if (!this.props.zoneName) {
       throw new Error(
         `HostedZoneBuilder "${id}" requires a zoneName. ` +
@@ -88,6 +88,7 @@ class HostedZoneBuilder implements Lifecycle<HostedZoneBuilderResult> {
       id,
       this.props.zoneName,
       queryLogging,
+      context,
     );
 
     const hostedZone = new PublicHostedZone(scope, id, {

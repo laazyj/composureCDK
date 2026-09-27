@@ -1,23 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match } from "aws-cdk-lib/assertions";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import {
   RECEIVING_REGION_WARNING,
   SES_RECEIVING_REGIONS,
   warnIfNotReceivingRegion,
 } from "../src/region-support.js";
 
-function stackIn(region?: string): Stack {
-  return new Stack(
-    new App(),
-    "TestStack",
-    region ? { env: { account: "111111111111", region } } : {},
-  );
-}
-
 describe("warnIfNotReceivingRegion", () => {
   it("warns in a region without SES receiving support", () => {
-    const stack = stackIn("af-south-1");
+    const stack = newStack({ env: testEnv("af-south-1") });
     warnIfNotReceivingRegion(stack);
     Annotations.fromStack(stack).hasWarning(
       "*",
@@ -26,13 +18,13 @@ describe("warnIfNotReceivingRegion", () => {
   });
 
   it("does not warn in a supported region", () => {
-    const stack = stackIn("us-east-1");
+    const stack = newStack({ env: testEnv("us-east-1") });
     warnIfNotReceivingRegion(stack);
     Annotations.fromStack(stack).hasNoWarning("*", Match.anyValue());
   });
 
   it("does not warn for an environment-agnostic stack", () => {
-    const stack = stackIn();
+    const stack = newStack();
     warnIfNotReceivingRegion(stack);
     Annotations.fromStack(stack).hasNoWarning("*", Match.anyValue());
   });

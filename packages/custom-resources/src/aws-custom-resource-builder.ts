@@ -5,10 +5,16 @@ import {
   type AwsCustomResourceProps,
 } from "aws-cdk-lib/custom-resources";
 import { type IConstruct } from "constructs";
-import { Builder, COPY_STATE, type IBuilder, type Lifecycle, type Ref } from "@composurecdk/core";
+import {
+  addDependencies,
+  Builder,
+  COPY_STATE,
+  type DependencySource,
+  type IBuilder,
+  type Lifecycle,
+} from "@composurecdk/core";
 import { AWS_CUSTOM_RESOURCE_DEFAULTS } from "./defaults.js";
 import { resolveCall, type SdkCallConfig } from "./calls.js";
-import { addDependenciesFromRefs } from "./dependencies.js";
 
 /**
  * Passthrough configuration for the custom resource's provider Lambda and
@@ -90,7 +96,7 @@ class AwsCustomResourceBuilder implements Lifecycle<AwsCustomResourceBuilderResu
   #onDelete?: SdkCallConfig;
   #policy?: AwsCustomResourcePolicy;
   readonly #statements: PolicyStatement[] = [];
-  readonly #dependsOn: Ref<object>[] = [];
+  readonly #dependsOn: DependencySource[] = [];
 
   /** The SDK call to run on resource creation. */
   onCreate(call: SdkCallConfig): this {
@@ -132,13 +138,16 @@ class AwsCustomResourceBuilder implements Lifecycle<AwsCustomResourceBuilderResu
   }
 
   /**
-   * Declares that this custom resource must be created after the named
-   * component(s). The refs are resolved against the build context and a
-   * CloudFormation `DependsOn` is added to each resolved construct — the
-   * reliable ordering seam for calls whose parameters carry no token.
+   * Declares that this custom resource must be created after the given
+   * sources, resolved against the build context — the reliable ordering seam
+   * for calls whose parameters carry no token, so CloudFormation derives no
+   * edge of its own.
+   *
+   * Takes any {@link DependencySource}: a construct, a `ref` to one construct
+   * inside a sibling's result, or a `ref` to the whole sibling.
    */
-  dependsOn(...refs: Ref<object>[]): this {
-    this.#dependsOn.push(...refs);
+  dependsOn(...sources: DependencySource[]): this {
+    this.#dependsOn.push(...sources);
     return this;
   }
 
@@ -174,7 +183,7 @@ class AwsCustomResourceBuilder implements Lifecycle<AwsCustomResourceBuilderResu
     };
 
     const customResource = new AwsCustomResource(scope, id, props);
-    addDependenciesFromRefs(customResource, this.#dependsOn, context);
+    addDependencies(customResource, this.#dependsOn, context);
     return { customResource };
   }
 

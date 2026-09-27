@@ -1,6 +1,7 @@
 export { at } from "./build-id.js";
 export { Builder, COPY_STATE, type IBuilder } from "./builder.js";
 export { constructId, sanitizeConstructId } from "./construct-id.js";
+export { addDependencies, type DependencySource } from "./dependencies.js";
 export {
   compose,
   type ComposedSystem,

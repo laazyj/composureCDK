@@ -20,6 +20,7 @@ class SimpleTarget {
 interface EmptyProps {}
 
 class EmptyTarget {
+  // eslint-disable-next-line @typescript-eslint/no-generated-empty-object-type -- Partial<EmptyProps> deliberately resolves to `{}`; this fixture is the builder-with-no-props case
   props: Partial<EmptyProps> = {};
 
   value(): string {

@@ -7,7 +7,7 @@ import {
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import { combine, COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { CertificateAlarmConfig } from "./alarm-config.js";
@@ -53,7 +53,8 @@ export interface CertificateBuilderProps extends CertificateProps {
    *
    * By default, the builder creates a recommended `daysToExpiry` alarm
    * at 45 days. The alarm can be customized or disabled. Set to `false`
-   * to disable all alarms.
+   * to disable the recommended alarms; custom alarms added via
+   * `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification
    * methods are user-specific. Access alarms from the build result
@@ -174,10 +175,9 @@ class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
     if (userValidation) {
       validation = userValidation;
     } else if (validationZones) {
-      const resolvedZones = Object.fromEntries(
-        Object.entries(validationZones).map(([domain, zone]) => [domain, resolve(zone, context)]),
+      validation = CertificateValidation.fromDnsMultiZone(
+        resolve(combine(validationZones), context),
       );
-      validation = CertificateValidation.fromDnsMultiZone(resolvedZones);
     } else if (validationZone) {
       validation = CertificateValidation.fromDns(resolve(validationZone, context));
     } else {

@@ -1,10 +1,36 @@
 import { LogGroup, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
-import { type Lifecycle } from "@composurecdk/core";
+import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { LOG_GROUP_DEFAULTS } from "./defaults.js";
 
-export type LogGroupBuilderProps = LogGroupProps;
+/**
+ * Configuration properties for the CloudWatch log group builder.
+ *
+ * The CDK {@link LogGroupProps} surface, with `encryptionKey` widened so the
+ * key can come from a composed component.
+ */
+export interface LogGroupBuilderProps extends Omit<LogGroupProps, "encryptionKey"> {
+  /**
+   * The customer-managed KMS key used to encrypt the log group.
+   *
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
+   *
+   * CloudWatch Logs encrypts every log group with a service-managed key by
+   * default, so this prop opts into a customer-managed one. The key policy
+   * must allow the `logs.<region>.amazonaws.com` service principal — CDK adds
+   * that statement for a key it can see.
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction —
+   * see the table in `@composurecdk/kms`'s README.
+   *
+   * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html
+   */
+  encryptionKey?: Resolvable<NonNullable<LogGroupProps["encryptionKey"]>>;
+}
 
 /**
  * The build output of a {@link ILogGroupBuilder}. Contains the CDK constructs
@@ -38,11 +64,15 @@ export type ILogGroupBuilder = ITaggedBuilder<LogGroupBuilderProps, LogGroupBuil
 class LogGroupBuilder implements Lifecycle<LogGroupBuilderResult> {
   props: Partial<LogGroupBuilderProps> = {};
 
-  build(scope: IConstruct, id: string): LogGroupBuilderResult {
+  build(scope: IConstruct, id: string, context?: Record<string, object>): LogGroupBuilderResult {
+    const { encryptionKey, ...logGroupProps } = this.props;
+
     const mergedProps = {
       ...LOG_GROUP_DEFAULTS,
-      ...this.props,
+      ...logGroupProps,
+      ...(encryptionKey !== undefined ? { encryptionKey: resolve(encryptionKey, context) } : {}),
     };
+
     return {
       logGroup: new LogGroup(scope, id, mergedProps),
     };

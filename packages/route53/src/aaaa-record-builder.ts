@@ -1,9 +1,4 @@
-import {
-  AaaaRecord,
-  type AaaaRecordProps,
-  type IHostedZone,
-  type RecordTarget,
-} from "aws-cdk-lib/aws-route53";
+import { AaaaRecord, type AaaaRecordProps } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -20,12 +15,16 @@ import { AAAA_RECORD_DEFAULTS } from "./defaults.js";
  * Extends the CDK {@link AaaaRecordProps} but replaces `zone` and `target`
  * with {@link Resolvable} variants so they can be wired from other components
  * in a composed system.
+ *
+ * Both read their inner type from CDK's own prop rather than naming
+ * `IHostedZone` / `RecordTarget`, so they keep tracking the installed
+ * `aws-cdk-lib` (ADR-0018).
  */
 export interface AaaaRecordBuilderProps extends Omit<AaaaRecordProps, "zone" | "target"> {
   /** The hosted zone in which to create the record. */
-  zone?: Resolvable<IHostedZone>;
+  zone?: Resolvable<NonNullable<AaaaRecordProps["zone"]>>;
   /** The record target. */
-  target?: Resolvable<RecordTarget>;
+  target?: Resolvable<NonNullable<AaaaRecordProps["target"]>>;
 }
 
 /**

@@ -9,23 +9,17 @@ import {
   type ITable,
   StreamViewType,
   TableEncryptionV2,
+  type TablePropsV2,
 } from "aws-cdk-lib/aws-dynamodb";
 import { Key } from "aws-cdk-lib/aws-kms";
+import { buildFixture } from "@composurecdk/cdk-testing";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createTableV2Builder } from "../src/table-v2-builder.js";
+import { createTableV2Builder, type TableV2BuilderProps } from "../src/table-v2-builder.js";
 
 const PK = { name: "pk", type: AttributeType.STRING };
 
-function synthTemplate(
-  configureFn?: (builder: ReturnType<typeof createTableV2Builder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createTableV2Builder().partitionKey(PK);
-  configureFn?.(builder);
-  builder.build(stack, "TestTable");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(() => createTableV2Builder().partitionKey(PK), "TestTable");
 
 describe("TableV2Builder", () => {
   describe("build", () => {
@@ -39,7 +33,7 @@ describe("TableV2Builder", () => {
     });
 
     it("creates exactly one DynamoDB GlobalTable resource", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       // TableV2 synthesises to AWS::DynamoDB::GlobalTable, not ::Table.
       template.resourceCountIs("AWS::DynamoDB::GlobalTable", 1);
@@ -75,9 +69,18 @@ describe("TableV2Builder", () => {
     });
   });
 
+  describe("props", () => {
+    it("accept everything CDK's own TablePropsV2 accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const _props: TableV2BuilderProps = undefined as unknown as TablePropsV2;
+    });
+  });
+
   describe("secure defaults", () => {
     it("uses on-demand (PAY_PER_REQUEST) billing by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
         BillingMode: "PAY_PER_REQUEST",
@@ -85,7 +88,7 @@ describe("TableV2Builder", () => {
     });
 
     it("encrypts at rest with an AWS-managed KMS key by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
         SSESpecification: { SSEEnabled: true, SSEType: "KMS" },
@@ -96,7 +99,7 @@ describe("TableV2Builder", () => {
     // Replicas[]), not at the resource root like the classic Table — assert
     // against Replicas[0].
     it("enables point-in-time recovery per-replica by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
         Replicas: Match.arrayWith([
@@ -108,7 +111,7 @@ describe("TableV2Builder", () => {
     });
 
     it("enables deletion protection per-replica by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
         Replicas: Match.arrayWith([Match.objectLike({ DeletionProtectionEnabled: true })]),
@@ -116,7 +119,7 @@ describe("TableV2Builder", () => {
     });
 
     it("allows deletion protection to be disabled via the fluent API", () => {
-      const template = synthTemplate((b) => b.deletionProtection(false));
+      const { template } = buildAndSynth((b) => b.deletionProtection(false));
 
       template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
         Replicas: Match.arrayWith([Match.objectLike({ DeletionProtectionEnabled: false })]),
@@ -126,7 +129,7 @@ describe("TableV2Builder", () => {
 
   describe("default overrides", () => {
     it("honours an explicit provisioned billing override", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.billing(
           Billing.provisioned({
             readCapacity: Capacity.fixed(5),
@@ -160,8 +163,28 @@ describe("TableV2Builder", () => {
       });
     });
 
+    it("resolves a Resolvable encryption from the build context", () => {
+      const stack = new Stack(new App(), "TestStack", {
+        env: { account: "123456789012", region: "us-east-1" },
+      });
+      const key = new Key(stack, "Key");
+
+      createTableV2Builder()
+        .partitionKey(PK)
+        .encryption(
+          ref<{ key: Key }, TableEncryptionV2>("tableKey", (r) =>
+            TableEncryptionV2.customerManagedKey(r.key),
+          ),
+        )
+        .build(stack, "TestTable", { tableKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::DynamoDB::GlobalTable", {
+        SSESpecification: { SSEEnabled: true, SSEType: "KMS" },
+      });
+    });
+
     it("allows falling back to the free AWS-owned key", () => {
-      const template = synthTemplate((b) => b.encryption(TableEncryptionV2.dynamoOwnedKey()));
+      const { template } = buildAndSynth((b) => b.encryption(TableEncryptionV2.dynamoOwnedKey()));
 
       // The AWS-owned key (TableEncryptionV2.dynamoOwnedKey) synthesises with
       // SSEEnabled false — DynamoDB still encrypts, just with the free key.
@@ -173,7 +196,7 @@ describe("TableV2Builder", () => {
 
   describe("synthesised output", () => {
     it("creates a table with the specified name and key schema", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.tableName("orders").sortKey({ name: "sk", type: AttributeType.NUMBER }),
       );
 
@@ -187,7 +210,7 @@ describe("TableV2Builder", () => {
     });
 
     it("forwards the stream view type to the underlying CDK construct", () => {
-      const template = synthTemplate((b) => b.dynamoStream(StreamViewType.NEW_IMAGE));
+      const { template } = buildAndSynth((b) => b.dynamoStream(StreamViewType.NEW_IMAGE));
 
       template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
         StreamSpecification: { StreamViewType: "NEW_IMAGE" },

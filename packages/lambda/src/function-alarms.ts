@@ -272,7 +272,8 @@ function eventSourceMetric(eventSourceMappingId: string, metricName: string): Me
  * @param scope - CDK construct scope for creating alarm constructs.
  * @param id - Base identifier for alarm construct ids.
  * @param fn - The Lambda function to create alarms for.
- * @param config - User-provided alarm configuration, or `false` to disable all.
+ * @param config - User-provided alarm configuration, or `false` to disable the
+ *   recommended alarms.
  * @param props - The merged function props, used for contextual alarm thresholds.
  * @param eventSources - Event sources attached to the function, used for
  *   per-event-source contextual alarms.
@@ -290,12 +291,10 @@ export function createFunctionAlarms(
   eventSources: AttachedEventSource[] = [],
   customAlarms: AlarmDefinitionBuilder<LambdaFunction>[] = [],
 ): Record<string, Alarm> {
-  if (config === false) return {};
-
-  const enabled = config?.enabled ?? FUNCTION_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveFunctionAlarmDefinitions(fn, config, props, eventSources);
+  const recommended =
+    config === false || config?.enabled === false
+      ? []
+      : resolveFunctionAlarmDefinitions(fn, config, props, eventSources);
   const custom = customAlarms.map((b) => b.resolve(fn));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

@@ -46,7 +46,7 @@ function resolveEndpointAlarmDefinitions(
       datapointsToAlarm: cfg.datapointsToAlarm,
       treatMissingData: cfg.treatMissingData,
       description:
-        `VPC interface endpoint is dropping packets — possible endpoint service unhealthy, ` +
+        `VPC interface endpoint is dropping packets - possible endpoint service unhealthy, ` +
         `security group blocking traffic, or packets exceeding the 8,500-byte PrivateLink MTU. ` +
         `Threshold: > ${String(cfg.threshold)} (sum) over ` +
         `${String(cfg.evaluationPeriods)} x ${PACKETS_DROPPED_PERIOD_LABEL}.`,
@@ -69,12 +69,10 @@ export function createInterfaceEndpointAlarms(
   config: InterfaceEndpointAlarmConfig | false | undefined,
   customAlarms: AlarmDefinitionBuilder<InterfaceVpcEndpoint>[] = [],
 ): Record<string, Alarm> {
-  if (config === false) return {};
-
-  const enabled = config?.enabled ?? INTERFACE_ENDPOINT_ALARM_DEFAULTS.enabled;
-  if (!enabled) return {};
-
-  const recommended = resolveEndpointAlarmDefinitions(endpoint, config);
+  const recommended =
+    config === false || config?.enabled === false
+      ? []
+      : resolveEndpointAlarmDefinitions(endpoint, config);
   const custom = customAlarms.map((b) => b.resolve(endpoint));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

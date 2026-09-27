@@ -3,6 +3,7 @@ import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type CfnBudget } from "aws-cdk-lib/aws-budgets";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
@@ -12,10 +13,6 @@ import {
   type BudgetAlarmBuilderResult,
 } from "../src/budget-alarm-builder.js";
 import type { BudgetBuilderResult } from "../src/budget-builder.js";
-
-const ACCOUNT = "123456789012";
-const ENV_US_EAST_1 = { account: ACCOUNT, region: "us-east-1" };
-const ENV_EU_WEST_2 = { account: ACCOUNT, region: "eu-west-2" };
 
 function ec2EstimatedCharges(a: AlarmDefinitionBuilder<CfnBudget>) {
   return a
@@ -32,7 +29,7 @@ function ec2EstimatedCharges(a: AlarmDefinitionBuilder<CfnBudget>) {
     .greaterThan();
 }
 
-function buildBudget(env = ENV_US_EAST_1) {
+function buildBudget(env = testEnv("us-east-1")) {
   const app = new App();
   const stack = new Stack(app, "TestStack", { env });
   const result = createBudgetBuilder()
@@ -100,8 +97,7 @@ describe("createBudgetAlarmBuilder", () => {
     });
 
     it("creates the recommended alarm without calling .budget() (account-level metric)", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack", { env: ENV_US_EAST_1 });
+      const stack = newStack({ env: testEnv("us-east-1") });
       const alarmResult = createBudgetAlarmBuilder()
         .recommendedAlarms({ estimatedCharges: { threshold: 1000 } })
         .build(stack, "Alarms");
@@ -111,8 +107,7 @@ describe("createBudgetAlarmBuilder", () => {
     });
 
     it("throws when addAlarm() is used without .budget()", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack", { env: ENV_US_EAST_1 });
+      const stack = newStack({ env: testEnv("us-east-1") });
       const builder = createBudgetAlarmBuilder().addAlarm(
         "ec2EstimatedCharges",
         ec2EstimatedCharges,
@@ -126,7 +121,9 @@ describe("createBudgetAlarmBuilder", () => {
     function buildAlarmsInRegion(region: string | undefined): Stack {
       const app = new App();
       const budgetStackProps =
-        region === undefined ? undefined : { env: ENV_EU_WEST_2, crossRegionReferences: true };
+        region === undefined
+          ? undefined
+          : { env: testEnv("eu-west-2"), crossRegionReferences: true };
       const budgetStack = new Stack(app, "BudgetStack", budgetStackProps);
       const result = createBudgetBuilder()
         .budgetName("Account")
@@ -138,7 +135,7 @@ describe("createBudgetAlarmBuilder", () => {
         region === undefined
           ? new Stack(app, "AlarmStack")
           : new Stack(app, "AlarmStack", {
-              env: { account: ACCOUNT, region },
+              env: testEnv(region),
               crossRegionReferences: true,
             });
       createBudgetAlarmBuilder()
@@ -178,7 +175,7 @@ describe("createBudgetAlarmBuilder", () => {
     it("warns on the custom-alarm-only path outside us-east-1", () => {
       const app = new App();
       const budgetStack = new Stack(app, "BudgetStack", {
-        env: ENV_EU_WEST_2,
+        env: testEnv("eu-west-2"),
         crossRegionReferences: true,
       });
       const result = createBudgetBuilder()
@@ -188,7 +185,7 @@ describe("createBudgetAlarmBuilder", () => {
         .build(budgetStack, "AccountBudget");
 
       const alarmStack = new Stack(app, "AlarmStack", {
-        env: { account: ACCOUNT, region: "us-west-2" },
+        env: testEnv("us-west-2"),
         crossRegionReferences: true,
       });
       createBudgetAlarmBuilder()
@@ -206,8 +203,7 @@ describe("createBudgetAlarmBuilder", () => {
 
   describe("with a Ref<BudgetBuilderResult> through compose", () => {
     it("resolves the budget and creates the same alarm surface", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack", { env: ENV_US_EAST_1 });
+      const stack = newStack({ env: testEnv("us-east-1") });
 
       const system = compose(
         {
@@ -239,11 +235,11 @@ describe("createBudgetAlarmBuilder", () => {
     it("routes alarms into a separate stack via withStacks()", () => {
       const app = new App();
       const appStack = new Stack(app, "AppStack", {
-        env: ENV_EU_WEST_2,
+        env: testEnv("eu-west-2"),
         crossRegionReferences: true,
       });
       const alarmStack = new Stack(app, "AlarmStack", {
-        env: ENV_US_EAST_1,
+        env: testEnv("us-east-1"),
         crossRegionReferences: true,
       });
 
@@ -308,7 +304,8 @@ describe("createBudgetAlarmBuilder", () => {
               .greaterThan(),
           );
         },
-        build: (b) => b.build(new Stack(new App(), "AlarmStack", { env: ENV_US_EAST_1 }), "Alarms"),
+        build: (b) =>
+          b.build(new Stack(new App(), "AlarmStack", { env: testEnv("us-east-1") }), "Alarms"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
     });

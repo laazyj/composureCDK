@@ -1,31 +1,30 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import {
   CachePolicy,
   type Distribution,
+  type DistributionProps,
+  type FunctionProps,
   PriceClass,
   ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Certificate } from "aws-cdk-lib/aws-certificatemanager";
+import { buildFixture } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { type BucketBuilderResult } from "@composurecdk/s3";
-import { createDistributionBuilder } from "../src/distribution-builder.js";
+import {
+  createDistributionBuilder,
+  type DistributionBuilderProps,
+  type InlineFunctionDefinition,
+} from "../src/distribution-builder.js";
 
-function synthTemplate(
-  configureFn: (builder: ReturnType<typeof createDistributionBuilder>, stack: Stack) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createDistributionBuilder();
-  configureFn(builder, stack);
-  builder.build(stack, "TestDistribution");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(createDistributionBuilder, "TestDistribution");
 
 function withBucketOrigin(stack: Stack) {
   const bucket = new Bucket(stack, "TestBucket");
@@ -33,6 +32,25 @@ function withBucketOrigin(stack: Stack) {
 }
 
 describe("DistributionBuilder", () => {
+  describe("props", () => {
+    it("accept everything CDK's own DistributionProps accepts (type-level guard)", () => {
+      // A re-declared prop must widen what CDK takes, never narrow it: pinning
+      // `certificate` to `ICertificate` rejected a certificate CDK itself
+      // takes, once CDK widened `DistributionProps.certificate` to
+      // `ICertificateRef` in 2.235.0. Asserted over the whole interface, so a
+      // prop re-declared later cannot reintroduce the narrowing. Structural
+      // assignment ignores the props the builder replaces outright, so they
+      // need no exemption here — and a prop that is merely widened must never
+      // be given one.
+      const _props: DistributionBuilderProps = undefined as unknown as DistributionProps;
+    });
+
+    it("accept every key-value store CDK's own FunctionProps accepts (type-level guard)", () => {
+      const _keyValueStore: NonNullable<InlineFunctionDefinition["keyValueStore"]> =
+        undefined as unknown as NonNullable<FunctionProps["keyValueStore"]>;
+    });
+  });
+
   describe("build", () => {
     it("returns a DistributionBuilderResult with a distribution property", () => {
       const app = new App();
@@ -58,13 +76,13 @@ describe("DistributionBuilder", () => {
 
   describe("synthesised output", () => {
     it("creates a CloudFront distribution", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       template.resourceCountIs("AWS::CloudFront::Distribution", 1);
     });
 
     it("creates a distribution with a comment", () => {
-      const template = synthTemplate((b, stack) =>
+      const { template } = buildAndSynth((b, stack) =>
         b.origin(withBucketOrigin(stack)).comment("My website"),
       );
 
@@ -76,7 +94,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("creates a distribution with custom error responses", () => {
-      const template = synthTemplate((b, stack) =>
+      const { template } = buildAndSynth((b, stack) =>
         b.origin(withBucketOrigin(stack)).errorResponses([
           {
             httpStatus: 404,
@@ -100,7 +118,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("allows the user to enable or disable the distribution", () => {
-      const template = synthTemplate((b, stack) =>
+      const { template } = buildAndSynth((b, stack) =>
         b.origin(withBucketOrigin(stack)).enabled(false),
       );
 
@@ -114,7 +132,7 @@ describe("DistributionBuilder", () => {
 
   describe("secure defaults", () => {
     it("uses PriceClass 100 by default", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
@@ -124,7 +142,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("redirects HTTP to HTTPS by default", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
@@ -136,7 +154,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("sets index.html as default root object", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
@@ -146,7 +164,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("uses HTTP/2 and HTTP/3 by default", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
@@ -156,7 +174,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("requires TLS 1.2 minimum protocol version by default", () => {
-      const template = synthTemplate((b, stack) => {
+      const { template } = buildAndSynth((b, stack) => {
         const cert = Certificate.fromCertificateArn(
           stack,
           "Cert",
@@ -175,7 +193,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("applies security response headers policy by default", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
@@ -187,7 +205,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("enables access logging by default", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
@@ -199,7 +217,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("creates a logging bucket with secure defaults", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       // The auto-created logging bucket should have secure defaults from BucketBuilder
       template.hasResourceProperties("AWS::S3::Bucket", {
@@ -216,7 +234,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("expires access log objects after 2 years on the auto-created logging bucket", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         LifecycleConfiguration: {
@@ -281,7 +299,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("uses the default 'logs/' prefix on the log bucket", () => {
-      const template = synthTemplate((b, stack) => b.origin(withBucketOrigin(stack)));
+      const { template } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
 
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
@@ -291,7 +309,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("applies a custom prefix on the auto-created log bucket", () => {
-      const template = synthTemplate((b, stack) =>
+      const { template } = buildAndSynth((b, stack) =>
         b.origin(withBucketOrigin(stack)).accessLogs({ prefix: "cdn/" }),
       );
 
@@ -323,7 +341,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("forwards includeCookies to logIncludesCookies", () => {
-      const template = synthTemplate((b, stack) =>
+      const { template } = buildAndSynth((b, stack) =>
         b.origin(withBucketOrigin(stack)).accessLogs({ includeCookies: true }),
       );
 
@@ -335,7 +353,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("applies a configure callback to the auto-created log bucket", () => {
-      const template = synthTemplate((b, stack) =>
+      const { template } = buildAndSynth((b, stack) =>
         b
           .origin(withBucketOrigin(stack))
           .accessLogs({ configure: (lb) => lb.bucketName("my-cdn-logs") }),
@@ -343,6 +361,34 @@ describe("DistributionBuilder", () => {
 
       template.hasResourceProperties("AWS::S3::Bucket", {
         BucketName: "my-cdn-logs",
+      });
+    });
+
+    it("configure callback can reach a sibling component through a ref", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+      const key = new Key(stack, "LogsKey");
+
+      createDistributionBuilder()
+        .origin(withBucketOrigin(stack))
+        .accessLogs({
+          configure: (lb) =>
+            lb.bucketName("my-cdn-logs").encryptionKey(ref<{ key: Key }>("logsKey").get("key")),
+        })
+        .build(stack, "TestDistribution", { logsKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::S3::Bucket", {
+        BucketName: "my-cdn-logs",
+        BucketEncryption: {
+          ServerSideEncryptionConfiguration: [
+            {
+              ServerSideEncryptionByDefault: {
+                SSEAlgorithm: "aws:kms",
+                KMSMasterKeyID: { "Fn::GetAtt": [Match.stringLikeRegexp("LogsKey"), "Arn"] },
+              },
+            },
+          ],
+        },
       });
     });
 
@@ -362,7 +408,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("allows the user to override price class", () => {
-      const template = synthTemplate((b, stack) =>
+      const { template } = buildAndSynth((b, stack) =>
         b.origin(withBucketOrigin(stack)).priceClass(PriceClass.PRICE_CLASS_ALL),
       );
 
@@ -376,7 +422,7 @@ describe("DistributionBuilder", () => {
 
   describe("defaultBehavior override", () => {
     it("preserves user-provided behavior options alongside secure defaults", () => {
-      const template = synthTemplate((b, stack) =>
+      const { template } = buildAndSynth((b, stack) =>
         b.origin(withBucketOrigin(stack)).defaultBehavior({
           cachePolicy: CachePolicy.CACHING_OPTIMIZED,
           compress: true,
@@ -396,7 +442,7 @@ describe("DistributionBuilder", () => {
     });
 
     it("allows overriding viewer protocol policy", () => {
-      const template = synthTemplate((b, stack) =>
+      const { template } = buildAndSynth((b, stack) =>
         b.origin(withBucketOrigin(stack)).defaultBehavior({
           viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
         }),

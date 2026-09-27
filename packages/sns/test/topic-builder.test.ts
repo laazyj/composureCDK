@@ -2,28 +2,21 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { Key } from "aws-cdk-lib/aws-kms";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
-import { type ITopic } from "aws-cdk-lib/aws-sns";
+import { type ITopic, type TopicProps } from "aws-cdk-lib/aws-sns";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import {
   EmailSubscription,
   LambdaSubscription,
   SqsSubscription,
 } from "aws-cdk-lib/aws-sns-subscriptions";
+import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createTopicBuilder } from "../src/topic-builder.js";
+import { createTopicBuilder, type TopicBuilderProps } from "../src/topic-builder.js";
 
-function synthTemplate(
-  configureFn?: (builder: ReturnType<typeof createTopicBuilder>) => void,
-): Template {
-  const app = new App();
-  const stack = new Stack(app, "TestStack");
-  const builder = createTopicBuilder();
-  configureFn?.(builder);
-  builder.build(stack, "TestTopic");
-  return Template.fromStack(stack);
-}
+const buildAndSynth = buildFixture(createTopicBuilder, "TestTopic");
 
 describe("TopicBuilder", () => {
   describe("build", () => {
@@ -39,7 +32,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates exactly one SNS topic", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.resourceCountIs("AWS::SNS::Topic", 1);
     });
@@ -47,7 +40,7 @@ describe("TopicBuilder", () => {
 
   describe("synthesised output", () => {
     it("creates a topic with the specified display name", () => {
-      const template = synthTemplate((b) => b.displayName("My Topic"));
+      const { template } = buildAndSynth((b) => b.displayName("My Topic"));
 
       template.hasResourceProperties("AWS::SNS::Topic", {
         DisplayName: "My Topic",
@@ -55,7 +48,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates a topic with the specified topic name", () => {
-      const template = synthTemplate((b) => b.topicName("my-topic"));
+      const { template } = buildAndSynth((b) => b.topicName("my-topic"));
 
       template.hasResourceProperties("AWS::SNS::Topic", {
         TopicName: "my-topic",
@@ -63,7 +56,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates a FIFO topic when configured", () => {
-      const template = synthTemplate((b) => b.fifo(true).topicName("my-topic.fifo"));
+      const { template } = buildAndSynth((b) => b.fifo(true).topicName("my-topic.fifo"));
 
       template.hasResourceProperties("AWS::SNS::Topic", {
         FifoTopic: true,
@@ -72,7 +65,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates a topic with content-based deduplication", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.fifo(true).contentBasedDeduplication(true).topicName("my-topic.fifo"),
       );
 
@@ -93,7 +86,7 @@ describe("TopicBuilder", () => {
     });
 
     it("creates a Subscription resource for an EmailSubscription", () => {
-      const template = synthTemplate((b) =>
+      const { template } = buildAndSynth((b) =>
         b.addSubscription("ops", new EmailSubscription("ops@example.com")),
       );
 
@@ -193,7 +186,7 @@ describe("TopicBuilder", () => {
 
   describe("secure defaults", () => {
     it("enforces SSL by default", () => {
-      const template = synthTemplate();
+      const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::SNS::TopicPolicy", {
         PolicyDocument: {
@@ -210,14 +203,84 @@ describe("TopicBuilder", () => {
     });
 
     it("allows the user to disable SSL enforcement", () => {
-      const template = synthTemplate((b) => b.enforceSSL(false));
+      const { template } = buildAndSynth((b) => b.enforceSSL(false));
 
       template.resourceCountIs("AWS::SNS::TopicPolicy", 0);
     });
   });
 
+  describe("policy", () => {
+    it("returns the topic's own policy, which holds the enforceSSL statement", () => {
+      const { result, template } = buildAndSynth();
+
+      expect(result.policy).toBeDefined();
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [Match.objectLike({ Sid: "AllowPublishThroughSSLOnly" })],
+        }),
+      });
+      expect(result.policy?.node.path).toBe(`${result.topic.node.path}/Policy`);
+    });
+
+    it("is undefined when the topic has no policy statements", () => {
+      const { result } = buildAndSynth((b) => b.enforceSSL(false));
+
+      expect(result.policy).toBeUndefined();
+    });
+  });
+
+  describe("allowServicePublish", () => {
+    it("adds the statement to the topic's own policy alongside enforceSSL", () => {
+      const { template } = buildAndSynth((b) => b.allowServicePublish("budgets.amazonaws.com"));
+
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [
+            Match.objectLike({ Sid: "AllowPublishThroughSSLOnly" }),
+            Match.objectLike({
+              Effect: "Allow",
+              Principal: { Service: "budgets.amazonaws.com" },
+              Action: "sns:Publish",
+              Resource: { Ref: Match.anyValue() },
+            }),
+          ],
+        }),
+      });
+    });
+
+    it("creates the policy when enforceSSL is off", () => {
+      const { result, template } = buildAndSynth((b) =>
+        b.enforceSSL(false).allowServicePublish("budgets.amazonaws.com"),
+      );
+
+      expect(result.policy).toBeDefined();
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+    });
+
+    it("adds conditions to the statement", () => {
+      const { template } = buildAndSynth((b) =>
+        b.allowServicePublish("codestar-notifications.amazonaws.com", {
+          conditions: { StringEquals: { "aws:SourceAccount": "123456789012" } },
+        }),
+      );
+
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Principal: { Service: "codestar-notifications.amazonaws.com" },
+              Condition: { StringEquals: { "aws:SourceAccount": "123456789012" } },
+            }),
+          ]),
+        }),
+      });
+    });
+  });
+
   describe("[COPY_STATE]", () => {
-    it("preserves #customAlarms and #subscriptions across .copy()", () => {
+    it("preserves #customAlarms, #subscriptions and #servicePublishers across .copy()", () => {
       const failedMetric = (topic: ITopic): Metric =>
         new Metric({
           namespace: "AWS/SNS",
@@ -234,18 +297,62 @@ describe("TopicBuilder", () => {
             a.metric(failedMetric).threshold(1).greaterThanOrEqual(),
           );
           b.addSubscription("first", new EmailSubscription("first@example.com"));
+          b.allowServicePublish("budgets.amazonaws.com");
         },
         mutate: (b) => {
           b.addAlarm("secondCustom", (a) =>
             a.metric(failedMetric).threshold(5).greaterThanOrEqual(),
           );
           b.addSubscription("second", new EmailSubscription("second@example.com"));
+          b.allowServicePublish("events.amazonaws.com");
         },
         build: (b) => b.build(new Stack(new App(), "S"), "Topic"),
         inspect: (r) => ({
           alarms: Object.keys(r.alarms).sort(),
           subscriptions: Object.keys(r.subscriptions).sort(),
+          policyStatements: r.policy?.document.statementCount,
         }),
+      });
+    });
+  });
+
+  describe("props", () => {
+    it("accept everything CDK's own TopicProps accepts (type-level guard)", () => {
+      // A re-declared prop must accept everything CDK's own prop accepts, so a
+      // later re-declaration cannot silently narrow the builder's surface
+      // (ADR-0018). A `tsc`-only assertion — vitest does not typecheck.
+      const _props: TopicBuilderProps = undefined as unknown as TopicProps;
+    });
+  });
+
+  describe("masterKey", () => {
+    it("leaves the topic unencrypted at rest when no key is supplied", () => {
+      const { template } = buildAndSynth();
+
+      template.hasResourceProperties("AWS::SNS::Topic", { KmsMasterKeyId: Match.absent() });
+    });
+
+    it("passes a concrete key through to the topic", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      createTopicBuilder().masterKey(key).build(stack, "TestTopic");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SNS::Topic", {
+        KmsMasterKeyId: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
+      });
+    });
+
+    it("resolves a Resolvable key from the build context", () => {
+      const stack = newStack();
+      const key = new Key(stack, "Key");
+
+      createTopicBuilder()
+        .masterKey(ref<{ key: Key }, Key>("topicKey", (r) => r.key))
+        .build(stack, "TestTopic", { topicKey: { key } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::SNS::Topic", {
+        KmsMasterKeyId: { "Fn::GetAtt": ["Key961B73FD", "Arn"] },
       });
     });
   });

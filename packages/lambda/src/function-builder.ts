@@ -5,9 +5,11 @@ import {
   type FunctionProps,
   type IEventSource,
 } from "aws-cdk-lib/aws-lambda";
-import type { ILogGroup, LogGroup } from "aws-cdk-lib/aws-logs";
+import type { LogGroup } from "aws-cdk-lib/aws-logs";
+import type { Trigger } from "aws-cdk-lib/triggers";
 import { type IConstruct } from "constructs";
 import {
+  combine,
   COPY_STATE,
   type Grant,
   GrantQueue,
@@ -33,37 +35,109 @@ import {
   isComposureEventSource,
 } from "./event-sources/composure-event-source.js";
 import { EVENT_SOURCE_RELATIONSHIP_GUARDS } from "./event-sources/event-source-relationship-guards.js";
+import { createDeploymentTrigger, type InvokeOnDeployOptions } from "./invoke-on-deploy.js";
 
 const LOGS_WRITER_POLICY_NAME = "LogsWriter";
+
+/**
+ * The log group's ARN, wherever the installed `aws-cdk-lib` keeps it.
+ *
+ * `FunctionProps.logGroup` is `logs.ILogGroup` at this package's floor and
+ * `logs.ILogGroupRef` on current CDK, and the ARN sits somewhere different on
+ * each: `logGroupArn` on the L2 interface, `logGroupRef.logGroupArn` on the
+ * reference interface. Neither member compiles against both ends of the
+ * supported range, and narrowing the prop to the one we can read is what
+ * ADR-0018 forbids, so the value is read structurally instead.
+ *
+ * Reading it through a cast to `ILogGroup` instead produced
+ * `Resource: ["undefined:log-stream:*"]` for a log group that only exposes the
+ * reference form: a policy that grants the function nothing, and that
+ * CloudFormation rejects as a malformed ARN.
+ */
+function logGroupArnOf(logGroup: NonNullable<FunctionProps["logGroup"]>, id: string): string {
+  const shape = logGroup as { logGroupArn?: string; logGroupRef?: { logGroupArn?: string } };
+  const arn = shape.logGroupArn ?? shape.logGroupRef?.logGroupArn;
+  if (arn === undefined) {
+    throw new Error(
+      `FunctionBuilder "${id}": the supplied logGroup exposes no ARN, so the default ` +
+        `execution role's ${LOGS_WRITER_POLICY_NAME} policy cannot be scoped to it. ` +
+        `Supply a log group that does, or bring your own role with .role() / .useCdkAutoRole().`,
+    );
+  }
+  return arn;
+}
 
 /**
  * Configuration properties for the Lambda function builder.
  *
  * Extends the CDK {@link FunctionProps} with builder-specific options. The
- * `role` prop is widened to {@link Resolvable} so a role built by a sibling
- * component can be referenced via `ref(...)` at configuration time.
+ * `role` and `environmentEncryption` are widened to {@link Resolvable}, and
+ * `environment` to a record of `Resolvable` values, so a role, key or value
+ * built by a sibling component can be referenced via `ref(...)` at
+ * configuration time. Each reads its inner type from CDK's own prop so they
+ * keep tracking it (ADR-0018).
  */
-export interface FunctionBuilderProps extends Omit<FunctionProps, "role"> {
+export interface FunctionBuilderProps extends Omit<
+  FunctionProps,
+  "role" | "environmentEncryption" | "environment"
+> {
   /**
    * The IAM execution role to attach to the function. When set, the builder
    * skips creating its own role and the auto-created `LogsWriter` inline
    * policy is **not** added — the caller is fully responsible for the role's
    * permissions.
    *
-   * Accepts a concrete {@link IRole} or a {@link Resolvable} for
-   * cross-component wiring (e.g. `ref("sharedRole", r => r.role)`).
+   * Accepts a concrete role or a {@link Resolvable} for cross-component wiring
+   * (e.g. `ref("sharedRole", r => r.role)`).
    *
    * Mutually exclusive with {@link IFunctionBuilder.configureRole} and
    * {@link IFunctionBuilder.useCdkAutoRole}.
    */
-  role?: Resolvable<IRole>;
+  role?: Resolvable<NonNullable<FunctionProps["role"]>>;
+
+  /**
+   * The customer-managed KMS key used to encrypt the function's environment
+   * variables at rest.
+   *
+   * Accepts a concrete key or a {@link Resolvable} — typically a {@link Ref}
+   * to a composed `@composurecdk/kms` key builder, so the key is a component
+   * of the system rather than a construct built outside it.
+   *
+   * Lambda encrypts environment variables with an AWS-managed key by default,
+   * so this prop opts into a customer-managed one. The key policy must allow
+   * the function's execution role to decrypt — CDK adds that grant for a key
+   * it can see.
+   *
+   * The inner type is read from CDK's own prop rather than named as `IKey`, so
+   * it tracks the `kms.IKey` → `kms.IKeyRef` migration in either direction —
+   * see the table in `@composurecdk/kms`'s README.
+   *
+   * @see https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-encryption
+   */
+  environmentEncryption?: Resolvable<NonNullable<FunctionProps["environmentEncryption"]>>;
+
+  /**
+   * Key-value pairs the function can read from `process.env` (e.g.
+   * `.environment({ API_URL: ref("api", (r) => r.api.url), LOG_LEVEL: "info" })`).
+   *
+   * Each **value** is independently {@link Resolvable}, rather than the record
+   * as a whole, because mixing a reference with literals is the common case:
+   * wrapping the record would push every literal through the same `ref`, and
+   * through {@link combine} as soon as two siblings are involved. Matches
+   * `validationZones` in `@composurecdk/acm`.
+   *
+   * The value type is read from CDK's own prop rather than written as `string`,
+   * so it tracks `aws-cdk-lib` (ADR-0018).
+   */
+  environment?: Record<string, Resolvable<NonNullable<FunctionProps["environment"]>[string]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
    * By default, the builder creates recommended alarms with sensible
    * thresholds for every applicable metric. Individual alarms can be
-   * customized or disabled. Set to `false` to disable all alarms.
+   * customized or disabled. Set to `false` to disable the recommended
+   * alarms; custom alarms added via `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification
    * methods are user-specific. Access alarms from the build result
@@ -141,6 +215,19 @@ export interface FunctionBuilderResult {
    * Always present — `{}` when no event sources were added.
    */
   eventSources: Record<string, IEventSource>;
+
+  /**
+   * The custom resource that invokes the function during deployment, or
+   * `undefined` unless {@link IFunctionBuilder.invokeOnDeploy} was called.
+   *
+   * Exposed so a sibling can be ordered against the invocation — e.g.
+   * `deploymentTrigger.executeBefore(...)` to gate another resource on the
+   * call having succeeded.
+   *
+   * Optional, unlike the always-present `alarms` / `eventSources` beside it:
+   * there is no empty `Trigger` to stand in for the absence of one.
+   */
+  deploymentTrigger?: Trigger;
 }
 
 /**
@@ -212,6 +299,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   readonly #grants = new GrantQueue<IGrantable>();
   #configureRole?: (rb: IRoleBuilder) => unknown;
   #useCdkAutoRole = false;
+  #invokeOnDeploy?: InvokeOnDeployOptions;
 
   addAlarm(
     key: string,
@@ -288,6 +376,52 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   }
 
   /**
+   * Invoke this function once during deployment, and **fail the deployment if
+   * it fails** — a domain action for work that must happen as part of shipping
+   * the stack, such as registering the release with an external service,
+   * verifying the deployed system answers correctly, or seeding reference data
+   * through a service API (ADR-0016).
+   *
+   * The deployment waits for the handler's response. If the handler throws or
+   * times out, the stack fails and rolls back, and the handler's error message
+   * reaches the CloudFormation stack events.
+   *
+   * **The handler must throw to fail the deployment.** Returning an error
+   * object — an HTTP-shaped `{ statusCode: 500 }`, or a caught error swallowed
+   * into the response — is a *successful* invocation as far as Lambda is
+   * concerned, and the deployment goes green.
+   *
+   * Ordering is data: the function's own execution role is always waited for,
+   * and anything else the call needs is declared with
+   * {@link InvokeOnDeployOptions.after}.
+   *
+   * The deployment waits for this function's own `timeout` plus 30s, rather
+   * than the flat 2 minutes CDK's `Trigger` defaults to, so a handler that runs
+   * to its limit reports *its* error instead of the deployment abandoning the
+   * call first. The wait is capped at 14m30s — see
+   * {@link InvokeOnDeployOptions.timeout}, which throws above that rather than
+   * clamping.
+   *
+   * Calling this more than once replaces the previous options. The resulting
+   * custom resource is exposed on
+   * {@link FunctionBuilderResult.deploymentTrigger}.
+   *
+   * @example
+   * ```ts
+   * createFunctionBuilder()
+   *   .runtime(Runtime.NODEJS_22_X)
+   *   .handler("index.handler")
+   *   .code(Code.fromAsset("register"))
+   *   .timeout(Duration.seconds(30))
+   *   .invokeOnDeploy({ after: [ref("api", (r: RestApiBuilderResult) => r.api)] });
+   * ```
+   */
+  invokeOnDeploy(options: InvokeOnDeployOptions = {}): this {
+    this.#invokeOnDeploy = options;
+    return this;
+  }
+
+  /**
    * Grant this function's execution role access to a resource built by a
    * sibling component.
    *
@@ -318,6 +452,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     this.#grants.copyInto(target.#grants);
     target.#configureRole = this.#configureRole;
     target.#useCdkAutoRole = this.#useCdkAutoRole;
+    target.#invokeOnDeploy = this.#invokeOnDeploy;
   }
 
   build(
@@ -325,7 +460,13 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     id: string,
     context: Record<string, object> = {},
   ): FunctionBuilderResult {
-    const { role: roleResolvable, recommendedAlarms: alarmConfig, ...functionProps } = this.props;
+    const {
+      role: roleResolvable,
+      environmentEncryption,
+      environment,
+      recommendedAlarms: alarmConfig,
+      ...functionProps
+    } = this.props;
 
     const seamCount =
       (roleResolvable !== undefined ? 1 : 0) +
@@ -341,20 +482,15 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     let logGroupProps = {};
 
     if (!this.props.logGroup) {
-      logGroup = createLogGroupBuilder().build(scope, `${id}LogGroup`).logGroup;
+      logGroup = createLogGroupBuilder().build(scope, `${id}LogGroup`, context).logGroup;
       logGroupProps = { logGroup };
     }
 
-    let role: IRole | undefined;
+    let role: NonNullable<FunctionProps["role"]> | undefined;
     if (roleResolvable !== undefined) {
       role = resolve(roleResolvable, context);
     } else if (!this.#useCdkAutoRole) {
-      role = this.#buildDefaultRole(
-        scope,
-        id,
-        context,
-        (logGroup ?? this.props.logGroup) as ILogGroup | undefined,
-      );
+      role = this.#buildDefaultRole(scope, id, context, logGroup ?? this.props.logGroup);
     }
 
     const mergedProps = {
@@ -362,6 +498,10 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       ...logGroupProps,
       ...functionProps,
       ...(role ? { role } : {}),
+      ...(environmentEncryption !== undefined
+        ? { environmentEncryption: resolve(environmentEncryption, context) }
+        : {}),
+      ...(environment !== undefined ? { environment: resolve(combine(environment), context) } : {}),
     } as FunctionProps;
 
     const fn = new LambdaFunction(scope, id, mergedProps);
@@ -416,21 +556,27 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
       throw new Error(`FunctionBuilder "${id}": Lambda function has no execution role.`);
     }
 
-    return { function: fn, role: resolvedRole, logGroup, alarms, eventSources };
+    // Built last so the invocation is ordered after everything the builder
+    // attached to the function — grants included.
+    const deploymentTrigger = this.#invokeOnDeploy
+      ? createDeploymentTrigger(scope, id, fn, resolvedRole, this.#invokeOnDeploy, context)
+      : undefined;
+
+    return { function: fn, role: resolvedRole, logGroup, alarms, eventSources, deploymentTrigger };
   }
 
   #buildDefaultRole(
     scope: IConstruct,
     id: string,
     context: Record<string, object>,
-    logGroup: ILogGroup | undefined,
+    logGroup: FunctionProps["logGroup"],
   ): IRole {
     if (!logGroup) {
       throw new Error(
         `FunctionBuilder "${id}": cannot build the default execution role without a log group.`,
       );
     }
-    const logGroupArn = logGroup.logGroupArn;
+    const logGroupArn = logGroupArnOf(logGroup, id);
     const roleBuilder = createServiceRoleBuilder("lambda.amazonaws.com").addInlinePolicyStatements(
       LOGS_WRITER_POLICY_NAME,
       [

@@ -5,19 +5,9 @@ import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
 import { compose, type Lifecycle } from "@composurecdk/core";
+import { tagsPerResource } from "@composurecdk/cdk-testing";
+import { singleStack } from "../src/strategies.js";
 import { tags } from "../src/tags.js";
-
-interface CfnTagEntry {
-  Key: string;
-  Value: string;
-}
-interface CfnResourceWithTags {
-  Properties?: { Tags?: CfnTagEntry[] };
-}
-
-function tagsOnResource(resource: CfnResourceWithTags | undefined): CfnTagEntry[] {
-  return resource?.Properties?.Tags ?? [];
-}
 
 function bucketComponent(): Lifecycle<{ bucket: Bucket }> {
   return {
@@ -51,17 +41,16 @@ describe("tags() afterBuild helper", () => {
       .build(stack, "MySystem");
 
     const template = Template.fromStack(stack);
-    const buckets = template.findResources("AWS::S3::Bucket") as Record<
-      string,
-      CfnResourceWithTags
-    >;
-    const topics = template.findResources("AWS::SNS::Topic") as Record<string, CfnResourceWithTags>;
     const expectedTags = [
       { Key: "Owner", Value: "platform" },
       { Key: "Environment", Value: "prod" },
     ];
-    expect(tagsOnResource(Object.values(buckets)[0])).toEqual(expect.arrayContaining(expectedTags));
-    expect(tagsOnResource(Object.values(topics)[0])).toEqual(expect.arrayContaining(expectedTags));
+    expect(tagsPerResource(template, "AWS::S3::Bucket")[0]).toEqual(
+      expect.arrayContaining(expectedTags),
+    );
+    expect(tagsPerResource(template, "AWS::SNS::Topic")[0]).toEqual(
+      expect.arrayContaining(expectedTags),
+    );
   });
 
   it("applies `byComponent` tags only to that component's scope", () => {
@@ -87,12 +76,8 @@ describe("tags() afterBuild helper", () => {
 
     const tA = Template.fromStack(stackA);
     const tB = Template.fromStack(stackB);
-    const bucketTags = tagsOnResource(
-      Object.values(tA.findResources("AWS::S3::Bucket") as Record<string, CfnResourceWithTags>)[0],
-    );
-    const topicTags = tagsOnResource(
-      Object.values(tB.findResources("AWS::SNS::Topic") as Record<string, CfnResourceWithTags>)[0],
-    );
+    const bucketTags = tagsPerResource(tA, "AWS::S3::Bucket")[0];
+    const topicTags = tagsPerResource(tB, "AWS::SNS::Topic")[0];
 
     expect(bucketTags).toEqual(expect.arrayContaining([{ Key: "Tier", Value: "data" }]));
     expect(bucketTags).not.toEqual(expect.arrayContaining([{ Key: "Tier", Value: "messaging" }]));
@@ -143,11 +128,26 @@ describe("tags() afterBuild helper", () => {
       .build(stack, "MySystem");
 
     const template = Template.fromStack(stack);
-    const buckets = template.findResources("AWS::S3::Bucket") as Record<
-      string,
-      CfnResourceWithTags
-    >;
-    const ownerTags = tagsOnResource(Object.values(buckets)[0]).filter((t) => t.Key === "Owner");
+    const ownerTags = tagsPerResource(template, "AWS::S3::Bucket")[0].filter(
+      (t) => t.Key === "Owner",
+    );
     expect(ownerTags).toEqual([{ Key: "Owner", Value: "builder" }]);
+  });
+
+  // `tags()` receives the scope `build()` was called with, which under a stack
+  // strategy is the App — not a Stack. `@aws-cdk/core:explicitStackTags` makes
+  // `Tags.of().add()` skip `aws:cdk:stack` anywhere in that subtree, so the
+  // stacks the strategy created would carry no stack-level tag at all. That is
+  // the tag cost allocation keys on, and `system` is documented as the place to
+  // put it.
+  it("applies system tags to a strategy's stacks under explicitStackTags", () => {
+    const app = new App({ context: { "@aws-cdk/core:explicitStackTags": true } });
+
+    compose({ primary: bucketComponent() }, { primary: [] })
+      .withStackStrategy(singleStack())
+      .afterBuild(tags({ system: { Owner: "platform" } }))
+      .build(app, "MySystem");
+
+    expect(app.synth().getStackByName("MySystem").tags).toEqual({ Owner: "platform" });
   });
 });

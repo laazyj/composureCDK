@@ -4,7 +4,7 @@
 // jasonduffett.net. Only that heading is touched — everything else inherits
 // nx's DefaultChangelogRenderer, so upstream changelog changes flow through on
 // upgrade. Wired in via release.changelog.workspaceChangelog.renderer in
-// nx.json. Preview with `npm run release:dryrun`.
+// nx.json. Preview with `npx nx release:dryrun`.
 //
 // CommonJS (.cjs): nx resolves non-".ts" renderer paths with require(), which
 // cannot load an ESM module even though this workspace is "type": "module".

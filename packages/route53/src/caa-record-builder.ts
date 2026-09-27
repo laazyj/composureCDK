@@ -1,4 +1,4 @@
-import { CaaRecord, type CaaRecordProps, type IHostedZone } from "aws-cdk-lib/aws-route53";
+import { CaaRecord, type CaaRecordProps } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -14,10 +14,13 @@ import { CAA_RECORD_DEFAULTS } from "./defaults.js";
  *
  * Extends the CDK {@link CaaRecordProps} but replaces `zone` with a
  * {@link Resolvable} so it can be wired from composed components.
+ *
+ * `zone` reads its inner type from CDK's own prop rather than naming
+ * `IHostedZone`, so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
  */
 export interface CaaRecordBuilderProps extends Omit<CaaRecordProps, "zone"> {
   /** The hosted zone in which to create the record. */
-  zone?: Resolvable<IHostedZone>;
+  zone?: Resolvable<NonNullable<CaaRecordProps["zone"]>>;
 }
 
 /**

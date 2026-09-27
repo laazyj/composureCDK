@@ -1,7 +1,7 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { type IQueue, Queue, type QueueProps } from "aws-cdk-lib/aws-sqs";
+import { type IQueue, Queue, QueueEncryption, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { QueueBuilderExtensionProps, QueueBuilderPropsByRole } from "./queue-props.js";
@@ -43,7 +43,8 @@ export interface QueueBuilderResult {
  * this type exists so one `QueueBuilder` implementation can back every
  * role.
  */
-interface InternalQueueBuilderProps extends QueueProps, QueueBuilderExtensionProps {
+interface InternalQueueBuilderProps
+  extends Omit<QueueProps, "encryptionMasterKey">, QueueBuilderExtensionProps {
   /**
    * The queue's role, set by `createQueueBuilder(role)`. Stored as a
    * prop (not a private field) so it is data: `.copy()` preserves it
@@ -106,8 +107,8 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string): QueueBuilderResult {
-    const { queueRole: role = "standard", ...configured } = this.props;
+  build(scope: IConstruct, id: string, context?: Record<string, object>): QueueBuilderResult {
+    const { queueRole: role = "standard", encryptionMasterKey, ...configured } = this.props;
     const fifo = isFifoRole(role);
     const dlq = isDlqRole(role);
 
@@ -115,6 +116,7 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
       ...QUEUE_DEFAULTS,
       ...(dlq ? DLQ_QUEUE_DEFAULTS : {}),
       ...configured,
+      ...encryptionMasterKeyProps(encryptionMasterKey, configured.encryption, context),
       ...(fifo ? { fifo: true } : {}),
     };
 
@@ -137,6 +139,29 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
 
     return { queue, alarms };
   }
+}
+
+/**
+ * Resolves a `Resolvable` master key and infers the encryption mode it
+ * implies.
+ *
+ * The `QueueEncryption.SQS_MANAGED` default is mutually exclusive with a
+ * customer-managed key — CDK rejects the pair — and supplying a key is an
+ * unambiguous request for SSE-KMS, so the default yields rather than forcing
+ * the user to set both (ADR-0009). An explicit `encryption` still wins, and an
+ * incompatible explicit pairing is left for CDK to reject.
+ */
+function encryptionMasterKeyProps(
+  encryptionMasterKey: QueueBuilderExtensionProps["encryptionMasterKey"],
+  userEncryption: QueueEncryption | undefined,
+  context: Record<string, object> | undefined,
+): Partial<QueueProps> {
+  if (encryptionMasterKey === undefined) return {};
+
+  return {
+    encryptionMasterKey: resolve(encryptionMasterKey, context),
+    ...(userEncryption === undefined ? { encryption: QueueEncryption.KMS } : {}),
+  };
 }
 
 /**

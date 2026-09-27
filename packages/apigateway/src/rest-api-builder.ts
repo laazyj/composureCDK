@@ -121,6 +121,7 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
       accessLogging,
       REST_API_DEFAULTS.deployOptions,
       restApiProps.deployOptions ?? {},
+      context,
     );
 
     const api = new RestApi(scope, id, {

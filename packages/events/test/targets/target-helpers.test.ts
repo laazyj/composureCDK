@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { EventBus, Schedule } from "aws-cdk-lib/aws-events";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
@@ -7,6 +7,15 @@ import { LogGroup } from "aws-cdk-lib/aws-logs";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { DefinitionBody, Pass, StateMachine } from "aws-cdk-lib/aws-stepfunctions";
+import {
+  CloudWatchLogGroup as CloudWatchLogGroupTarget,
+  EventBus as EventBusTarget,
+  LambdaFunction as LambdaFunctionTarget,
+  SfnStateMachine as SfnStateMachineTarget,
+  SnsTopic as SnsTopicTarget,
+  SqsQueue as SqsQueueTarget,
+} from "aws-cdk-lib/aws-events-targets";
+import { newStack } from "@composurecdk/cdk-testing";
 import { isRef, ref } from "@composurecdk/core";
 import { createRuleBuilder } from "../../src/rule-builder.js";
 import { lambdaTarget } from "../../src/targets/lambda-target.js";
@@ -15,10 +24,6 @@ import { snsTarget } from "../../src/targets/sns-target.js";
 import { sfnStateMachineTarget } from "../../src/targets/sfn-state-machine-target.js";
 import { eventBusTarget } from "../../src/targets/event-bus-target.js";
 import { cloudWatchLogGroupTarget } from "../../src/targets/cloud-watch-log-group-target.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack");
-}
 
 function makeFn(stack: Stack, id = "Handler"): LambdaFn {
   return new LambdaFn(stack, id, {
@@ -30,6 +35,19 @@ function makeFn(stack: Stack, id = "Handler"): LambdaFn {
 
 describe("target helpers", () => {
   describe("lambdaTarget", () => {
+    it("accepts every function CDK's own LambdaFunction target accepts (type-level guard)", () => {
+      // The helper reads its accepted type from CDK's own target constructor,
+      // so this holds at whatever `aws-cdk-lib` is installed. It fails if the
+      // parameter is re-pinned to a named interface after CDK widens the
+      // constructor — the narrowing CDK's `*Ref` migration lands on a pinned
+      // target, and what issue #401 was about (ADR-0018). Re-pinning before
+      // CDK moves still compiles, which is why the rule is the ADR's, not
+      // this guard's, to enforce.
+      const _fn: Parameters<typeof lambdaTarget>[0] = undefined as unknown as ConstructorParameters<
+        typeof LambdaFunctionTarget
+      >[0];
+    });
+
     it("returns a concrete IRuleTarget for a concrete function", () => {
       const stack = newStack();
       const fn = makeFn(stack);
@@ -86,6 +104,13 @@ describe("target helpers", () => {
   });
 
   describe("sqsTarget", () => {
+    it("accepts every queue CDK's own SqsQueue target accepts (type-level guard)", () => {
+      // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
+      const _queue: Parameters<typeof sqsTarget>[0] = undefined as unknown as ConstructorParameters<
+        typeof SqsQueueTarget
+      >[0];
+    });
+
     it("attaches an SQS queue and grants SendMessage", () => {
       const stack = newStack();
       const queue = new Queue(stack, "Q");
@@ -130,6 +155,13 @@ describe("target helpers", () => {
   });
 
   describe("snsTarget", () => {
+    it("accepts every topic CDK's own SnsTopic target accepts (type-level guard)", () => {
+      // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
+      const _topic: Parameters<typeof snsTarget>[0] = undefined as unknown as ConstructorParameters<
+        typeof SnsTopicTarget
+      >[0];
+    });
+
     it("attaches an SNS topic", () => {
       const stack = newStack();
       const topic = new Topic(stack, "T");
@@ -174,6 +206,12 @@ describe("target helpers", () => {
   });
 
   describe("sfnStateMachineTarget", () => {
+    it("accepts every state machine CDK's own SfnStateMachine target accepts (type-level guard)", () => {
+      // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
+      const _stateMachine: Parameters<typeof sfnStateMachineTarget>[0] =
+        undefined as unknown as ConstructorParameters<typeof SfnStateMachineTarget>[0];
+    });
+
     it("attaches a state machine with an invoke role", () => {
       const stack = newStack();
       const sm = new StateMachine(stack, "SM", {
@@ -212,6 +250,12 @@ describe("target helpers", () => {
   });
 
   describe("eventBusTarget", () => {
+    it("accepts every bus CDK's own EventBus target accepts (type-level guard)", () => {
+      // Same guard as `lambdaTarget`'s; see the comment there (ADR-0018).
+      const _bus: Parameters<typeof eventBusTarget>[0] =
+        undefined as unknown as ConstructorParameters<typeof EventBusTarget>[0];
+    });
+
     it("attaches another bus and grants events:PutEvents", () => {
       const stack = newStack();
       const downstream = new EventBus(stack, "Downstream");
@@ -246,6 +290,14 @@ describe("target helpers", () => {
   });
 
   describe("cloudWatchLogGroupTarget", () => {
+    it("accepts every log group CDK's own CloudWatchLogGroup target accepts (type-level guard)", () => {
+      // The helper reads its accepted type from CDK's own target constructor,
+      // which already takes the broader `logs.ILogGroupRef` — pinning
+      // `ILogGroup` rejected a log group CDK itself takes (ADR-0018).
+      const _logGroup: Parameters<typeof cloudWatchLogGroupTarget>[0] =
+        undefined as unknown as ConstructorParameters<typeof CloudWatchLogGroupTarget>[0];
+    });
+
     it("attaches the log group ARN as the target ARN on the rule", () => {
       const stack = newStack();
       const lg = new LogGroup(stack, "LG");

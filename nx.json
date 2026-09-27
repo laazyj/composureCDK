@@ -71,6 +71,7 @@
         "default",
         "^production",
         "{workspaceRoot}/eslint.config.mjs",
+        "{workspaceRoot}/cdk-floors.json",
         "{workspaceRoot}/packages/eslint-plugin/src/**/*",
         {
           "externalDependencies": ["eslint", "typescript-eslint", "@typescript-eslint/parser"]

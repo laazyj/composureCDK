@@ -1,3 +1,4 @@
+import { Token } from "aws-cdk-lib";
 import { charSets, stringConstraint, validateString } from "@composurecdk/cloudformation";
 
 declare const alarmNameBrand: unique symbol;
@@ -6,6 +7,8 @@ declare const alarmNameBrand: unique symbol;
  * A validated CloudWatch alarm name. Construct via {@link alarmName} or
  * {@link joinAlarmName}; the brand prevents bare strings from being passed
  * where an `AlarmName` is required.
+ *
+ * A name holding an unresolved CDK token is branded unchecked (ADR-0010 rule 6).
  */
 export type AlarmName = string & { readonly [alarmNameBrand]: true };
 
@@ -45,11 +48,13 @@ export function alarmName(input: string): AlarmName {
 
 /**
  * Builds an {@link AlarmName} by kebab-casing each segment and joining with
- * `sep`. Empty segments after kebab-casing are dropped. Segments must be
- * literals: an unresolved token fails validation.
+ * `sep`. Empty segments after kebab-casing are dropped. A segment holding an
+ * unresolved CDK token is kept verbatim: kebab-casing would corrupt the token.
  */
 export function joinAlarmName(segments: readonly string[], sep = "/"): AlarmName {
-  const parts = segments.map(kebab).filter((s) => s.length > 0);
+  const parts = segments
+    .map((s) => (Token.isUnresolved(s) ? s : kebab(s)))
+    .filter((s) => s.length > 0);
   return alarmName(parts.join(sep));
 }
 

@@ -130,6 +130,8 @@ Every alarm a ComposureCDK builder creates gets an explicit, hierarchical name o
 
 To name one alarm yourself, pass an `AlarmName` in its config. `alarmName()` checks a string against [CloudWatch's naming rules](./src/alarm-name.ts) and returns the branded `AlarmName` type. It trims surrounding whitespace and otherwise uses the value as written.
 
+A name holding an unresolved CDK token (e.g. a `CfnParameter` value) is not validated, since its value is only known at deploy. The default name keeps such a segment verbatim rather than kebab-casing it, so the token still resolves.
+
 ```ts
 import { alarmName } from "@composurecdk/cloudwatch";
 

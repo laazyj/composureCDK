@@ -1,8 +1,18 @@
 import { describe, it, expect } from "vitest";
+import { App, CfnParameter, Stack } from "aws-cdk-lib";
 import { alarmName, joinAlarmName, kebab } from "../src/alarm-name.js";
 import { constraints } from "../src/index.js";
 
+function unresolvedString(): string {
+  return new CfnParameter(new Stack(new App(), "S"), "Env").valueAsString;
+}
+
 describe("alarmName", () => {
+  it("brands an unresolved token without validating it", () => {
+    const token = unresolvedString();
+    expect(alarmName(token)).toBe(token);
+  });
+
   it("returns the input verbatim when valid", () => {
     expect(alarmName("payments-prod/lambda/errors")).toBe("payments-prod/lambda/errors");
   });
@@ -66,6 +76,11 @@ describe("joinAlarmName", () => {
 
   it("drops empty segments after kebabing", () => {
     expect(joinAlarmName(["", "siteAlerts", "errors"])).toBe("site-alerts/errors");
+  });
+
+  it("keeps a token segment verbatim instead of kebab-casing it", () => {
+    const token = unresolvedString();
+    expect(joinAlarmName([token, "siteAlerts", "errors"])).toBe(`${token}/site-alerts/errors`);
   });
 
   it("validates the result", () => {

@@ -1,10 +1,17 @@
-// Shared helper for the cdk-floor diagnostic scripts. Used by both
+// Shared helpers for the cdk-floor diagnostic scripts. Used by both
 // `cdk-floors.mjs` (the `establish` mode) and `cdk-floor-validate.mjs`.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+/** SemVer compare (assumes plain `MAJOR.MINOR.PATCH`, no pre-release tags). */
+export function compareSemver(a, b) {
+  const [a0, a1, a2] = a.split(".").map(Number);
+  const [b0, b1, b2] = b.split(".").map(Number);
+  return a0 - b0 || a1 - b1 || a2 - b2;
+}
 
 const PACKAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "packages");
 

@@ -34,23 +34,18 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { packPublishablePackages } from "./cdk-floor/packages.mjs";
+import { compareSemver, packPublishablePackages } from "./cdk-floor/packages.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..");
 const MANIFEST = join(REPO_ROOT, "cdk-floors.json");
 const CONSTRUCTS_RANGE = "^10.0.0";
 
-/** SemVer compare (assumes plain `MAJOR.MINOR.PATCH`, no pre-release tags). */
-function compareSemver(a, b) {
-  const [a0, a1, a2] = a.split(".").map(Number);
-  const [b0, b1, b2] = b.split(".").map(Number);
-  return a0 - b0 || a1 - b1 || a2 - b2;
-}
-
 /**
  * Picks the version under test. Precedence: `--cdk-version=…` arg > CDK_FLOOR
- * env > `max(declared floors)` from the manifest. The manifest-derived default
+ * env > `max(declared floors)` from the manifest — equal to the max of the
+ * published (peer-derived) floors, since each of those is some package's own
+ * floor. The manifest-derived default
  * means the composed-system floor is "the highest version any package
  * promises", i.e. the de-facto floor for an integrated app.
  */

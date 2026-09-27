@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { type CfnElement } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { newStack, testEnv } from "@composurecdk/cdk-testing";
@@ -52,6 +53,42 @@ describe("ReceiptRuleSetBuilder", () => {
     );
   });
 
+  it("gives both activation provider Lambdas a declared log group", () => {
+    const stack = newStack({ env: testEnv("us-east-1") });
+    const { activationLogGroup } = createReceiptRuleSetBuilder()
+      .rule("inbound", (r) => r.recipients(["info@example.com"]))
+      .build(stack, "MailRuleSet");
+
+    expect(activationLogGroup).toBeDefined();
+    const template = Template.fromStack(stack);
+    template.resourceCountIs("AWS::Logs::LogGroup", 1);
+    template.hasResource("AWS::Logs::LogGroup", {
+      Properties: { RetentionInDays: 731 },
+      DeletionPolicy: "Retain",
+    });
+    const logGroupId = stack.resolve(activationLogGroup?.logGroupName) as { Ref: string };
+    template.resourceCountIs("AWS::Lambda::Function", 2);
+    template.resourcePropertiesCountIs(
+      "AWS::Lambda::Function",
+      { LoggingConfig: Match.objectLike({ LogGroup: logGroupId }) },
+      2,
+    );
+  });
+
+  it("activates the rule set only after its rules exist", () => {
+    const stack = newStack({ env: testEnv("us-east-1") });
+    const { rules } = createReceiptRuleSetBuilder()
+      .rule("first", (r) => r.recipients(["a@example.com"]))
+      .rule("second", (r) => r.recipients(["b@example.com"]))
+      .build(stack, "MailRuleSet");
+
+    const resources = Template.fromStack(stack).findResources("Custom::SESActiveReceiptRuleSet");
+    const [dependsOn] = Object.values(resources).map((r) => r.DependsOn as string[]);
+    for (const rule of Object.values(rules)) {
+      expect(dependsOn).toContain(stack.getLogicalId(rule.node.defaultChild as CfnElement));
+    }
+  });
+
   it("opts out of activation with .activate(false)", () => {
     const stack = newStack({ env: testEnv("us-east-1") });
     const { activation } = createReceiptRuleSetBuilder()
@@ -60,7 +97,9 @@ describe("ReceiptRuleSetBuilder", () => {
       .build(stack, "MailRuleSet");
 
     expect(activation).toBeUndefined();
-    Template.fromStack(stack).resourceCountIs("Custom::SESActiveReceiptRuleSet", 0);
+    const template = Template.fromStack(stack);
+    template.resourceCountIs("Custom::SESActiveReceiptRuleSet", 0);
+    template.resourceCountIs("AWS::Logs::LogGroup", 0);
   });
 
   it("preserves declaration order across rules", () => {

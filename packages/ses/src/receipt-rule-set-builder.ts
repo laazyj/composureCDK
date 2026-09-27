@@ -1,4 +1,5 @@
 import { type CustomResource } from "aws-cdk-lib";
+import { type LogGroup } from "aws-cdk-lib/aws-logs";
 import { type ReceiptRule, ReceiptRuleSet, type ReceiptRuleSetProps } from "aws-cdk-lib/aws-ses";
 import { type IConstruct } from "constructs";
 import {
@@ -8,6 +9,7 @@ import {
   type IBuilder,
   type Lifecycle,
 } from "@composurecdk/core";
+import { createLogGroupBuilder } from "@composurecdk/logs";
 import { activateReceiptRuleSet } from "./activation.js";
 import { createReceiptRuleBuilder, type IReceiptRuleBuilder } from "./receipt-rule-builder.js";
 import { warnIfNotReceivingRegion } from "./region-support.js";
@@ -30,6 +32,12 @@ export interface ReceiptRuleSetBuilderResult {
    * `.activate(false)`.
    */
   activation?: CustomResource;
+  /**
+   * The log group the activation provider's Lambdas write to, with the
+   * `@composurecdk/logs` retention and removal defaults. Present unless
+   * activation was disabled with `.activate(false)`.
+   */
+  activationLogGroup?: LogGroup;
 }
 
 interface RuleEntry {
@@ -102,11 +110,25 @@ class ReceiptRuleSetBuilder implements Lifecycle<ReceiptRuleSetBuilderResult> {
       rules[entry.key] = ruleSet.addRule(constructId(entry.key), builder.toOptions(context));
     }
 
-    const activation = this.#activate
-      ? activateReceiptRuleSet(scope, `${id}Activation`, ruleSet)
-      : undefined;
+    if (!this.#activate) return { ruleSet, rules };
 
-    return { ruleSet, rules, ...(activation && { activation }) };
+    // Declared so Lambda does not create `/aws/lambda/<name>` on first
+    // invocation with indefinite retention, outside the template.
+    const activationLogGroup = createLogGroupBuilder().build(
+      scope,
+      `${id}ActivationLogs`,
+      context,
+    ).logGroup;
+    const activation = activateReceiptRuleSet(
+      scope,
+      `${id}Activation`,
+      ruleSet,
+      activationLogGroup,
+    );
+    // Activate only once every rule exists, so the set never goes live empty
+    // mid-deploy; on delete the order reverses and it is deactivated first.
+    activation.node.addDependency(...Object.values(rules));
+    return { ruleSet, rules, activation, activationLogGroup };
   }
 }
 

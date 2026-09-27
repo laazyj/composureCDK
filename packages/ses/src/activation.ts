@@ -1,6 +1,7 @@
 import { CustomResource, Duration } from "aws-cdk-lib";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Code, Function as LambdaFunction, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
+import { type LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IReceiptRuleSet } from "aws-cdk-lib/aws-ses";
 import { Provider } from "aws-cdk-lib/custom-resources";
 import { type IConstruct } from "constructs";
@@ -34,12 +35,14 @@ exports.handler = async (event) => {
  * Makes `ruleSet` the account's active receipt rule set, and conditionally
  * deactivates it on delete. Bundled by
  * {@link IReceiptRuleSetBuilder.activate | `.activate()`}; returned on the build
- * result so consumers can reference the custom resource.
+ * result so consumers can reference the custom resource. Both provider Lambdas
+ * (the handler and CDK's provider framework) write to `logGroup`.
  */
 export function activateReceiptRuleSet(
   scope: IConstruct,
   id: string,
   ruleSet: IReceiptRuleSet,
+  logGroup: LogGroup,
 ): CustomResource {
   // A magic-string runtime rather than the `Runtime.NODEJS_24_X` enum, so
   // adopting the latest LTS doesn't pull the package's aws-cdk-lib floor up to
@@ -53,6 +56,7 @@ export function activateReceiptRuleSet(
   });
   const onEvent = new LambdaFunction(scope, `${id}Fn`, {
     runtime,
+    logGroup,
     handler: "index.handler",
     code: Code.fromInline(HANDLER),
     timeout: Duration.minutes(1),
@@ -65,7 +69,7 @@ export function activateReceiptRuleSet(
       resources: ["*"],
     }),
   );
-  const provider = new Provider(scope, `${id}Provider`, { onEventHandler: onEvent });
+  const provider = new Provider(scope, `${id}Provider`, { onEventHandler: onEvent, logGroup });
   return new CustomResource(scope, id, {
     serviceToken: provider.serviceToken,
     resourceType: "Custom::SESActiveReceiptRuleSet",

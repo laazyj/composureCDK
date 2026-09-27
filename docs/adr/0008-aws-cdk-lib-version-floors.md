@@ -111,8 +111,10 @@ floor — when no version is supplied.
 
 This complements the static guard already in place: the
 `composurecdk/no-cdk-api-above-floor` ESLint rule (`@composurecdk/eslint-plugin`)
-blocks known version-gated APIs at lint time, so they can't be written into
-`src/` in the first place.
+blocks known version-gated APIs at lint time, so they can't be written in the
+first place. It reads each package's floor from this manifest and reports an API
+only where it postdates that floor, in `test/` as well as `src/` — `enforce`
+runs the whole suite, so tests are bound by the floor exactly as source is.
 
 ### Lockstep alpha peers
 

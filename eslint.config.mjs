@@ -6,6 +6,13 @@ import eslintConfigPrettier from "eslint-config-prettier/flat";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import nx from "@nx/eslint-plugin";
 import composurecdk from "@composurecdk/eslint-plugin";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+/** Each package's aws-cdk-lib floor, keyed by its directory under `packages/`. */
+const cdkFloors = /** @type {{ floors: Record<string, { floor: string }> }} */ (
+  JSON.parse(readFileSync(fileURLToPath(import.meta.resolve("./cdk-floors.json")), "utf8"))
+).floors;
 
 export default defineConfig(
   {
@@ -135,6 +142,19 @@ export default defineConfig(
       composurecdk.configs.internal,
     ],
   },
+  // `no-cdk-api-above-floor` only reports an API above the floor it is given,
+  // so each package gets its own from `cdk-floors.json` — for `test/` as well
+  // as `src/`, because `cdk-floors:enforce` runs the whole suite, typecheck
+  // included, against that floor. Only this rule reaches tests: the rest of
+  // `internal` is written for library source. A package with no manifest
+  // entry (cdk-testing, core) keeps the preset's unset floor, which reports
+  // every banned API — the strictest reading, and the right one for code every
+  // floored package builds.
+  ...Object.entries(cdkFloors).map(([dir, { floor }]) => ({
+    files: [`packages/${dir}/src/**/*.ts`, `packages/${dir}/test/**/*.ts`],
+    plugins: { composurecdk },
+    rules: { "composurecdk/no-cdk-api-above-floor": ["error", { floor }] },
+  })),
   {
     // The ADR-0018 type-level guards declare a `const` purely so its type
     // annotation forces an assignability check — the value is never read, and

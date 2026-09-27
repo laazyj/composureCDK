@@ -95,8 +95,7 @@ export function createReputationAlarms(
   config: ReputationAlarmConfig | false | undefined,
   customAlarms: AlarmDefinitionBuilder<void>[] = [],
 ): Record<string, Alarm> {
-  const recommended =
-    config === false || config?.enabled === false ? [] : resolveReputationAlarmDefinitions(config);
+  const recommended = config === false ? [] : resolveReputationAlarmDefinitions(config);
   const custom = customAlarms.map((b) => b.resolve(undefined));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

@@ -1,9 +1,8 @@
 import {
   ConfigurationSet,
   type ConfigurationSetEventDestination,
+  type ConfigurationSetEventDestinationOptions,
   type ConfigurationSetProps,
-  type EmailSendingEvent,
-  type EventDestination,
 } from "aws-cdk-lib/aws-ses";
 import { type IConstruct } from "constructs";
 import {
@@ -24,26 +23,20 @@ import { CONFIGURATION_SET_DEFAULTS } from "./configuration-set-defaults.js";
  */
 export type ConfigurationSetBuilderProps = ConfigurationSetProps;
 
-/** Options for a single configuration-set event destination. */
-export interface EventDestinationOptions {
-  /**
-   * Where to publish the events — an SNS topic, EventBridge bus, or CloudWatch
-   * dimensions. Use the {@link snsDestination} / {@link eventBusDestination} /
-   * {@link cloudWatchDestination} helpers, which accept `Resolvable`s so a
-   * destination can `ref()` a sibling component.
-   */
-  readonly destination: Resolvable<EventDestination>;
-  /**
-   * The send events to publish. Defaults to SES's behaviour of publishing all
-   * event types when omitted.
-   */
-  readonly events?: EmailSendingEvent[];
-  /**
-   * Whether SES publishes events to this destination.
-   * @default true
-   */
-  readonly enabled?: boolean;
-}
+/**
+ * Options for a single configuration-set event destination — CDK's own
+ * {@link ConfigurationSetEventDestinationOptions}, with `destination` widened to
+ * a {@link Resolvable} so it can `ref()` a sibling topic or bus. Use the
+ * {@link snsDestination} / {@link eventBusDestination} /
+ * {@link cloudWatchDestination} helpers to build one. `events` defaults to every
+ * {@link https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ses.EmailSendingEvent.html | EmailSendingEvent}.
+ */
+export type EventDestinationOptions = Omit<
+  ConfigurationSetEventDestinationOptions,
+  "destination"
+> & {
+  readonly destination: Resolvable<ConfigurationSetEventDestinationOptions["destination"]>;
+};
 
 /** The build output of an {@link IConfigurationSetBuilder}. */
 export interface ConfigurationSetBuilderResult {
@@ -79,14 +72,9 @@ export type IConfigurationSetBuilder = IBuilder<
   ConfigurationSetBuilder
 >;
 
-interface EventDestinationEntry {
-  key: string;
-  options: EventDestinationOptions;
-}
-
 class ConfigurationSetBuilder implements Lifecycle<ConfigurationSetBuilderResult> {
   props: Partial<ConfigurationSetBuilderProps> = {};
-  readonly #eventDestinations: EventDestinationEntry[] = [];
+  readonly #eventDestinations = new Map<string, EventDestinationOptions>();
 
   /**
    * Register an event destination for this configuration set. Accepts a
@@ -96,19 +84,21 @@ class ConfigurationSetBuilder implements Lifecycle<ConfigurationSetBuilderResult
    * a sender drives suppression — AWS requires you to track them.
    */
   addEventDestination(key: string, options: EventDestinationOptions): this {
-    if (this.#eventDestinations.some((e) => e.key === key)) {
+    if (this.#eventDestinations.has(key)) {
       throw new Error(
         `ConfigurationSetBuilder.addEventDestination: duplicate key "${key}". ` +
           `Each event destination must use a unique key.`,
       );
     }
-    this.#eventDestinations.push({ key, options });
+    this.#eventDestinations.set(key, options);
     return this;
   }
 
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: ConfigurationSetBuilder): void {
-    target.#eventDestinations.push(...this.#eventDestinations);
+    for (const [key, options] of this.#eventDestinations) {
+      target.#eventDestinations.set(key, options);
+    }
   }
 
   build(
@@ -120,12 +110,10 @@ class ConfigurationSetBuilder implements Lifecycle<ConfigurationSetBuilderResult
     const configurationSet = new ConfigurationSet(scope, id, mergedProps);
 
     const eventDestinations: Record<string, ConfigurationSetEventDestination> = {};
-    for (const entry of this.#eventDestinations) {
-      const { destination, events, enabled } = entry.options;
-      eventDestinations[entry.key] = configurationSet.addEventDestination(constructId(entry.key), {
+    for (const [key, { destination, ...options }] of this.#eventDestinations) {
+      eventDestinations[key] = configurationSet.addEventDestination(constructId(key), {
+        ...options,
         destination: resolve(destination, context),
-        ...(events !== undefined && { events }),
-        ...(enabled !== undefined && { enabled }),
       });
     }
 

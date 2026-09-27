@@ -59,4 +59,3 @@ export {
 } from "./reputation-alarm-builder.js";
 export { type ReputationAlarmConfig } from "./reputation-alarm-config.js";
 export { REPUTATION_ALARM_DEFAULTS } from "./reputation-alarm-defaults.js";
-export { createReputationAlarms, resolveReputationAlarmDefinitions } from "./reputation-alarms.js";

@@ -1,16 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { App, Duration, Stack } from "aws-cdk-lib";
+import { Duration } from "aws-cdk-lib";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createReputationAlarmBuilder } from "../src/reputation-alarm-builder.js";
 import { resolveReputationAlarmDefinitions } from "../src/reputation-alarms.js";
-
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack", {
-    env: { account: "111111111111", region: "us-east-1" },
-  });
-}
 
 /** A target-less custom alarm on the SES `Reject` count, for reuse in tests. */
 function rejectAlarm(a: AlarmDefinitionBuilder<void>): AlarmDefinitionBuilder<void> {
@@ -31,7 +26,7 @@ function rejectAlarm(a: AlarmDefinitionBuilder<void>): AlarmDefinitionBuilder<vo
 
 describe("ReputationAlarmBuilder", () => {
   it("creates bounce and complaint rate alarms with AWS-recommended thresholds", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { alarms } = createReputationAlarmBuilder().build(stack, "SesReputation");
 
     expect(Object.keys(alarms).sort()).toEqual(["bounceRate", "complaintRate"]);
@@ -53,7 +48,7 @@ describe("ReputationAlarmBuilder", () => {
   });
 
   it("emits the reputation metrics without dimensions (account-scoped)", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createReputationAlarmBuilder().build(stack, "SesReputation");
     Template.fromStack(stack).hasResourceProperties("AWS::CloudWatch::Alarm", {
       MetricName: "Reputation.BounceRate",
@@ -62,7 +57,7 @@ describe("ReputationAlarmBuilder", () => {
   });
 
   it("disables the recommended alarms when recommendedAlarms is false", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { alarms } = createReputationAlarmBuilder()
       .recommendedAlarms(false)
       .build(stack, "SesReputation");
@@ -71,7 +66,7 @@ describe("ReputationAlarmBuilder", () => {
   });
 
   it("keeps custom alarms when the recommended alarms are disabled with false", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { alarms } = createReputationAlarmBuilder()
       .recommendedAlarms(false)
       .addAlarm("rejects", rejectAlarm)
@@ -83,7 +78,7 @@ describe("ReputationAlarmBuilder", () => {
   });
 
   it("keeps custom alarms when the recommended alarms are disabled with enabled:false", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { alarms } = createReputationAlarmBuilder()
       .recommendedAlarms({ enabled: false })
       .addAlarm("rejects", rejectAlarm)
@@ -93,7 +88,7 @@ describe("ReputationAlarmBuilder", () => {
   });
 
   it("disables only the bounce-rate alarm", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { alarms } = createReputationAlarmBuilder()
       .recommendedAlarms({ bounceRate: false })
       .build(stack, "SesReputation");
@@ -102,7 +97,7 @@ describe("ReputationAlarmBuilder", () => {
   });
 
   it("disables a single alarm and tunes the other's threshold", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createReputationAlarmBuilder()
       .recommendedAlarms({ complaintRate: false, bounceRate: { threshold: 0.08 } })
       .build(stack, "SesReputation");
@@ -115,7 +110,7 @@ describe("ReputationAlarmBuilder", () => {
   });
 
   it("disables all alarms via the config enabled switch", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { alarms } = createReputationAlarmBuilder()
       .recommendedAlarms({ enabled: false })
       .build(stack, "SesReputation");
@@ -124,21 +119,22 @@ describe("ReputationAlarmBuilder", () => {
   });
 
   it("copies accumulated custom alarms on .copy()", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const base = createReputationAlarmBuilder().addAlarm("rejects", rejectAlarm);
     const { alarms } = base.copy().build(stack, "SesReputation");
     expect(alarms.rejects).toBeDefined();
   });
 
   it("adds a custom alarm alongside the recommended ones", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const { alarms } = createReputationAlarmBuilder()
       .addAlarm("rejects", rejectAlarm)
       .build(stack, "SesReputation");
 
     expect(alarms.rejects).toBeDefined();
-    Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 3);
-    Template.fromStack(stack).hasResourceProperties("AWS::CloudWatch::Alarm", {
+    const t = Template.fromStack(stack);
+    t.resourceCountIs("AWS::CloudWatch::Alarm", 3);
+    t.hasResourceProperties("AWS::CloudWatch::Alarm", {
       MetricName: "Reject",
     });
   });

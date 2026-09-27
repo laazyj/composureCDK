@@ -1,5 +1,4 @@
 import { EventDestination } from "aws-cdk-lib/aws-ses";
-import { type ITopic } from "aws-cdk-lib/aws-sns";
 import { isRef, type Resolvable } from "@composurecdk/core";
 
 /**
@@ -11,9 +10,16 @@ import { isRef, type Resolvable } from "@composurecdk/core";
  * {@link https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ses.EmailSendingEvent.html | EmailSendingEvent}s
  * to publish.
  *
+ * `topic` reads its type from CDK's own `EventDestination.snsTopic` parameter
+ * rather than naming `ITopic`, so it keeps tracking the installed `aws-cdk-lib`
+ * (ADR-0018).
+ *
  * @see https://docs.aws.amazon.com/ses/latest/dg/event-publishing-add-event-destination-sns.html
  */
-export function snsDestination(topic: Resolvable<ITopic>): Resolvable<EventDestination> {
-  const build = (resolved: ITopic): EventDestination => EventDestination.snsTopic(resolved);
-  return isRef(topic) ? topic.map(build) : build(topic);
+export function snsDestination(
+  topic: Resolvable<Parameters<typeof EventDestination.snsTopic>[0]>,
+): Resolvable<EventDestination> {
+  return isRef(topic)
+    ? topic.map((t) => EventDestination.snsTopic(t))
+    : EventDestination.snsTopic(topic);
 }

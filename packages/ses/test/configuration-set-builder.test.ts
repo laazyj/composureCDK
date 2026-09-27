@@ -1,22 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { EventBus, type IEventBus } from "aws-cdk-lib/aws-events";
 import { ConfigurationSetTlsPolicy, EmailSendingEvent } from "aws-cdk-lib/aws-ses";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { ref } from "@composurecdk/core";
+import { newStack, testEnv } from "@composurecdk/cdk-testing";
 import { createConfigurationSetBuilder } from "../src/configuration-set-builder.js";
 import { eventBusDestination, snsDestination } from "../src/event-destinations/index.js";
 
-function newStack(): Stack {
-  return new Stack(new App(), "TestStack", {
-    env: { account: "111111111111", region: "us-east-1" },
-  });
-}
-
 describe("ConfigurationSetBuilder", () => {
   it("requires TLS and enables reputation metrics by default", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createConfigurationSetBuilder().build(stack, "MailConfig");
     Template.fromStack(stack).hasResourceProperties("AWS::SES::ConfigurationSet", {
       DeliveryOptions: { TlsPolicy: "REQUIRE" },
@@ -25,7 +19,7 @@ describe("ConfigurationSetBuilder", () => {
   });
 
   it("lets the caller override the TLS policy", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createConfigurationSetBuilder()
       .tlsPolicy(ConfigurationSetTlsPolicy.OPTIONAL)
       .build(stack, "MailConfig");
@@ -35,7 +29,7 @@ describe("ConfigurationSetBuilder", () => {
   });
 
   it("passes through a configuration set name", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     createConfigurationSetBuilder()
       .configurationSetName("transactional")
       .build(stack, "MailConfig");
@@ -45,7 +39,7 @@ describe("ConfigurationSetBuilder", () => {
   });
 
   it("wires an SNS event destination filtered to bounce/complaint events", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const topic = new Topic(stack, "Feedback");
     const { eventDestinations } = createConfigurationSetBuilder()
       .addEventDestination("feedback", {
@@ -65,7 +59,7 @@ describe("ConfigurationSetBuilder", () => {
   });
 
   it("resolves a Resolvable destination from the build context", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     // SES event destinations can only target the account's default event bus.
     const bus = EventBus.fromEventBusName(stack, "DefaultBus", "default");
     createConfigurationSetBuilder()
@@ -82,7 +76,7 @@ describe("ConfigurationSetBuilder", () => {
   });
 
   it("passes through a disabled event destination", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const topic = new Topic(stack, "Feedback");
     createConfigurationSetBuilder()
       .addEventDestination("feedback", { destination: snsDestination(topic), enabled: false })
@@ -93,7 +87,7 @@ describe("ConfigurationSetBuilder", () => {
   });
 
   it("rejects a duplicate event-destination key", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const topic = new Topic(stack, "Feedback");
     expect(() =>
       createConfigurationSetBuilder()
@@ -104,7 +98,7 @@ describe("ConfigurationSetBuilder", () => {
   });
 
   it("copies accumulated event destinations on .copy()", () => {
-    const stack = newStack();
+    const stack = newStack({ env: testEnv("us-east-1") });
     const topic = new Topic(stack, "Feedback");
     const base = createConfigurationSetBuilder().addEventDestination("feedback", {
       destination: snsDestination(topic),

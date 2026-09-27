@@ -1,22 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { type Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { EmailIdentity, Identity } from "aws-cdk-lib/aws-ses";
 import { ref } from "@composurecdk/core";
+import {
+  assertCapabilitiesCovered,
+  newStack,
+  policyJson,
+  testEnv,
+} from "@composurecdk/cdk-testing";
 import { identityGrants } from "../src/grants.js";
 
 function setup() {
-  const app = new App();
-  const stack = new Stack(app, "S", { env: { account: "111111111111", region: "us-east-1" } });
+  const stack = newStack({ env: testEnv("us-east-1") });
   const identity = new EmailIdentity(stack, "Identity", {
     identity: Identity.domain("example.com"),
   });
   const role = new Role(stack, "Role", { assumedBy: new ServicePrincipal("lambda.amazonaws.com") });
   return { stack, identity, role };
 }
-
-const policyJson = (stack: Stack) => JSON.stringify(Template.fromStack(stack).toJSON());
 
 /** Extracts the actions of the IAM statement that grants SES sending. */
 function sesSendActions(stack: Stack): string[] {
@@ -34,15 +37,20 @@ function sesSendActions(stack: Stack): string[] {
 }
 
 describe("identityGrants", () => {
+  it("covers every capability identityGrants exposes", () => {
+    assertCapabilitiesCovered(identityGrants, ["send", "sendFrom"]);
+  });
+
   it("send grants ses:SendEmail and ses:SendRawEmail on the identity", () => {
     const { stack, identity, role } = setup();
 
     identityGrants.send(identity).applyTo(role, {});
 
-    const json = policyJson(stack);
+    const t = Template.fromStack(stack);
+    const json = JSON.stringify(t.toJSON());
     expect(json).toContain("ses:SendEmail");
     expect(json).toContain("ses:SendRawEmail");
-    Template.fromStack(stack).resourceCountIs("AWS::IAM::Policy", 1);
+    t.resourceCountIs("AWS::IAM::Policy", 1);
   });
 
   it("resolves a Resolvable identity from the build context before granting", () => {
@@ -85,7 +93,8 @@ describe("identityGrants", () => {
       .sendFrom(sendFromCase.identity, ["alerts@example.com"])
       .applyTo(sendFromCase.role, {});
 
-    expect(sesSendActions(sendCase.stack)).toEqual(sesSendActions(sendFromCase.stack));
-    expect(sesSendActions(sendCase.stack)).toEqual(["ses:SendEmail", "ses:SendRawEmail"]);
+    const sendActions = sesSendActions(sendCase.stack);
+    expect(sendActions).toEqual(sesSendActions(sendFromCase.stack));
+    expect(sendActions).toEqual(["ses:SendEmail", "ses:SendRawEmail"]);
   });
 });

@@ -196,6 +196,16 @@ Keys are CloudFormation resource types; values are **CDK L1 property names** (ca
 
 To check a single value directly rather than a whole tree, use `constraints.validate.templateText` / `constraints.sanitize.templateText` ([catalogue](../../docs/constraints.md)).
 
+## stackNameSegments
+
+`stackNameSegments(scope)` returns the synth-time-literal segments that identify `scope`'s stack, for building a stack-scoped default physical name. For a top-level stack it is `[stackName]`. Inside a `NestedStack`, whose own `stackName` is a token CloudFormation fills in at deploy time, it is the top-level stack's name followed by each nested stack's construct id — `["Parent", "Dns"]` — so the name stays readable in the template and can be validated at synth time. Join the segments as the target name format requires.
+
+```ts
+import { stackNameSegments } from "@composurecdk/cloudformation";
+
+const name = `/aws/lambda/${stackNameSegments(scope).join("/")}-my-function`;
+```
+
 ## Examples
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`

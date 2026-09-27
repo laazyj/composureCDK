@@ -163,7 +163,7 @@ The child half is already least privilege: CDK grants the custom-resource provid
 
 The delegation record is backed by a Lambda custom resource, and aws-cdk-lib creates that Lambda as a raw `AWS::Lambda::Function` with no `LoggingConfig`. Left alone, the Lambda service creates `/aws/lambda/<generated-name>` on first invocation with **indefinite** retention — a log group no template describes and no `@composurecdk/logs` default reaches.
 
-**The builder brings it under the same defaults as every other log group in the library.** It declares `/aws/lambda/<stackName>-cross-account-zone-delegation` with `RetentionDays.TWO_YEARS` / `RemovalPolicy.RETAIN` and points the provider's `LoggingConfig` at it. The provider is a stack-level singleton, so the log group is one too: every delegation record in the stack shares it, and each build result returns the same handle as `result.providerLogGroup`.
+**The builder brings it under the same defaults as every other log group in the library.** It declares `/aws/lambda/<stackName>-cross-account-zone-delegation` (in a nested stack, `<stackName>` is `Parent/Dns`: see [`stackNameSegments`](../cloudformation/README.md#stacknamesegments)) with `RetentionDays.TWO_YEARS` / `RemovalPolicy.RETAIN` and points the provider's `LoggingConfig` at it. The provider is a stack-level singleton, so the log group is one too: every delegation record in the stack shares it, and each build result returns the same handle as `result.providerLogGroup`.
 
 ```ts
 type DelegationProviderLoggingConfig =

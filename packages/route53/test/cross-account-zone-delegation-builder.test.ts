@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { App, CfnResource, Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
+import { App, CfnResource, Duration, NestedStack, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Construct } from "constructs";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
@@ -252,6 +252,17 @@ describe("createCrossAccountZoneDelegationBuilder", () => {
       template.hasResource("AWS::Logs::LogGroup", { DeletionPolicy: "Retain" });
       template.hasResourceProperties("AWS::Lambda::Function", {
         LoggingConfig: { LogGroup: { Ref: Match.anyValue() } },
+      });
+    });
+
+    it("names a nested stack's log group after the top-level stack and nested ids", () => {
+      const nested = new NestedStack(new Stack(new App(), "Parent"), "Dns");
+      const childZone = new PublicHostedZone(nested, "ChildZone", { zoneName: "beta.example.com" });
+
+      minimal().delegatedZone(childZone).build(nested, "ParentDelegation");
+
+      Template.fromStack(nested).hasResourceProperties("AWS::Logs::LogGroup", {
+        LogGroupName: `${DELEGATION_PROVIDER_LOG_GROUP_NAME_PREFIX}/Parent/Dns-cross-account-zone-delegation`,
       });
     });
 

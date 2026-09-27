@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/examples",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "description": "Example applications exercising the ComposureCDK public API",
   "private": true,
   "author": "Jason Duffett (https://github.com/laazyj)",

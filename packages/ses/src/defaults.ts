@@ -41,3 +41,12 @@ export const DEFAULT_RECEIPT_RULE: Partial<ReceiptRuleOptions> = {
  * @see https://docs.aws.amazon.com/ses/latest/dg/mail-from.html
  */
 export const DEFAULT_MAIL_FROM_BEHAVIOR_ON_MX_FAILURE = MailFromBehaviorOnMxFailure.REJECT_MESSAGE;
+
+/**
+ * MX preference for the inbound record published by `.publishInboundMx()` — the
+ * value SES's own setup guide uses. It only orders this record against other MX
+ * records on the same name; lower wins.
+ *
+ * @see https://docs.aws.amazon.com/ses/latest/dg/receiving-email-mx-record.html
+ */
+export const DEFAULT_INBOUND_MX_PRIORITY = 10;

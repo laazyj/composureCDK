@@ -4,7 +4,7 @@ import { type IConstruct } from "constructs";
 /**
  * AWS Regions where Amazon SES supports **inbound email receiving**. Identity
  * verification and DKIM work in far more Regions, so this gate applies only to
- * the receiving constructs (rule sets, filters).
+ * the receiving constructs and records (rule sets, filters, the inbound MX).
  *
  * Maintained against the Email receiving endpoints table — update it there when
  * AWS expands receiving to new Regions.

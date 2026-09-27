@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SecretValue, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
 import { EasyDkimSigningKeyLength, MailFromBehaviorOnMxFailure } from "aws-cdk-lib/aws-ses";
 import { newStack, testEnv } from "@composurecdk/cdk-testing";
@@ -111,12 +111,73 @@ describe("EmailIdentityBuilder", () => {
     });
   });
 
+  it("publishes the inbound MX for a subdomain at the subdomain", () => {
+    const stack = newStack({ env: testEnv("eu-west-1") });
+    const { inboundMxRecords } = createEmailIdentityBuilder()
+      .domain("ask.example.com")
+      .publishInboundMx(newZone(stack))
+      .build(stack, "MailIdentity");
+    expect(inboundMxRecords).toBeDefined();
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "MX",
+      Name: "ask.example.com.",
+      ResourceRecords: ["10 inbound-smtp.eu-west-1.amazonaws.com"],
+    });
+  });
+
+  it("publishes the inbound MX at the apex of a public hosted zone", () => {
+    const stack = newStack({ env: testEnv("us-east-1") });
+    const zone = newZone(stack);
+    createEmailIdentityBuilder()
+      .publicHostedZone(zone)
+      .publishInboundMx(zone, { priority: 5 })
+      .build(stack, "MailIdentity");
+    Template.fromStack(stack).hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "MX",
+      Name: "example.com.",
+      ResourceRecords: ["5 inbound-smtp.us-east-1.amazonaws.com"],
+    });
+  });
+
+  it("derives the inbound endpoint from an environment-agnostic stack's Region token", () => {
+    const stack = newStack();
+    createEmailIdentityBuilder()
+      .domain("ask.example.com")
+      .publishInboundMx(newZone(stack))
+      .build(stack, "MailIdentity");
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "MX",
+      ResourceRecords: [
+        { "Fn::Join": ["", ["10 inbound-smtp.", { Ref: "AWS::Region" }, ".amazonaws.com"]] },
+      ],
+    });
+    expect(Annotations.fromStack(stack).findWarning("*", Match.anyValue())).toHaveLength(0);
+  });
+
+  it("warns when publishing the inbound MX in a Region that cannot receive mail", () => {
+    const stack = newStack({ env: testEnv("eu-south-1") });
+    createEmailIdentityBuilder()
+      .domain("ask.example.com")
+      .publishInboundMx(newZone(stack))
+      .build(stack, "MailIdentity");
+    Annotations.fromStack(stack).hasWarning(
+      "*",
+      Match.stringLikeRegexp("SES email receiving is not available in eu-south-1"),
+    );
+  });
+
   it("copies configured state independently", () => {
     const stack = newStack({ env: testEnv("us-east-1") });
-    const base = createEmailIdentityBuilder().domain("example.com").publishDkim(newZone(stack));
+    const zone = newZone(stack);
+    const base = createEmailIdentityBuilder()
+      .domain("example.com")
+      .publishDkim(zone)
+      .publishInboundMx(zone);
     const copy = base.copy();
-    const { dkimRecords } = copy.build(stack, "MailIdentity");
+    const { dkimRecords, inboundMxRecords } = copy.build(stack, "MailIdentity");
     expect(dkimRecords).toBeDefined();
+    expect(inboundMxRecords).toBeDefined();
   });
 
   describe("validation", () => {
@@ -141,6 +202,16 @@ describe("EmailIdentityBuilder", () => {
       const builder = createEmailIdentityBuilder().publicHostedZone(zone).publishDkim(zone);
       expect(() => builder.build(stack, "MailIdentity")).toThrow(
         /redundant with \.publicHostedZone\(\)/,
+      );
+    });
+
+    it("throws when publishing the inbound MX for an email identity", () => {
+      const stack = newStack({ env: testEnv("us-east-1") });
+      const builder = createEmailIdentityBuilder()
+        .email("info@example.com")
+        .publishInboundMx(newZone(stack));
+      expect(() => builder.build(stack, "MailIdentity")).toThrow(
+        /\.publishInboundMx\(\) needs a domain identity/,
       );
     });
 

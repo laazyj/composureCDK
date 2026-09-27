@@ -10,7 +10,7 @@ SES is Amazon's email service for **sending** and **receiving** mail. This packa
 npm install @composurecdk/ses
 ```
 
-Peer dependencies: `@composurecdk/core`, `@composurecdk/route53` (for `.publishDkim()`), `aws-cdk-lib`, `constructs`.
+Peer dependencies: `@composurecdk/core`, `@composurecdk/route53` (for `.publishDkim()` / `.publishInboundMx()`), `aws-cdk-lib`, `constructs`.
 
 ## Email identity
 
@@ -20,17 +20,21 @@ An [SES email identity](https://docs.aws.amazon.com/ses/latest/dg/creating-ident
 import { createEmailIdentityBuilder } from "@composurecdk/ses";
 import { ref } from "@composurecdk/core";
 
+const zone = ref<HostedZoneBuilderResult>("zone").get("hostedZone");
+
 const { emailIdentity, dkim } = createEmailIdentityBuilder()
   .domain("ask.example.com") // .email(...) / .publicHostedZone(...) also
   .easyDkim() // default; .byoDkim({ selector, privateKey, publicKey }) for BYODKIM
-  .publishDkim(ref<HostedZoneBuilderResult>("zone").get("hostedZone"))
+  .publishDkim(zone)
+  .publishInboundMx(zone) // route the domain's mail to SES
   .build(stack, "MailIdentity");
 ```
 
 - **`.domain()` / `.email()` / `.publicHostedZone()`** — the three identity variants. `.publicHostedZone(zone)` verifies the zone apex and lets CDK auto-publish DKIM into it — the concise "I own the whole zone" form.
 - **`.publishDkim(zone)`** — for the `.domain()` case (e.g. a subdomain whose apex lives elsewhere), publishes the DKIM DNS records into `zone`: three CNAMEs for Easy DKIM, one TXT for BYODKIM. Mutually exclusive with `.publicHostedZone()` (which already publishes); not valid for an email identity.
+- **`.publishInboundMx(zone, { priority? })`** — publishes the [MX record](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-mx-record.html) that routes the domain's mail to SES's inbound endpoint (`inbound-smtp.<region>.amazonaws.com`, derived from the stack's Region). Without it senders have nowhere to deliver, however the rule set is configured. Valid for `.domain()` and `.publicHostedZone()` — CDK's zone form publishes DKIM but never a receiving MX. Priority defaults to `10` (`DEFAULT_INBOUND_MX_PRIORITY`). Emits the `@composurecdk/ses:receiving-region` warning when the stack's Region can't receive mail.
 - **`.mailFromDomain(...)`** — a [custom MAIL FROM domain](https://docs.aws.amazon.com/ses/latest/dg/mail-from.html); defaults to `REJECT_MESSAGE` on MX failure (no insecure fallback to `amazonses.com`, preserving SPF/DMARC alignment).
-- The result exposes `dkim` — the identity's DKIM DNS records as `{ name, value }[]` (CDK's `dkimRecords`), for manual publication when a zone isn't available — and `dkimRecords` (the Route 53 records) when `.publishDkim()` was used.
+- The result exposes `dkim` — the identity's DKIM DNS records as `{ name, value }[]` (CDK's `dkimRecords`), for manual publication when a zone isn't available — and `dkimRecords` / `inboundMxRecords` (the Route 53 records) when `.publishDkim()` / `.publishInboundMx()` were used.
 
 ## Receipt rule set
 
@@ -99,4 +103,4 @@ createAllowListReceiptFilterBuilder().ips(["203.0.113.0/24"]).build(stack, "Allo
 
 ## Region support
 
-SES email **receiving** is available only in a subset of Regions. The rule-set and filter builders emit a synth-time warning (`@composurecdk/ses:receiving-region`) when built in a Region that can't receive mail. Identity verification and DKIM work in far more Regions, so the warning is scoped to the receiving constructs. See the [email receiving endpoints](https://docs.aws.amazon.com/general/latest/gr/ses.html#ses_inbound_endpoints) table.
+SES email **receiving** is available only in a subset of Regions. The rule-set and filter builders, and `.publishInboundMx()`, emit a synth-time warning (`@composurecdk/ses:receiving-region`) when built in a Region that can't receive mail. Identity verification and DKIM work in far more Regions, so the warning is scoped to the receiving constructs. See the [email receiving endpoints](https://docs.aws.amazon.com/general/latest/gr/ses.html#ses_inbound_endpoints) table.

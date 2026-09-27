@@ -20,6 +20,7 @@ import {
 import { type ZoneRecordsBuilderResult } from "@composurecdk/route53/zone";
 import { DEFAULT_MAIL_FROM_BEHAVIOR_ON_MX_FAILURE } from "./defaults.js";
 import { type PublishDkimSpec, publishDkimRecords } from "./publish-dkim.js";
+import { type InboundMxOptions, publishInboundMx } from "./publish-inbound-mx.js";
 
 /**
  * Configuration for the SES email-identity builder. The `identity` and
@@ -44,6 +45,12 @@ export interface EmailIdentityBuilderResult {
    * only when `.publishDkim(zone)` was called.
    */
   dkimRecords?: ZoneRecordsBuilderResult;
+  /**
+   * The inbound MX record emitted by
+   * {@link IEmailIdentityBuilder.publishInboundMx}. Present only when
+   * `.publishInboundMx(zone)` was called.
+   */
+  inboundMxRecords?: ZoneRecordsBuilderResult;
 }
 
 /**
@@ -80,6 +87,10 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
   /** Set when BYODKIM is selected; `undefined` means Easy DKIM. */
   #byoDkim?: { readonly selector: string; readonly publicKey?: string };
   #publishZone?: Resolvable<NonNullable<RecordSetOptions["zone"]>>;
+  #inboundMx?: {
+    readonly zone: Resolvable<NonNullable<RecordSetOptions["zone"]>>;
+    readonly options: InboundMxOptions;
+  };
 
   /** Verify a whole domain (or subdomain). Publish DKIM with `.publishDkim()`. */
   domain(domain: string): this {
@@ -137,12 +148,34 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
     return this;
   }
 
+  /**
+   * Publish the MX record that routes this domain's mail to SES's inbound
+   * endpoint in the stack's Region (`inbound-smtp.<region>.amazonaws.com`), so
+   * the receipt rule set can see it. Valid for `.domain()` and
+   * `.publicHostedZone()` identities; throws for an email identity, whose
+   * domain's MX is not this identity's to claim.
+   *
+   * Unlike DKIM, `.publicHostedZone()` does not publish this for you — CDK
+   * never emits a receiving MX. `zone` tracks CDK's `RecordSetOptions["zone"]`
+   * for the same reason as {@link publishDkim} (ADR-0018).
+   *
+   * @see https://docs.aws.amazon.com/ses/latest/dg/receiving-email-mx-record.html
+   */
+  publishInboundMx(
+    zone: Resolvable<NonNullable<RecordSetOptions["zone"]>>,
+    options: InboundMxOptions = {},
+  ): this {
+    this.#inboundMx = { zone, options };
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: EmailIdentityBuilder): void {
     target.#source = this.#source;
     target.#dkim = this.#dkim;
     target.#byoDkim = this.#byoDkim;
     target.#publishZone = this.#publishZone;
+    target.#inboundMx = this.#inboundMx;
   }
 
   build(
@@ -166,6 +199,12 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
     const publish = this.#publishZone
       ? { zone: this.#publishZone, spec: this.#dkimSpec(id, source) }
       : undefined;
+    if (this.#inboundMx && source.kind === "email") {
+      throw new Error(
+        `EmailIdentityBuilder "${id}": .publishInboundMx() needs a domain identity; ` +
+          `an email-address identity does not own its domain's MX record.`,
+      );
+    }
 
     // A custom MAIL FROM defaults to rejecting on MX failure (no insecure
     // fallback to amazonses.com); an explicitly-set behaviour wins.
@@ -193,10 +232,22 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
         )
       : undefined;
 
+    const inboundMxRecords = this.#inboundMx
+      ? publishInboundMx(
+          scope,
+          `${id}InboundMx`,
+          identity.value,
+          this.#inboundMx.zone,
+          this.#inboundMx.options,
+          context,
+        )
+      : undefined;
+
     return {
       emailIdentity,
       dkim: emailIdentity.dkimRecords,
       ...(dkimRecords && { dkimRecords }),
+      ...(inboundMxRecords && { inboundMxRecords }),
     };
   }
 

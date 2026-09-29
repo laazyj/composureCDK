@@ -46,6 +46,10 @@ is the max of its own aws-cdk-lib usage and its `@composurecdk` peers' floors.
 > entry records only the package's own usage; `apply` writes, and `check`
 > asserts, the max over the `@composurecdk/*` peers in each `package.json`, and
 > `enforce` shards by that derived floor, so each shard tests what ships.
+> An own floor below an inherited one is therefore untested, and the tooling
+> prints it as such. It cannot be tested, since the package cannot load below
+> its peer's floor, and it is never published. `enforce` tests it from the
+> moment it becomes the published floor.
 
 ### What a floor guarantees
 

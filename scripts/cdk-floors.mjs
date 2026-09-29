@@ -125,8 +125,13 @@ function effectiveFloors(floors) {
   return effective;
 }
 
+/**
+ * An inherited floor marks the own floor untested: `enforce` shards by the
+ * published floor, and the package cannot load below its peer's anyway. It is
+ * tested from the moment it becomes the published floor.
+ */
 function describe({ floor, own, via }) {
-  return via === undefined ? `^${floor}` : `^${floor} (own ${own}, via ${via})`;
+  return via === undefined ? `^${floor}` : `^${floor} (own ${own} untested, via ${via})`;
 }
 
 /** Writes each package's peerDependencies.aws-cdk-lib from the derived floors. */

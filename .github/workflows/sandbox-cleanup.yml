@@ -5,7 +5,9 @@ name: Sandbox Cleanup
 # CloudFront teardown (~15 min per distribution).
 
 on:
-  workflow_run:
+  # zizmor flags every workflow_run. This one reads nothing from the run that
+  # fired it: it checks out the default branch and tears down by stack prefix.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     # Every top-level run of deploy-test.yml — its own workflow_dispatch and
     # its `push: release/**` release gate — fires this, pass or fail. A failed
     # deploy is exactly when a half-deployed fleet is left standing.
@@ -49,12 +51,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          cache: npm
+          # No dependency cache in a job holding credentials; see docs/ci.md#auditing-the-workflows.
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci

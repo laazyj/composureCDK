@@ -28,9 +28,10 @@ on:
         default: sandbox
         type: string
 
+# id-token is granted to the deploy job alone: at workflow level the reusable
+# CI call below would inherit it, and CI has no use for an OIDC token.
 permissions:
   contents: read
-  id-token: write # Required for AWS OIDC
 
 concurrency:
   # Shared with sandbox-cleanup.yml so a teardown can never run against the
@@ -42,7 +43,9 @@ concurrency:
 jobs:
   ci:
     name: CI
-    uses: ./.github/workflows/ci.yml
+    # zizmor wants GitHub's `$/` self-repository syntax here, but actionlint
+    # (1.7.12) cannot parse it yet. Revisit when actionlint supports it.
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
     # A pre-deploy sanity check, not a second full CI run. The deploy runs on
     # Node 24 against the pinned aws-cdk-lib, so the other matrix legs (which
     # exist to prove dual ESM/CJS resolution across runtimes, ADR-0007) and the
@@ -65,16 +68,22 @@ jobs:
     # inputs, and losing the environment binding would silently drop the AWS
     # role and region vars with it.
     environment: ${{ inputs.environment || 'sandbox' }}
+    permissions:
+      contents: read
+      id-token: write # Required for AWS OIDC
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          cache: npm
+          # No dependency cache in a job holding credentials; see docs/ci.md#auditing-the-workflows.
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci

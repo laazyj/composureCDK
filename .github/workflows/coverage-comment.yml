@@ -13,7 +13,9 @@ name: Coverage Comment
 # comment now works for fork PRs, which the in-line step could never do.
 
 on:
-  workflow_run:
+  # zizmor flags every workflow_run. This one never checks out or runs PR
+  # code: it reads a markdown table and a PR number it validates as numeric.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [CI]
     types: [completed]
 

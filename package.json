@@ -40,7 +40,8 @@
   ],
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md,yaml,yml}": "prettier --write",
-    ".github/workflows/*.yml": "npx nx actionlint --"
+    ".github/workflows/*.yml": "npx nx actionlint --",
+    ".github/{workflows/*.yml,dependabot.yml}": "npx nx zizmor --"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",

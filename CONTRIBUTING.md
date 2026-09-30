@@ -59,6 +59,16 @@ lints the workflows unconditionally and the `pre-push` hook runs `verify`, so
 you need shellcheck to push whatever you changed — see
 [linting the workflows](docs/ci.md#linting-the-workflows).
 
+Optionally, install [zizmor](https://docs.zizmor.sh) to audit the GitHub
+Actions workflows and Dependabot config for security problems before you push:
+
+```sh
+brew install zizmor       # or see https://docs.zizmor.sh/installation/
+```
+
+`npx nx verify` skips the audit when zizmor is not on your `PATH`. CI always
+runs it — see [auditing the workflows](docs/ci.md#auditing-the-workflows).
+
 ```sh
 git clone https://github.com/laazyj/composureCDK.git
 cd composureCDK

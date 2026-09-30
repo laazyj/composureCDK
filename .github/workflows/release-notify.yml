@@ -17,7 +17,9 @@ name: Release Notify
 # below, which is what the script's marker idempotency is built for.
 
 on:
-  workflow_run:
+  # zizmor flags every workflow_run. This one listens only to Release, which
+  # runs only on tag pushes, and it validates the tag before using it.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [Release]
     types: [completed]
   workflow_dispatch:
@@ -65,6 +67,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # No `npm ci` or setup-node: the script has no dependencies and drives the
       # preinstalled gh CLI. So it is called directly rather than as

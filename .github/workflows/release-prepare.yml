@@ -41,6 +41,9 @@ jobs:
         # since the previous release, so it needs the full git history.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Deliberate: the release-branch push below authenticates with the credentials
+          # checkout leaves in .git/config.
+          persist-credentials: true
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
 
@@ -48,7 +51,8 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          cache: npm
+          # No dependency cache in a job holding credentials; see docs/ci.md#auditing-the-workflows.
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci
@@ -63,14 +67,20 @@ jobs:
         # Once we reach 1.x, peer-dep ranges become ^X.0.0 and this step is no
         # longer needed for minor bumps.
         if: ${{ inputs.bump-peer-deps }}
+        # Inputs reach the shell through env, never `${{ }}` in the script, so a
+        # crafted specifier cannot inject code.
+        env:
+          SPECIFIER: ${{ inputs.specifier }}
         run: |
           for f in packages/*/package.json; do
-            sed -i 's|"@composurecdk/\([^"]*\)": "\^0\.[0-9]\+\.0"|"@composurecdk/\1": "^${{ inputs.specifier }}"|g' "$f"
+            sed -i 's|"@composurecdk/\([^"]*\)": "\^0\.[0-9]\+\.0"|"@composurecdk/\1": "^'"$SPECIFIER"'"|g' "$f"
           done
 
       - name: Version packages
+        env:
+          SPECIFIER: ${{ inputs.specifier }}
         run: |
-          npx nx release version ${{ inputs.specifier && format('--specifier={0}', inputs.specifier) || '' }}
+          npx nx release version ${SPECIFIER:+"--specifier=$SPECIFIER"}
 
       - name: Resolve new version
         id: version
@@ -80,8 +90,10 @@ jobs:
           echo "branch=release/v${version}" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          npx nx release changelog ${{ steps.version.outputs.version }}
+          npx nx release changelog "$VERSION"
 
       - name: Create release branch and commit
         env:

@@ -4,6 +4,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Wait a week before proposing a release, so a compromised or broken one is
+    # more likely to have been yanked before we adopt it. Security updates are
+    # not held back — cooldown applies to version updates only. zizmor's
+    # dependabot-cooldown audit requires at least seven days.
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns:
@@ -12,6 +18,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Same one-week cooldown, for the same reason, as github-actions above.
+    cooldown:
+      default-days: 7
     ignore:
       # 4.0.5 added `"type": "module"` but still ships .d.ts files whose relative
       # imports carry no extension, so under NodeNext every graphlib type fails

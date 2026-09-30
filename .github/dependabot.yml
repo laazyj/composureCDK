@@ -93,3 +93,13 @@ updates:
           - "@eslint/*"
           - "@eslint-community/*"
           - "eslint-config-prettier"
+  # zizmor, which CI installs from this hash-pinned lock. `uv`, not `pip`:
+  # the lock is `uv pip compile` output, and the uv ecosystem regenerates it
+  # the same way, hashes included, from the sibling requirements.in.
+  - package-ecosystem: uv
+    directory: /.github/zizmor
+    schedule:
+      interval: weekly
+    # Same one-week cooldown, for the same reason, as github-actions above.
+    cooldown:
+      default-days: 7

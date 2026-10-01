@@ -40,7 +40,7 @@ They stay out of the graph because the root manifest sets `"nx": { "includedScri
 
 `format` forwards to `prettier:write` rather than a same-named target because `nx format` is a built-in nx command; see below.
 
-The workspace-wide gates — `prettier:check`, `actionlint`, `ci:covers-verify`, `catalogue:check`, `licenses:check`, `cdk-floors:check`, `cdk-flags:check` and their write-side siblings — are targets on the `workspace-root` project in [`project.json`](../project.json). They were npm scripts, which made them invisible to the graph: they could not be scheduled against the packages' work, and `verify` had to chain them by hand with `&&`, spawning an npm process per gate. As one graph the cold gate drops from ~123s to ~102s and the warm one from ~10.3s to ~4.6s.
+The workspace-wide gates — `prettier:check`, `actionlint`, `zizmor`, `ci:covers-verify`, `catalogue:check`, `licenses:check`, `cdk-floors:check`, `cdk-flags:check` and their write-side siblings — are targets on the `workspace-root` project in [`project.json`](../project.json). They were npm scripts, which made them invisible to the graph: they could not be scheduled against the packages' work, and `verify` had to chain them by hand with `&&`, spawning an npm process per gate. As one graph the cold gate drops from ~123s to ~102s and the warm one from ~10.3s to ~4.6s.
 
 Three things about that file are deliberate:
 

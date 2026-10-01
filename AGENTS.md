@@ -14,9 +14,10 @@ Run the gates after each task, before presenting work for review:
 npx nx run-many -t lint
 npx nx prettier:check
 npx nx actionlint          # only if you touched .github/workflows/
+npx nx zizmor              # only if you touched .github/workflows/ or dependabot.yml
 ```
 
-Auto-fix with `npx nx run-many -t lint -- --fix` and `npx nx prettier:write`. `actionlint` is separate because eslint does not read workflow files, and a broken workflow is one of the few things CI cannot catch for you; it needs `shellcheck >= 0.9` on `PATH`, which containers often lack — install it rather than skipping the gate. `npx nx verify` runs everything, and the pre-push hook runs it for you.
+Auto-fix with `npx nx run-many -t lint -- --fix` and `npx nx prettier:write`. `actionlint` is separate because eslint does not read workflow files, and a broken workflow is one of the few things CI cannot catch for you; it needs `shellcheck >= 0.9` on `PATH`, which containers often lack — install it rather than skipping the gate. `zizmor` audits the same files for security problems; it skips when not on `PATH`, but CI does not, so fix or suppress its findings with a reason (see [docs/ci.md](docs/ci.md#auditing-the-workflows)). `npx nx verify` runs everything, and the pre-push hook runs it for you.
 
 ## Build system
 

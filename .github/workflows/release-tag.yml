@@ -44,6 +44,9 @@ jobs:
         # GITHUB_TOKEN do not trigger downstream workflows.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Deliberate: the tag push below authenticates with the credentials
+          # checkout leaves in .git/config.
+          persist-credentials: true
           fetch-depth: 1
           token: ${{ secrets.RELEASE_PR_TOKEN }}
 

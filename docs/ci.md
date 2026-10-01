@@ -103,6 +103,22 @@ The whole run takes ~300ms, so it is simply always run rather than cached or pat
 
 Suppress a false positive with a `# shellcheck disable=SCxxxx` comment inside the `run:` block, and say why — as `ci.yml`'s `Read distinct floors from manifest` step does, where single quotes are load-bearing and "fixing" SC2016 would break the script.
 
+## Auditing the workflows
+
+`npx nx zizmor` runs [zizmor](https://docs.zizmor.sh) over the repository. zizmor is a security linter for GitHub Actions: it looks for template injection, over-broad permissions, credentials left on disk, cache poisoning, dangerous triggers, and a Dependabot config with no cooldown. actionlint asks whether a workflow is valid; zizmor asks whether it is safe. Like actionlint, it is chained into `npx nx verify`, fires from `lint-staged` when a workflow or `.github/dependabot.yml` is staged, and runs in CI as the **Audit workflows** step.
+
+It differs from actionlint in one way: **locally it is optional.** zizmor ships as a release binary rather than an npm package, so [`scripts/zizmor.mjs`](../scripts/zizmor.mjs) looks for it on `PATH`. If it is not there, the script prints how to install it and passes, so a contributor who never touches a workflow is not blocked. **In CI a missing zizmor fails the step.** The script refuses to skip when `CI` is set, so the gate cannot go hollow the way actionlint does without shellcheck (see [Linting the workflows](#linting-the-workflows)).
+
+- **CI pins the version.** The **Install zizmor** step uses [`taiki-e/install-action`](https://github.com/taiki-e/install-action), which downloads a named zizmor release and verifies its checksum. The action is SHA-pinned and kept current by Dependabot. The zizmor version is set in the step's `tool:` input, which Dependabot does not update, so raise it by hand. A local zizmor may be newer or older, so it can disagree with CI; CI's result is the one that counts.
+- **Only CI runs the online audits.** zizmor checks for impostor commits and for actions with known vulnerabilities only when it has a GitHub token. **Audit workflows** passes `GH_TOKEN`. Local runs are `--offline` whatever is in your environment, so `verify` does not call the GitHub API on every push. Run `GH_TOKEN=$(gh auth token) zizmor .` by hand to get the online audits locally.
+- **One matrix leg**, the same one that runs **Lint workflows**, for the same reason.
+
+Fix a finding in preference to suppressing it. When one is intended, suppress it on the flagged line with `# zizmor: ignore[<audit>]` and give the reason in a comment beside it. A workflow that needs git credentials after checkout says so with an explicit `persist-credentials: true`, not with an ignore.
+
+**`release.yml` and `deploy-test.yml` restore no dependency cache**, following zizmor's `cache-poisoning` audit. Each job holds credentials (npm publishing, AWS), and a poisoned cache written by another ref would run with them. Both set `package-manager-cache: false` on `actions/setup-node`. Dropping `cache: npm` is not enough, because setup-node can turn caching on by itself unless told not to. Other credentialed jobs keep `cache: npm`. zizmor does not flag them, and `npm ci` checks every package against the lockfile's integrity hashes, which limits what a poisoned cache can do.
+
+`.github/dependabot.yml` gives both ecosystems a seven-day `cooldown`, so a new release waits a week before Dependabot proposes it. A compromised or broken release is then more likely to have been yanked before it lands here. Security updates are not delayed. zizmor's `dependabot-cooldown` audit fails on anything shorter.
+
 ## Trimming CI for deploy-test
 
 `ci.yml` takes two `workflow_call` inputs, both defaulting to the full run so `push` and `pull_request` are untouched — those events carry no inputs, and the expressions fall back accordingly:
@@ -114,7 +130,7 @@ Suppress a false positive with a `# shellcheck disable=SCxxxx` comment inside th
 
 `deploy-test.yml` passes `"[24]"` and `true`, taking that call from 17 jobs to 1.
 
-The trimmed-away work cannot tell you whether the examples deploy. The Node 20/22/26 legs exist to prove dual ESM/CJS resolution across runtimes ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)); the floor shards pin `aws-cdk-lib` down to each package's declared minimum ([ADR-0008](adr/0008-aws-cdk-lib-version-floors.md)). A deploy runs on Node 24 against the installed `aws-cdk-lib` and touches neither dimension. What is kept is the whole `verify` chain on Node 24 — format, `ci:covers-verify`, `licenses:check`, actionlint, typecheck, build, `catalogue:check`, `check:exports`, lint, `cdk-floors:check`, `cdk-flags:check`, `validate` (synth + CloudFormation Validate), test — which is the part that can.
+The trimmed-away work cannot tell you whether the examples deploy. The Node 20/22/26 legs exist to prove dual ESM/CJS resolution across runtimes ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)); the floor shards pin `aws-cdk-lib` down to each package's declared minimum ([ADR-0008](adr/0008-aws-cdk-lib-version-floors.md)). A deploy runs on Node 24 against the installed `aws-cdk-lib` and touches neither dimension. What is kept is the whole `verify` chain on Node 24 — format, `ci:covers-verify`, `licenses:check`, actionlint, zizmor, typecheck, build, `catalogue:check`, `check:exports`, lint, `cdk-floors:check`, `cdk-flags:check`, `validate` (synth + CloudFormation Validate), test — which is the part that can.
 
 `skip-cdk-floors` is phrased as a skip rather than a run because an unset input coerces to `false` in GitHub expressions, so `false` has to be the value that means "do the normal thing".
 
@@ -409,5 +425,6 @@ npx nx cdk examples -- destroy --all
 - **Environment-scoped trust** — the AWS role restricts assumption to the `sandbox` environment; npm trusted publishers restrict publishing to `release.yml` in the `npm` environment.
 - **Tag-based resource scoping** — Lambda, CloudWatch Logs, and IAM permissions use `aws:cloudformation:stack-name` tag conditions limited to `ComposureCDK-*`. The Neptune smoke test's `ssm:SendCommand` is likewise scoped to bastion instances carrying that tag (the `AWS-RunShellScript` document is granted separately). SQS, SNS, and DynamoDB smoke-test access is ARN-scoped to the sandbox account (CloudFormation system tags don't propagate to SQS or SNS in a form IAM evaluates, and DynamoDB does not support tag-based authorization for data-plane actions at all). Read-only describes that AWS does not support resource-level permissions for — EC2 `Describe*`, `rds:DescribeDBClusters`, `ssm:GetCommandInvocation`, `cloudformation:ListStacks` — are granted on `*`.
 - **npm provenance** — published packages include provenance attestations linking them to this repo and workflow run.
-- **Action pinning** — all GitHub Actions are pinned by commit SHA, kept current by Dependabot.
+- **Action pinning** — all GitHub Actions are pinned by commit SHA, kept current by Dependabot with a seven-day cooldown.
+- **Workflow audit** — zizmor checks every workflow and the Dependabot config on each PR (see [Auditing the workflows](#auditing-the-workflows)).
 - **Concurrency** — deploy-test uses `cancel-in-progress: false` so an in-flight deployment cannot be interrupted into an inconsistent state.

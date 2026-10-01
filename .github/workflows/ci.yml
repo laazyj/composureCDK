@@ -40,6 +40,9 @@ jobs:
     timeout-minutes: 15
     env:
       NX_DAEMON: false
+      # The one leg that runs the Node-independent workflow gates below.
+      # Computed once so the steps cannot disagree about which leg it is.
+      WORKFLOW_GATES_LEG: ${{ matrix.node-version == fromJSON(inputs.node-versions || '[20, 22, 24, 26]')[0] }}
     strategy:
       fail-fast: false
       matrix:
@@ -51,6 +54,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 1
 
       - name: Setup Node.js
@@ -59,8 +63,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      # package.json requires npm >= 11; Node 20/22 ship npm 10.
-      - name: Pin npm
+      # package.json requires npm >= 11; Node 20/22 ship npm 10. npm cannot be
+      # installed from the lockfile it reads, so zizmor's adhoc-packages finding
+      # has no lockfile-based fix here.
+      - name: Pin npm # zizmor: ignore[adhoc-packages]
         run: npm install -g npm@11
 
       # vitest and lint-staged need Node >= 22, which engine-strict enforces. The
@@ -110,8 +116,22 @@ jobs:
       # listeners always dispatch the default-branch copy, and an edited trigger
       # is not exercised until it next fires.
       - name: Lint workflows
-        if: matrix.node-version == fromJSON(inputs.node-versions || '[20, 22, 24, 26]')[0]
+        if: env.WORKFLOW_GATES_LEG == 'true'
         run: npx nx actionlint
+
+      # Pinned and checksum-verified; see docs/ci.md#auditing-the-workflows.
+      - name: Install zizmor
+        if: env.WORKFLOW_GATES_LEG == 'true'
+        uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
+        with:
+          tool: zizmor@1.30.1
+
+      # GH_TOKEN turns on zizmor's online audits.
+      - name: Audit workflows
+        if: env.WORKFLOW_GATES_LEG == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npx nx zizmor
 
       - name: Typecheck
         run: npx nx run-many -t typecheck
@@ -222,6 +242,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 1
 
       - name: Read distinct floors from manifest
@@ -265,6 +286,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 1
 
       - name: Setup Node.js

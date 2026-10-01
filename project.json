@@ -20,6 +20,7 @@
     "prettier:write": { "command": "prettier --write .", "cache": false },
     "prettier:check": { "command": "prettier --check .", "cache": false },
     "actionlint": { "command": "node scripts/actionlint.mjs", "cache": false },
+    "zizmor": { "command": "node scripts/zizmor.mjs", "cache": false },
     "ci:covers-verify": { "command": "node scripts/ci-covers-verify.mjs", "cache": false },
     "catalogue": {
       "command": "node scripts/gen-constraint-catalogue.mjs",
@@ -69,6 +70,7 @@
         "prettier:check",
         "ci:covers-verify",
         "actionlint",
+        "zizmor",
         "catalogue:check",
         "licenses:check",
         "cdk-floors:check",

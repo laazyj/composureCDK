@@ -85,7 +85,7 @@ Two things to know if you change it:
 - **`sharedGlobals` must stay declared.** nx provides it built-in, but defining your own `default` that references it makes it your responsibility; drop it and every nx command fails with `"sharedGlobals" is an invalid fileset`.
 - **The exclusion list is short because the tree is tidy.** `dist`, `coverage`, `.tshy` and `cdk.out` are gitignored and nx only hashes tracked files, so they are already out. `package.json` must stay in `production` — tshy reads its build config from there.
 
-**The Node version is part of every hash.** `sharedGlobals` carries a `{ "runtime": "node --version" }` input, so no task result can be replayed across Node majors. Without it a restored cache would let one matrix leg replay another's results and report success without running anything, which is the whole point of the matrix — see [CI](ci.md#nx-task-cache).
+**The Node version is part of every hash.** `sharedGlobals` carries a `{ "runtime": "node --version" }` input, so no task result can be replayed across Node majors. Without it, switching Node versions locally (with `nvm`, say) would replay results produced on the other version, and report success for checks that never ran on the one in use.
 
 ## Installing dependencies
 

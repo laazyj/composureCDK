@@ -115,6 +115,5 @@
       "pattern": "v{version}"
     }
   },
-  "analytics": false,
-  "cacheDirectory": ".nx/cache"
+  "analytics": false
 }

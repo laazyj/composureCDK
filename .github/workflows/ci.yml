@@ -223,6 +223,77 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # Packs every publishable package, as `npm publish` would, for the Consumer
+  # jobs to install. See docs/ci.md#consumer-compatibility.
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NX_DAEMON: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and pack
+        run: npx nx consumer:pack
+
+      - name: Upload packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: packages
+          path: dist/consumer
+          if-no-files-found: error
+          retention-days: 1
+
+  # Installs the packed packages into a fresh project on each supported Node
+  # and loads them as a consumer would: no workspace, no dev toolchain, peers
+  # checked strictly. See docs/ci.md#consumer-compatibility.
+  consumer:
+    name: Consumer (Node ${{ matrix.node-version }})
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ${{ fromJSON(inputs.node-versions || '[20, 22, 24, 26]') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Download packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: packages
+          path: dist/consumer
+
+      # Called directly rather than through nx: this job installs none of the
+      # workspace, which is the point.
+      - name: Check the packages as a consumer
+        run: node scripts/consumer-compat.mjs check dist/consumer
+
   # Derive the distinct published floors (each package's own floor raised to
   # its @composurecdk peers') from cdk-floors.json, so the enforce matrix stays
   # in sync without duplicating values in YAML and shards by what ships.
@@ -290,7 +361,7 @@ jobs:
   result:
     name: CI
     if: always()
-    needs: [workflows, ci, cdk-floors-list, cdk-floors-enforce]
+    needs: [workflows, ci, package, consumer, cdk-floors-list, cdk-floors-enforce]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

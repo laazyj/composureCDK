@@ -119,12 +119,15 @@ jobs:
         if: env.WORKFLOW_GATES_LEG == 'true'
         run: npx nx actionlint
 
-      # Pinned and checksum-verified; see docs/ci.md#auditing-the-workflows.
+      # Hash-pinned in .github/zizmor/requirements.txt, which Dependabot keeps
+      # current; see docs/ci.md#auditing-the-workflows. A venv because the
+      # runner's system Python refuses pip installs (PEP 668).
       - name: Install zizmor
         if: env.WORKFLOW_GATES_LEG == 'true'
-        uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
-        with:
-          tool: zizmor@1.30.1
+        run: |
+          python3 -m venv "$RUNNER_TEMP/zizmor"
+          "$RUNNER_TEMP/zizmor/bin/pip" install --disable-pip-version-check --require-hashes --no-deps -r .github/zizmor/requirements.txt
+          echo "$RUNNER_TEMP/zizmor/bin" >> "$GITHUB_PATH"
 
       # GH_TOKEN turns on zizmor's online audits.
       - name: Audit workflows

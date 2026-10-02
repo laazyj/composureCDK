@@ -33,7 +33,7 @@ Cutting a release
 
 `deploy-test.yml` also runs standalone via `workflow_dispatch`.
 
-- **`ci.yml`** — runs the `verify` gates (format, typecheck, build, `check:exports`, lint, test, …) in a **Verify** job on Node 24, the workflow checks (actionlint, zizmor, `ci:covers-verify`) once in a **Workflows** job, the packed packages through a **Consumer** job per Node version (see [Consumer compatibility](#consumer-compatibility)), and the aws-cdk-lib floor shards. A final **CI** job is the one [required check](#required-checks). It runs on every PR whatever its base (see [Stacked pull requests](#stacked-pull-requests)) and every push to `main`. Also `workflow_call`-able. Quality gate for everything downstream. The steps are the same nx targets `npx nx verify` depends on locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). **Verify** also reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)). It holds no write scopes, so it stays callable from `deploy-test.yml`.
+- **`ci.yml`** — runs the `verify` gates (format, typecheck, build, `check:exports`, lint, test, …) in a **Verify** job on Node 24, the workflow checks (actionlint, zizmor, `ci:covers-verify`) in a **Workflows** job, [dependency review](#dependency-review) on pull requests, the packed packages through a **Consumer** job per Node version (see [Consumer compatibility](#consumer-compatibility)), and the aws-cdk-lib floor shards. A final **CI** job is the one [required check](#required-checks). It runs on every PR whatever its base (see [Stacked pull requests](#stacked-pull-requests)) and every push to `main`. Also `workflow_call`-able. Quality gate for everything downstream. The steps are the same nx targets `npx nx verify` depends on locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). **Verify** also reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)). It holds no write scopes, so it stays callable from `deploy-test.yml`.
 - **`coverage-comment.yml`** — `workflow_run` listener on CI. Posts the coverage table as a sticky PR comment (see [Coverage reporting](#coverage-reporting)).
 - **`deploy-test.yml`** — calls CI as a pre-deploy sanity check (Workflows and Verify only — see [Trimming CI for deploy-test](#trimming-ci-for-deploy-test)), then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation. Runs on demand via `workflow_dispatch`, and automatically on any push to `release/**` — **that is the release gate**, and it lands as a check on the release PR next to CI. A release branch is the only ref holding exactly what is being released, version bumps and changelog included; `main`'s HEAD is a different tree, and tag time is too late to gate anything.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`; pushing the branch is also what starts the deploy gate above.
@@ -47,7 +47,7 @@ The `main` ruleset requires two checks: **CI**, and **Not blocked** (`blocked-la
 
 Because the ruleset names that one check, jobs, Node versions and CDK floors can be added or removed without editing the ruleset. A new job joins the requirement through the `needs:` list of **CI**. `npx nx ci:covers-verify` fails if any job in `ci.yml` is missing from that list, since such a job would run but never block a merge.
 
-`skipped` counts as passing so that a caller can opt out of jobs. `deploy-test.yml` skips the floor shards, for example. A job skipped because something it needs failed still fails **CI**, through that job's own result.
+`skipped` counts as passing so that a caller can opt out of jobs (`deploy-test.yml` skips the floor shards, for example), and so that a job with nothing to do on an event can skip it, as **Dependency review** does on `push`. A job skipped because something it needs failed still fails **CI**, through that job's own result.
 
 ## Stacked pull requests
 
@@ -127,6 +127,15 @@ The packages promise to work for consumers on Node 20, 22, 24 and 26, under both
 - **Consumer (Node N)** installs the tarballs into a fresh, empty project, with their external peers (`aws-cdk-lib`, `constructs`, `eslint`, the Neptune alpha) at the versions `package-lock.json` pins. It then runs [`@composurecdk/module-compat`](../packages/module-compat/README.md)'s `check.mjs` against that install. Nothing from the workspace is installed and `check.mjs` is plain Node, so this runs on Node 20, which the dev toolchain (vitest) does not support. npm checks the peer ranges strictly, with no `--legacy-peer-deps`, as it would for a consumer. A peer range no consumer can satisfy is a bug, and this is where it shows up ([#580](https://github.com/laazyj/composureCDK/issues/580)).
 
 The same `check.mjs` runs against the workspace build in `npx nx test module-compat`, so `verify` keeps a fast, offline version of these checks. `npx nx consumer:check` runs the full version locally on your Node. It installs from the npm registry, so it is not part of `verify`.
+
+## Dependency review
+
+The **Dependency review** job runs [`actions/dependency-review-action`](https://github.com/actions/dependency-review-action) on every pull request. It compares the dependency graph of the PR's base and head, npm packages and GitHub Actions alike, and fails if the PR adds a dependency, or moves one to a version, with a known vulnerability of **moderate** severity or worse. Dependabot only reports a vulnerability after it has merged; this stops one arriving through a PR.
+
+- **Development dependencies count**, unlike the action's default: nearly every dependency here is one, and they run in CI.
+- **Only changes are checked.** A vulnerability already on `main` does not fail unrelated PRs; Dependabot's alerts and security updates deal with those.
+- **To accept a specific advisory**, add its GHSA ID to the job's `allow-ghsas` input, with a comment saying why.
+- **Skipped on `push`**, which has no base to compare; see [Required checks](#required-checks).
 
 ## Trimming CI for deploy-test
 
@@ -430,4 +439,5 @@ npx nx cdk examples -- destroy --all
 - **npm provenance** — published packages include provenance attestations linking them to this repo and workflow run.
 - **Action pinning** — all GitHub Actions are pinned by commit SHA, kept current by Dependabot with a seven-day cooldown.
 - **Workflow audit** — zizmor checks every workflow and the Dependabot config on each PR (see [Auditing the workflows](#auditing-the-workflows)).
+- **Dependency review** — a PR cannot add a dependency version with a known vulnerability (see [Dependency review](#dependency-review)).
 - **Concurrency** — deploy-test uses `cancel-in-progress: false` so an in-flight deployment cannot be interrupted into an inconsistent state.

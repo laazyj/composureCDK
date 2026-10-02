@@ -74,6 +74,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: npx nx zizmor
 
+  # Pull requests only, since it compares base and head; see
+  # docs/ci.md#dependency-review.
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          # Development too: nearly every dependency here is one, and runs in CI.
+          fail-on-scopes: runtime, development
+
   # The `verify` gates other than the workflow checks, on the Node the dev
   # toolchain is developed against.
   verify:
@@ -332,7 +347,14 @@ jobs:
   result:
     name: CI
     if: always()
-    needs: [workflows, verify, package, consumer, cdk-floors-list, cdk-floors-enforce]
+    needs:
+      - workflows
+      - dependency-review
+      - verify
+      - package
+      - consumer
+      - cdk-floors-list
+      - cdk-floors-enforce
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -2,15 +2,23 @@
 
 /**
  * Per-package aws-cdk-lib floor tooling. `cdk-floors.json` is the curated
- * source of truth (package -> { floor, gatedBy }); this script reads it,
+ * source of truth (package -> { floor, gatedBy }) for each package's *own*
+ * aws-cdk-lib usage; this script derives the floor each package publishes,
  * keeps each package's `peerDependencies.aws-cdk-lib` in sync, and verifies
- * the declared floors actually hold by running each package's existing unit
+ * the published floors actually hold by running each package's existing unit
  * suite against a real install of its own floor.
  *
+ * The published (effective) floor is the max of a package's own manifest floor
+ * and the effective floors of its `@composurecdk/*` peers, read from each
+ * package.json — a package cannot load below a peer's floor, so the manifest
+ * never restates one (see ADR-0008).
+ *
  * - `apply` writes each package's `peerDependencies.aws-cdk-lib` from the
- *   manifest. Run it after editing `cdk-floors.json`.
- * - `check` asserts every package.json matches the manifest, exiting non-zero
- *   on drift. Cheap; wired into the main CI job and `npx nx verify`.
+ *   derived floors. Run it after editing `cdk-floors.json`.
+ * - `check` asserts every package.json matches the derived floors, exiting
+ *   non-zero on drift. Cheap; wired into the main CI job and `npx nx verify`.
+ * - `list` prints the derived floors and, under CI, writes the distinct ones
+ *   to `$GITHUB_OUTPUT` as the `enforce` matrix.
  * - `enforce` pins aws-cdk-lib to a declared floor (via a temporary npm
  *   `overrides`, which forces every copy in the tree, not just the hoisted
  *   one) on a from-scratch install, asserts the floor actually bound, then
@@ -24,11 +32,15 @@
  *   against a descending ladder of real aws-cdk-lib releases, recording the
  *   lowest each loads on and the gating export. Writes a ladder-granular
  *   draft (`cdk-floors.discovered.json`) to be refined into `cdk-floors.json`.
+ *   A packed package loads only once its peers do, so a discovered floor is a
+ *   published floor: where it equals a peer's, the package's own floor is
+ *   unmeasured, and the manifest records its own gating API, not the peer's.
  *   Manual; used when establishing or deliberately lowering a floor.
  *
  * Usage:
  *   node scripts/cdk-floors.mjs apply
  *   node scripts/cdk-floors.mjs check
+ *   node scripts/cdk-floors.mjs list
  *   node scripts/cdk-floors.mjs enforce              # every floor (CI: all shards)
  *   node scripts/cdk-floors.mjs enforce 2.118.0      # one floor (CI matrix shard)
  *   CDK_FLOORS_FLOOR=2.118.0 node scripts/cdk-floors.mjs enforce
@@ -37,12 +49,20 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { packPublishablePackages } from "./cdk-floor/packages.mjs";
+import { compareSemver, packPublishablePackages } from "./cdk-floor/packages.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGES_DIR = join(REPO_ROOT, "packages");
@@ -69,16 +89,63 @@ function readFloors() {
   return JSON.parse(readFileSync(MANIFEST, "utf8")).floors;
 }
 
-/** Writes each package's peerDependencies.aws-cdk-lib from the curated manifest. */
+function readPeers(pkg) {
+  return JSON.parse(readFileSync(pkgJsonPath(pkg), "utf8")).peerDependencies ?? {};
+}
+
+/**
+ * Each package's published floor: the max of its own manifest floor and the
+ * effective floors of its `@composurecdk/*` peers, walked depth-first from the
+ * package.json peer graph. Returns `Map<pkg, { floor, via? }>`, where `via`
+ * names the package whose own floor was inherited. Peers absent from the
+ * manifest (`core`, which has no aws-cdk-lib peer) contribute nothing.
+ */
+function effectiveFloors(floors) {
+  const effective = new Map();
+  const visiting = new Set();
+  const visit = (pkg) => {
+    if (effective.has(pkg)) return effective.get(pkg);
+    if (visiting.has(pkg)) throw new Error(`peer cycle through @composurecdk/${pkg}`);
+    visiting.add(pkg);
+    const own = floors[pkg].floor;
+    let result = { floor: own, own };
+    for (const name of Object.keys(readPeers(pkg))) {
+      const peer = name.replace("@composurecdk/", "");
+      if (peer === name || floors[peer] === undefined) continue;
+      const inherited = visit(peer);
+      if (compareSemver(inherited.floor, result.floor) > 0) {
+        result = { floor: inherited.floor, own, via: inherited.via ?? peer };
+      }
+    }
+    visiting.delete(pkg);
+    effective.set(pkg, result);
+    return result;
+  };
+  for (const pkg of Object.keys(floors)) visit(pkg);
+  return effective;
+}
+
+/**
+ * An inherited floor marks the own floor untested: `enforce` shards by the
+ * published floor, and the package cannot load below its peer's anyway. It is
+ * tested from the moment it becomes the published floor.
+ */
+function describe({ floor, own, via }) {
+  return via === undefined ? `^${floor}` : `^${floor} (own ${own} untested, via ${via})`;
+}
+
+/** Writes each package's peerDependencies.aws-cdk-lib from the derived floors. */
 function apply() {
-  for (const [pkg, { floor, peerFloors }] of Object.entries(readFloors())) {
+  const floors = readFloors();
+  const effective = effectiveFloors(floors);
+  for (const [pkg, { peerFloors }] of Object.entries(floors)) {
     const path = pkgJsonPath(pkg);
     const json = JSON.parse(readFileSync(path, "utf8"));
     if (json.peerDependencies?.["aws-cdk-lib"] === undefined) {
       console.log(`  ${pkg.padEnd(16)} skipped (no aws-cdk-lib peer — constructs only)`);
       continue;
     }
-    json.peerDependencies["aws-cdk-lib"] = `^${floor}`;
+    json.peerDependencies["aws-cdk-lib"] = `^${effective.get(pkg).floor}`;
     // Lockstep peers (e.g. a version-locked @aws-cdk/aws-*-alpha) are stored exact
     // in the manifest, like `floor`, and written as a caret range here.
     const extras = [];
@@ -88,21 +155,23 @@ function apply() {
     }
     writeFileSync(path, `${JSON.stringify(json, null, 2)}\n`);
     console.log(
-      `  ${pkg.padEnd(16)} aws-cdk-lib ^${floor}${extras.length > 0 ? ` + ${extras.join(", ")}` : ""}`,
+      `  ${pkg.padEnd(16)} aws-cdk-lib ${describe(effective.get(pkg))}${extras.length > 0 ? ` + ${extras.join(", ")}` : ""}`,
     );
   }
   console.log("\nApplied to package.json files (run `npx nx prettier:write` to normalise).");
 }
 
-/** Asserts each package.json peer range matches the manifest; non-zero on drift. */
+/** Asserts each package.json peer range matches the derived floors; non-zero on drift. */
 function check() {
   const floors = readFloors();
+  const effective = effectiveFloors(floors);
   const mismatches = [];
-  for (const [pkg, { floor, peerFloors }] of Object.entries(floors)) {
-    const peers = JSON.parse(readFileSync(pkgJsonPath(pkg), "utf8")).peerDependencies ?? {};
-    if (peers["aws-cdk-lib"] !== `^${floor}`) {
+  for (const [pkg, { peerFloors }] of Object.entries(floors)) {
+    const peers = readPeers(pkg);
+    const expected = effective.get(pkg);
+    if (peers["aws-cdk-lib"] !== `^${expected.floor}`) {
       mismatches.push(
-        `  ${pkg}: package.json has aws-cdk-lib "${peers["aws-cdk-lib"] ?? "(unset)"}", manifest expects "^${floor}"`,
+        `  ${pkg}: package.json has aws-cdk-lib "${peers["aws-cdk-lib"] ?? "(unset)"}", expected ${describe(expected)}`,
       );
     }
     for (const [name, version] of Object.entries(peerFloors ?? {})) {
@@ -119,14 +188,35 @@ function check() {
     );
     process.exit(1);
   }
+  const inherited = [...effective].filter(([, e]) => e.via !== undefined);
   console.log(
-    `cdk-floors check passed (${Object.keys(floors).length} packages match the manifest)`,
+    `cdk-floors check passed (${Object.keys(floors).length} packages match the derived floors)`,
   );
+  for (const [pkg, e] of inherited) console.log(`  ${pkg.padEnd(16)} ${describe(e)}`);
 }
 
-function groupByFloor(floors) {
+/**
+ * Prints each package's own and derived floor, and under CI writes the distinct
+ * derived floors to `$GITHUB_OUTPUT` as `floors`, the `enforce` matrix.
+ */
+function list() {
+  const floors = readFloors();
+  const effective = effectiveFloors(floors);
+  console.log("Per-package aws-cdk-lib floors (derived from cdk-floors.json):");
+  for (const pkg of Object.keys(floors).sort()) {
+    console.log(`  ${pkg.padEnd(16)} ${describe(effective.get(pkg))}`);
+  }
+  const distinct = JSON.stringify([...groupByFloor(effective).keys()]);
+  console.log(`\nDistinct floors -> enforce matrix shards: ${distinct}`);
+  if (process.env.GITHUB_OUTPUT !== undefined) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `floors=${distinct}\n`);
+  }
+}
+
+/** Groups packages by the floor they publish, so each enforce shard tests what ships. */
+function groupByFloor(effective) {
   const byFloor = new Map();
-  for (const [pkg, { floor }] of Object.entries(floors)) {
+  for (const [pkg, { floor }] of effective) {
     if (!byFloor.has(floor)) byFloor.set(floor, []);
     byFloor.get(floor).push(`@composurecdk/${pkg}`);
   }
@@ -140,10 +230,10 @@ function groupByFloor(floors) {
  * alpha too, a lowered aws-cdk-lib floor would be probed against a mismatched
  * (latest) alpha and the result would be meaningless.
  */
-function peerOverridesByFloor(floors) {
+function peerOverridesByFloor(floors, effective) {
   const byFloor = {};
-  for (const { floor, peerFloors } of Object.values(floors)) {
-    byFloor[floor] = { ...byFloor[floor], ...peerFloors };
+  for (const [pkg, { floor }] of effective) {
+    byFloor[floor] = { ...byFloor[floor], ...floors[pkg].peerFloors };
   }
   return byFloor;
 }
@@ -187,11 +277,12 @@ function enforce() {
   const requested = process.env.CDK_FLOORS_FLOOR ?? process.argv[3];
   const hasRequested = requested !== undefined && requested !== "" && requested !== "--force";
   const floors = readFloors();
-  const byFloor = groupByFloor(floors);
-  const peerByFloor = peerOverridesByFloor(floors);
+  const effective = effectiveFloors(floors);
+  const byFloor = groupByFloor(effective);
+  const peerByFloor = peerOverridesByFloor(floors, effective);
   if (hasRequested && !byFloor.has(requested)) {
     console.error(
-      `cdk-floors enforce: no packages declare aws-cdk-lib floor ${requested}.\n` +
+      `cdk-floors enforce: no packages publish aws-cdk-lib floor ${requested}.\n` +
         `  Known floors: ${[...byFloor.keys()].join(", ")}`,
     );
     process.exit(1);
@@ -416,7 +507,8 @@ function establish() {
         {
           $comment:
             "Raw discovery from `node scripts/cdk-floors.mjs establish` — ladder-granular. " +
-            "Refine the floors to the exact introducing release and copy into cdk-floors.json (the curated source of truth).",
+            "Refine the floors to the exact introducing release and copy into cdk-floors.json (the curated source of truth). " +
+            "A package loads only once its peers do, so these are published floors: where one equals a peer's, record the package's own gating API instead — the peer's floor is derived.",
           ladder: LADDER,
           floors,
         },
@@ -435,12 +527,12 @@ function establish() {
 }
 
 const mode = process.argv[2];
-const modes = { apply, check, enforce, establish };
+const modes = { apply, check, list, enforce, establish };
 if (modes[mode] !== undefined) {
   modes[mode]();
 } else {
   console.error(
-    `Unknown mode "${mode ?? ""}". Usage: node scripts/cdk-floors.mjs <apply|check|enforce|establish>`,
+    `Unknown mode "${mode ?? ""}". Usage: node scripts/cdk-floors.mjs <apply|check|list|enforce|establish>`,
   );
   process.exit(1);
 }

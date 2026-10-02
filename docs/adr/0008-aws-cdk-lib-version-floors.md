@@ -36,8 +36,20 @@ consumed independently, so the floor belongs per package.
 **Each publishable package declares its own measured `peerDependencies.aws-cdk-lib`
 floor. `cdk-floors.json` is the source of truth; tooling establishes, applies,
 and enforces it.** Floors are monotonic with the peer graph — a package's floor
-is the max of its own aws-cdk-lib usage and its `@composurecdk` peers' floors,
-which holds automatically because a package can only load once its peers do.
+is the max of its own aws-cdk-lib usage and its `@composurecdk` peers' floors.
+
+> **Amended ([#377](https://github.com/laazyj/composureCDK/issues/377)):** this
+> was first recorded as holding automatically, because a package can only load
+> once its peers do. That is true of an install, not of the declared range we
+> publish: a hand-copied peer floor that was missed would have passed every
+> cheap gate. The max is now **computed and enforced**. Each `cdk-floors.json`
+> entry records only the package's own usage; `apply` writes, and `check`
+> asserts, the max over the `@composurecdk/*` peers in each `package.json`, and
+> `enforce` shards by that derived floor, so each shard tests what ships.
+> An own floor below an inherited one is therefore untested, and the tooling
+> prints it as such. It cannot be tested, since the package cannot load below
+> its peer's floor, and it is never published. `enforce` tests it from the
+> moment it becomes the published floor.
 
 ### What a floor guarantees
 

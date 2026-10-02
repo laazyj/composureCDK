@@ -229,8 +229,9 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # Derive the distinct floors from cdk-floors.json so the enforce matrix
-  # stays in sync without duplicating values in YAML.
+  # Derive the distinct published floors (each package's own floor raised to
+  # its @composurecdk peers') from cdk-floors.json, so the enforce matrix stays
+  # in sync without duplicating values in YAML and shards by what ships.
   cdk-floors-list:
     name: List CDK floors
     # Skipping this skips cdk-floors-enforce with it, via `needs`.
@@ -245,24 +246,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
+      # Plain `node`, not the nx target: this job installs nothing, and `list`
+      # needs only the manifest and the package.json peer graph.
       - name: Read distinct floors from manifest
         id: read
-        run: |
-          # The single quotes below are load-bearing: they hand the script to
-          # node unexpanded. Double quotes would let the shell substitute the
-          # `${pkg}` / `${e.floor}` JS template placeholders before node sees them.
-          # shellcheck disable=SC2016
-          node -e '
-            const m = JSON.parse(require("node:fs").readFileSync("cdk-floors.json", "utf8")).floors;
-            const rows = Object.entries(m)
-              .sort((a, b) => a[0].localeCompare(b[0]))
-              .map(([pkg, e]) => `  ${pkg.padEnd(16)} ${e.floor}  (${e.gatedBy})`)
-              .join("\n");
-            const floors = [...new Set(Object.values(m).map((e) => e.floor))];
-            console.log("Per-package aws-cdk-lib floors (cdk-floors.json):\n" + rows);
-            console.log("\nDistinct floors -> enforce matrix shards: " + JSON.stringify(floors));
-            require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, "floors=" + JSON.stringify(floors) + "\n");
-          '
+        run: node scripts/cdk-floors.mjs list
 
   # For each declared floor, pin aws-cdk-lib to it (npm overrides, clean install)
   # and run that floor's package group's unit suite against it. The suites

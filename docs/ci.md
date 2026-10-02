@@ -101,7 +101,7 @@ shellcheck comes from `PATH` rather than npm because the packages that vendored 
 
 The whole run takes ~300ms, so it is simply always run rather than cached or path-filtered: nx's own overhead on a cache _hit_ exceeds the cost of doing the work, and a path filter is one more thing to drift. It is one of the plain `node scripts/*.mjs` gates on the `workspace-root` project, like `catalogue:check` and `cdk-floors:check` — all of them `cache: false` for the same reason.
 
-Suppress a false positive with a `# shellcheck disable=SCxxxx` comment inside the `run:` block, and say why — as `ci.yml`'s `Read distinct floors from manifest` step does, where single quotes are load-bearing and "fixing" SC2016 would break the script.
+Suppress a false positive with a `# shellcheck disable=SCxxxx` comment inside the `run:` block, and say why — for instance SC2016 on a single-quoted `node -e` script, where the quotes are load-bearing and "fixing" the finding would let the shell expand the script's `${…}` template placeholders.
 
 ## Auditing the workflows
 

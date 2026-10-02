@@ -1,0 +1,66 @@
+name: PR policy
+
+# Checks on the pull request itself rather than its code: the `blocked` label,
+# and a Conventional Commit title. The final **PR policy** job is the one check
+# the `main` ruleset requires from here, so a new check joins by being added to
+# its `needs`. See docs/ci.md#required-checks.
+#
+# Not part of ci.yml: these must re-run when a label or the title changes, and
+# ci.yml must not re-run every gate on a label or title edit.
+
+on:
+  pull_request:
+    # No base-branch filter, for the same reason as ci.yml: a stacked PR must
+    # still get these checks. See docs/ci.md#stacked-pull-requests.
+    types: [opened, edited, labeled, unlabeled, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  blocked:
+    name: Not blocked
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if 'blocked' label is present
+        if: contains(github.event.pull_request.labels.*.name, 'blocked')
+        run: |
+          echo "::error::This PR carries the 'blocked' label and cannot be merged. Remove the label to unblock."
+          exit 1
+
+  # See docs/ci.md#pull-request-titles.
+  title:
+    name: PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require a Conventional Commit title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        # The types are nx release's default conventional-commit types, which
+        # nx.json (`release.version.conventionalCommits`) relies on. Change both
+        # together.
+        run: |
+          pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9/._-]+\))?!?: .+'
+          if [[ ! "$TITLE" =~ $pattern ]]; then
+            echo "::error::PR title is not a Conventional Commit: '$TITLE'"
+            echo "Use '<type>(<optional scope>): <description>', e.g. 'fix(s3): …'. Types: feat fix docs style refactor perf test build ci chore revert; add '!' before ':' for a breaking change."
+            exit 1
+          fi
+          echo "PR title OK: $TITLE"
+
+  # always() so a failed or cancelled check fails this one, rather than
+  # leaving it skipped, which a required check counts as passing.
+  result:
+    name: PR policy
+    if: always()
+    needs: [blocked, title]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every check to pass
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "::error::A PR policy check failed or was cancelled; see the jobs above."
+          exit 1

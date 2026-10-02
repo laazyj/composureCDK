@@ -29,6 +29,10 @@
  * an `if:` counts as covered, so a gate could in principle be guarded out from
  * under this. Worth knowing; not worth parsing conditions for.
  *
+ * It also checks that the aggregate `result` job needs every other job in
+ * ci.yml (docs/ci.md#required-checks). `needs:` may be a one-line `[a, b]` list
+ * or a block of `- a` lines, so Prettier reflowing a long list cannot break it.
+ *
  * Usage:
  *   node scripts/ci-covers-verify.mjs
  */
@@ -76,9 +80,21 @@ function withoutComments(yaml) {
     .join("\n");
 }
 
+/** Top-level job ids in ci.yml, and the ids the aggregate `result` job needs. */
+function jobsAndAggregateNeeds(yaml) {
+  const jobs = [...yaml.split(/^jobs:\n/m)[1].matchAll(/^ {2}([\w-]+):$/gm)].map((m) => m[1]);
+  // The `result` job's body: its 4-space-indented lines, up to the next job.
+  const body = /^ {2}result:\n((?: {4}.*\n?)*)/m.exec(yaml)?.[1] ?? "";
+  const flow = /^ {4}needs: \[([^\]]*)\]/m.exec(body)?.[1];
+  const block = /^ {4}needs:\n((?: {6}- .*\n?)+)/m.exec(body)?.[1];
+  const needs = flow?.split(",") ?? block?.split("\n").map((line) => line.replace(/^\s*- /, ""));
+  return { jobs, needs: needs?.map((id) => id.trim()).filter(Boolean) };
+}
+
 function main() {
+  const workflow = withoutComments(readFileSync(WORKFLOW, "utf8"));
   const required = gatesInVerify();
-  const inCi = new Set(targetsIn(withoutComments(readFileSync(WORKFLOW, "utf8"))));
+  const inCi = new Set(targetsIn(workflow));
 
   const missing = required.filter((target) => !inCi.has(target));
   if (missing.length > 0) {
@@ -91,7 +107,25 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`ci.yml covers all ${String(required.length)} gates in \`nx verify\`.`);
+  const { jobs, needs } = jobsAndAggregateNeeds(workflow);
+  if (!needs) {
+    console.error("ci.yml has no `result` job with a `needs:` list.");
+    process.exit(1);
+  }
+  const unneeded = jobs.filter((job) => job !== "result" && !needs.includes(job));
+  if (unneeded.length > 0) {
+    console.error(
+      `ci.yml job(s) not in the aggregate \`result\` job's needs, so they cannot block a merge:\n  ` +
+        `${unneeded.join("\n  ")}\n` +
+        "Add them to `needs:` on the `result` job. See docs/ci.md#required-checks.",
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `ci.yml covers all ${String(required.length)} gates in \`nx verify\`, ` +
+      `and its \`CI\` job needs all ${String(jobs.length - 1)} other jobs.`,
+  );
 }
 
 main();

@@ -41,6 +41,14 @@ Cutting a release
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Creates the GitHub Release from the matching `CHANGELOG.md` section, then runs `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
 - **`release-notify.yml`** — `workflow_run` listener on Release. Comments on the issues the release addressed (see [Release notifications](#release-notifications)).
 
+## Required checks
+
+The `main` ruleset requires two checks: **CI**, and **Not blocked** (`blocked-label.yml`). **CI** is the last job in `ci.yml`. It needs every other job, runs even when one fails, and passes only if each finished as `success` or `skipped`.
+
+Because the ruleset names that one check, jobs, Node versions and CDK floors can be added or removed without editing the ruleset. A new job joins the requirement through the `needs:` list of **CI**. `npx nx ci:covers-verify` fails if any job in `ci.yml` is missing from that list, since such a job would run but never block a merge.
+
+`skipped` counts as passing so that a caller can opt out of jobs. `deploy-test.yml` skips the floor shards, for example. A job skipped because something it needs failed still fails **CI**, through that job's own result.
+
 ## Stacked pull requests
 
 `ci.yml` and `blocked-label.yml` run on every pull request whatever its base branch, so a PR stacked on another PR's branch gets the same checks as one against `main` ([#359](https://github.com/laazyj/composureCDK/issues/359)). They used to filter `pull_request` on `branches: [main]` — and that filter matches the _base_, not the head. A stacked PR therefore got no check runs at all, which GitHub shows as `blocked` against an empty check list — indistinguishable from CI about to start.
@@ -376,7 +384,8 @@ npx nx run-many -t test
 locally means a green CI. That is enforced rather than maintained: `npx nx
 ci:covers-verify` fails if a gate joins `verify` without a matching step in
 `ci.yml`. It is one-directional — CI may run more (`coverage:summary`, the
-floor shards) — and it checks that a step exists, not that it runs. A husky `pre-push` hook runs `npx nx verify`
+floor shards) — and it checks that a step exists, not that it runs. It also fails if a
+job is missing from the **CI** job's `needs` (see [Required checks](#required-checks)). A husky `pre-push` hook runs `npx nx verify`
 automatically — a regression cannot reach GitHub without the maintainer seeing
 it first. The only check `verify` cannot reproduce is CI's Node 20 + 24 matrix.
 

@@ -52,7 +52,7 @@ Three things about that file are deliberate:
 
 One consequence of routing everything through nx: **a gate can only be invoked as an nx target where `node_modules` exists.** Two CI jobs deliberately run without installing — `cdk-floors-enforce`, whose script does its own floor-pinned install and needs the clean checkout, and `release-notify`, which has no dependencies at all and drives the preinstalled `gh`. Both call `node scripts/…` directly, and say why inline. The nx target still exists for everyone else.
 
-`verify` is an `nx:noop` target whose `dependsOn` lists every gate. It is one unordered graph, so the old cheap-gates-first fail-fast is gone; the pre-push hook passes `--nxBail` to stop at the first failure, and CI keeps one step per gate, which is where ordering now lives. `scripts/ci-covers-verify.mjs` reads that `dependsOn` and fails if a gate has no CI step.
+`verify` is an `nx:noop` target whose `dependsOn` lists every gate. It is one unordered graph, so the old cheap-gates-first fail-fast is gone; the pre-push hook passes `--nxBail` to stop at the first failure, and CI keeps one step per gate, which is where ordering now lives. `scripts/ci-covers-verify.mjs` reads that `dependsOn` and fails if a gate has no CI step, or if a job in `ci.yml` is missing from the aggregate **CI** job's `needs` ([required checks](ci.md#required-checks)).
 
 ## Inputs are only ever tracked files
 

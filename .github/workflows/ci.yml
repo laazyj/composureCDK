@@ -7,21 +7,11 @@ on:
   # See docs/ci.md#stacked-pull-requests.
   pull_request:
   workflow_call:
-    # Both inputs default to the full run, so `push`/`pull_request` are
-    # unaffected — those events carry no inputs at all, and the expressions
-    # below fall back accordingly. Only a caller that opts out gets less.
     inputs:
-      node-versions:
-        description: "JSON array of Node major versions to run the matrix on."
-        required: false
-        default: "[20, 22, 24, 26]"
-        type: string
-      skip-cdk-floors:
-        # Phrased as a skip, not a run, deliberately. On a push or
-        # pull_request every input is unset, and GitHub expressions coerce an
-        # unset input to false — so false has to be the value that means "do
-        # the normal thing".
-        description: "Skip the aws-cdk-lib floor-enforcement shards."
+      # Phrased so that unset means the full run: `push` and `pull_request`
+      # carry no inputs, and GitHub expressions coerce an unset one to false.
+      pre-deploy:
+        description: "Run only what a pre-deploy check needs: Workflows and Verify."
         required: false
         default: false
         type: boolean
@@ -34,8 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The checks on the workflows themselves: Node-independent, so run once, and
-  # as their own job so a workflow problem shows as **Workflows** failing.
+  # The checks on the workflows themselves, as their own job so a workflow
+  # problem shows as **Workflows** failing.
   # See docs/ci.md#linting-the-workflows.
   workflows:
     name: Workflows
@@ -84,19 +74,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: npx nx zizmor
 
-  ci:
-    name: Lint, Format, Typecheck, Test, Build (Node ${{ matrix.node-version }})
+  # The `verify` gates other than the workflow checks, on the Node the dev
+  # toolchain is developed against.
+  verify:
+    name: Verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       NX_DAEMON: false
-    strategy:
-      fail-fast: false
-      matrix:
-        # Node 20 is the supported floor; 24 is current LTS; 26 is next.
-        # Dual-published packages must resolve on all — see ADR-0007.
-        node-version: ${{ fromJSON(inputs.node-versions || '[20, 22, 24, 26]') }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -107,22 +92,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24
           cache: npm
 
-      # package.json requires npm >= 11; Node 20/22 ship npm 10. npm cannot be
-      # installed from the lockfile it reads, so zizmor's adhoc-packages finding
-      # has no lockfile-based fix here.
-      - name: Pin npm # zizmor: ignore[adhoc-packages]
-        run: npm install -g npm@11
-
-      # vitest and lint-staged need Node >= 22, which engine-strict enforces. The
-      # Node 20 leg proves the published packages' runtime support, not the dev
-      # toolchain's, so it installs with a warning instead.
       - name: Install dependencies
         run: npm ci
-        env:
-          npm_config_engine_strict: ${{ matrix.node-version != 20 }}
 
       - name: Check formatting
         run: npx nx prettier:check
@@ -175,11 +149,7 @@ jobs:
       # The per-file thresholds in each vitest.config.ts already gate coverage
       # during the Test step above; these steps only surface the numbers to
       # reviewers. See docs/ci.md#coverage-reporting.
-      #
-      # This rides along on the Node 24 leg rather than a sibling job. A separate
-      # job had to re-run the whole build -> typecheck -> test chain this leg has
-      # already run, for identical output — ~3.5 min of duplicated wall-clock per
-      # CI run. Coverage (v8, json-summary reporter) is always on via
+      # Coverage (v8, json-summary reporter) is always on via
       # vitest.config.base, so the table is a by-product of the Test step.
       #
       # The sticky PR comment is posted by coverage-comment.yml, not here: this
@@ -199,7 +169,7 @@ jobs:
       # so the artifact never ships without the table the comment posts.
       - name: Build coverage summary
         id: coverage
-        if: always() && matrix.node-version == 24 && (steps.test.conclusion == 'success' || steps.test.conclusion == 'failure')
+        if: always() && (steps.test.conclusion == 'success' || steps.test.conclusion == 'failure')
         run: npx nx coverage:summary
 
       # The workflow_run listener has no access to this run's PR context, so the
@@ -227,6 +197,7 @@ jobs:
   # jobs to install. See docs/ci.md#consumer-compatibility.
   package:
     name: Package
+    if: ${{ !inputs.pre-deploy }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -269,7 +240,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ${{ fromJSON(inputs.node-versions || '[20, 22, 24, 26]') }}
+        node-version: [20, 22, 24, 26]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -300,7 +271,7 @@ jobs:
   cdk-floors-list:
     name: List CDK floors
     # Skipping this skips cdk-floors-enforce with it, via `needs`.
-    if: ${{ !inputs.skip-cdk-floors }}
+    if: ${{ !inputs.pre-deploy }}
     runs-on: ubuntu-latest
     outputs:
       floors: ${{ steps.read.outputs.floors }}
@@ -361,7 +332,7 @@ jobs:
   result:
     name: CI
     if: always()
-    needs: [workflows, ci, package, consumer, cdk-floors-list, cdk-floors-enforce]
+    needs: [workflows, verify, package, consumer, cdk-floors-list, cdk-floors-enforce]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

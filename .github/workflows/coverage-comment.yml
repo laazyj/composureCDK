@@ -1,7 +1,6 @@
 name: Coverage Comment
 
-# Posts the coverage table from ci.yml's Node 24 matrix leg as a sticky PR
-# comment.
+# Posts the coverage table from ci.yml's Verify job as a sticky PR comment.
 #
 # This lives outside ci.yml because ci.yml is workflow_call-able from
 # deploy-test.yml, and permissions only narrow down a reusable-workflow chain: a
@@ -37,7 +36,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      # The summary artifact is only uploaded when the Node 24 leg ran its tests
+      # The summary artifact is only uploaded when the Verify job ran its tests
       # to completion and built a table. A cancelled run, an infra failure, or a
       # failure in an earlier gate (lint, format, typecheck, cdk-floors) leaves
       # none.
@@ -65,7 +64,7 @@ jobs:
       - name: Report missing coverage summary
         if: steps.download.outcome != 'success' || hashFiles('coverage-summary.md') == ''
         run: |
-          echo "::notice::No coverage table in the coverage-summary artifact on run ${{ github.event.workflow_run.id }} (${{ github.event.workflow_run.conclusion }}) — CI was cancelled or failed before the Node 24 Test step finished. Nothing to comment."
+          echo "::notice::No coverage table in the coverage-summary artifact on run ${{ github.event.workflow_run.id }} (${{ github.event.workflow_run.conclusion }}) — CI was cancelled or failed before the Verify job's Test step finished. Nothing to comment."
 
       - name: Read PR number
         id: pr

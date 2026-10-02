@@ -85,7 +85,7 @@ jobs:
       # save, and `github.sha` makes every run write a fresh entry rather than
       # skipping the save on a key that already exists.
       - name: Restore nx cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/cache
           key: nx-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
@@ -122,7 +122,7 @@ jobs:
       # Pinned and checksum-verified; see docs/ci.md#auditing-the-workflows.
       - name: Install zizmor
         if: env.WORKFLOW_GATES_LEG == 'true'
-        uses: taiki-e/install-action@dfae9bf3d6f6c6f20ef4ebb3486c01a51341ff12 # v2.87.18
+        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
         with:
           tool: zizmor@1.30.1
 

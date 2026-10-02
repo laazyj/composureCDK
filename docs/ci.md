@@ -34,6 +34,7 @@ Cutting a release
 `deploy-test.yml` also runs standalone via `workflow_dispatch`.
 
 - **`ci.yml`** — runs the `verify` gates (format, typecheck, build, `check:exports`, lint, test, …) in a **Verify** job on Node 24, the workflow checks (actionlint, zizmor, `ci:covers-verify`) in a **Workflows** job, [dependency review](#dependency-review) on pull requests, the packed packages through a **Consumer** job per Node version (see [Consumer compatibility](#consumer-compatibility)), and the aws-cdk-lib floor shards. A final **CI** job is the one [required check](#required-checks). It runs on every PR whatever its base (see [Stacked pull requests](#stacked-pull-requests)) and every push to `main`. Also `workflow_call`-able. Quality gate for everything downstream. The steps are the same nx targets `npx nx verify` depends on locally — so CI executes the gate, it does not _define_ it (see [ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). **Verify** also reports test coverage on PRs (see [Coverage reporting](#coverage-reporting)). It holds no write scopes, so it stays callable from `deploy-test.yml`.
+- **`pr-policy.yml`** — checks on the PR itself: no `blocked` label, and a Conventional Commit title (see [Pull request titles](#pull-request-titles)).
 - **`coverage-comment.yml`** — `workflow_run` listener on CI. Posts the coverage table as a sticky PR comment (see [Coverage reporting](#coverage-reporting)).
 - **`deploy-test.yml`** — calls CI as a pre-deploy sanity check (Workflows and Verify only — see [Trimming CI for deploy-test](#trimming-ci-for-deploy-test)), then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation. Runs on demand via `workflow_dispatch`, and automatically on any push to `release/**` — **that is the release gate**, and it lands as a check on the release PR next to CI. A release branch is the only ref holding exactly what is being released, version bumps and changelog included; `main`'s HEAD is a different tree, and tag time is too late to gate anything.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`; pushing the branch is also what starts the deploy gate above.
@@ -43,21 +44,30 @@ Cutting a release
 
 ## Required checks
 
-The `main` ruleset requires two checks: **CI**, and **Not blocked** (`blocked-label.yml`). **CI** is the last job in `ci.yml`. It needs every other job, runs even when one fails, and passes only if each finished as `success` or `skipped`.
+The `main` ruleset requires two checks: **CI**, the last job in `ci.yml`, and **PR policy**, the last job in `pr-policy.yml`, which needs **Not blocked** (no `blocked` label) and **PR title** (see [Pull request titles](#pull-request-titles)). Both work the same way; what follows describes **CI**. It needs every other job, runs even when one fails, and passes only if each finished as `success` or `skipped`.
 
 Because the ruleset names that one check, jobs, Node versions and CDK floors can be added or removed without editing the ruleset. A new job joins the requirement through the `needs:` list of **CI**. `npx nx ci:covers-verify` fails if any job in `ci.yml` is missing from that list, since such a job would run but never block a merge.
 
 `skipped` counts as passing so that a caller can opt out of jobs (`deploy-test.yml` skips the floor shards, for example), and so that a job with nothing to do on an event can skip it, as **Dependency review** does on `push`. A job skipped because something it needs failed still fails **CI**, through that job's own result.
 
+## Pull request titles
+
+Versions and the changelog come from the Conventional Commit subjects on `main` (see [Versioning](#versioning)). PRs are merged by squash only, and the squash commit's subject is always the PR title, so the title is the one place a subject has to be right:
+
+- **The PR title check** (in `pr-policy.yml`) fails a PR whose title is not a Conventional Commit with one of nx release's default types. It re-runs when the title is edited, so fixing the title fixes the check.
+- **The repository allows squash merges only**, and sets the squash subject to the PR title (`PR_TITLE`) and the body to the PR's commit messages. With the default (`COMMIT_OR_PR_TITLE`), a single-commit PR lands under its commit subject, which this check never sees.
+
+Commit messages inside a PR are not checked. They become the squash commit's body and do not drive the release.
+
 ## Stacked pull requests
 
-`ci.yml` and `blocked-label.yml` run on every pull request whatever its base branch, so a PR stacked on another PR's branch gets the same checks as one against `main` ([#359](https://github.com/laazyj/composureCDK/issues/359)). They used to filter `pull_request` on `branches: [main]` — and that filter matches the _base_, not the head. A stacked PR therefore got no check runs at all, which GitHub shows as `blocked` against an empty check list — indistinguishable from CI about to start.
+`ci.yml` and `pr-policy.yml` run on every pull request whatever its base branch, so a PR stacked on another PR's branch gets the same checks as one against `main` ([#359](https://github.com/laazyj/composureCDK/issues/359)). They used to filter `pull_request` on `branches: [main]` — and that filter matches the _base_, not the head. A stacked PR therefore got no check runs at all, which GitHub shows as `blocked` against an empty check list — indistinguishable from CI about to start.
 
 Branch protection, not the trigger, decides what `main` requires. A PR onto another branch pays runner minutes for checks nothing strictly requires, which is the price of it having any signal before it is retargeted.
 
 Two things still need a push once the bottom of a stack merges and the next PR is retargeted onto `main`:
 
-- **Retargeting does not re-run CI.** Changing a PR's base fires `pull_request: edited`, which the workflows do not listen for, so the PR keeps the checks from its old base. That is deliberate: `edited` also fires on title and body edits, and a run that skipped its jobs there would overwrite a real result — and skipped satisfies a required check. Push (or merge `main` into the branch) after retargeting to get a `synchronize` run against the new base.
+- **Retargeting does not re-run CI.** Changing a PR's base fires `pull_request: edited`, which `ci.yml` does not listen for, so the PR keeps CI's checks from its old base. That is deliberate: `edited` also fires on title and body edits, and a run that skipped its jobs there would overwrite a real result — and skipped satisfies a required check. (`pr-policy.yml` does listen for `edited`, but its checks always run in full, so a re-run only ever re-evaluates.) Push (or merge `main` into the branch) after retargeting to get a `synchronize` run against the new base.
 - **CodeQL runs through GitHub's default setup**, configured in the repository's code-security settings rather than a workflow file here, and it only analyses PRs targeting the default branch. A stacked PR gets no CodeQL result until it targets `main` and receives a push — the same push as above covers it.
 
 ## nx task cache

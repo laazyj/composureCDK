@@ -34,15 +34,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The checks on the workflows themselves: Node-independent, so run once, and
+  # as their own job so a workflow problem shows as **Workflows** failing.
+  # See docs/ci.md#linting-the-workflows.
+  workflows:
+    name: Workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NX_DAEMON: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `verify` and ci.yml are two lists of the same gates. This fails if a
+      # gate is added to `verify` with no step in ci.yml — which is how
+      # `catalogue:check` came to be enforced only at push time — or if a job
+      # is missing from the CI job's `needs`.
+      - name: Check CI covers every verify gate
+        run: npx nx ci:covers-verify
+
+      - name: Lint workflows
+        run: npx nx actionlint
+
+      # Hash-pinned in .github/zizmor/requirements.txt, which Dependabot keeps
+      # current; see docs/ci.md#auditing-the-workflows. A venv because the
+      # runner's system Python refuses pip installs (PEP 668).
+      - name: Install zizmor
+        run: |
+          python3 -m venv "$RUNNER_TEMP/zizmor"
+          "$RUNNER_TEMP/zizmor/bin/pip" install --disable-pip-version-check --require-hashes --no-deps -r .github/zizmor/requirements.txt
+          echo "$RUNNER_TEMP/zizmor/bin" >> "$GITHUB_PATH"
+
+      # GH_TOKEN turns on zizmor's online audits.
+      - name: Audit workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npx nx zizmor
+
   ci:
     name: Lint, Format, Typecheck, Test, Build (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       NX_DAEMON: false
-      # The one leg that runs the Node-independent workflow gates below.
-      # Computed once so the steps cannot disagree about which leg it is.
-      WORKFLOW_GATES_LEG: ${{ matrix.node-version == fromJSON(inputs.node-versions || '[20, 22, 24, 26]')[0] }}
     strategy:
       fail-fast: false
       matrix:
@@ -79,46 +126,6 @@ jobs:
 
       - name: Check formatting
         run: npx nx prettier:check
-
-      # `verify` and the steps below are two lists of the same gates. This
-      # fails if a gate is added to `verify` with no step here — which is how
-      # `catalogue:check` came to be enforced only at push time. It checks a
-      # step exists, not that it runs: a step guarded by an `if:` still counts.
-      - name: Check CI covers every verify gate
-        run: npx nx ci:covers-verify
-
-      # Workflow linting is Node-independent, so one leg is enough. Keyed to the
-      # matrix's first entry rather than a literal version: `[0]` always selects
-      # exactly one leg whatever `node-versions` holds, whereas `== 24` matches
-      # nothing the moment 24 leaves the matrix — silently dropping the gate,
-      # which is the failure mode this whole check exists to prevent.
-      #
-      # Kept early so a malformed workflow fails the job in seconds. `nx verify`
-      # has no such ordering — its gates are one unordered graph, so CI is where
-      # cheap-gate-first lives. This is also the only pre-merge signal
-      # for workflow changes that cannot test themselves: `workflow_run`
-      # listeners always dispatch the default-branch copy, and an edited trigger
-      # is not exercised until it next fires.
-      - name: Lint workflows
-        if: env.WORKFLOW_GATES_LEG == 'true'
-        run: npx nx actionlint
-
-      # Hash-pinned in .github/zizmor/requirements.txt, which Dependabot keeps
-      # current; see docs/ci.md#auditing-the-workflows. A venv because the
-      # runner's system Python refuses pip installs (PEP 668).
-      - name: Install zizmor
-        if: env.WORKFLOW_GATES_LEG == 'true'
-        run: |
-          python3 -m venv "$RUNNER_TEMP/zizmor"
-          "$RUNNER_TEMP/zizmor/bin/pip" install --disable-pip-version-check --require-hashes --no-deps -r .github/zizmor/requirements.txt
-          echo "$RUNNER_TEMP/zizmor/bin" >> "$GITHUB_PATH"
-
-      # GH_TOKEN turns on zizmor's online audits.
-      - name: Audit workflows
-        if: env.WORKFLOW_GATES_LEG == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: npx nx zizmor
 
       - name: Typecheck
         run: npx nx run-many -t typecheck
@@ -283,7 +290,7 @@ jobs:
   result:
     name: CI
     if: always()
-    needs: [ci, cdk-floors-list, cdk-floors-enforce]
+    needs: [workflows, ci, cdk-floors-list, cdk-floors-enforce]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -143,7 +143,8 @@ compile.
 A manifest entry may therefore carry an optional **`peerFloors`** map of lockstep
 peers, each stored as an exact version exactly like `floor`
 (here `{ "@aws-cdk/aws-neptune-alpha": "2.190.0-alpha.0" }`). `apply` writes it to
-`peerDependencies` as a `^` range and `check` asserts it, while `enforce` pins the
+`peerDependencies` as a `^` range (`*` for a prerelease; see the amendment below)
+and `check` asserts it, while `enforce` pins the
 exact version in the same `overrides` block it uses for aws-cdk-lib — otherwise a
 lowered aws-cdk-lib floor would be probed against the still-latest alpha
 devDependency, and the run would prove nothing.
@@ -154,6 +155,17 @@ single caret/`>=` range spans an arbitrary span of `-alpha.0` minors. The
 `aws-cdk-lib` peer stays a clean stable range (`^2.190.0`, satisfied by the latest
 devDependency), so the package still tests at the latest CDK; the alpha peer is the
 narrow lockstep pin, matching how the alpha ecosystem is consumed in practice.
+
+_Amended ([#580](https://github.com/laazyj/composureCDK/issues/580)):_ the narrow
+pin was unsatisfiable, not narrow: npm matches a prerelease only against a range
+naming the same `X.Y.Z`, so every consumer on a current alpha hit `ERESOLVE` on
+install. A prerelease peer floor is now published as `*`, which npm and pnpm accept
+(tested) for any alpha, and `check` rejects a prerelease comparator in any package's
+peer ranges. The floor itself stays in the manifest, is proven by `enforce`, and is
+stated in the package README, which `check` asserts; the alpha's own `aws-cdk-lib`
+peer keeps the two in step. The peer stays declared rather than dropped, because
+strict package managers such as Yarn Plug'n'Play refuse an import the package does
+not declare.
 
 ## Consequences
 

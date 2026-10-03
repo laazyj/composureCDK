@@ -134,6 +134,11 @@ function describe({ floor, own, via }) {
   return via === undefined ? `^${floor}` : `^${floor} (own ${own} untested, via ${via})`;
 }
 
+/** A caret range, or `*` for a prerelease (an alpha), which npm cannot range over: ADR-0008, #580. */
+function peerRange(version) {
+  return version.includes("-") ? "*" : `^${version}`;
+}
+
 /** Writes each package's peerDependencies.aws-cdk-lib from the derived floors. */
 function apply() {
   const floors = readFloors();
@@ -147,11 +152,12 @@ function apply() {
     }
     json.peerDependencies["aws-cdk-lib"] = `^${effective.get(pkg).floor}`;
     // Lockstep peers (e.g. a version-locked @aws-cdk/aws-*-alpha) are stored exact
-    // in the manifest, like `floor`, and written as a caret range here.
+    // in the manifest, like `floor`.
     const extras = [];
     for (const [name, version] of Object.entries(peerFloors ?? {})) {
-      json.peerDependencies[name] = `^${version}`;
-      extras.push(`${name} ^${version}`);
+      const range = peerRange(version);
+      json.peerDependencies[name] = range;
+      extras.push(`${name} ${range}`);
     }
     writeFileSync(path, `${JSON.stringify(json, null, 2)}\n`);
     console.log(
@@ -175,9 +181,31 @@ function check() {
       );
     }
     for (const [name, version] of Object.entries(peerFloors ?? {})) {
-      if (peers[name] !== `^${version}`) {
+      const range = peerRange(version);
+      if (peers[name] !== range) {
         mismatches.push(
-          `  ${pkg}: package.json has ${name} "${peers[name] ?? "(unset)"}", manifest expects "^${version}"`,
+          `  ${pkg}: package.json has ${name} "${peers[name] ?? "(unset)"}", manifest expects "${range}"`,
+        );
+      }
+      // `*` publishes no minimum, so the README is the only place a consumer
+      // sees it, and must keep up with the manifest.
+      if (
+        range === "*" &&
+        !readFileSync(join(PACKAGES_DIR, pkg, "README.md"), "utf8").includes(version)
+      ) {
+        mismatches.push(`  ${pkg}: README.md does not state the ${name} floor ${version}`);
+      }
+    }
+  }
+  // A prerelease comparator in any peer range can only match that one X.Y.Z, so
+  // no consumer on a later prerelease can install the package (#580). Lockstep
+  // alpha peers belong in the manifest's peerFloors, which apply writes as `*`.
+  for (const entry of readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    for (const [name, range] of Object.entries(readPeers(entry.name))) {
+      if (/\d+\.\d+\.\d+-/.test(range)) {
+        mismatches.push(
+          `  ${entry.name}: ${name} "${range}" has a prerelease comparator; declare the floor in cdk-floors.json peerFloors instead`,
         );
       }
     }

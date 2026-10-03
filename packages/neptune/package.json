@@ -40,7 +40,7 @@
     }
   },
   "peerDependencies": {
-    "@aws-cdk/aws-neptune-alpha": "^2.190.0-alpha.0",
+    "@aws-cdk/aws-neptune-alpha": "*",
     "@composurecdk/cloudformation": "^0.10.0",
     "@composurecdk/cloudwatch": "^0.10.0",
     "@composurecdk/core": "^0.10.0",

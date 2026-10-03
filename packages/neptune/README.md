@@ -4,7 +4,7 @@ Amazon Neptune cluster builder for [ComposureCDK](../../README.md).
 
 This package provides a fluent builder for Amazon Neptune clusters with secure, AWS-recommended defaults. It wraps the CDK alpha [`DatabaseCluster`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-neptune-alpha-readme.html) L2 construct — refer to the CDK documentation for the full set of configurable properties.
 
-> **Alpha dependency.** Neptune's CDK L2 lives in `@aws-cdk/aws-neptune-alpha`, which is production-usable but semver-unstable and version-locked to its matching `aws-cdk-lib` release. It is a **peer dependency** of this package — install it (and a matching `aws-cdk-lib`) in your app and pin the version you want.
+> **Alpha dependency.** Neptune's CDK L2 lives in `@aws-cdk/aws-neptune-alpha`, which is production-usable but semver-unstable and version-locked to its matching `aws-cdk-lib` release. It is a **peer dependency** of this package — install it alongside `aws-cdk-lib` in your app, at **`2.190.0-alpha.0` or later** and matching your `aws-cdk-lib` release. The peer range is `*`, so npm does not enforce that minimum.
 
 ```sh
 npm install @composurecdk/neptune @aws-cdk/aws-neptune-alpha aws-cdk-lib

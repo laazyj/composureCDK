@@ -1,3 +1,4 @@
+import { globSync } from "node:fs";
 import { defineConfig, mergeConfig, type ViteUserConfig } from "vitest/config";
 
 export interface CoverageThresholds {
@@ -8,13 +9,15 @@ export interface CoverageThresholds {
 }
 
 // perFile: true fails an individual file that dips below the thresholds on
-// its own, rather than diluting it into a package-wide average — a new
-// builder shipped with no test shows up as 0% and fails immediately.
+// its own, rather than diluting it into a package-wide average. `include`
+// lists the source files up front, so an untested file reports 0% (and fails
+// perFile) instead of being omitted. A package with code outside src/ adds its
+// own globs through `config`.
 export function withCoverage(
   thresholds: CoverageThresholds,
   config: ViteUserConfig = {},
 ): ViteUserConfig {
-  return mergeConfig(
+  const merged = mergeConfig(
     defineConfig({
       test: {
         // nx runs three packages at once and each vitest sizes its own fork
@@ -30,6 +33,7 @@ export function withCoverage(
         coverage: {
           provider: "v8",
           enabled: true,
+          include: ["src/**/*.ts"],
           // text: local console. json-summary: machine-readable per-package
           // totals at coverage/coverage-summary.json, merged by
           // scripts/coverage-summary.mjs into the CI PR comment + job summary.
@@ -43,4 +47,14 @@ export function withCoverage(
     }),
     config,
   );
+  // A package whose globs match nothing would measure 0/0 lines, which the
+  // thresholds pass: green while checking nothing.
+  const include = (merged.test?.coverage as { include?: string[] } | undefined)?.include ?? [];
+  if (!include.some((pattern) => globSync(pattern).length > 0)) {
+    throw new Error(
+      `coverage.include (${include.join(", ")}) matches no files in ${process.cwd()}; ` +
+        "add the package's source globs through withCoverage's config.",
+    );
+  }
+  return merged;
 }

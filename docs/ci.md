@@ -78,7 +78,7 @@ The ways around that are worse than a cold build. `NX_REJECT_UNKNOWN_LOCAL_CACHE
 
 ## Coverage reporting
 
-Coverage is reported on PRs without any external service (no Codecov/Coveralls account, no secrets, no data leaving GitHub). It is a reporting layer only — the actual gate is each package's `perFile` thresholds in `vitest.config.ts`, enforced by `npx nx run-many -t test`.
+Coverage is reported on PRs without any external service (no Codecov/Coveralls account, no secrets, no data leaving GitHub). It is a reporting layer only — the actual gate is each package's `perFile` thresholds in `vitest.config.ts`, enforced by `npx nx run-many -t test`. Coverage counts every `src/**/*.ts` file (`vitest.config.base.ts`), so a file no test loads shows up at 0% and fails its threshold, rather than dropping out of the report.
 
 How it fits together:
 

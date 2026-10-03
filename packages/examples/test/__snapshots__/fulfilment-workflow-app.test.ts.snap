@@ -363,6 +363,16 @@ exports[`fulfilment-workflow-app > matches the expected synthesised template 1`]
             ],
           ],
         },
+        "EncryptionConfiguration": {
+          "KmsDataKeyReusePeriodSeconds": 300,
+          "KmsKeyId": {
+            "Fn::GetAtt": [
+              "FulfilmentWorkflowworkflowKey3891EACD",
+              "Arn",
+            ],
+          },
+          "Type": "CUSTOMER_MANAGED_KMS_KEY",
+        },
         "LoggingConfiguration": {
           "Destinations": [
             {
@@ -473,6 +483,77 @@ exports[`fulfilment-workflow-app > matches the expected synthesised template 1`]
                       "Ref": "FulfilmentWorkfloworders66A10CC3",
                     },
                   ],
+                ],
+              },
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:GenerateDataKey",
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "kms:EncryptionContext:aws:states:stateMachineArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":states:",
+                        {
+                          "Ref": "AWS::Region",
+                        },
+                        ":",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":stateMachine:ComposureCDKFulfilmentWorkflowStack-FulfilmentWorkflowfulfilment-CEEC14C0",
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "FulfilmentWorkflowworkflowKey3891EACD",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "kms:GenerateDataKey",
+              "Condition": {
+                "StringEquals": {
+                  "kms:EncryptionContext:SourceArn": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":logs:",
+                        {
+                          "Ref": "AWS::Region",
+                        },
+                        ":",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":*",
+                      ],
+                    ],
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "FulfilmentWorkflowworkflowKey3891EACD",
+                  "Arn",
                 ],
               },
             },
@@ -980,6 +1061,64 @@ exports[`fulfilment-workflow-app > matches the expected synthesised template 1`]
         "TreatMissingData": "notBreaching",
       },
       "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkflowworkflowKey3891EACD": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "Description": "Encrypts the fulfilment workflow's definition and execution history.",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Statement": [
+            {
+              "Action": "kms:*",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+            {
+              "Action": "kms:Decrypt*",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "delivery.logs.amazonaws.com",
+              },
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PendingWindowInDays": 30,
+      },
+      "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "FulfilmentWorkflowworkflowKeyAlias306BE727": {
+      "Properties": {
+        "AliasName": "alias/composurecdk-examples/fulfilment-workflow",
+        "TargetKeyId": {
+          "Fn::GetAtt": [
+            "FulfilmentWorkflowworkflowKey3891EACD",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::KMS::Alias",
     },
   },
   "Rules": {

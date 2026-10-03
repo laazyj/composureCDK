@@ -2,7 +2,11 @@ import { Duration, Stack } from "aws-cdk-lib";
 import { AttributeType, type ITableV2 } from "aws-cdk-lib/aws-dynamodb";
 import { RuleTargetInput } from "aws-cdk-lib/aws-events";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
-import { JsonPath, Succeed } from "aws-cdk-lib/aws-stepfunctions";
+import {
+  CustomerManagedEncryptionConfiguration,
+  JsonPath,
+  Succeed,
+} from "aws-cdk-lib/aws-stepfunctions";
 import {
   DynamoAttributeValue,
   DynamoPutItem,
@@ -12,6 +16,7 @@ import type { Construct } from "constructs";
 import { combine, compose, ref } from "@composurecdk/core";
 import { createTableV2Builder, type TableV2BuilderResult } from "@composurecdk/dynamodb";
 import { createRuleBuilder, sfnStateMachineTarget } from "@composurecdk/events";
+import { createKeyBuilder, type KeyBuilderResult } from "@composurecdk/kms";
 import { createFunctionBuilder, type FunctionBuilderResult } from "@composurecdk/lambda";
 import {
   createStateMachineBuilder,
@@ -52,6 +57,11 @@ function recordStatus(scope: Construct, id: string, orders: ITableV2, status: st
  * Running out of stock is a business outcome, not a fault: a `Catch` records
  * the order `REJECTED` and the execution **succeeds**, so the recommended
  * `executionsFailed` alarm keeps meaning "something is broken".
+ *
+ * The workflow is encrypted with a customer-managed key from a sibling
+ * `createKeyBuilder()`. CDK scopes the execution role's key grant to the state
+ * machine's ARN, which needs a name; the builder always sets one, where
+ * unnamed plain CDK would deny every execution the key.
  */
 export function createFulfilmentWorkflowApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-FulfilmentWorkflowStack");
@@ -81,8 +91,17 @@ export function createFulfilmentWorkflowApp(app = exampleApp()) {
         .timeout(Duration.seconds(10))
         .description("Reserves stock for an order; throws OutOfStock past the limit"),
 
+      workflowKey: createKeyBuilder()
+        .description("Encrypts the fulfilment workflow's definition and execution history.")
+        .alias("composurecdk-examples/fulfilment-workflow"),
+
       fulfilment: createStateMachineBuilder()
         .timeout(Duration.minutes(5))
+        .encryptionConfiguration(
+          ref<KeyBuilderResult>("workflowKey")
+            .get("key")
+            .map((key) => new CustomerManagedEncryptionConfiguration(key)),
+        )
         .definition(
           combine(
             {
@@ -118,8 +137,9 @@ export function createFulfilmentWorkflowApp(app = exampleApp()) {
     },
     {
       orders: [],
+      workflowKey: [],
       checkStock: [],
-      fulfilment: ["orders", "checkStock"],
+      fulfilment: ["orders", "checkStock", "workflowKey"],
       orderPlaced: ["fulfilment"],
     },
   ).build(stack, "FulfilmentWorkflow");

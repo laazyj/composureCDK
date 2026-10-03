@@ -71,8 +71,23 @@ export type StateMachineDefinition = (scope: Construct) => IChainable;
  */
 export interface StateMachineBuilderProps extends Omit<
   StateMachineProps,
-  "definition" | "definitionBody" | "definitionSubstitutions" | "role" | "encryptionConfiguration"
+  | "definition"
+  | "definitionBody"
+  | "definitionSubstitutions"
+  | "role"
+  | "encryptionConfiguration"
+  | "logs"
 > {
+  /**
+   * Execution-history logging, merged over the defaults for the state
+   * machine's type (`STATE_MACHINE_LOG_DEFAULTS`). The builder creates the log
+   * group when `destination` is unset and the level is not `OFF`. Re-declared
+   * as `Partial` because `destination` is required on CDK's `LogOptions` at
+   * this package's floor, which would make a partial override — or
+   * `{ level: LogLevel.OFF }` — impossible to express there.
+   */
+  logs?: Partial<NonNullable<StateMachineProps["logs"]>>;
+
   /**
    * A pre-built definition: an Amazon States Language document from a file or
    * string (`DefinitionBody.fromFile(...)`), or a chain whose states were
@@ -214,14 +229,14 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
     const built: { stateMachine?: StateMachine } = {};
     const owner = () => built.stateMachine;
 
-    const resolvedLogs = { ...STATE_MACHINE_LOG_DEFAULTS[stateMachineType], ...logs };
+    const logOptions = { ...STATE_MACHINE_LOG_DEFAULTS[stateMachineType], ...logs };
     let logGroup: LogGroup | undefined;
-    if (resolvedLogs.destination === undefined && resolvedLogs.level !== LogLevel.OFF) {
+    if (logOptions.destination === undefined && logOptions.level !== LogLevel.OFF) {
       logGroup = createLogGroupBuilder()
         .logGroupName(lazyUniqueName(owner, LOG_GROUP_NAME_MAX_LENGTH, VENDED_LOG_GROUP_PREFIX))
         .build(scope, `${id}Logs`, context).logGroup;
-      resolvedLogs.destination = logGroup;
     }
+    const destination = logOptions.destination ?? logGroup;
 
     const body = this.#resolveDefinitionBody(scope, id, definitionBody, context);
 
@@ -229,7 +244,9 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
       ...STATE_MACHINE_DEFAULTS,
       ...stateMachineProps,
       definitionBody: body,
-      logs: resolvedLogs,
+      // Leave `logs` unset when logging is OFF: CDK 2.160.0 dereferences the
+      // absent destination and throws.
+      ...(destination !== undefined ? { logs: { ...logOptions, destination } } : {}),
       ...(definitionSubstitutions !== undefined
         ? { definitionSubstitutions: resolve(combine(definitionSubstitutions), context) }
         : {}),

@@ -215,6 +215,9 @@ describe("StateMachineBuilder", () => {
 
       expect(result.logGroup).toBeUndefined();
       template.resourceCountIs("AWS::Logs::LogGroup", 0);
+      template.hasResourceProperties("AWS::StepFunctions::StateMachine", {
+        LoggingConfiguration: Match.absent(),
+      });
     });
 
     it("lets the tracing default be overridden", () => {

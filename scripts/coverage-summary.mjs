@@ -47,6 +47,8 @@ function marker(pct) {
 }
 
 function pctCell(entry) {
+  // 0/0 means the tests measured no code at all, which is not 0% coverage.
+  if (entry?.total === 0) return "⚠️ n/a (nothing measured)";
   const pct = typeof entry?.pct === "number" ? entry.pct : 0;
   return `${marker(pct)} ${pct.toFixed(2)}%`;
 }

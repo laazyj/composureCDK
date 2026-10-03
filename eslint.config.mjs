@@ -64,6 +64,7 @@ export default defineConfig(
       "tools/*.mjs",
       "packages/examples/test/smoke/*.mjs",
       "packages/module-compat/check.mjs",
+      "packages/module-compat/checks.mjs",
     ],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {

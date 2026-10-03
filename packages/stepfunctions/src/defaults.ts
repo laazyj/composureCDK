@@ -21,8 +21,7 @@ export const STATE_MACHINE_DEFAULTS: Partial<StateMachineProps> = {
 
 /**
  * Execution-history logging defaults, by workflow type. The builder merges the
- * caller's `logs` over the entry for the state machine's type, and creates the
- * log group unless the caller supplies a `destination` or sets `OFF`.
+ * caller's `logs` over the entry for the state machine's type.
  *
  * Logging is on for every type: CDK's default is none, and Security Hub
  * control StepFunctions.1 requires it. Execution data — the input and output of
@@ -33,7 +32,10 @@ export const STATE_MACHINE_DEFAULTS: Partial<StateMachineProps> = {
  * @see https://docs.aws.amazon.com/wellarchitected/latest/framework/sec_detect_investigate_events_app_service_logging.html
  * @see https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/data-protection.html
  */
-export const STATE_MACHINE_LOG_DEFAULTS: Record<StateMachineType, LogOptions> = {
+export const STATE_MACHINE_LOG_DEFAULTS: Record<
+  StateMachineType,
+  Omit<LogOptions, "destination">
+> = {
   /**
    * `ERROR` — Standard workflows keep their full execution history in Step
    * Functions for 90 days, so the logs need only carry the failures, aborts

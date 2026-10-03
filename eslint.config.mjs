@@ -45,6 +45,7 @@ export default defineConfig(
             "tools/*.mjs",
             "scripts/cdk-floor/*.mjs",
             "packages/examples/test/smoke/*.mjs",
+            "packages/module-compat/check.mjs",
             "vitest.config.base.ts",
             "packages/*/vitest.config.ts",
           ],
@@ -62,6 +63,7 @@ export default defineConfig(
       "scripts/cdk-floor/*.mjs",
       "tools/*.mjs",
       "packages/examples/test/smoke/*.mjs",
+      "packages/module-compat/check.mjs",
     ],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {

@@ -17,16 +17,25 @@ and `npx nx verify`.
 
 ## Layout
 
-- `test/dual-packages.ts` — the list of dual-published packages and a probe
-  export for each. Each entry needs a matching `peerDependency` in
-  `package.json`.
-- `test/resolution.test.ts` — spawns `node` per package per module syntax.
-- `test/synth.test.ts` — spawns `node` on each `cdk synth` fixture.
-- `test/fixtures/{cjs,esm}/` — the CommonJS and ESM CDK-app fixtures, each in a
-  directory with its own `package.json` `type` marker.
+- `check.mjs` — the checks themselves, in plain Node so they run on every
+  supported Node without the dev toolchain. Every `@composurecdk/*` package in
+  `peerDependencies` must load under `require()` and `import` with named
+  exports, and each fixture app must exit 0.
+- `test/fixtures/{cjs,esm,dual-realm}/` — the fixture apps: a CommonJS synth,
+  an ESM synth, and both module systems in one process. Each directory has its
+  own `package.json` `type` marker.
+- `test/check.test.ts` — runs `check.mjs` against the workspace build, and
+  proves a failing fixture (`test/fixtures/failing/`) fails the run.
+
+A new package needs adding to `peerDependencies`; `npx nx consumer:pack` fails
+if a published package is missing.
 
 ## Running
 
 ```sh
-npx nx test module-compat
+npx nx test module-compat   # against the workspace build, on your Node
+npx nx consumer:check       # build, pack, install the tarballs, then check.mjs
 ```
+
+CI runs the second on every supported Node; see
+[consumer compatibility](../../docs/ci.md#consumer-compatibility).

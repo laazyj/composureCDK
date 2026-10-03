@@ -49,6 +49,16 @@
     "cdk-floor:validate": { "command": "node scripts/cdk-floor-validate.mjs", "cache": false },
     "cdk-flags:check": { "command": "node scripts/cdk-flags.mjs check", "cache": false },
     "cdk-flags:audit": { "command": "node scripts/cdk-flags.mjs audit", "cache": false },
+    "consumer:pack": {
+      "command": "node scripts/consumer-compat.mjs pack dist/consumer",
+      "dependsOn": [{ "projects": "*", "target": "build" }],
+      "cache": false
+    },
+    "consumer:check": {
+      "command": "node scripts/consumer-compat.mjs check dist/consumer",
+      "dependsOn": ["consumer:pack"],
+      "cache": false
+    },
     "coverage:summary": {
       "command": "node scripts/coverage-summary.mjs",
       "dependsOn": [{ "projects": "*", "target": "test" }],

@@ -1,5 +1,6 @@
-// Shared helpers for the cdk-floor diagnostic scripts. Used by both
-// `cdk-floors.mjs` (the `establish` mode) and `cdk-floor-validate.mjs`.
+// Shared helpers for the scripts that install the packed packages:
+// `cdk-floors.mjs` (the `establish` mode), `cdk-floor-validate.mjs` and
+// `consumer-compat.mjs`.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";

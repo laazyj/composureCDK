@@ -24,19 +24,14 @@ export interface TopicPolicyConflictPolicyConfig {
  * one topic compare equal, or `undefined` for any other node. Detected by
  * resource-type string rather than `instanceof`, which fails across realms.
  */
-function targetsOf(node: IConstruct): { document: unknown; keys: string[] } | undefined {
+function targetsOf(node: IConstruct): string[] | undefined {
   if (!CfnResource.isCfnResource(node)) return undefined;
 
   let topics: unknown;
-  let document: unknown;
   if (node.cfnResourceType === CfnTopicPolicy.CFN_RESOURCE_TYPE_NAME) {
-    const policy = node as CfnTopicPolicy;
-    topics = policy.topics;
-    document = policy.policyDocument;
+    topics = (node as CfnTopicPolicy).topics;
   } else if (node.cfnResourceType === CfnTopicInlinePolicy.CFN_RESOURCE_TYPE_NAME) {
-    const inline = node as CfnTopicInlinePolicy;
-    topics = [inline.topicArn];
-    document = inline.policyDocument;
+    topics = [(node as CfnTopicInlinePolicy).topicArn];
   } else {
     return undefined;
   }
@@ -48,12 +43,11 @@ function targetsOf(node: IConstruct): { document: unknown; keys: string[] } | un
   // A literal ARN names the same topic from any stack; an intrinsic (`Ref`,
   // `Fn::ImportValue`) only means something inside the stack it resolves in.
   const stackPath = stack.node.path;
-  const keys = resolved.map((topic: unknown) =>
+  return resolved.map((topic: unknown) =>
     typeof topic === "string" && !Token.isUnresolved(topic)
       ? topic
       : `${stackPath}:${JSON.stringify(topic)}`,
   );
-  return { document, keys };
 }
 
 /**
@@ -61,11 +55,6 @@ function targetsOf(node: IConstruct): { document: unknown; keys: string[] } | un
  * `AWS::SNS::TopicInlinePolicy` targets the same SNS topic. Each replaces the
  * topic's single access policy, so the last one CloudFormation applies wins
  * and nothing reports it. See the package README for the full rationale.
- *
- * Two resources holding the same `PolicyDocument` object render the same
- * document, so the order cannot matter and they are not reported. This is
- * what lets `@composurecdk/budgets` keep its retained transitional policy
- * beside the topic's own.
  *
  * Installs a CDK Aspect; call it once on any scope before `app.synth()`.
  *
@@ -79,23 +68,23 @@ export function topicPolicyConflictPolicy(
   config: TopicPolicyConflictPolicyConfig = {},
 ): void {
   const { onViolation = "throw" } = config;
-  const claims = new Map<string, { node: IConstruct; document: unknown }>();
+  const claims = new Map<string, IConstruct>();
 
   Aspects.of(scope).add({
     visit(node: IConstruct): void {
-      const found = targetsOf(node);
-      if (found === undefined) return;
+      const keys = targetsOf(node);
+      if (keys === undefined) return;
 
-      for (const key of found.keys) {
+      for (const key of keys) {
         const prior = claims.get(key);
         if (prior === undefined) {
-          claims.set(key, { node, document: found.document });
+          claims.set(key, node);
           continue;
         }
-        if (prior.node === node || prior.document === found.document) continue;
+        if (prior === node) continue;
 
         const message =
-          `${node.node.path}: another topic policy (${prior.node.node.path}) already targets ` +
+          `${node.node.path}: another topic policy (${prior.node.path}) already targets ` +
           `SNS topic ${key}, and whichever CloudFormation applies last replaces the other. ` +
           `Add statements with topic.addToResourcePolicy(...) instead.`;
         if (onViolation === "throw") throw new Error(message);

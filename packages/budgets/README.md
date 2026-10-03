@@ -87,10 +87,7 @@ When at least one notification subscriber is an SNS topic, the builder grants `S
 
 The statement is added to the topic's own access policy with `topic.addToResourcePolicy(...)`, next to any statement already there, such as the `enforceSSL` statement [`@composurecdk/sns`](../sns/README.md) adds by default. An SNS topic has exactly one access policy and every `AWS::SNS::TopicPolicy` replaces it, so a second policy resource would race the first. [`topicPolicyConflictPolicy`](../sns/README.md#topic-policy-conflict-policy) catches that at synth.
 
-`result.topicPolicies` holds the `TopicPolicy` constructs the builder creates, keyed by the topic's fully-qualified node path (unique within the CDK app):
-
-- **A topic created in CDK:** a transitional policy that shares the topic's own `PolicyDocument`, so both resources always render the same document. It sits at the logical id earlier versions used for a separate Budgets-only policy, and is retained on removal. Deleting that old resource would make CloudFormation reset the topic's policy after the update had written the merged one. This keeps the upgrade safe and will be removed in a later release; with its `Retain` policy in place by then, removing it resets nothing.
-- **An imported topic** (`Topic.fromTopicArn`): CDK cannot add to its policy, so the builder creates a standalone `TopicPolicy` as before. It replaces whatever policy the topic already has, and the builder emits a synth warning (`@composurecdk/budgets:imported-topic-policy`) saying so.
+An imported topic (`Topic.fromTopicArn`) is the exception: CDK cannot add to its policy, so the builder creates a standalone `TopicPolicy` granting only the Budgets statement. It replaces whatever policy the topic already has, and the builder emits a synth warning (`@composurecdk/budgets:imported-topic-policy`) saying so. `result.topicPolicies` holds these policies, keyed by the topic's fully-qualified node path (unique within the CDK app); it is empty when every SNS subscriber is a topic created in CDK.
 
 To manage the topics' access policies yourself, turn this off with `.topicPolicy(false)`. The builder then adds no statement and creates no policy; Budgets cannot deliver to a topic whose policy does not allow `budgets.amazonaws.com` to publish.
 

@@ -226,10 +226,9 @@ describe("BudgetBuilder", () => {
         .notifyOnActual(100, { sns: topic })
         .build(stack, "SnsBudget");
 
-      // The topic's own policy, plus the retained transitional policy sharing its document.
       const template = Template.fromStack(stack);
-      template.resourceCountIs("AWS::SNS::TopicPolicy", 2);
-      template.allResourcesProperties("AWS::SNS::TopicPolicy", {
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
         PolicyDocument: Match.objectLike({
           Statement: Match.arrayWith([
             Match.objectLike({
@@ -242,7 +241,7 @@ describe("BudgetBuilder", () => {
       });
     });
 
-    it("deduplicates topic policies when the same topic is reused", () => {
+    it("adds the statement once when the same topic is reused", () => {
       const stack = newStack();
       const topic = new Topic(stack, "AlertsTopic");
 
@@ -252,8 +251,14 @@ describe("BudgetBuilder", () => {
         .notifyOnForecasted(100, { sns: topic })
         .build(stack, "DupSnsBudget");
 
-      expect(Object.keys(result.topicPolicies)).toHaveLength(1);
-      Template.fromStack(stack).resourceCountIs("AWS::SNS::TopicPolicy", 2);
+      expect(result.topicPolicies).toEqual({});
+      const template = Template.fromStack(stack);
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [Match.objectLike({ Sid: "AllowBudgetsPublish" })],
+        }),
+      });
     });
 
     it("leaves the topic's policy alone with topicPolicy(false)", () => {

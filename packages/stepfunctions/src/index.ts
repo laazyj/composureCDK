@@ -1,6 +1,5 @@
 export {
   createStateMachineBuilder,
-  STATE_MACHINE_TIMEOUT_WARNING_ID,
   type IStateMachineBuilder,
   type StateMachineBuilderProps,
   type StateMachineBuilderResult,

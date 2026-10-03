@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Duration, Stack } from "aws-cdk-lib";
-import { Annotations, Match } from "aws-cdk-lib/assertions";
+import { Match } from "aws-cdk-lib/assertions";
 import { type IGrantable, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
@@ -17,24 +17,20 @@ import type { Construct } from "constructs";
 import { buildFixture, newStack, policyJson, tagsPerResource } from "@composurecdk/cdk-testing";
 import { combine, compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import {
-  createStateMachineBuilder,
-  STATE_MACHINE_TIMEOUT_WARNING_ID,
-} from "../src/state-machine-builder.js";
+import { createStateMachineBuilder } from "../src/state-machine-builder.js";
 import { VENDED_LOG_GROUP_PREFIX } from "../src/physical-names.js";
-
-const buildUntimed = buildFixture(
-  () =>
-    createStateMachineBuilder().definition((scope: Construct) => new Pass(scope, "PassThrough")),
-  "Workflow",
-);
 
 const passThrough = (scope: Construct) => new Pass(scope, "PassThrough");
 
-const buildAndSynth = buildFixture(
-  () => createStateMachineBuilder().definition(passThrough).timeout(Duration.minutes(5)),
+/** A builder that satisfies the Standard-workflow timeout rule, for tests about something else. */
+const timedBuilder = () => createStateMachineBuilder().timeout(Duration.minutes(5));
+
+const buildUntimed = buildFixture(
+  () => createStateMachineBuilder().definition(passThrough),
   "Workflow",
 );
+
+const buildAndSynth = buildFixture(() => timedBuilder().definition(passThrough), "Workflow");
 
 describe("StateMachineBuilder", () => {
   describe("definition", () => {
@@ -51,7 +47,7 @@ describe("StateMachineBuilder", () => {
     it("creates the states in a scope of their own, so state ids do not collide with siblings", () => {
       const stack = newStack();
       for (const id of ["A", "B"]) {
-        createStateMachineBuilder().definition(passThrough).build(stack, id);
+        timedBuilder().definition(passThrough).build(stack, id);
       }
 
       for (const id of ["A", "B"]) {
@@ -65,7 +61,7 @@ describe("StateMachineBuilder", () => {
       compose(
         {
           alerts: { build: (scope: Construct, id: string) => ({ topic: new Topic(scope, id) }) },
-          workflow: createStateMachineBuilder().definition(
+          workflow: timedBuilder().definition(
             ref(
               "alerts",
               (r: { topic: Topic }) => (scope: Construct) =>
@@ -88,7 +84,7 @@ describe("StateMachineBuilder", () => {
         {
           first: topicComponent,
           second: topicComponent,
-          workflow: createStateMachineBuilder().definition(
+          workflow: timedBuilder().definition(
             combine(
               {
                 first: ref<{ topic: Topic }>("first").get("topic"),
@@ -139,7 +135,7 @@ describe("StateMachineBuilder", () => {
 
     it("throws when no workflow is set", () => {
       expect(() => createStateMachineBuilder().build(newStack(), "Workflow")).toThrow(
-        /no workflow/,
+        /requires a workflow/,
       );
     });
   });
@@ -229,49 +225,49 @@ describe("StateMachineBuilder", () => {
     });
   });
 
-  describe("timeout warning", () => {
-    const warnings = (stack: ReturnType<typeof newStack>) =>
-      Annotations.fromStack(stack).findWarning(
-        "*",
-        Match.stringLikeRegexp(STATE_MACHINE_TIMEOUT_WARNING_ID),
-      );
-
-    it("warns for a Standard workflow with no timeout", () => {
-      const { stack } = buildUntimed();
-
-      expect(warnings(stack)).toHaveLength(1);
+  describe("timeout", () => {
+    it("throws for a Standard workflow with no timeout", () => {
+      expect(() => buildUntimed()).toThrow(/requires a timeout/);
     });
 
-    it("does not warn once a timeout is set", () => {
-      const { stack } = buildUntimed((b) => b.timeout(Duration.minutes(5)));
-
-      expect(warnings(stack)).toHaveLength(0);
-    });
-
-    it("does not warn for an Express workflow, which is capped at five minutes", () => {
-      const { stack } = buildUntimed((b) => b.stateMachineType(StateMachineType.EXPRESS));
-
-      expect(warnings(stack)).toHaveLength(0);
-    });
-
-    it("warns for a chain supplied through definitionBody, whose timeout CDK also writes", () => {
-      const { stack } = buildFixture(
-        createStateMachineBuilder,
-        "Workflow",
-      )((b, st) => b.definitionBody(DefinitionBody.fromChainable(new Pass(st, "Outside"))));
-
-      expect(warnings(stack)).toHaveLength(1);
-    });
-
-    it("does not warn for an ASL document, which carries its own TimeoutSeconds", () => {
+    it("validates before creating any construct, so a caught error leaves nothing behind", () => {
       const stack = newStack();
-      createStateMachineBuilder()
-        .definitionBody(
-          DefinitionBody.fromString('{"StartAt":"S","States":{"S":{"Type":"Succeed"}}}'),
-        )
-        .build(stack, "Workflow");
 
-      expect(warnings(stack)).toHaveLength(0);
+      expect(() =>
+        createStateMachineBuilder().definition(passThrough).build(stack, "Workflow"),
+      ).toThrow(/requires a timeout/);
+      expect(stack.node.children).toHaveLength(0);
+    });
+
+    it("throws for a chain supplied through definitionBody, whose timeout CDK also writes", () => {
+      expect(() =>
+        buildFixture(
+          createStateMachineBuilder,
+          "Workflow",
+        )((b, st) => b.definitionBody(DefinitionBody.fromChainable(new Pass(st, "Outside")))),
+      ).toThrow(/requires a timeout/);
+    });
+
+    it("writes a configured timeout into the ASL", () => {
+      const { template } = buildAndSynth();
+
+      template.hasResourceProperties("AWS::StepFunctions::StateMachine", {
+        DefinitionString: Match.serializedJson(Match.objectLike({ TimeoutSeconds: 300 })),
+      });
+    });
+
+    it("does not require one for an Express workflow, which is capped at five minutes", () => {
+      expect(() => buildUntimed((b) => b.stateMachineType(StateMachineType.EXPRESS))).not.toThrow();
+    });
+
+    it("does not require one for an ASL document, which carries its own TimeoutSeconds", () => {
+      expect(() =>
+        createStateMachineBuilder()
+          .definitionBody(
+            DefinitionBody.fromString('{"StartAt":"S","States":{"S":{"Type":"Succeed"}}}'),
+          )
+          .build(newStack(), "Workflow"),
+      ).not.toThrow();
     });
   });
 
@@ -281,13 +277,28 @@ describe("StateMachineBuilder", () => {
         b.encryptionConfiguration(new CustomerManagedEncryptionConfiguration(new Key(s, "Key"))),
       );
 
-      template.hasResourceProperties("AWS::StepFunctions::StateMachine", {
-        StateMachineName: Match.stringLikeRegexp("^TestStack-Workflow-"),
+      const [stateMachine] = Object.values(
+        template.findResources("AWS::StepFunctions::StateMachine"),
+      ) as { Properties: { StateMachineName: string } }[];
+      const name = stateMachine.Properties.StateMachineName;
+      expect(name).toMatch(/^TestStack-Workflow-/);
+
+      // The condition's ARN must end in exactly the generated name.
+      template.hasResourceProperties("AWS::IAM::Policy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Condition: {
+                StringEquals: {
+                  "kms:EncryptionContext:aws:states:stateMachineArn": {
+                    "Fn::Join": ["", Match.arrayWith([`:stateMachine:${name}`])],
+                  },
+                },
+              },
+            }),
+          ]),
+        },
       });
-      const condition = /stateMachine:([^"]*)"/.exec(
-        JSON.stringify(template.findResources("AWS::IAM::Policy")),
-      );
-      expect(condition?.[1]).toMatch(/^TestStack-Workflow-/);
     });
 
     it("keeps a caller-supplied name", () => {
@@ -307,7 +318,7 @@ describe("StateMachineBuilder", () => {
       compose(
         {
           key: { build: (scope: Construct, id: string) => ({ key: new Key(scope, id) }) },
-          workflow: createStateMachineBuilder()
+          workflow: timedBuilder()
             .definition(passThrough)
             .encryptionConfiguration(
               ref<{ key: Key }>("key")
@@ -339,7 +350,7 @@ describe("StateMachineBuilder", () => {
       const system = compose(
         {
           shared: { build: () => ({ role }) },
-          workflow: createStateMachineBuilder()
+          workflow: timedBuilder()
             .definition(passThrough)
             .role(ref<{ role: Role }>("shared").get("role")),
         },
@@ -356,7 +367,7 @@ describe("StateMachineBuilder", () => {
       compose(
         {
           alerts: { build: (scope: Construct, id: string) => ({ topic: new Topic(scope, id) }) },
-          workflow: createStateMachineBuilder()
+          workflow: timedBuilder()
             .definition(passThrough)
             .grant({
               applyTo: (grantee, context) => {

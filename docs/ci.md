@@ -97,13 +97,13 @@ Notes:
 
 ## Linting the workflows
 
-`npx nx actionlint` runs [actionlint](https://github.com/rhysd/actionlint) over `.github/workflows/`. It is chained into `npx nx verify` (so the husky `pre-push` hook catches it), fires from `lint-staged` in `pre-commit` whenever a workflow file is staged, and runs in CI as the **Lint workflows** step of the **Workflows** job. Same nx target in all three places — CI executes the gate, it does not define it.
+`npx nx actionlint` runs [actionlint](https://github.com/kjanat/actionlint) over `.github/workflows/`. It is chained into `npx nx verify` (so the husky `pre-push` hook catches it), fires from `lint-staged` in `pre-commit` whenever a workflow file is staged, and runs in CI as the **Lint workflows** step of the **Workflows** job. Same nx target in all three places — CI executes the gate, it does not define it.
 
 Workflow files are the case that most needs a local gate, because CI is least able to check them: a `workflow_run` listener always dispatches the _default-branch_ copy, and an edit to a trigger is not exercised until it next fires. `actionlint` is often the only pre-merge signal a workflow change gets.
 
 Three things make this reliable rather than decorative:
 
-- **actionlint is a pinned devDependency** — `github-actionlint`, which fetches the official release binary for the version it is named after. [`scripts/actionlint.mjs`](../scripts/actionlint.mjs) resolves it from the installed package rather than from `PATH`.
+- **actionlint is a pinned devDependency** — [`@kjanat/actionlint`](https://www.npmjs.com/package/@kjanat/actionlint), a maintained fork of [rhysd/actionlint](https://github.com/rhysd/actionlint) that parses GitHub's `$/` self-repository `uses:` syntax ([#574](https://github.com/laazyj/composureCDK/issues/574)). Return to upstream once it releases `$/` support (rhysd/actionlint#711, #732). [`scripts/actionlint.mjs`](../scripts/actionlint.mjs) resolves it from the installed package rather than from `PATH`.
 - **A missing shellcheck fails the run.** actionlint treats shellcheck as optional: it shells out only if it finds it and reports a clean run when it does not — and it does the same for an explicit `-shellcheck=` path that resolves to nothing. Both exit `0` with no output. That matters more than it sounds, because _every finding this repo has ever had came from shellcheck rather than actionlint's own checks_, so a missing shellcheck does not weaken the gate, it empties it. The script therefore probes shellcheck first and refuses to lint until it has proven it runs.
 - **A missing shellcheck is a red build, not a skipped one.** CI relies on the GitHub-hosted `ubuntu-latest` image shipping shellcheck; nothing installs it. If that image ever drops it, the probe above exits non-zero and **Lint workflows** fails on every PR with the install hint — loudly, which is the point. That is why there is no `apt-get` step buying a network dependency to pre-empt a failure that already describes itself.
 

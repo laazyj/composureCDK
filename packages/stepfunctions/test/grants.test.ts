@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { Template } from "aws-cdk-lib/assertions";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { DefinitionBody, Pass, StateMachine } from "aws-cdk-lib/aws-stepfunctions";
+import { Activity, DefinitionBody, Pass, StateMachine } from "aws-cdk-lib/aws-stepfunctions";
 import { assertCapabilitiesCovered, newStack, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
-import { stateMachineGrants } from "../src/grants.js";
+import { activityGrants, stateMachineGrants } from "../src/grants.js";
 
 function setup() {
   const stack = newStack();
@@ -48,5 +48,33 @@ describe("stateMachineGrants", () => {
       .applyTo(role, { workflow: { stateMachine } });
 
     expect(policyJson(stack)).toContain("states:StartExecution");
+  });
+});
+
+describe("activityGrants", () => {
+  it("covers every capability activityGrants exposes", () => {
+    assertCapabilitiesCovered(activityGrants, ["worker"]);
+  });
+
+  it("worker lets the grantee poll for tasks and report their result", () => {
+    const stack = newStack();
+    const activity = new Activity(stack, "Review");
+    const role = new Role(stack, "Worker", {
+      assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+    });
+
+    activityGrants
+      .worker(ref<{ activity: Activity }>("review").get("activity"))
+      .applyTo(role, { review: { activity } });
+
+    const json = policyJson(stack);
+    for (const action of [
+      "GetActivityTask",
+      "SendTaskSuccess",
+      "SendTaskFailure",
+      "SendTaskHeartbeat",
+    ]) {
+      expect(json).toContain(`states:${action}`);
+    }
   });
 });

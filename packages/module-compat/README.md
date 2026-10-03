@@ -17,15 +17,19 @@ and `npx nx verify`.
 
 ## Layout
 
-- `check.mjs` — the checks themselves, in plain Node so they run on every
+- `checks.mjs` — the checks themselves, in plain Node so they run on every
   supported Node without the dev toolchain. Every `@composurecdk/*` package in
   `peerDependencies` must load under `require()` and `import` with named
   exports, and each fixture app must exit 0.
+- `check.mjs` — the command line over `checks.mjs` that CI runs; it prints the
+  results and exits non-zero on a failure.
 - `test/fixtures/{cjs,esm,dual-realm}/` — the fixture apps: a CommonJS synth,
   an ESM synth, and both module systems in one process. Each directory has its
   own `package.json` `type` marker.
-- `test/check.test.ts` — runs `check.mjs` against the workspace build, and
-  proves a failing fixture (`test/fixtures/failing/`) fails the run.
+- `test/check.test.ts` — imports `checks.mjs` (so its code is measured by
+  coverage) and runs it against the workspace build, proves a failing fixture
+  (`test/fixtures/failing/`) is reported, and checks `check.mjs` exits non-zero
+  on one.
 
 A new package needs adding to `peerDependencies`; `npx nx consumer:pack` fails
 if a published package is missing.

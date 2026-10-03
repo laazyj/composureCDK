@@ -1,7 +1,14 @@
 import { RemovalPolicy } from "aws-cdk-lib";
+import { S3_SERVER_ACCESS_LOGS_USE_BUCKET_POLICY } from "aws-cdk-lib/cx-api";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import { Bucket, BucketEncryption, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
-import { type IConstruct } from "constructs";
+import {
+  Bucket,
+  BucketEncryption,
+  type BucketProps,
+  type IBucket,
+  ObjectOwnership,
+} from "aws-cdk-lib/aws-s3";
+import { Construct, type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
@@ -212,17 +219,23 @@ function resolveAccessLogs(
 
   let subBuilder = createBucketBuilder()
     .serverAccessLogs(false)
+    .objectOwnership(ObjectOwnership.BUCKET_OWNER_ENFORCED)
     .versioned(false)
     .removalPolicy(RemovalPolicy.RETAIN)
     .lifecycleRules(DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES);
   if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }
+  // CDK grants log delivery by ACL unless `serverAccessLogsUseBucketPolicy` is
+  // set, reading it from the destination's own context — so scope it to a
+  // wrapper (#502). `Default` is omitted from logical IDs, keeping the bucket's.
+  const logsScope = new Construct(scope, `${id}AccessLogs`);
+  logsScope.node.setContext(S3_SERVER_ACCESS_LOGS_USE_BUCKET_POLICY, true);
   // Pass the build context down: `IBucketBuilder` widens `encryptionKey` to a
   // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
   // KMS key. Without the context that ref resolves against an empty record and
   // throws "component not found".
-  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`, context).bucket;
+  const accessLogsBucket = subBuilder.build(logsScope, "Default", context).bucket;
 
   return {
     accessLogsBucket,

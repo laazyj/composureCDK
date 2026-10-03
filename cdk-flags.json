@@ -193,9 +193,9 @@
       "because": "The flag fills in any BlockPublicAccess option left undefined. BucketBuilder already sets BLOCK_ALL (packages/s3/src/defaults.ts), so there is nothing left to fill \u2014 not because the path is unexercised."
     },
     "@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": {
-      "status": "declined",
+      "status": "no-effect",
       "recommended": true,
-      "because": "Would be an improvement \u2014 without it the access-logs bucket bucket-builder.ts creates carries AccessControl LogDeliveryWrite and ObjectWriter ownership, i.e. ACLs enabled. The builder cannot express that guarantee itself (objectOwnership BUCKET_OWNER_ENFORCED is a synth error while the flag is off), so it needs the decision in issue #502 rather than a manifest entry."
+      "because": "BucketBuilder sets it on the scope of the access-logs bucket it creates, so the examples are already ACL-free (#502). Still worth setting app-wide: it also covers a user-supplied destination."
     },
     "@aws-cdk/aws-s3:setUniqueReplicationRoleName": {
       "status": "no-effect",

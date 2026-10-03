@@ -3,9 +3,9 @@
 /**
  * `actionlint` — lint the GitHub Actions workflows in `.github/workflows/`.
  *
- * Wraps `actionlint` (via the `github-actionlint` npm package, which fetches
- * the official release binary) so the gate runs identically from a developer's
- * `npx nx verify` and from CI — see docs/ci.md#linting-the-workflows.
+ * Wraps `actionlint` (via `@kjanat/actionlint`) so the gate runs identically
+ * from a developer's `npx nx verify` and from CI — see
+ * docs/ci.md#linting-the-workflows.
  *
  * The wrapper exists because actionlint treats shellcheck as *optional*: it
  * shells out to shellcheck only if it can find it, and silently reports a
@@ -97,8 +97,8 @@ if (compareSemver(version, MINIMUM_SHELLCHECK) < 0) {
   );
 }
 
-const manifest = require.resolve("github-actionlint/package.json");
-const actionlint = resolve(dirname(manifest), require(manifest).bin["github-actionlint"]);
+const manifest = require.resolve("@kjanat/actionlint/package.json");
+const actionlint = resolve(dirname(manifest), require(manifest).bin.actionlint);
 
 // Passing -shellcheck is not redundant with actionlint's default: were that
 // default ever to change, the probe above would still pass and the gate would

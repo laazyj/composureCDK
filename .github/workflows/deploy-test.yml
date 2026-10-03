@@ -43,9 +43,9 @@ concurrency:
 jobs:
   ci:
     name: CI
-    # zizmor wants GitHub's `$/` self-repository syntax here, but actionlint
-    # (1.7.12) cannot parse it yet. Revisit when actionlint supports it.
-    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
+    # `$/` resolves to this repository at the running commit, not to whatever
+    # is on the runner's disk (#574).
+    uses: $/.github/workflows/ci.yml
     # A pre-deploy sanity check, not a second full CI run; see
     # docs/ci.md#trimming-ci-for-deploy-test.
     with:

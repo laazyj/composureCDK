@@ -131,6 +131,37 @@ CDK grants the execution role the key, conditioned on the state machine's ARN �
 
 CDK does not grant **callers** the key. `DescribeExecution`, `GetExecutionHistory` and `StartSyncExecution` need `kms:Decrypt` on it, so a grantee using `stateMachineGrants.read` or `startSyncExecution` on an encrypted state machine also needs `keyGrants.decrypt` ([what each API needs](https://docs.aws.amazon.com/step-functions/latest/dg/encryption-at-rest.html)).
 
+## Recommended Alarms
+
+**AWS publishes no [recommended alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) for Step Functions.** The builder alarms on the metrics the [Serverless Lens](https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/opex-metrics-and-alerts.html) names for aggregate-level alerting; the thresholds are this library's choice, shaped like Lambda's `errors` and `throttles` — the first occurrence in a minute. No alarm actions are configured; apply them from `result.alarms` or with `alarmActionsPolicy`.
+
+| Alarm                | Metric (Sum, 1 min)  | Default threshold | Created when                                                                                                                                                                                  |
+| -------------------- | -------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `executionsFailed`   | `ExecutionsFailed`   | > 0               | Always                                                                                                                                                                                        |
+| `executionsTimedOut` | `ExecutionsTimedOut` | > 0               | Always                                                                                                                                                                                        |
+| `executionThrottled` | `ExecutionThrottled` | > 0               | Standard only — [the quota-increase signal](https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/aws-step-functions-2.html); Express transitions are not throttled |
+
+Missing data is not breaching, so an idle state machine stays `OK`. The defaults are exported as `STATE_MACHINE_ALARM_DEFAULTS`.
+
+`executionsFailed` fires on every failed execution. Model an expected outcome — a rejected order, a failed validation — as a `Catch` that ends in `Succeed`, and keep `Fail` for faults, so the alarm means something is broken.
+
+`ExecutionsAborted` (an operator's `StopExecution`) and `ExecutionTime` (no universal baseline) are not alarmed by default; add them with `addAlarm`.
+
+### Customizing and disabling
+
+```ts
+createStateMachineBuilder()
+  .recommendedAlarms({
+    executionsFailed: { threshold: 5, evaluationPeriods: 3, datapointsToAlarm: 2 },
+    executionThrottled: false,
+  })
+  .addAlarm("aborted", (alarm) =>
+    alarm.metric((sm) => sm.metricAborted({ period: Duration.minutes(1) })).threshold(0),
+  );
+```
+
+`.recommendedAlarms(false)` (or `{ enabled: false }`) disables every recommended alarm; custom alarms added with `addAlarm` are still created.
+
 ## Execution role
 
 CDK creates the execution role unless one is supplied with `.role(...)`, which accepts a `Resolvable`. Either way it is returned as `result.role`. The log-delivery and X-Ray actions CDK adds are on `*`, because those APIs [do not support resource-level permissions](https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html), so a hand-built role would gain nothing over CDK's.

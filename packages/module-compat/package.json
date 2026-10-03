@@ -40,6 +40,7 @@
     "@composurecdk/ses": "^0.10.0",
     "@composurecdk/sns": "^0.10.0",
     "@composurecdk/sqs": "^0.10.0",
+    "@composurecdk/stepfunctions": "^0.10.0",
     "@composurecdk/xray": "^0.10.0"
   },
   "devDependencies": {

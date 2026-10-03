@@ -33,6 +33,7 @@
     "ses": ["aws-ses"],
     "sns": ["aws-sns", "aws-sns-subscriptions"],
     "sqs": ["aws-sqs"],
+    "stepfunctions": ["aws-stepfunctions"],
     "xray": ["aws-xray"]
   },
   "statusReasons": {
@@ -201,6 +202,10 @@
       "recommended": true
     },
     "@aws-cdk/aws-sns-subscriptions:restrictSqsDescryption": {
+      "status": "no-effect",
+      "recommended": true
+    },
+    "@aws-cdk/aws-stepfunctions:useDistributedMapResultWriterV2": {
       "status": "no-effect",
       "recommended": true
     },

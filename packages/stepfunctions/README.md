@@ -102,7 +102,7 @@ The defaults are exported as `STATE_MACHINE_DEFAULTS` and `STATE_MACHINE_LOG_DEF
 
 ### Timeouts
 
-CDK sets no timeout, so a Standard execution waiting on a task that never answers stays open for up to a year. Well-Architected [REL05-BP05](https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_mitigate_interaction_failure_client_timeouts.html) advises against relying on defaults here, but the right bound is the workload's, so the builder does not pick one. Instead it warns (`STATE_MACHINE_TIMEOUT_WARNING_ID`) when a Standard workflow written with `.definition()` has no `.timeout(...)`. An ASL document carries its own `TimeoutSeconds`, and an Express execution is capped at five minutes, so neither warns.
+CDK sets no timeout, so a Standard execution waiting on a task that never answers stays open for up to a year. Well-Architected [REL05-BP05](https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_mitigate_interaction_failure_client_timeouts.html) advises against relying on defaults here, so the builder **requires** one: building a Standard workflow written with `.definition()` (or any chain) and no `.timeout(...)` throws. The right bound is the workload's, so the builder does not pick one; to allow the maximum deliberately, set `Duration.days(365)`. An Express execution is capped at five minutes, so it needs none. An ASL document must carry its own top-level `TimeoutSeconds`: CDK applies `.timeout()` only to a chain ([aws-cdk#37150](https://github.com/aws/aws-cdk/issues/37150)), and the builder cannot inspect a document uploaded as an asset.
 
 Set `TimeoutSeconds` (and `HeartbeatSeconds`, for callbacks) on individual task states too — the [Step Functions best practices](https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html) explain why.
 
@@ -115,6 +115,7 @@ compose(
   {
     workflowKey: createKeyBuilder().description("Encrypts the orders workflow at rest."),
     workflow: createStateMachineBuilder()
+      .timeout(Duration.minutes(5))
       .definition(/* ... */)
       .encryptionConfiguration(
         ref<KeyBuilderResult>("workflowKey")

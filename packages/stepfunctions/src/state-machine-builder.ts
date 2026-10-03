@@ -1,6 +1,5 @@
 import type { IGrantable, IRole } from "aws-cdk-lib/aws-iam";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
-import { Annotations } from "aws-cdk-lib";
 import {
   DefinitionBody,
   type IChainable,
@@ -28,15 +27,6 @@ import {
   STATE_MACHINE_NAME_MAX_LENGTH,
   VENDED_LOG_GROUP_PREFIX,
 } from "./physical-names.js";
-
-/**
- * Warning id for a Standard state machine built from a chain with no timeout.
- * Acknowledge it with `Annotations.of(scope).acknowledgeWarning(...)` where an
- * unbounded execution is intended.
- *
- * @see https://docs.aws.amazon.com/wellarchitected/latest/framework/rel_mitigate_interaction_failure_client_timeouts.html
- */
-export const STATE_MACHINE_TIMEOUT_WARNING_ID = "@composurecdk/stepfunctions:no-timeout";
 
 /**
  * True for a `DefinitionBody.fromChainable(...)` body. Read by shape rather
@@ -124,7 +114,7 @@ export interface StateMachineBuilderProps extends Omit<
   /**
    * Server-side encryption of the definition and execution history. Step
    * Functions encrypts with an AWS-owned key by default; pass a
-   * `CustomerManagedKeyEncryptionConfiguration` to use your own key —
+   * `CustomerManagedEncryptionConfiguration` to use your own key —
    * typically mapped from a composed `@composurecdk/kms` key builder.
    *
    * @see https://docs.aws.amazon.com/step-functions/latest/dg/encryption-at-rest.html
@@ -223,6 +213,21 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
 
     const stateMachineType = stateMachineProps.stateMachineType ?? StateMachineType.STANDARD;
 
+    // Validated before any construct is created.
+    const workflow = this.#resolveWorkflow(id, definitionBody, context);
+    // CDK writes `.timeout()` into the ASL only for a chain; Express is capped at five minutes.
+    if (
+      ("build" in workflow || isChainBody(workflow.body)) &&
+      stateMachineProps.timeout === undefined &&
+      stateMachineType === StateMachineType.STANDARD
+    ) {
+      throw new Error(
+        `StateMachineBuilder "${id}" requires a timeout for a Standard workflow, or an ` +
+          `execution can wait up to a year on a task that never answers. Call .timeout(...); ` +
+          `to allow the maximum deliberately, set Duration.days(365).`,
+      );
+    }
+
     // The log group name and a generated state machine name are both derived
     // from the state machine, which does not exist until the end of build().
     // They resolve lazily, at synth, by when it has been assigned.
@@ -238,7 +243,10 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
     }
     const destination = logOptions.destination ?? logGroup;
 
-    const body = this.#resolveDefinitionBody(scope, id, definitionBody, context);
+    const body =
+      "build" in workflow
+        ? DefinitionBody.fromChainable(workflow.build(new Construct(scope, `${id}Definition`)))
+        : workflow.body;
 
     const mergedProps: StateMachineProps = {
       ...STATE_MACHINE_DEFAULTS,
@@ -267,43 +275,28 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
     built.stateMachine = stateMachine;
     this.#grants.applyTo(stateMachine, context);
 
-    // CDK writes the timeout into the ASL only for a chain; an ASL document
-    // carries its own `TimeoutSeconds`, and an Express execution is capped at
-    // five minutes regardless.
-    if (
-      isChainBody(body) &&
-      mergedProps.timeout === undefined &&
-      stateMachineType === StateMachineType.STANDARD
-    ) {
-      Annotations.of(stateMachine).addWarningV2(
-        STATE_MACHINE_TIMEOUT_WARNING_ID,
-        `StateMachineBuilder "${id}": no timeout. A Standard execution with none can wait up ` +
-          `to a year on a task that never answers. Set .timeout(...) to bound it.`,
-      );
-    }
-
     return { stateMachine, role: stateMachine.role, logGroup };
   }
 
-  #resolveDefinitionBody(
-    scope: IConstruct,
+  /**
+   * The workflow to build, resolved without creating any construct: either a
+   * callback still to be given its scope, or a pre-built definition body.
+   */
+  #resolveWorkflow(
     id: string,
     definitionBody: StateMachineBuilderProps["definitionBody"],
     context: Record<string, object>,
-  ): DefinitionBody {
+  ): { build: StateMachineDefinition } | { body: DefinitionBody } {
     if (this.#definition !== undefined && definitionBody !== undefined) {
       throw new Error(
         `StateMachineBuilder "${id}": .definition() and .definitionBody() are mutually exclusive.`,
       );
     }
-    if (definitionBody !== undefined) return resolve(definitionBody, context);
-    if (this.#definition === undefined) {
-      throw new Error(
-        `StateMachineBuilder "${id}": no workflow. Set one with .definition() or .definitionBody().`,
-      );
-    }
-    const states = new Construct(scope, `${id}Definition`);
-    return DefinitionBody.fromChainable(resolve(this.#definition, context)(states));
+    if (this.#definition !== undefined) return { build: resolve(this.#definition, context) };
+    if (definitionBody !== undefined) return { body: resolve(definitionBody, context) };
+    throw new Error(
+      `StateMachineBuilder "${id}" requires a workflow. Call .definition() or .definitionBody().`,
+    );
   }
 }
 

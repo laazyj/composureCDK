@@ -23,7 +23,8 @@ import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation
 import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createLogGroupBuilder } from "@composurecdk/logs";
 import type { StateMachineAlarmConfig } from "./state-machine-alarm-config.js";
-import { createStateMachineAlarms } from "./state-machine-alarms.js";
+import { createSpecAlarms } from "./alarm-specs.js";
+import { STATE_MACHINE_ALARMS } from "./state-machine-alarms.js";
 import { STATE_MACHINE_DEFAULTS, STATE_MACHINE_LOG_DEFAULTS } from "./defaults.js";
 import {
   LOG_GROUP_NAME_MAX_LENGTH,
@@ -311,10 +312,11 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
     built.stateMachine = stateMachine;
     this.#grants.applyTo(stateMachine, context);
 
-    const alarms = createStateMachineAlarms(
+    const alarms = createSpecAlarms(
       scope,
       id,
       stateMachine,
+      STATE_MACHINE_ALARMS,
       recommendedAlarms,
       this.#customAlarms,
     );

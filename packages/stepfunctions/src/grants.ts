@@ -1,5 +1,5 @@
 import type { IGrantable } from "aws-cdk-lib/aws-iam";
-import type { IStateMachine } from "aws-cdk-lib/aws-stepfunctions";
+import type { Activity, IStateMachine } from "aws-cdk-lib/aws-stepfunctions";
 import { type Grant, grantVia, type Resolvable } from "@composurecdk/core";
 
 /** Wraps one of {@link IStateMachine}'s native grant methods as a capability helper. */
@@ -46,4 +46,28 @@ export const stateMachineGrants = {
   redriveExecution: capability((sm, grantee) => {
     sm.grantExecution(grantee, "states:RedriveExecution");
   }),
+};
+
+/**
+ * Consumer-side grant helpers for a Step Functions activity. `IActivity` has no
+ * grant methods, so these take the concrete `Activity` the activity builder
+ * produces and delegate to its `grant`; an activity imported with
+ * `Activity.fromActivityArn` is not accepted.
+ */
+export const activityGrants = {
+  /**
+   * Work the activity: poll for tasks and report their result
+   * (`states:GetActivityTask`, `SendTaskSuccess`, `SendTaskFailure`,
+   * `SendTaskHeartbeat`).
+   */
+  worker: (activity: Resolvable<Activity>): Grant<IGrantable> =>
+    grantVia(activity, (a, grantee) => {
+      a.grant(
+        grantee,
+        "states:GetActivityTask",
+        "states:SendTaskSuccess",
+        "states:SendTaskFailure",
+        "states:SendTaskHeartbeat",
+      );
+    }),
 };

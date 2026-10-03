@@ -1,5 +1,5 @@
-import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
+import { ANY_OCCURRENCE } from "./alarm-defaults.js";
 
 interface StateMachineAlarmDefaults {
   enabled: true;
@@ -7,14 +7,6 @@ interface StateMachineAlarmDefaults {
   executionsTimedOut: AlarmConfigDefaults;
   executionThrottled: AlarmConfigDefaults;
 }
-
-/** Alarm on the first occurrence; an idle state machine stays OK. */
-const ANY_OCCURRENCE: AlarmConfigDefaults = {
-  threshold: 0,
-  evaluationPeriods: 1,
-  datapointsToAlarm: 1,
-  treatMissingData: TreatMissingData.NOT_BREACHING,
-};
 
 /**
  * Default alarm configuration for state machines — see {@link StateMachineAlarmConfig}.

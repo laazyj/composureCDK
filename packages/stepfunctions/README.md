@@ -188,6 +188,55 @@ createFunctionBuilder().grant(
 | `taskResponse`       | `states:SendTaskSuccess`, `SendTaskFailure`, `SendTaskHeartbeat`                 |
 | `redriveExecution`   | `states:RedriveExecution` (Standard only)                                        |
 
+## Activity Builder
+
+An [activity](https://docs.aws.amazon.com/step-functions/latest/dg/concepts-activities.html) is a task a state machine hands to workers that poll for it — work running on a server, a container or a person's desk rather than behind a service integration. For new work, a [`.waitForTaskToken`](https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token) callback usually serves the same purpose without a resource to manage; activities suit long-lived workers that pull.
+
+```ts
+import { StepFunctionsInvokeActivity } from "aws-cdk-lib/aws-stepfunctions-tasks";
+import {
+  activityGrants,
+  createActivityBuilder,
+  type ActivityBuilderResult,
+} from "@composurecdk/stepfunctions";
+
+compose(
+  {
+    review: createActivityBuilder().activityName("manual-review"),
+    reviewer: createFunctionBuilder()./* ... */.grant(
+      activityGrants.worker(ref<ActivityBuilderResult>("review").get("activity")),
+    ),
+    workflow: createStateMachineBuilder()
+      .timeout(Duration.hours(1))
+      .definition(
+      ref(
+        "review",
+        (r: ActivityBuilderResult) => (scope: Construct) =>
+          new StepFunctionsInvokeActivity(scope, "Review", {
+            activity: r.activity,
+            heartbeatTimeout: Timeout.duration(Duration.minutes(5)),
+          }),
+      ),
+    ),
+  },
+  { review: [], reviewer: ["review"], workflow: ["review"] },
+);
+```
+
+The builder is tagged, which Security Hub [StepFunctions.2](https://docs.aws.amazon.com/securityhub/latest/userguide/stepfunctions-controls.html#stepfunctions-2) requires of activities. `encryptionConfiguration` accepts a `Resolvable` customer-managed key; an activity's encryption cannot change after creation, so changing it replaces the activity. With a customer-managed key, a worker also needs `keyGrants.decrypt` to read its tasks.
+
+`activityGrants.worker` grants `states:GetActivityTask`, `SendTaskSuccess`, `SendTaskFailure` and `SendTaskHeartbeat`. Set a `heartbeatTimeout` on the task that invokes the activity, so a worker that dies mid-task is noticed.
+
+### Activity alarms
+
+| Alarm                         | Metric (Sum, 1 min)           | Default threshold |
+| ----------------------------- | ----------------------------- | ----------------- |
+| `activitiesFailed`            | `ActivitiesFailed`            | > 0               |
+| `activitiesTimedOut`          | `ActivitiesTimedOut`          | > 0               |
+| `activitiesHeartbeatTimedOut` | `ActivitiesHeartbeatTimedOut` | > 0               |
+
+`ActivitiesTimedOut` is the metric the Serverless Lens names; the other two complete the ways a worker's task ends badly. As with the state machine alarms, the thresholds are this library's choice. They are tuned, disabled and extended exactly as above, and exported as `ACTIVITY_ALARM_DEFAULTS`.
+
 ## Starting executions from other services
 
 The CDK integrations accept the built state machine through a `ref`, with no change to this package:

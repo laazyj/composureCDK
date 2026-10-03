@@ -1072,7 +1072,6 @@ exports[`static-website-app > stack > matches the expected synthesised template 
     "StaticWebsitesiteAccessLogsC30B6C68": {
       "DeletionPolicy": "Retain",
       "Properties": {
-        "AccessControl": "LogDeliveryWrite",
         "BucketEncryption": {
           "ServerSideEncryptionConfiguration": [
             {
@@ -1101,7 +1100,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
         "OwnershipControls": {
           "Rules": [
             {
-              "ObjectOwnership": "ObjectWriter",
+              "ObjectOwnership": "BucketOwnerEnforced",
             },
           ],
         },
@@ -1155,6 +1154,42 @@ exports[`static-website-app > stack > matches the expected synthesised template 
                   ],
                 },
               ],
+            },
+            {
+              "Action": "s3:PutObject",
+              "Condition": {
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::GetAtt": [
+                      "StaticWebsitesite792D65DA",
+                      "Arn",
+                    ],
+                  },
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId",
+                  },
+                },
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "logging.s3.amazonaws.com",
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "StaticWebsitesiteAccessLogsC30B6C68",
+                        "Arn",
+                      ],
+                    },
+                    "/logs/*",
+                  ],
+                ],
+              },
             },
           ],
           "Version": "2012-10-17",

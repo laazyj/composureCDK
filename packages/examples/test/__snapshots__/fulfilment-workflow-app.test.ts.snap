@@ -1,0 +1,1013 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`fulfilment-workflow-app > matches the expected synthesised template 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "FulfilmentWorkflowcheckStockDE690272": {
+      "DependsOn": [
+        "FulfilmentWorkflowcheckStockExecutionRoleDefaultPolicyCF2B6CED",
+        "FulfilmentWorkflowcheckStockExecutionRole2C0794F5",
+      ],
+      "Properties": {
+        "Code": {
+          "ZipFile": "exports.handler = async (order) => {
+  if (order.quantity > 10) {
+    const error = new Error("Only 10 of " + order.sku + " in stock");
+    error.name = "OutOfStock";
+    throw error;
+  }
+  return { reserved: order.quantity };
+};",
+        },
+        "Description": "Reserves stock for an order; throws OutOfStock past the limit",
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "FulfilmentWorkflowcheckStockLogGroupB7E7D774",
+          },
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "FulfilmentWorkflowcheckStockExecutionRole2C0794F5",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 10,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "FulfilmentWorkflowcheckStockDurationAlarmEA0D2109": {
+      "Properties": {
+        "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 9000ms (90% of 10000ms timeout).",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/check-stock/duration",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "FulfilmentWorkflowcheckStockDE690272",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Threshold": 9000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkflowcheckStockErrorsAlarm0F055B53": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/check-stock/errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "FulfilmentWorkflowcheckStockDE690272",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkflowcheckStockExecutionRole2C0794F5": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "FulfilmentWorkflowcheckStockLogGroupB7E7D774",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "FulfilmentWorkflowcheckStockLogGroupB7E7D774",
+                              "Arn",
+                            ],
+                          },
+                          ":log-stream:*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "LogsWriter",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "FulfilmentWorkflowcheckStockExecutionRoleDefaultPolicyCF2B6CED": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "FulfilmentWorkflowcheckStockExecutionRoleDefaultPolicyCF2B6CED",
+        "Roles": [
+          {
+            "Ref": "FulfilmentWorkflowcheckStockExecutionRole2C0794F5",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "FulfilmentWorkflowcheckStockLogGroupB7E7D774": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "FulfilmentWorkflowcheckStockThrottlesAlarm4D6670B5": {
+      "Properties": {
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/check-stock/throttles",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "FulfilmentWorkflowcheckStockDE690272",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkflowfulfilmentEventsRole0785586D": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "FulfilmentWorkflowfulfilmentEventsRoleDefaultPolicy31C81606": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "states:StartExecution",
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "FulfilmentWorkflowfulfilmentFCFDB86D",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "FulfilmentWorkflowfulfilmentEventsRoleDefaultPolicy31C81606",
+        "Roles": [
+          {
+            "Ref": "FulfilmentWorkflowfulfilmentEventsRole0785586D",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "FulfilmentWorkflowfulfilmentExecutionThrottledAlarm847E13F7": {
+      "Properties": {
+        "AlarmDescription": "State machine state transitions are being throttled; consider a Standard workflow quota increase. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/fulfilment/execution-throttled",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "StateMachineArn",
+            "Value": {
+              "Ref": "FulfilmentWorkflowfulfilmentFCFDB86D",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ExecutionThrottled",
+        "Namespace": "AWS/States",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkflowfulfilmentExecutionsFailedAlarm3B04549D": {
+      "Properties": {
+        "AlarmDescription": "State machine executions are failing. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/fulfilment/executions-failed",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "StateMachineArn",
+            "Value": {
+              "Ref": "FulfilmentWorkflowfulfilmentFCFDB86D",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ExecutionsFailed",
+        "Namespace": "AWS/States",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkflowfulfilmentExecutionsTimedOutAlarm11B2F028": {
+      "Properties": {
+        "AlarmDescription": "State machine executions are timing out. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/fulfilment/executions-timed-out",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "StateMachineArn",
+            "Value": {
+              "Ref": "FulfilmentWorkflowfulfilmentFCFDB86D",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ExecutionsTimedOut",
+        "Namespace": "AWS/States",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkflowfulfilmentFCFDB86D": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "FulfilmentWorkflowfulfilmentRoleDefaultPolicyB3C69519",
+        "FulfilmentWorkflowfulfilmentRoleB8AB01F0",
+      ],
+      "Properties": {
+        "DefinitionString": {
+          "Fn::Join": [
+            "",
+            [
+              "{"StartAt":"CheckStock","States":{"CheckStock":{"Next":"RecordAccepted","Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Catch":[{"ErrorEquals":["OutOfStock"],"ResultPath":"$.error","Next":"RecordRejected"}],"Type":"Task","ResultPath":"$.stock","Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::lambda:invoke","Parameters":{"FunctionName":"",
+              {
+                "Fn::GetAtt": [
+                  "FulfilmentWorkflowcheckStockDE690272",
+                  "Arn",
+                ],
+              },
+              "","Payload.$":"$"}},"RecordAccepted":{"Next":"Accepted","Type":"Task","ResultPath":null,"Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::dynamodb:putItem","Parameters":{"Item":{"orderId":{"S.$":"$.orderId"},"status":{"S":"ACCEPTED"}},"TableName":"",
+              {
+                "Ref": "FulfilmentWorkfloworders66A10CC3",
+              },
+              ""}},"Accepted":{"Type":"Succeed"},"RecordRejected":{"Next":"Rejected","Type":"Task","ResultPath":null,"Resource":"arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":states:::dynamodb:putItem","Parameters":{"Item":{"orderId":{"S.$":"$.orderId"},"status":{"S":"REJECTED"}},"TableName":"",
+              {
+                "Ref": "FulfilmentWorkfloworders66A10CC3",
+              },
+              ""}},"Rejected":{"Type":"Succeed"}},"TimeoutSeconds":300}",
+            ],
+          ],
+        },
+        "LoggingConfiguration": {
+          "Destinations": [
+            {
+              "CloudWatchLogsLogGroup": {
+                "LogGroupArn": {
+                  "Fn::GetAtt": [
+                    "FulfilmentWorkflowfulfilmentLogsDAC46D77",
+                    "Arn",
+                  ],
+                },
+              },
+            },
+          ],
+          "IncludeExecutionData": false,
+          "Level": "ERROR",
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "FulfilmentWorkflowfulfilmentRoleB8AB01F0",
+            "Arn",
+          ],
+        },
+        "StateMachineName": "ComposureCDKFulfilmentWorkflowStack-FulfilmentWorkflowfulfilment-CEEC14C0",
+        "TracingConfiguration": {
+          "Enabled": true,
+        },
+      },
+      "Type": "AWS::StepFunctions::StateMachine",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "FulfilmentWorkflowfulfilmentLogsDAC46D77": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "LogGroupName": "/aws/vendedlogs/states/ComposureCDKFulfilmentWorkflowStack-FulfilmentWorkflowfulfilment-CEEC14C0",
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "FulfilmentWorkflowfulfilmentRoleB8AB01F0": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "states.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "FulfilmentWorkflowfulfilmentRoleDefaultPolicyB3C69519": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "FulfilmentWorkflowcheckStockDE690272",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "FulfilmentWorkflowcheckStockDE690272",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "dynamodb:PutItem",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":dynamodb:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":table/",
+                    {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": [
+                "logs:CreateLogDelivery",
+                "logs:GetLogDelivery",
+                "logs:UpdateLogDelivery",
+                "logs:DeleteLogDelivery",
+                "logs:ListLogDeliveries",
+                "logs:PutResourcePolicy",
+                "logs:DescribeResourcePolicies",
+                "logs:DescribeLogGroups",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "FulfilmentWorkflowfulfilmentRoleDefaultPolicyB3C69519",
+        "Roles": [
+          {
+            "Ref": "FulfilmentWorkflowfulfilmentRoleB8AB01F0",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "FulfilmentWorkfloworderPlacedE308C09F": {
+      "Properties": {
+        "Description": "Starts fulfilment for each placed order",
+        "EventPattern": {
+          "detail-type": [
+            "OrderPlaced",
+          ],
+          "source": [
+            "composurecdk.examples.orders",
+          ],
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Ref": "FulfilmentWorkflowfulfilmentFCFDB86D",
+            },
+            "Id": "Target0",
+            "InputPath": "$.detail",
+            "RoleArn": {
+              "Fn::GetAtt": [
+                "FulfilmentWorkflowfulfilmentEventsRole0785586D",
+                "Arn",
+              ],
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
+    },
+    "FulfilmentWorkfloworderPlacedFailedInvocationsAlarm5708724B": {
+      "Properties": {
+        "AlarmDescription": "EventBridge rule is failing to invoke targets. Threshold: > 0 failures in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/order-placed/failed-invocations",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "RuleName",
+            "Value": {
+              "Ref": "FulfilmentWorkfloworderPlacedE308C09F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FailedInvocations",
+        "Namespace": "AWS/Events",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkfloworderPlacedInvocationsFailedToBeSentToDlqAlarm50323D60": {
+      "Properties": {
+        "AlarmDescription": "EventBridge rule failed to redrive an event to a target dead-letter queue; events may be lost. Threshold: > 0 failed redrives in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/order-placed/invocations-failed-to-be-sent-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "RuleName",
+            "Value": {
+              "Ref": "FulfilmentWorkfloworderPlacedE308C09F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "InvocationsFailedToBeSentToDlq",
+        "Namespace": "AWS/Events",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkfloworderPlacedInvocationsSentToDlqAlarm648A7985": {
+      "Properties": {
+        "AlarmDescription": "EventBridge rule is redriving events to a target dead-letter queue. Threshold: > 0 redrives in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/order-placed/invocations-sent-to-dlq",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "RuleName",
+            "Value": {
+              "Ref": "FulfilmentWorkfloworderPlacedE308C09F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "InvocationsSentToDlq",
+        "Namespace": "AWS/Events",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkfloworderPlacedThrottledRulesAlarm5D48DDD8": {
+      "Properties": {
+        "AlarmDescription": "EventBridge rule is being throttled, indicating quota or downstream concurrency limits. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/order-placed/throttled-rules",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "RuleName",
+            "Value": {
+              "Ref": "FulfilmentWorkfloworderPlacedE308C09F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ThrottledRules",
+        "Namespace": "AWS/Events",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkfloworders66A10CC3": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "orderId",
+            "AttributeType": "S",
+          },
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [
+          {
+            "AttributeName": "orderId",
+            "KeyType": "HASH",
+          },
+        ],
+        "Replicas": [
+          {
+            "DeletionProtectionEnabled": true,
+            "PointInTimeRecoverySpecification": {
+              "PointInTimeRecoveryEnabled": true,
+            },
+            "Region": {
+              "Ref": "AWS::Region",
+            },
+          },
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+        },
+      },
+      "Type": "AWS::DynamoDB::GlobalTable",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "FulfilmentWorkflowordersReadThrottleEventsAlarm4D1ABCAD": {
+      "Properties": {
+        "AlarmDescription": "DynamoDB table read requests are being throttled, indicating a hot partition or insufficient read capacity. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/orders/read-throttle-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": {
+              "Ref": "FulfilmentWorkfloworders66A10CC3",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ReadThrottleEvents",
+        "Namespace": "AWS/DynamoDB",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkflowordersSystemErrorsAlarm40C49406": {
+      "Properties": {
+        "AlarmDescription": "DynamoDB table is returning server-side (HTTP 500) errors, summed across the core data-plane operations. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/orders/system-errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "EvaluationPeriods": 1,
+        "Metrics": [
+          {
+            "Expression": "getitem + batchgetitem + query + scan + putitem + updateitem + deleteitem + batchwriteitem + transactgetitems + transactwriteitems",
+            "Id": "expr_1",
+            "Label": "Sum of errors across all operations",
+            "ReturnData": true,
+          },
+          {
+            "Id": "getitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "GetItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "batchgetitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "BatchGetItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "query",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "Query",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "scan",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "Scan",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "putitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "PutItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "updateitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "UpdateItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "deleteitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "DeleteItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "batchwriteitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "BatchWriteItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "transactgetitems",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "TransactGetItems",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "transactwriteitems",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "TransactWriteItems",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "FulfilmentWorkfloworders66A10CC3",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+        ],
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "FulfilmentWorkflowordersWriteThrottleEventsAlarmA1BFE19A": {
+      "Properties": {
+        "AlarmDescription": "DynamoDB table write requests are being throttled, indicating a hot partition or insufficient write capacity. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/orders/write-throttle-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": {
+              "Ref": "FulfilmentWorkfloworders66A10CC3",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "WriteThrottleEvents",
+        "Namespace": "AWS/DynamoDB",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

@@ -38,6 +38,26 @@ describe("fulfilment-workflow-app", () => {
     });
   });
 
+  it("grants the execution role its customer-managed key on this state machine's own ARN", () => {
+    // CDK builds the condition's ARN from the name; on an unnamed state machine
+    // it ends at `stateMachine:` and matches nothing, denying every execution.
+    template.hasResourceProperties("AWS::IAM::Policy", {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Condition: {
+              StringEquals: {
+                "kms:EncryptionContext:aws:states:stateMachineArn": {
+                  "Fn::Join": ["", Match.arrayWith([Match.stringLikeRegexp(":stateMachine:.+$")])],
+                },
+              },
+            },
+          }),
+        ]),
+      },
+    });
+  });
+
   it("matches the expected synthesised template", () => {
     expect(template.toJSON()).toMatchSnapshot();
   });

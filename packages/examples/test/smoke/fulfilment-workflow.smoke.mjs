@@ -72,8 +72,10 @@ export default {
     );
 
     // A recorded status proves the whole path: the rule started an execution,
-    // the execution role could invoke the stock check and write the table, and
-    // the Catch routed the business error. Both orders share one deadline.
+    // the execution role could use the workflow's customer-managed key (whose
+    // grant is scoped to the state machine's name), invoke the stock check and
+    // write the table, and the Catch routed the business error. Both orders
+    // share one deadline.
     const recorded = new Map();
     await pollUntil(
       () => {
@@ -92,7 +94,7 @@ export default {
       const status = recorded.get(orderId);
       if (status === undefined) {
         fail(
-          `${orderId} — no status recorded within ${OUTCOME_TIMEOUT_MS / 1000}s — check the state machine's executions in ${STACK}`,
+          `${orderId} — no status recorded within ${OUTCOME_TIMEOUT_MS / 1000}s — check the state machine's executions in ${STACK} (a KMS AccessDenied there means the key grant does not match the state machine)`,
         );
       } else if (status !== expected) {
         fail(`${orderId} — recorded ${status}, expected ${expected}`);

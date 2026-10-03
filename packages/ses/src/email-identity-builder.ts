@@ -22,12 +22,16 @@ import { DEFAULT_MAIL_FROM_BEHAVIOR_ON_MX_FAILURE } from "./defaults.js";
 import { type PublishDkimSpec, publishDkimRecords } from "./publish-dkim.js";
 
 /**
- * Configuration for the SES email-identity builder. The `identity` and
- * `dkimIdentity` props are owned by the builder's fluent methods
- * ({@link IEmailIdentityBuilder.domain | `.domain()`} etc.); every other
- * {@link EmailIdentityProps} field passes through unchanged.
+ * Configuration for the SES email-identity builder. The `identity`,
+ * `dkimIdentity`, and `configurationSet` props are owned by the builder's fluent
+ * methods ({@link IEmailIdentityBuilder.domain | `.domain()`},
+ * {@link IEmailIdentityBuilder.configurationSet | `.configurationSet()`}, etc.);
+ * every other {@link EmailIdentityProps} field passes through unchanged.
  */
-export type EmailIdentityBuilderProps = Omit<EmailIdentityProps, "identity" | "dkimIdentity">;
+export type EmailIdentityBuilderProps = Omit<
+  EmailIdentityProps,
+  "identity" | "dkimIdentity" | "configurationSet"
+>;
 
 /** The build output of an {@link IEmailIdentityBuilder}. */
 export interface EmailIdentityBuilderResult {
@@ -80,6 +84,7 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
   /** Set when BYODKIM is selected; `undefined` means Easy DKIM. */
   #byoDkim?: { readonly selector: string; readonly publicKey?: string };
   #publishZone?: Resolvable<NonNullable<RecordSetOptions["zone"]>>;
+  #configurationSet?: Resolvable<NonNullable<EmailIdentityProps["configurationSet"]>>;
 
   /** Verify a whole domain (or subdomain). Publish DKIM with `.publishDkim()`. */
   domain(domain: string): this {
@@ -137,12 +142,30 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
     return this;
   }
 
+  /**
+   * Associate the identity with an SES configuration set, so every message sent
+   * from this identity is tracked and controlled by that set (TLS, reputation
+   * metrics, event routing). Accepts a {@link Resolvable}, so a sibling
+   * configuration set built by {@link createConfigurationSetBuilder} can be wired
+   * in with `ref()`.
+   *
+   * Reads its inner type from CDK's own `EmailIdentityProps["configurationSet"]`
+   * so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
+   */
+  configurationSet(
+    configurationSet: Resolvable<NonNullable<EmailIdentityProps["configurationSet"]>>,
+  ): this {
+    this.#configurationSet = configurationSet;
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: EmailIdentityBuilder): void {
     target.#source = this.#source;
     target.#dkim = this.#dkim;
     target.#byoDkim = this.#byoDkim;
     target.#publishZone = this.#publishZone;
+    target.#configurationSet = this.#configurationSet;
   }
 
   build(
@@ -174,11 +197,15 @@ class EmailIdentityBuilder implements Lifecycle<EmailIdentityBuilderResult> {
       this.props.mailFromBehaviorOnMxFailure === undefined
         ? { mailFromBehaviorOnMxFailure: DEFAULT_MAIL_FROM_BEHAVIOR_ON_MX_FAILURE }
         : {};
+    const configurationSet = this.#configurationSet
+      ? resolve(this.#configurationSet, context)
+      : undefined;
     const props: EmailIdentityProps = {
       ...mailFromDefault,
       ...this.props,
       identity,
       dkimIdentity: this.#dkim,
+      ...(configurationSet && { configurationSet }),
     };
     const emailIdentity = new EmailIdentity(scope, id, props);
 

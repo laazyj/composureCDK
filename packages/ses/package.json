@@ -39,6 +39,8 @@
     }
   },
   "peerDependencies": {
+    "@composurecdk/cloudformation": "^0.10.0",
+    "@composurecdk/cloudwatch": "^0.10.0",
     "@composurecdk/core": "^0.10.0",
     "@composurecdk/route53": "^0.10.0",
     "aws-cdk-lib": "^2.225.0",

@@ -127,7 +127,7 @@ compose(
 );
 ```
 
-CDK grants the execution role the key, conditioned on the state machine's ARN — which it builds from the state machine's _name_. An unnamed state machine leaves that condition matching nothing, and every execution is denied the key. The builder therefore always names the state machine when you don't (`<stack>-<path>-<hash>`, at most 80 characters) — always, not only once a key is set, because changing a state machine's name replaces it, losing its execution history and any running executions. Set your own with `.stateMachineName(...)`.
+CDK grants the execution role the key, conditioned on the state machine's ARN — which it builds from the state machine's _name_. An unnamed state machine leaves that condition matching nothing, and every execution is denied the key ([aws-cdk#38958](https://github.com/aws/aws-cdk/issues/38958)). The builder therefore always names the state machine when you don't (`<stack>-<path>-<hash>`, at most 80 characters) — always, not only once a key is set, because changing a state machine's name replaces it, losing its execution history and any running executions. Set your own with `.stateMachineName(...)`.
 
 CDK does not grant **callers** the key. `DescribeExecution`, `GetExecutionHistory` and `StartSyncExecution` need `kms:Decrypt` on it, so a grantee using `stateMachineGrants.read` or `startSyncExecution` on an encrypted state machine also needs `keyGrants.decrypt` ([what each API needs](https://docs.aws.amazon.com/step-functions/latest/dg/encryption-at-rest.html)).
 

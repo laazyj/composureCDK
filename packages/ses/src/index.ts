@@ -33,5 +33,10 @@ export {
   stopAction,
   addHeaderAction,
 } from "./actions/index.js";
-export { DEFAULT_RECEIPT_RULE, DEFAULT_MAIL_FROM_BEHAVIOR_ON_MX_FAILURE } from "./defaults.js";
+export {
+  DEFAULT_RECEIPT_RULE,
+  DEFAULT_MAIL_FROM_BEHAVIOR_ON_MX_FAILURE,
+  DEFAULT_INBOUND_MX_PRIORITY,
+} from "./defaults.js";
+export { type InboundMxOptions } from "./publish-inbound-mx.js";
 export { SES_RECEIVING_REGIONS, RECEIVING_REGION_WARNING } from "./region-support.js";

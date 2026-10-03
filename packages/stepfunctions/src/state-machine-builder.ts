@@ -266,7 +266,10 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
       // the ARN built from the name, which for an unnamed state machine ends at
       // `stateMachine:` and matches nothing. Naming it up front, rather than
       // only once a key is set, keeps the name — and so the resource — stable
-      // when encryption is turned on later.
+      // when encryption is turned on later. Keep it even once CDK fixes the
+      // condition: dropping the name would rename, and so replace, every
+      // deployed state machine.
+      // https://github.com/aws/aws-cdk/issues/38958
       stateMachineName:
         stateMachineProps.stateMachineName ?? lazyUniqueName(owner, STATE_MACHINE_NAME_MAX_LENGTH),
     };

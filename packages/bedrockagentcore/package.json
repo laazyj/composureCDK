@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/bedrockagentcore",
-  "version": "0.10.3",
+  "version": "0.11.0",
   "description": "Composable Amazon Bedrock AgentCore: runtimes, memory, gateways and evaluations with secure defaults, grants and alarms",
   "repository": {
     "type": "git",
@@ -40,13 +40,13 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/bedrock": "^0.10.0",
-    "@composurecdk/cloudformation": "^0.10.0",
-    "@composurecdk/cloudwatch": "^0.10.0",
-    "@composurecdk/core": "^0.10.0",
-    "@composurecdk/ec2": "^0.10.0",
-    "@composurecdk/iam": "^0.10.0",
-    "@composurecdk/logs": "^0.10.0",
+    "@composurecdk/bedrock": "^0.11.0",
+    "@composurecdk/cloudformation": "^0.11.0",
+    "@composurecdk/cloudwatch": "^0.11.0",
+    "@composurecdk/core": "^0.11.0",
+    "@composurecdk/ec2": "^0.11.0",
+    "@composurecdk/iam": "^0.11.0",
+    "@composurecdk/logs": "^0.11.0",
     "aws-cdk-lib": "^2.255.0",
     "constructs": "^10.0.0"
   },

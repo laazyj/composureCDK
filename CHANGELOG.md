@@ -1,3 +1,43 @@
+## 0.11.0 (2026-10-04)
+
+### 🚀 Features
+
+- ⚠️ **eslint-plugin:** compare no-cdk-api-above-floor against a configured floor ([25f2569](https://github.com/laazyj/composureCDK/commit/25f2569))
+- **examples:** give CDK's helper Lambdas stack-owned log groups under cleanDeskPolicy ([dd33906](https://github.com/laazyj/composureCDK/commit/dd33906))
+- **examples:** add the fulfilment workflow example ([#599](https://github.com/laazyj/composureCDK/pull/599))
+- **ses:** publish the inbound MX record with .publishInboundMx() ([#571](https://github.com/laazyj/composureCDK/pull/571))
+- **stepfunctions:** add the state machine builder ([#596](https://github.com/laazyj/composureCDK/pull/596))
+- **stepfunctions:** add recommended state machine alarms ([#597](https://github.com/laazyj/composureCDK/pull/597))
+- **stepfunctions:** add the activity builder ([#598](https://github.com/laazyj/composureCDK/pull/598))
+
+### 🩹 Fixes
+
+- **build:** build dependencies before lint ([fd7b0d7](https://github.com/laazyj/composureCDK/commit/fd7b0d7))
+- **ci:** run PR checks whatever the base branch ([#359](https://github.com/laazyj/composureCDK/issues/359))
+- **ci:** install zizmor in release-prepare ([#604](https://github.com/laazyj/composureCDK/pull/604))
+- **cloudformation:** skip unresolved tokens in validateString ([#532](https://github.com/laazyj/composureCDK/issues/532))
+- **module-compat:** measure the consumer checks' coverage again ([#592](https://github.com/laazyj/composureCDK/pull/592))
+- **neptune:** accept any @aws-cdk/aws-neptune-alpha in the peer range ([#587](https://github.com/laazyj/composureCDK/pull/587))
+- **route53:** give nested-stack delegation provider log group a literal name ([#531](https://github.com/laazyj/composureCDK/issues/531))
+- **scripts:** derive cdk-floors across the peer graph ([#570](https://github.com/laazyj/composureCDK/pull/570), [#377](https://github.com/laazyj/composureCDK/issues/377))
+- **ses:** give the activation provider a declared log group and activate after the rules ([#591](https://github.com/laazyj/composureCDK/pull/591))
+- **test:** count every source file in coverage, not only loaded ones ([#594](https://github.com/laazyj/composureCDK/pull/594))
+
+### ⚠️ Breaking Changes
+
+- **eslint-plugin:** compare no-cdk-api-above-floor against a configured floor ([25f2569](https://github.com/laazyj/composureCDK/commit/25f2569))
+  no-cdk-api-above-floor now reports `Match.stringLikeRegexp`,
+  `Annotations.addWarningV2` and `Annotations` imported from
+  `aws-cdk-lib/assertions`. With no `floor` set it reports them everywhere,
+  as it always has its ban list; set `floor` to the bottom of your
+  aws-cdk-lib peer range to report only what postdates it. The message
+  text changes to name the floor it compared against.
+  Refs #408
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.10.3 (2026-09-26)
 
 ### 🚀 Features

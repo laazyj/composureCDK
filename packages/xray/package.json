@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/xray",
-  "version": "0.10.3",
+  "version": "0.11.0",
   "description": "Composable AWS X-Ray: account-level CloudWatch Transaction Search",
   "repository": {
     "type": "git",
@@ -40,7 +40,7 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/core": "^0.10.0",
+    "@composurecdk/core": "^0.11.0",
     "aws-cdk-lib": "^2.183.0",
     "constructs": "^10.0.0"
   },

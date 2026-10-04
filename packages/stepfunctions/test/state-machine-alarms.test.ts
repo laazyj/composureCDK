@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { Duration } from "aws-cdk-lib";
-import { Match } from "aws-cdk-lib/assertions";
+import { Duration, type Stack } from "aws-cdk-lib";
+import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { Pass, StateMachineType } from "aws-cdk-lib/aws-stepfunctions";
 import type { Construct } from "constructs";
 import { buildFixture } from "@composurecdk/cdk-testing";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
+import { INAPPLICABLE_ALARM_CONFIG_WARNING_ID } from "../src/index.js";
 import { createStateMachineBuilder } from "../src/state-machine-builder.js";
 
 const buildAndSynth = buildFixture(
@@ -49,9 +50,45 @@ describe("state machine alarms", () => {
   );
 
   it("omits the throttle alarm for an Express state machine, whose transitions are not throttled", () => {
-    const { result } = buildAndSynth((b) => b.stateMachineType(StateMachineType.EXPRESS));
+    const { result, stack } = buildAndSynth((b) => b.stateMachineType(StateMachineType.EXPRESS));
 
     expect(Object.keys(result.alarms).sort()).toEqual(["executionsFailed", "executionsTimedOut"]);
+    // Left unset, the inapplicable alarm is dropped without a warning.
+    expect(
+      Annotations.fromStack(stack).findWarning(
+        "*",
+        Match.stringLikeRegexp(INAPPLICABLE_ALARM_CONFIG_WARNING_ID),
+      ),
+    ).toHaveLength(0);
+  });
+
+  describe("configuring an alarm that cannot apply", () => {
+    const inapplicable = (stack: Stack) =>
+      Annotations.fromStack(stack).findWarning(
+        "*",
+        Match.stringLikeRegexp(INAPPLICABLE_ALARM_CONFIG_WARNING_ID),
+      );
+
+    it("warns when executionThrottled is tuned on an Express state machine", () => {
+      const { stack, result } = buildAndSynth((b) =>
+        b
+          .stateMachineType(StateMachineType.EXPRESS)
+          .recommendedAlarms({ executionThrottled: { threshold: 5 } }),
+      );
+
+      expect(result.alarms.executionThrottled).toBeUndefined();
+      expect(inapplicable(stack)).toHaveLength(1);
+    });
+
+    it("does not warn when it is disabled", () => {
+      const { stack } = buildAndSynth((b) =>
+        b
+          .stateMachineType(StateMachineType.EXPRESS)
+          .recommendedAlarms({ executionThrottled: false }),
+      );
+
+      expect(inapplicable(stack)).toHaveLength(0);
+    });
   });
 
   it("tunes an alarm, keeping the rest of its defaults", () => {

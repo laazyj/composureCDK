@@ -1,4 +1,4 @@
-import { Duration } from "aws-cdk-lib";
+import { Annotations, Duration } from "aws-cdk-lib";
 import { type Alarm, ComparisonOperator, type Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type StateMachine, StateMachineType } from "aws-cdk-lib/aws-stepfunctions";
 import type { IConstruct } from "constructs";
@@ -6,6 +6,15 @@ import type { AlarmDefinition, AlarmDefinitionBuilder } from "@composurecdk/clou
 import { createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
 import type { StateMachineAlarmConfig } from "./state-machine-alarm-config.js";
 import { STATE_MACHINE_ALARM_DEFAULTS } from "./state-machine-alarm-defaults.js";
+
+/**
+ * Warning id for a recommended alarm configured on a state machine type it does
+ * not apply to. The configuration is ignored. Acknowledge via
+ * `Annotations.of(scope).acknowledgeWarning(INAPPLICABLE_ALARM_CONFIG_WARNING_ID)`
+ * where that is intended, so the id must stay stable.
+ */
+export const INAPPLICABLE_ALARM_CONFIG_WARNING_ID =
+  "@composurecdk/stepfunctions:inapplicable-alarm-config";
 
 const METRIC_PERIOD = Duration.minutes(1);
 const METRIC_PERIOD_LABEL = `${String(METRIC_PERIOD.toMinutes())} minute`;
@@ -51,7 +60,15 @@ export function resolveStateMachineAlarmDefinitions(
   return (Object.keys(SPECS) as AlarmKey[]).flatMap((key) => {
     const spec = SPECS[key];
     const userConfig = config?.[key];
-    if (userConfig === false || (spec.standardOnly && !isStandard)) return [];
+    const inapplicable = spec.standardOnly && !isStandard;
+    if (inapplicable && userConfig) {
+      Annotations.of(stateMachine).addWarningV2(
+        INAPPLICABLE_ALARM_CONFIG_WARNING_ID,
+        `recommendedAlarms.${key} applies only to Standard state machines; the alarm is ` +
+          `not created. Remove the setting or set it to false.`,
+      );
+    }
+    if (userConfig === false || inapplicable) return [];
     const cfg = resolveAlarmConfig(userConfig, STATE_MACHINE_ALARM_DEFAULTS[key]);
     return {
       key,

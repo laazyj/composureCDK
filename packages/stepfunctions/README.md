@@ -141,7 +141,7 @@ CDK does not grant **callers** the key. `DescribeExecution`, `GetExecutionHistor
 | `executionsTimedOut` | `ExecutionsTimedOut` | > 0               | Always                                                                                                                                                                                        |
 | `executionThrottled` | `ExecutionThrottled` | > 0               | Standard only — [the quota-increase signal](https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/aws-step-functions-2.html); Express transitions are not throttled |
 
-Missing data is not breaching, so an idle state machine stays `OK`. The defaults are exported as `STATE_MACHINE_ALARM_DEFAULTS`.
+Missing data is not breaching, so an idle state machine stays `OK`. Configuring a Standard-only alarm on an Express state machine warns (`INAPPLICABLE_ALARM_CONFIG_WARNING_ID`) instead of being silently ignored. The defaults are exported as `STATE_MACHINE_ALARM_DEFAULTS`.
 
 `executionsFailed` fires on every failed execution. Model an expected outcome — a rejected order, a failed validation — as a `Catch` that ends in `Succeed`, and keep `Fail` for faults, so the alarm means something is broken.
 

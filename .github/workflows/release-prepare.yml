@@ -56,6 +56,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `nx release version` runs `nx verify`, whose zizmor gate refuses to
+      # skip in CI. Installed as in ci.yml. With no GH_TOKEN on the version
+      # step, zizmor skips its online audits; ci.yml runs those.
+      - name: Install zizmor
+        run: |
+          python3 -m venv "$RUNNER_TEMP/zizmor"
+          "$RUNNER_TEMP/zizmor/bin/pip" install --disable-pip-version-check --require-hashes --no-deps -r .github/zizmor/requirements.txt
+          echo "$RUNNER_TEMP/zizmor/bin" >> "$GITHUB_PATH"
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"

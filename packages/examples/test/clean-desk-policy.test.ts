@@ -447,6 +447,33 @@ describe("cleanDeskPolicy", () => {
     expect(retained).toEqual([]);
   });
 
+  // The halves a DeletionPolicy sweep cannot see: a resource still protected
+  // from deletion, or a key left on a long pending-deletion window.
+  it("leaves no deletion protection or long key deletion window across every example stack", () => {
+    const blocking = buildExampleApp(exampleApp({ outdir: "cdk.out/clean-desk-protection" }))
+      .synth()
+      .stacks.flatMap(({ stackName, template }) =>
+        Object.entries(
+          (
+            template as {
+              Resources?: Record<string, { Type: string; Properties?: Record<string, unknown> }>;
+            }
+          ).Resources ?? {},
+        ).flatMap(([logicalId, { Type, Properties = {} }]) => {
+          const replicas =
+            (Properties.Replicas as { DeletionProtectionEnabled?: boolean }[] | undefined) ?? [];
+          const isProtected =
+            Properties.DeletionProtection === true ||
+            Properties.DeletionProtectionEnabled === true ||
+            replicas.some((replica) => replica.DeletionProtectionEnabled === true);
+          const longKeyWindow = Type === "AWS::KMS::Key" && Properties.PendingWindowInDays !== 7;
+          return isProtected || longKeyWindow ? [`${stackName}/${logicalId}`] : [];
+        }),
+      );
+
+    expect(blocking).toEqual([]);
+  });
+
   describe("function log groups", () => {
     interface TemplateResource {
       Type: string;

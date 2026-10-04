@@ -47,6 +47,7 @@ import { exampleApp } from "./app-context.js";
  * - CAA policy restricting issuance to a single CA
  * - NS delegation of an internal subdomain
  * - HTTPS service-binding record advertising HTTP/3 + HTTP/2 at the apex
+ * - DNS query logging, which Route 53 accepts only in `us-east-1`
  * - Composing the record set with a hosted zone and surfacing the delegation
  *   name servers as a CloudFormation output
  */
@@ -61,7 +62,8 @@ export function createDnsZoneApp(app = exampleApp()): void {
     {
       zone: createHostedZoneBuilder()
         .zoneName("composurecdk-zone-dsl-demo.com")
-        .comment("Customer-facing zone managed by ComposureCDK"),
+        .comment("Customer-facing zone managed by ComposureCDK")
+        .queryLogging(true),
 
       // Minimal CloudFront distribution standing in for a web front-door, so
       // the www alias records below have something to point at. In a real

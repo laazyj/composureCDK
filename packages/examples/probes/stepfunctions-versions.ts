@@ -54,7 +54,9 @@ function probeStack(app: App, type: StateMachineType, variant: string) {
     .definition(workflow(variant))
     .publishVersion({ retain: 2 })
     .addAlias("live", {
-      deployment: { type: "CANARY", percentage: 50, interval: Duration.minutes(1) },
+      // One minute is shorter than the metrics take to reach the alarms: a 1-minute
+      // canary completed before its alarms fired. Five matches AWS's own example.
+      deployment: { type: "CANARY", percentage: 50, interval: Duration.minutes(5) },
     })
     .build(stack, "Workflow");
 

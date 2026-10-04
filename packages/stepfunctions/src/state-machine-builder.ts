@@ -1,3 +1,4 @@
+import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IGrantable, IRole } from "aws-cdk-lib/aws-iam";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import {
@@ -19,7 +20,10 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createLogGroupBuilder } from "@composurecdk/logs";
+import type { StateMachineAlarmConfig } from "./state-machine-alarm-config.js";
+import { createStateMachineAlarms } from "./state-machine-alarms.js";
 import { STATE_MACHINE_DEFAULTS, STATE_MACHINE_LOG_DEFAULTS } from "./defaults.js";
 import {
   LOG_GROUP_NAME_MAX_LENGTH,
@@ -120,6 +124,16 @@ export interface StateMachineBuilderProps extends Omit<
    * @see https://docs.aws.amazon.com/step-functions/latest/dg/encryption-at-rest.html
    */
   encryptionConfiguration?: Resolvable<NonNullable<StateMachineProps["encryptionConfiguration"]>>;
+
+  /**
+   * Configuration for the recommended CloudWatch alarms. Each is on by
+   * default; set one to `false` to disable it, or the whole prop to `false` to
+   * disable them all. Custom alarms added via `addAlarm()` are still created.
+   *
+   * No alarm actions are configured — apply them from the build result or
+   * with `alarmActionsPolicy`.
+   */
+  recommendedAlarms?: StateMachineAlarmConfig | false;
 }
 
 /**
@@ -141,6 +155,12 @@ export interface StateMachineBuilderResult {
    * when the caller supplied a `logs.destination` or turned logging off.
    */
   logGroup?: LogGroup;
+
+  /**
+   * CloudWatch alarms created for the state machine, keyed by alarm name —
+   * the recommended alarms and any added via {@link IStateMachineBuilder.addAlarm}.
+   */
+  alarms: Record<string, Alarm>;
 }
 
 /**
@@ -162,6 +182,7 @@ export type IStateMachineBuilder = ITaggedBuilder<StateMachineBuilderProps, Stat
 
 class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
   props: Partial<StateMachineBuilderProps> = {};
+  readonly #customAlarms: AlarmDefinitionBuilder<StateMachine>[] = [];
   readonly #grants = new GrantQueue<IGrantable>();
   #definition?: Resolvable<StateMachineDefinition>;
 
@@ -175,6 +196,16 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
    */
   definition(definition: Resolvable<StateMachineDefinition>): this {
     this.#definition = definition;
+    return this;
+  }
+
+  addAlarm(
+    key: string,
+    configure: (
+      alarm: AlarmDefinitionBuilder<StateMachine>,
+    ) => AlarmDefinitionBuilder<StateMachine>,
+  ): this {
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<StateMachine>(key)));
     return this;
   }
 
@@ -193,6 +224,7 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
 
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: StateMachineBuilder): void {
+    target.#customAlarms.push(...this.#customAlarms);
     this.#grants.copyInto(target.#grants);
     target.#definition = this.#definition;
   }
@@ -208,6 +240,7 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
       role,
       encryptionConfiguration,
       logs,
+      recommendedAlarms,
       ...stateMachineProps
     } = this.props;
 
@@ -278,7 +311,15 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
     built.stateMachine = stateMachine;
     this.#grants.applyTo(stateMachine, context);
 
-    return { stateMachine, role: stateMachine.role, logGroup };
+    const alarms = createStateMachineAlarms(
+      scope,
+      id,
+      stateMachine,
+      recommendedAlarms,
+      this.#customAlarms,
+    );
+
+    return { stateMachine, role: stateMachine.role, logGroup, alarms };
   }
 
   /**

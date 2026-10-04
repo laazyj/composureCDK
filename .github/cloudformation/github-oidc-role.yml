@@ -334,16 +334,31 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:sns:*:${AWS::AccountId}:*
 
-          # DynamoDB — smoke test writes one item to the stream-processor
-          # table to verify the consumer Lambda. DynamoDB does not support
-          # tag-based authorization for data-plane actions, so — as with SQS
-          # above — this is ARN-scoped to the sandbox account.
-          - Sid: DynamoDBPutItem
+          # DynamoDB — smoke tests write one item to the stream-processor
+          # table to verify the consumer Lambda, and read the status the
+          # fulfilment workflow records. DynamoDB does not support tag-based
+          # authorization for data-plane actions, so — as with SQS above —
+          # this is ARN-scoped to the sandbox account.
+          - Sid: DynamoDBSmokeItems
             Effect: Allow
             Action:
               - dynamodb:PutItem
+              - dynamodb:GetItem
             Resource:
               - !Sub arn:${AWS::Partition}:dynamodb:*:${AWS::AccountId}:table/*
+
+          # EventBridge — the fulfilment smoke test publishes OrderPlaced
+          # events to the default bus. Scoped to the example's own event
+          # source, so the role cannot publish as any other source.
+          - Sid: EventsPutOrderEvents
+            Effect: Allow
+            Action:
+              - events:PutEvents
+            Resource:
+              - !Sub arn:${AWS::Partition}:events:*:${AWS::AccountId}:event-bus/default
+            Condition:
+              StringEquals:
+                events:source: composurecdk.examples.orders
 
           # CDK bootstrap roles — assumed by CDK CLI for asset publishing
           # and CloudFormation execution

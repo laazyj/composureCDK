@@ -8,6 +8,7 @@ import { createDnsZoneApp } from "./dns-zone-app.js";
 import { createDualFunctionApp } from "./dual-function-app.js";
 import { createDynamoStreamProcessorApp } from "./dynamo-stream-processor-app.js";
 import { createEc2App } from "./ec2-app.js";
+import { createFulfilmentWorkflowApp } from "./fulfilment-workflow-app.js";
 import { createMockApiApp } from "./mock-api-app.js";
 import { createMultiStackApp } from "./multi-stack-app.js";
 import { createNeptuneGraphApp } from "./neptune-graph-app.js";
@@ -33,6 +34,7 @@ export function buildExampleApp(app = exampleApp()): App {
   createDualFunctionApp(app);
   createDynamoStreamProcessorApp(app);
   createEc2App(app);
+  createFulfilmentWorkflowApp(app);
   createMockApiApp(app);
   createMultiStackApp(app);
   createNeptuneGraphApp(app);

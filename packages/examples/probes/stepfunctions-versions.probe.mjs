@@ -14,9 +14,11 @@
  *             rules, one granted on the alias ARN (CDK's SfnStateMachine), one on
  *             the state machine's own ARN. Reports which actually started.
  *   express   Point 6: a synchronous Express execution through the alias.
- *   rollback  Point 3: with traffic flowing through each alias, deploy the bad
- *             variant behind a 50% canary. Expect the rollback alarm to fire,
- *             CloudFormation to roll back, and the alias to stay on the good version.
+ *   rollback  Point 3: per stack, with traffic flowing through the alias, deploy
+ *             the bad variant behind a 50% canary. Expect the rollback alarm to
+ *             fire, CloudFormation to roll back, and the alias to stay on the
+ *             good version. Waits out any alarm already in ALARM first, then
+ *             reads the alarm history to say whether the canary triggered it.
  *   prune     Point 2: publish three more versions (retain 2) and list what survives.
  *   destroy   Tear both stacks down.
  */
@@ -35,8 +37,15 @@ const SOURCES = {
 };
 const APP = "node dist/probes/stepfunctions-versions.js";
 
-// The same shape scripts/smoke-test.mjs passes to the smoke helpers.
-const aws = (...args) => JSON.parse(execFileSync("aws", args, { encoding: "utf8" }) || "{}");
+// The same shape scripts/smoke-test.mjs passes to the smoke helpers. The
+// environment forces JSON, so the result never depends on the caller's profile.
+const aws = (...args) =>
+  JSON.parse(
+    execFileSync("aws", args, {
+      encoding: "utf8",
+      env: { ...process.env, AWS_DEFAULT_OUTPUT: "json" },
+    }) || "{}",
+  );
 const log = (msg) => console.log(`  ${msg}`);
 
 /** `cdk deploy` the variant; resolves to its exit code rather than throwing. */
@@ -114,14 +123,7 @@ const steps = {
       DetailType: "Probe",
       Detail: JSON.stringify({ run, wiring }),
     }));
-    const { FailedEntryCount } = aws(
-      "events",
-      "put-events",
-      "--entries",
-      JSON.stringify(entries),
-      "--output",
-      "json",
-    );
+    const { FailedEntryCount } = aws("events", "put-events", "--entries", JSON.stringify(entries));
     log(`published one event per wiring (failed entries: ${FailedEntryCount})`);
 
     // Describe each new execution once, and stop as soon as both wirings show up.
@@ -136,8 +138,6 @@ const steps = {
           stateMachineArn(STACKS.standard),
           "--max-items",
           "20",
-          "--output",
-          "json",
         );
         for (const e of executions) {
           if (described.has(e.executionArn) || new Date(e.startDate).getTime() < since) continue;
@@ -147,8 +147,6 @@ const steps = {
             "describe-execution",
             "--execution-arn",
             e.executionArn,
-            "--output",
-            "json",
           );
           const wiring = Object.keys(SOURCES).find((w) => input.includes(run) && input.includes(w));
           if (wiring) started.set(wiring, e);
@@ -187,11 +185,33 @@ const steps = {
   },
 
   async rollback() {
-    const before = Object.fromEntries(Object.entries(STACKS).map(([t, s]) => [t, aliasRouting(s)]));
-    let traffic = true;
-    const generator = (async () => {
-      while (traffic) {
-        for (const stack of Object.values(STACKS)) {
+    // One stack at a time, Standard first: a single `cdk deploy` of both stops
+    // at the first failure, which is the outcome this step expects.
+    for (const [type, stack] of Object.entries(STACKS)) {
+      const alarms = findStackResources(aws, stack, {
+        type: "AWS::CloudWatch::Alarm",
+        namePattern: /^WorkflowAliaslive/,
+      }).map((r) => r.PhysicalResourceId);
+      const short = (name) => name.split("/").pop();
+
+      // An alarm already in ALARM makes CloudFormation abort before shifting any
+      // traffic, which tests nothing; a re-run can inherit one from the last run.
+      const quiet = await pollUntil(
+        () =>
+          aws("cloudwatch", "describe-alarms", "--alarm-names", ...alarms).MetricAlarms.every(
+            (a) => a.StateValue !== "ALARM",
+          ),
+        { timeoutMs: 5 * 60_000, intervalMs: 15_000 },
+      );
+      if (!quiet) {
+        log(`${type}: SKIPPED — a rollback alarm stayed in ALARM for 5 minutes`);
+        continue;
+      }
+
+      const before = aliasRouting(stack);
+      let traffic = true;
+      const generator = (async () => {
+        while (traffic) {
           aws(
             "stepfunctions",
             "start-execution",
@@ -200,28 +220,40 @@ const steps = {
             "--input",
             "{}",
           );
+          await delay(3_000);
         }
-        await delay(3_000);
-      }
-    })();
-    const code = await deploy("bad");
-    traffic = false;
-    await generator;
-    log(
-      `deploying the bad variant exited ${code} (non-zero expected: the canary should roll back)`,
-    );
-    for (const [type, stack] of Object.entries(STACKS)) {
-      const { Stacks } = aws(
-        "cloudformation",
-        "describe-stacks",
-        "--stack-name",
-        stack,
-        "--output",
-        "json",
+      })();
+      const started = new Date();
+      const code = await deploy("bad", [stack]);
+      traffic = false;
+      await generator;
+
+      const { Stacks } = aws("cloudformation", "describe-stacks", "--stack-name", stack);
+      log(
+        `${type}: deploy exited ${code} (non-zero expected); stack ${Stacks[0].StackStatus}; live was ${before}, is now ${aliasRouting(stack)}`,
+      );
+      // Every alarm was out of ALARM before the deploy, so a transition into
+      // ALARM since then means the canary's traffic tripped it.
+      const history = alarms.flatMap((name) =>
+        aws(
+          "cloudwatch",
+          "describe-alarm-history",
+          "--alarm-name",
+          name,
+          "--history-item-type",
+          "StateUpdate",
+          "--start-date",
+          started.toISOString(),
+        ).AlarmHistoryItems.map((item) => ({ ...item, name: short(name) })),
+      );
+      const fired = history.filter(
+        (item) => JSON.parse(item.HistoryData).newState.stateValue === "ALARM",
       );
       log(
-        `${type}: stack ${Stacks[0].StackStatus}; live was ${before[type]}, is now ${aliasRouting(stack)}`,
+        `${type}: ${fired.length ? `canary-triggered rollback (${fired.map((i) => i.name).join(", ")} fired)` : "NO rollback alarm fired after the deploy started"}`,
       );
+      for (const item of history)
+        log(`${type}:   ${item.Timestamp} ${item.name}: ${item.HistorySummary}`);
     }
   },
 

@@ -51,3 +51,11 @@ export const STATE_MACHINE_LOG_DEFAULTS: Record<
    */
   [StateMachineType.EXPRESS]: { level: LogLevel.ALL, includeExecutionData: false },
 };
+
+/**
+ * Published versions `.publishVersion()` keeps by default — see
+ * {@link PublishVersionOptions.retain}. Enough to roll an alias back several
+ * releases, far below Step Functions' 1,000-version quota.
+ * @see https://docs.aws.amazon.com/step-functions/latest/dg/service-quotas.html
+ */
+export const DEFAULT_RETAINED_VERSIONS = 5;

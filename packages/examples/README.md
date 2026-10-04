@@ -23,6 +23,14 @@ All example stacks use the `ComposureCDK-` name prefix. This convention enables 
 | [`ComposureCDK-CrudApiStack`](src/crud-api-app.ts)                                                  | Minimal CRUD REST API backed directly by DynamoDB via `AwsIntegration` — no Lambda in the request path, wired with `combine` and consumer-side `tableGrants`, with the table encrypted by a composed customer-managed KMS key, and its reference catalogue seeded through the API at deploy time by `.invokeOnDeploy()`                                                                                                                               |
 | [`ComposureCDK-FulfilmentWorkflowStack`](src/fulfilment-workflow-app.ts)                            | Order fulfilment as a Standard Step Functions workflow started by an EventBridge `OrderPlaced` event: a Lambda stock check wired into the definition with `combine`, a direct DynamoDB integration recording the outcome, and a `Catch` that records out-of-stock orders as a business outcome so the recommended `executionsFailed` alarm stays meaningful, with the workflow encrypted by a composed customer-managed KMS key                       |
 
+## Probes
+
+[`probes/`](probes/) holds one-off sandbox probes: CDK apps that prove how AWS actually behaves before a feature merges, run by hand and never by CI. They are not examples — nothing registers them in `src/apps.ts` — and each has a runner that deploys, exercises and reports. Their stacks use the `ComposureCDK-Probe-` prefix, so `sandbox-cleanup` also tears down anything left behind. Destroy a probe before the next `deploy-test` run: a probe stack still mid-update holds up its in-progress-stack check. A probe is deleted once the follow-up its findings inform has landed.
+
+| Probe                                                        | Proves                                                                                                                                           |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`stepfunctions-versions`](probes/stepfunctions-versions.ts) | Step Functions versions and aliases (#600): canary rollback on alias alarms, version pruning, alias ARNs as EventBridge targets, Express support |
+
 ## Prerequisites
 
 1. **AWS Account** — We recommend a dedicated test/sandbox account, not production.

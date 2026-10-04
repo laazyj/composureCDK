@@ -350,6 +350,7 @@ jobs:
   # always() rather than !cancelled(): a cancelled run must fail this check,
   # because a required check that is skipped counts as passing.
   result:
+    # release-prepare.yml finds this check by name; renaming it blocks releases.
     name: CI
     if: always()
     needs:

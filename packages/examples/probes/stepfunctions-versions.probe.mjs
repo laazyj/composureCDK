@@ -107,6 +107,25 @@ function aliasRouting(stack) {
     .join(", ");
 }
 
+/** Every step but deploy needs the stacks; say so rather than fail mid-step. */
+function requireStacks() {
+  const { StackSummaries } = aws(
+    "cloudformation",
+    "list-stacks",
+    "--stack-status-filter",
+    "CREATE_COMPLETE",
+    "UPDATE_COMPLETE",
+    "UPDATE_ROLLBACK_COMPLETE",
+  );
+  const live = new Set(StackSummaries.map((s) => s.StackName));
+  const missing = Object.values(STACKS).filter((stack) => !live.has(stack));
+  if (missing.length) {
+    throw new Error(
+      `${missing.join(", ")} not deployed in ${process.env.AWS_REGION ?? "the default region"}: run the deploy step first`,
+    );
+  }
+}
+
 const steps = {
   async deploy() {
     if ((await deploy("good")) !== 0) throw new Error("deploying the good variant failed");
@@ -276,9 +295,13 @@ const steps = {
 };
 
 const requested = process.argv.slice(2);
-for (const name of requested.length ? requested : Object.keys(steps)) {
+const run = requested.length ? requested : Object.keys(steps);
+for (const name of run) {
   if (!steps[name])
     throw new Error(`unknown step "${name}"; one of ${Object.keys(steps).join(", ")}`);
+}
+if (run[0] !== "deploy" && run[0] !== "destroy") requireStacks();
+for (const name of run) {
   console.log(`\n=== ${name} ===`);
   await steps[name]();
 }

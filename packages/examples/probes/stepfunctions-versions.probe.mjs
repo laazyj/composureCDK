@@ -227,6 +227,26 @@ const steps = {
         continue;
       }
 
+      // Deploying the bad variant over itself shifts no traffic, so tests nothing.
+      const { routingConfiguration } = aws(
+        "stepfunctions",
+        "describe-state-machine-alias",
+        "--state-machine-alias-arn",
+        aliasArn(stack),
+      );
+      const live = routingConfiguration.map((r) =>
+        aws(
+          "stepfunctions",
+          "describe-state-machine",
+          "--state-machine-arn",
+          r.stateMachineVersionArn,
+        ),
+      );
+      if (live.some((version) => JSON.parse(version.definition).States.Broken)) {
+        log(`${type}: SKIPPED — live already routes to the bad variant; run the deploy step first`);
+        continue;
+      }
+
       const before = aliasRouting(stack);
       let traffic = true;
       const generator = (async () => {

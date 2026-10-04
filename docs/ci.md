@@ -22,8 +22,9 @@ Cutting a release
 
     ··········· squash-merge the release PR ···········
 
-  release-tag.yml                push: main, chore(release): vX.Y.Z commits
-    │ pushes tag vX.Y.Z with the PAT
+  release-tag.yml                workflow_run: CI or Deploy Test, chore(release) commits
+    │ once CI passed the commit on main and Deploy Test passed its tree,
+    │ pushes tag vX.Y.Z with the PAT (else re-pushes release/vX.Y.Z to deploy it)
     ▼
   release.yml                    push: tags v*.*.* — GitHub Release, then npm
     │ workflow_run
@@ -38,7 +39,7 @@ Cutting a release
 - **`coverage-comment.yml`** — `workflow_run` listener on CI. Posts the coverage table as a sticky PR comment (see [Coverage reporting](#coverage-reporting)).
 - **`deploy-test.yml`** — calls CI as a pre-deploy sanity check (Workflows and Verify only — see [Trimming CI for deploy-test](#trimming-ci-for-deploy-test)), then deploys all example stacks to the `sandbox` environment via OIDC, runs `scripts/smoke-test.mjs`, and exits. Teardown runs separately in `sandbox-cleanup.yml` so developer feedback lands in ~10 min instead of waiting on CloudFront propagation. Runs on demand via `workflow_dispatch`, and automatically on any push to `release/**` — **that is the release gate**, and it lands as a check on the release PR next to CI. A release branch is the only ref holding exactly what is being released, version bumps and changelog included; `main`'s HEAD is a different tree, and tag time is too late to gate anything.
 - **`release-prepare.yml`** — manual `workflow_dispatch`. Runs `nx release version` (whose `preVersionCommand` runs `nx verify` first, so the job installs zizmor as CI does) + `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`; pushing the branch is also what starts the deploy gate above.
-- **`release-tag.yml`** — runs on every push to `main`. If the head commit subject matches `chore(release): vX.Y.Z` (squash-merge required), it tags the commit. The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
+- **`release-tag.yml`** — `workflow_run` listener on CI and Deploy Test. For a `chore(release): vX.Y.Z` commit on `main` (squash-merge required) it runs the release gate, [`scripts/release-gate.mjs`](../scripts/release-gate.mjs), and tags the commit once CI has passed that exact commit and Deploy Test has passed a commit with the same tree (see [Creating a release](#creating-a-release)). The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Creates the GitHub Release from the matching `CHANGELOG.md` section, then runs `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
 - **`release-notify.yml`** — `workflow_run` listener on Release. Comments on the issues the release addressed (see [Release notifications](#release-notifications)).
 
@@ -49,6 +50,8 @@ The `main` ruleset requires two checks: **CI**, the last job in `ci.yml`, and **
 Because the ruleset names that one check, jobs, Node versions and CDK floors can be added or removed without editing the ruleset. A new job joins the requirement through the `needs:` list of **CI**. `npx nx ci:covers-verify` fails if any job in `ci.yml` is missing from that list, since such a job would run but never block a merge.
 
 `skipped` counts as passing so that a caller can opt out of jobs (`deploy-test.yml` skips the floor shards, for example), and so that a job with nothing to do on an event can skip it, as **Dependency review** does on `push`. A job skipped because something it needs failed still fails **CI**, through that job's own result.
+
+The ruleset does **not** require a branch to be up to date before merging, so a PR that falls behind (a Dependabot PR after another merge, say) still auto-merges. That makes each commit on `main` a tree no PR check ran on, which is safe because CI runs on every commit on `main` and is never cancelled there, and nothing is released until CI has passed the exact commit being tagged (see [Creating a release](#creating-a-release)).
 
 ## Pull request titles
 
@@ -185,11 +188,15 @@ Scopes are optional and do not affect the bump.
 
    Pushing the `release/vX.Y.Z` branch fires `deploy-test.yml`, so the sandbox deploy starts on its own as soon as the PR exists — allow ~45 min for it alongside CI. The two overlap: the PR's own CI run covers the merge ref, and `deploy-test.yml` calls CI again for the branch tip. On a freshly cut release branch those are the same tree, so expect the trimmed run (see [Trimming CI for deploy-test](#trimming-ci-for-deploy-test)) to run twice per release.
 
-3. **Review and merge.** Squash-merge once **both** CI and **Deploy Test** are green on the PR. (The release-tag filter assumes the release commit is HEAD on `main`.) Deploy Test ran against the release branch — the exact tree being released — so nothing downstream re-runs it. Pushing a fix to the branch re-runs both checks.
+3. **Review and merge.** Squash-merge once **both** CI and **Deploy Test** are green on the PR. Pushing a fix to the branch re-runs both checks. The branch does not need to be up to date with `main`; the gate in the next step covers a merge that lands in between.
 
    The merge checklist is the enforcement here, not branch protection: required status checks are configured per _base_ branch, so requiring Deploy Test on `main` would block every PR — the check only ever runs on `release/**`.
 
-4. **Tag and publish — automatic.** `release-tag.yml` tags the merge commit, and the tag invokes `release.yml`, which creates the GitHub Release and publishes to npm. Neither re-runs the deploy: merging the release PR _is_ the release decision.
+4. **Tag and publish — automatic.** Merging the release PR _is_ the release decision. What ships is the squash commit on `main`, so that is what [`scripts/release-gate.mjs`](../scripts/release-gate.mjs) gates before `release-tag.yml` tags it:
+   - **CI must pass that exact commit**, in its own push run on `main`. `ci.yml` never cancels one; see its `concurrency` comment.
+   - **Deploy Test must pass a commit with the same tree.** If nothing merged between cutting the branch and merging it, the squash commit has the release branch's tree, so the PR's deploy counts and nothing re-runs. If something did, the gate force-pushes the merged commit to `release/vX.Y.Z`, which runs Deploy Test on exactly what will ship, and tags when that passes.
+
+   The tag invokes `release.yml`, which creates the GitHub Release and publishes to npm. `release-tag.yml` listens to both CI and Deploy Test, so whichever finishes last triggers the tag. A gate that fails (CI or the re-run deploy red on the merged commit) fails the **Release Tag** run and nothing is tagged. Re-run the failed check, or dispatch **Release Tag** with the commit's SHA to re-evaluate. If the failure is real, fix forward and cut a new release.
 
 #### Bumping the minor version in 0.x (breaking change)
 
@@ -211,7 +218,7 @@ Patch releases within the same minor (`0.6.0` → `0.6.1`) need neither input.
 The automated chain depends on a fine-grained PAT stored as repository secret `RELEASE_PR_TOKEN`. Three reasons, all the same underlying rule — per [GitHub's rules][gha-token-rules], anything authenticated with `GITHUB_TOKEN` does not fire downstream workflow triggers:
 
 - **Tag push triggers `release.yml`.** Without the PAT, `release-tag.yml` would tag the commit but `release.yml` would never publish.
-- **Release-branch push triggers `deploy-test.yml`.** Without the PAT, the release gate would silently never run — the PR would simply have no Deploy Test check.
+- **Release-branch push triggers `deploy-test.yml`.** Without the PAT, the release gate would silently never run — the PR would simply have no Deploy Test check, and a merged commit `release-tag.yml` re-pushes would never deploy.
 - **PR auto-CI.** PRs opened by `GITHUB_TOKEN` do not trigger `pull_request` workflows, so CI would not run on the release PR until someone re-opened it. The PAT-opened PR triggers CI normally.
 
 Create a fine-grained PAT (or GitHub App) scoped to this repo with `contents:write` and `pull_requests:write`, store it as `RELEASE_PR_TOKEN`. Track its expiry — when it lapses, both `release-prepare.yml` and `release-tag.yml` will start failing at the checkout step.
@@ -380,7 +387,7 @@ Because a push to `release/**` now deploys by itself, pair the environment polic
 | Rules   | Restrict creations, restrict updates, restrict deletions |
 | Bypass  | Repository admin                                         |
 
-`release-prepare.yml` pushes with `RELEASE_PR_TOKEN`, which acts as its owner — so that owner must hold the bypass, or the workflow fails at the branch push. The two controls are complementary: the ruleset governs who can make a release branch, the environment policy governs what a release branch can reach.
+`release-prepare.yml` and `release-tag.yml` push with `RELEASE_PR_TOKEN`, which acts as its owner — so that owner must hold the bypass, or the workflows fail at the branch push. The two controls are complementary: the ruleset governs who can make a release branch, the environment policy governs what a release branch can reach.
 
 ### 4. Trigger the workflow
 

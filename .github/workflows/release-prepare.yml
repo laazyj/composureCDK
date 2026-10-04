@@ -141,7 +141,7 @@ jobs:
           - [ ] Changelog reads correctly
           - [ ] Version bumps match expectations
 
-          On merge, the \`release-tag\` workflow pushes tag \`v${VERSION}\`, which triggers \`release.yml\` (GitHub Release → npm publish). Neither re-runs the deploy — merging this PR is the release decision.
+          Merging this PR is the release decision. Once CI passes the merge commit on \`main\`, the \`release-tag\` workflow pushes tag \`v${VERSION}\`, which triggers \`release.yml\` (GitHub Release → npm publish). The deploy is re-run only if \`main\` moved before the merge, so the commit differs from this branch.
           EOF
           )
 

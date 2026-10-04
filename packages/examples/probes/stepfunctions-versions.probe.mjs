@@ -8,6 +8,9 @@
  *   node probes/stepfunctions-versions.probe.mjs            # every step, in order
  *   node probes/stepfunctions-versions.probe.mjs targets    # one or more named steps
  *
+ * PROBE_DEPLOYMENT=all-at-once deploys the alias all at once instead of
+ * through the canary; every deploy in a run uses it.
+ *
  * Steps:
  *   deploy    Deploy both probe stacks with the good variant.
  *   targets   Point 5: start executions through the alias from two EventBridge
@@ -49,8 +52,10 @@ const aws = (...args) =>
 const log = (msg) => console.log(`  ${msg}`);
 
 /** `cdk deploy` the variant; resolves to its exit code rather than throwing. */
+const DEPLOYMENT = process.env.PROBE_DEPLOYMENT ?? "canary";
+
 function deploy(variant, stacks = Object.values(STACKS)) {
-  console.log(`  $ cdk deploy -c variant=${variant}`);
+  console.log(`  $ cdk deploy -c variant=${variant} -c deployment=${DEPLOYMENT}`);
   return new Promise((done) => {
     const child = spawn(
       "npx",
@@ -61,6 +66,8 @@ function deploy(variant, stacks = Object.values(STACKS)) {
         APP,
         "-c",
         `variant=${variant}`,
+        "-c",
+        `deployment=${DEPLOYMENT}`,
         "--require-approval",
         "never",
         ...stacks,

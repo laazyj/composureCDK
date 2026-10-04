@@ -6,8 +6,9 @@
  * reports what AWS actually does. Its findings inform the follow-up phase.
  *
  * Two stacks, one per workflow type, each publishing a version, retaining two,
- * and routing a `live` alias with a one-minute 50% canary. The `variant`
- * context value picks the workflow:
+ * and routing a `live` alias with a five-minute 50% canary, or all at once
+ * when the `deployment` context value is `all-at-once`. The `variant` context
+ * value picks the workflow:
  *
  * - `good` — succeeds.
  * - `bad` — fails, so executions through the alias fail and the canary's
@@ -26,7 +27,11 @@ import { SfnStateMachine } from "aws-cdk-lib/aws-events-targets";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Fail, Pass, Result, StateMachine, StateMachineType } from "aws-cdk-lib/aws-stepfunctions";
 import type { Construct } from "constructs";
-import { createStateMachineBuilder, stateMachineGrants } from "@composurecdk/stepfunctions";
+import {
+  type AliasDeployment,
+  createStateMachineBuilder,
+  stateMachineGrants,
+} from "@composurecdk/stepfunctions";
 import { exampleApp } from "../src/app-context.js";
 import { cleanDeskPolicy } from "../src/clean-desk-policy.js";
 
@@ -43,7 +48,12 @@ function workflow(variant: string) {
       : new Pass(scope, "Done", { result: Result.fromObject({ value: variant }) });
 }
 
-function probeStack(app: App, type: StateMachineType, variant: string) {
+function probeStack(
+  app: App,
+  type: StateMachineType,
+  variant: string,
+  deployment: AliasDeployment,
+) {
   const name = type === StateMachineType.STANDARD ? "Standard" : "Express";
   const stack = new Stack(app, `ComposureCDK-Probe-SfnVersions${name}`);
 
@@ -53,11 +63,7 @@ function probeStack(app: App, type: StateMachineType, variant: string) {
     .timeout(Duration.minutes(5))
     .definition(workflow(variant))
     .publishVersion({ retain: 2 })
-    .addAlias("live", {
-      // One minute is shorter than the metrics take to reach the alarms: a 1-minute
-      // canary completed before its alarms fired. Five matches AWS's own example.
-      deployment: { type: "CANARY", percentage: 50, interval: Duration.minutes(5) },
-    })
+    .addAlias("live", { deployment })
     .build(stack, "Workflow");
 
   return { stack, result };
@@ -66,9 +72,15 @@ function probeStack(app: App, type: StateMachineType, variant: string) {
 const app = exampleApp();
 cleanDeskPolicy(app);
 const variant = (app.node.tryGetContext("variant") as string | undefined) ?? "good";
+// One minute is shorter than the metrics take to reach the alarms: a 1-minute
+// canary completed before its alarms fired. Five matches AWS's own example.
+const deployment: AliasDeployment =
+  app.node.tryGetContext("deployment") === "all-at-once"
+    ? { type: "ALL_AT_ONCE" }
+    : { type: "CANARY", percentage: 50, interval: Duration.minutes(5) };
 
-const { stack, result } = probeStack(app, StateMachineType.STANDARD, variant);
-probeStack(app, StateMachineType.EXPRESS, variant);
+const { stack, result } = probeStack(app, StateMachineType.STANDARD, variant, deployment);
+probeStack(app, StateMachineType.EXPRESS, variant, deployment);
 const aliasArn = result.aliases.live.alias.attrArn;
 
 // Spike A: CDK's own target, given the alias as an IStateMachine. It grants

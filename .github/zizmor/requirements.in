@@ -1,5 +1,4 @@
-# zizmor for CI's Audit workflows step and release-prepare's `nx verify`.
-# Regenerate the lock after editing:
+# zizmor for CI's Audit workflows step. Regenerate the lock after editing:
 #   uv pip compile --universal --generate-hashes requirements.in -o requirements.txt
 # Dependabot does this itself when it bumps the pin.
 zizmor==1.30.1

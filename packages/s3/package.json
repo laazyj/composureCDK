@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/s3",
-  "version": "0.10.3",
+  "version": "0.11.0",
   "description": "Composable S3 bucket builder with well-architected defaults",
   "repository": {
     "type": "git",
@@ -40,10 +40,10 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.10.0",
-    "@composurecdk/cloudwatch": "^0.10.0",
-    "@composurecdk/core": "^0.10.0",
-    "@composurecdk/logs": "^0.10.0",
+    "@composurecdk/cloudformation": "^0.11.0",
+    "@composurecdk/cloudwatch": "^0.11.0",
+    "@composurecdk/core": "^0.11.0",
+    "@composurecdk/logs": "^0.11.0",
     "aws-cdk-lib": "^2.123.0",
     "constructs": "^10.0.0"
   },

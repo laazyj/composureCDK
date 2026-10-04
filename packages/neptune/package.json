@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/neptune",
-  "version": "0.10.3",
+  "version": "0.11.0",
   "description": "Composable Amazon Neptune cluster builder with well-architected defaults",
   "repository": {
     "type": "git",
@@ -41,9 +41,9 @@
   },
   "peerDependencies": {
     "@aws-cdk/aws-neptune-alpha": "*",
-    "@composurecdk/cloudformation": "^0.10.0",
-    "@composurecdk/cloudwatch": "^0.10.0",
-    "@composurecdk/core": "^0.10.0",
+    "@composurecdk/cloudformation": "^0.11.0",
+    "@composurecdk/cloudwatch": "^0.11.0",
+    "@composurecdk/core": "^0.11.0",
     "aws-cdk-lib": "^2.190.0",
     "constructs": "^10.0.0"
   },

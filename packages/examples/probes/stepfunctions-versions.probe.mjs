@@ -15,7 +15,7 @@
  *             the state machine's own ARN. Reports which actually started.
  *   express   Point 6: a synchronous Express execution through the alias.
  *   rollback  Point 3: per stack, with traffic flowing through the alias, deploy
- *             the bad variant behind a 50% canary. Expect the rollback alarm to
+ *             the bad variant behind a 5-minute, 50% canary. Expect the rollback alarm to
  *             fire, CloudFormation to roll back, and the alias to stay on the
  *             good version. Waits out any alarm already in ALARM first, then
  *             reads the alarm history to say whether the canary triggered it.
@@ -252,26 +252,41 @@ const steps = {
         `${type}: deploy exited ${code} (non-zero expected); stack ${Stacks[0].StackStatus}; live was ${before}, is now ${aliasRouting(stack)}`,
       );
       // Every alarm was out of ALARM before the deploy, so a transition into
-      // ALARM since then means the canary's traffic tripped it.
-      const history = alarms.flatMap((name) =>
-        aws(
-          "cloudwatch",
-          "describe-alarm-history",
-          "--alarm-name",
-          name,
-          "--history-item-type",
-          "StateUpdate",
-          "--start-date",
-          started.toISOString(),
-        ).AlarmHistoryItems.map((item) => ({ ...item, name: short(name) })),
-      );
-      const fired = history.filter(
-        (item) => JSON.parse(item.HistoryData).newState.stateValue === "ALARM",
-      );
-      log(
-        `${type}: ${fired.length ? `canary-triggered rollback (${fired.map((i) => i.name).join(", ")} fired)` : "NO rollback alarm fired after the deploy started"}`,
-      );
-      for (const item of history)
+      // ALARM since then came from the canary's traffic.
+      const history = () =>
+        alarms.flatMap((name) =>
+          aws(
+            "cloudwatch",
+            "describe-alarm-history",
+            "--alarm-name",
+            name,
+            "--history-item-type",
+            "StateUpdate",
+            "--start-date",
+            started.toISOString(),
+          ).AlarmHistoryItems.map((item) => ({ ...item, name: short(name) })),
+        );
+      const fired = (items) =>
+        items.filter((item) => JSON.parse(item.HistoryData).newState.stateValue === "ALARM");
+      const finished = new Date();
+      let items = history();
+      if (code === 0 && !fired(items).length) {
+        // The deploy finished first; watch on, to tell an alarm that fired too
+        // late to roll back from one that never fired.
+        log(`${type}: no alarm fired during the deploy; watching for 5 more minutes`);
+        await pollUntil(() => fired((items = history())).length > 0, {
+          timeoutMs: 5 * 60_000,
+          intervalMs: 30_000,
+        });
+      }
+      const [first] = fired(items).sort((a, b) => a.Timestamp.localeCompare(b.Timestamp));
+      const verdict = !first
+        ? "NO rollback alarm fired"
+        : new Date(first.Timestamp) > finished
+          ? `${first.name} fired ${Math.round((new Date(first.Timestamp) - finished) / 1000)}s AFTER the deploy completed — too late to roll back`
+          : `canary-triggered rollback (${first.name} fired during the deploy)`;
+      log(`${type}: deploy ran ${started.toISOString()} → ${finished.toISOString()}; ${verdict}`);
+      for (const item of items)
         log(`${type}:   ${item.Timestamp} ${item.name}: ${item.HistorySummary}`);
     }
   },

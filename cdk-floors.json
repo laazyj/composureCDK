@@ -57,6 +57,10 @@
       "floor": "2.166.0",
       "gatedBy": "aws-bedrock.CfnApplicationInferenceProfile (introduced 2.166.0); also CfnGuardrailVersion (2.143.0), CfnGuardrail (2.140.0), tags on AWS::CloudWatch::Alarm (2.138.0) and FoundationModelIdentifier/ProvisionedModel (2.115.0)"
     },
+    "stepfunctions": {
+      "floor": "2.160.0",
+      "gatedBy": "aws-stepfunctions.StateMachineProps.encryptionConfiguration and CustomerManagedEncryptionConfiguration (introduced 2.160.0), which StateMachineBuilderProps re-declares as Resolvable<NonNullable<StateMachineProps[\"encryptionConfiguration\"]>>. Note stateMachineGrants.redriveExecution names states:RedriveExecution via IStateMachine.grantExecution instead of delegating to grantRedriveExecution, which is newer than this floor (introduced 2.200.0); do not 'simplify' it to the native method without raising the floor. Note also that StateMachineBuilderProps re-declares logs as Partial<NonNullable<StateMachineProps[\"logs\"]>>, and the builder leaves logs unset when logging is OFF: LogOptions.destination is required at this floor, and CDK here dereferences an absent destination and throws on { level: OFF }. Do not 'simplify' either back to the CDK prop without raising the floor."
+    },
     "xray": {
       "floor": "2.183.0",
       "gatedBy": "aws-xray.CfnTransactionSearchConfig (introduced 2.183.0)"

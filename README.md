@@ -153,6 +153,7 @@ See [docs/showcase.md](docs/showcase.md) for case studies of projects built with
 | [`@composurecdk/s3`](https://www.npmjs.com/package/@composurecdk/s3)                             | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/s3?labelColor=b85416&color=0f0d0c)               | S3 bucket components with secure defaults                                |
 | [`@composurecdk/sns`](https://www.npmjs.com/package/@composurecdk/sns)                           | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/sns?labelColor=b85416&color=0f0d0c)              | SNS topic components with well-architected defaults                      |
 | [`@composurecdk/sqs`](https://www.npmjs.com/package/@composurecdk/sqs)                           | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/sqs?labelColor=b85416&color=0f0d0c)              | SQS queue components with well-architected defaults                      |
+| [`@composurecdk/stepfunctions`](https://www.npmjs.com/package/@composurecdk/stepfunctions)       | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/stepfunctions?labelColor=b85416&color=0f0d0c)    | Step Functions state machines with logging, tracing and secure defaults  |
 | [`@composurecdk/xray`](https://www.npmjs.com/package/@composurecdk/xray)                         | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/xray?labelColor=b85416&color=0f0d0c)             | CloudWatch Transaction Search, for X-Ray spans in CloudWatch Logs        |
 
 ## Contributing

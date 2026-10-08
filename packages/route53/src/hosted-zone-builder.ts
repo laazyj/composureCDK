@@ -10,7 +10,7 @@ import { resolveQueryLogging, type QueryLoggingConfig } from "./query-logging.js
  * Configuration properties for the Route53 public hosted zone builder.
  *
  * Hides the CDK `queryLogsLogGroupArn` field in favour of {@link queryLogging}
- * — a discriminated config that supports a `false` opt-out, a user-supplied
+ * — a discriminated config that supports a `true` opt-in, a user-supplied
  * pre-existing log group ARN, or a customizable auto-managed `LogGroup`
  * provisioned alongside the hosted zone.
  */
@@ -19,10 +19,11 @@ export interface HostedZoneBuilderProps extends Omit<
   "queryLogsLogGroupArn"
 > {
   /**
-   * See {@link QueryLoggingConfig}. Defaults to an auto-managed CloudWatch
-   * log group and a single shared resource policy granting Route 53 write
-   * access — the secure path is the easy path. Set to `false` to opt out, or
-   * to `{ logGroupArn }` to bring your own log group.
+   * See {@link QueryLoggingConfig}. Off by default, because Route 53 accepts
+   * query logs only in `us-east-1`. Set to `true` for an auto-managed
+   * CloudWatch log group and a single shared resource policy granting Route 53
+   * write access (the stack must then be in `us-east-1`), or to
+   * `{ logGroupArn }` to bring your own `us-east-1` log group.
    */
   queryLogging?: QueryLoggingConfig;
 }
@@ -54,8 +55,9 @@ export interface HostedZoneBuilderResult {
  *
  * The builder implements {@link Lifecycle}, so it can be used directly as a
  * component in a {@link compose | composed system}. When built, it creates a
- * public hosted zone with the configured properties — including the
- * auto-managed DNS query-log group and shared resource policy — and returns a
+ * public hosted zone with the configured properties — including, when
+ * enabled, the auto-managed DNS query-log group and shared resource policy —
+ * and returns a
  * {@link HostedZoneBuilderResult}.
  *
  * @example

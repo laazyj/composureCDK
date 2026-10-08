@@ -16,6 +16,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  checks: read
 
 concurrency:
   group: release-prepare
@@ -36,6 +37,27 @@ jobs:
           echo "::error::bump-peer-deps requires an explicit specifier (the new version to rewrite ranges to)."
           exit 1
 
+      # Versioning skips nx verify; this step stands in for it (see scripts/release-version.mjs).
+      - name: Require main with green CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Dispatch release-prepare from main, not $REF."
+            exit 1
+          fi
+          # ci.yml's aggregate "CI" check, from GitHub Actions (app 15368); the
+          # endpoint returns only the latest run per check name.
+          conclusion=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=CI&app_id=15368" \
+            --jq '.check_runs[0].conclusion // "missing"')
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI for $SHA is '$conclusion' (missing or still running reads as 'missing'), not success. Wait for CI on main to pass, then re-run."
+            exit 1
+          fi
+
       - name: Checkout
         # fetch-depth: 0 — nx release scans tags and conventional-commits history
         # since the previous release, so it needs the full git history.
@@ -55,15 +77,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      # `nx release version` runs `nx verify`, whose zizmor gate refuses to
-      # skip in CI. Installed as in ci.yml. With no GH_TOKEN on the version
-      # step, zizmor skips its online audits; ci.yml runs those.
-      - name: Install zizmor
-        run: |
-          python3 -m venv "$RUNNER_TEMP/zizmor"
-          "$RUNNER_TEMP/zizmor/bin/pip" install --disable-pip-version-check --require-hashes --no-deps -r .github/zizmor/requirements.txt
-          echo "$RUNNER_TEMP/zizmor/bin" >> "$GITHUB_PATH"
 
       - name: Configure git
         run: |
@@ -87,8 +100,7 @@ jobs:
       - name: Version packages
         env:
           SPECIFIER: ${{ inputs.specifier }}
-        run: |
-          npx nx release version ${SPECIFIER:+"--specifier=$SPECIFIER"}
+        run: npx nx release:version
 
       - name: Resolve new version
         id: version

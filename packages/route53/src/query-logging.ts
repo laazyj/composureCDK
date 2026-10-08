@@ -10,9 +10,14 @@ import {
 } from "./defaults.js";
 
 /**
- * Configures Route 53 public-hosted-zone DNS query logging. Pass `false` to
- * disable, or an object to either customize the auto-created CloudWatch
- * {@link LogGroup} sub-builder or to plug in a pre-existing log group ARN.
+ * Configures Route 53 public-hosted-zone DNS query logging. Off unless
+ * configured. Pass `true` (or `{}`) to enable it with an auto-created
+ * CloudWatch {@link LogGroup}, an object to either customize that log group's
+ * sub-builder or to plug in a pre-existing log group ARN, or `false` to
+ * disable it explicitly.
+ *
+ * Route 53 accepts query logs only in `us-east-1`, so the auto-created log
+ * group requires the hosted zone's stack to be deployed there.
  *
  * `configure` cannot be combined with `logGroupArn` — the latter says
  * "I am bringing my own log group", which leaves nothing to configure.
@@ -27,7 +32,7 @@ import {
  * @see https://docs.aws.amazon.com/Route53/latest/APIReference/API_CreateQueryLoggingConfig.html
  */
 export type QueryLoggingConfig =
-  | false
+  | boolean
   | {
       /**
        * Customize the auto-created LogGroup sub-builder. Receives a builder
@@ -80,12 +85,13 @@ export function resolveQueryLogging(
   scope: IConstruct,
   id: string,
   zoneName: string,
-  cfg: QueryLoggingConfig | undefined,
+  config: QueryLoggingConfig | undefined,
   context?: Record<string, object>,
 ): ResolvedQueryLogging {
-  if (cfg === false) return {};
+  if (config === undefined || config === false) return {};
+  const cfg = config === true ? {} : config;
 
-  if (cfg?.logGroupArn !== undefined) {
+  if (cfg.logGroupArn !== undefined) {
     if (cfg.configure !== undefined) {
       throw new Error(
         `queryLogging: 'configure' cannot be combined with 'logGroupArn' — ` +
@@ -100,7 +106,7 @@ export function resolveQueryLogging(
 
   const defaultLogGroupName = `${QUERY_LOGGING_LOG_GROUP_NAME_PREFIX}/${stripTrailingDot(zoneName)}`;
   let subBuilder: ILogGroupBuilder = createLogGroupBuilder().logGroupName(defaultLogGroupName);
-  if (cfg?.configure) {
+  if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }
 
@@ -185,7 +191,7 @@ function checkEnvAgnosticRegion(scope: IConstruct): void {
   if (envRegion === undefined || envRegion === "") {
     Annotations.of(scope).addWarningV2(
       QUERY_LOGGING_REGION_ANNOTATION,
-      `Route 53 query logging is enabled by default and requires the CloudWatch log ` +
+      `Route 53 query logging is enabled and requires the CloudWatch log ` +
         `group to live in ${QUERY_LOG_REGION}. This stack is env-agnostic and CDK_DEFAULT_REGION ` +
         `is not set, so the deploy region cannot be verified at synth time. Deploying ` +
         `outside ${QUERY_LOG_REGION} will fail with "InvalidInputException - The ARN for the ` +

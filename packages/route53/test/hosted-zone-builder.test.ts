@@ -50,8 +50,28 @@ describe("HostedZoneBuilder", () => {
 });
 
 describe("HostedZoneBuilder query logging", () => {
-  it("auto-creates a log group with secure defaults when queryLogging is left at its default", () => {
-    const { template } = buildAndSynth((b) => b.zoneName("example.com"));
+  it("is off by default, so a zone outside us-east-1 builds with no query logging", () => {
+    const stack = newStack({ env: testEnv("eu-west-2") });
+    const result = createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone");
+    const template = Template.fromStack(stack);
+
+    expect(result.queryLogGroup).toBeUndefined();
+    template.resourceCountIs("AWS::Logs::LogGroup", 0);
+    template.resourceCountIs("AWS::Logs::ResourcePolicy", 0);
+    template.hasResourceProperties("AWS::Route53::HostedZone", {
+      QueryLoggingConfig: Match.absent(),
+    });
+    expect(Annotations.fromStack(stack).findWarning("*", Match.anyValue())).toHaveLength(0);
+  });
+
+  it("queryLogging({}) enables it the same as queryLogging(true)", () => {
+    const { template } = buildAndSynth((b) => b.zoneName("example.com").queryLogging({}));
+    template.resourceCountIs("AWS::Logs::LogGroup", 1);
+    template.resourceCountIs("AWS::Logs::ResourcePolicy", 1);
+  });
+
+  it("auto-creates a log group with secure defaults when queryLogging is enabled", () => {
+    const { template } = buildAndSynth((b) => b.zoneName("example.com").queryLogging(true));
 
     template.resourceCountIs("AWS::Logs::LogGroup", 1);
     template.hasResourceProperties("AWS::Logs::LogGroup", {
@@ -62,7 +82,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("wires the auto-created log group ARN into the hosted zone via Fn::GetAtt", () => {
-    const { template } = buildAndSynth((b) => b.zoneName("example.com"));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com").queryLogging(true));
 
     template.hasResourceProperties("AWS::Route53::HostedZone", {
       QueryLoggingConfig: {
@@ -75,8 +95,8 @@ describe("HostedZoneBuilder query logging", () => {
 
   it("creates exactly one shared resource policy with a wildcard ARN even for multiple zones", () => {
     const stack = newStack({ env: testEnv("us-east-1") });
-    createHostedZoneBuilder().zoneName("example.com").build(stack, "ZoneA");
-    createHostedZoneBuilder().zoneName("example.net").build(stack, "ZoneB");
+    createHostedZoneBuilder().zoneName("example.com").queryLogging(true).build(stack, "ZoneA");
+    createHostedZoneBuilder().zoneName("example.net").queryLogging(true).build(stack, "ZoneB");
     const template = Template.fromStack(stack);
 
     template.resourceCountIs("AWS::Logs::ResourcePolicy", 1);
@@ -118,7 +138,7 @@ describe("HostedZoneBuilder query logging", () => {
     });
     expect(settled instanceof ResourcePolicy).toBe(false);
 
-    createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone");
+    createHostedZoneBuilder().zoneName("example.com").queryLogging(true).build(stack, "TestZone");
 
     Template.fromStack(stack).resourceCountIs("AWS::Logs::ResourcePolicy", 1);
   });
@@ -194,10 +214,10 @@ describe("HostedZoneBuilder query logging", () => {
   it("errors with three remediations when stack region is not us-east-1", () => {
     const stack = newStack({ env: testEnv("us-west-2") });
     expect(() =>
-      createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone"),
+      createHostedZoneBuilder().zoneName("example.com").queryLogging(true).build(stack, "TestZone"),
     ).toThrow(/Route 53 accepts DNS query logs only in us-east-1/);
     expect(() =>
-      createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone"),
+      createHostedZoneBuilder().zoneName("example.com").queryLogging(true).build(stack, "TestZone"),
     ).toThrow(/Deploy the stack containing this hosted zone in us-east-1/);
   });
 
@@ -211,7 +231,7 @@ describe("HostedZoneBuilder query logging", () => {
 
     it("warns rather than errors when CDK_DEFAULT_REGION is unset", () => {
       const stack = newStack();
-      createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone");
+      createHostedZoneBuilder().zoneName("example.com").queryLogging(true).build(stack, "TestZone");
       const warnings = Annotations.fromStack(stack).findWarning(
         "*",
         Match.stringLikeRegexp("env-agnostic and CDK_DEFAULT_REGION"),
@@ -223,7 +243,10 @@ describe("HostedZoneBuilder query logging", () => {
       vi.stubEnv("CDK_DEFAULT_REGION", "us-east-1");
       const stack = newStack();
       expect(() =>
-        createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone"),
+        createHostedZoneBuilder()
+          .zoneName("example.com")
+          .queryLogging(true)
+          .build(stack, "TestZone"),
       ).not.toThrow();
     });
 
@@ -231,7 +254,10 @@ describe("HostedZoneBuilder query logging", () => {
       vi.stubEnv("CDK_DEFAULT_REGION", "eu-west-2");
       const stack = newStack();
       expect(() =>
-        createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone"),
+        createHostedZoneBuilder()
+          .zoneName("example.com")
+          .queryLogging(true)
+          .build(stack, "TestZone"),
       ).toThrow(/Route 53 accepts DNS query logs only in us-east-1.*"eu-west-2"/s);
     });
   });
@@ -257,7 +283,10 @@ describe("HostedZoneBuilder query logging", () => {
 
   it("exposes the auto-created log group on the build result and undefined when disabled or BYO", () => {
     const stack = newStack({ env: testEnv("us-east-1") });
-    const auto = createHostedZoneBuilder().zoneName("a.example.com").build(stack, "Auto");
+    const auto = createHostedZoneBuilder()
+      .zoneName("a.example.com")
+      .queryLogging(true)
+      .build(stack, "Auto");
     expect(auto.queryLogGroup).toBeDefined();
 
     const disabled = createHostedZoneBuilder()
@@ -274,7 +303,7 @@ describe("HostedZoneBuilder query logging", () => {
   });
 
   it("strips the trailing dot from a fully-qualified zoneName when forming the log-group name", () => {
-    const { template } = buildAndSynth((b) => b.zoneName("example.com."));
+    const { template } = buildAndSynth((b) => b.zoneName("example.com.").queryLogging(true));
     template.hasResourceProperties("AWS::Logs::LogGroup", {
       LogGroupName: `${QUERY_LOGGING_LOG_GROUP_NAME_PREFIX}/example.com`,
     });
@@ -282,7 +311,7 @@ describe("HostedZoneBuilder query logging", () => {
 
   it("hosted zone is wired to depend on the shared resource policy", () => {
     const stack = newStack({ env: testEnv("us-east-1") });
-    createHostedZoneBuilder().zoneName("example.com").build(stack, "TestZone");
+    createHostedZoneBuilder().zoneName("example.com").queryLogging(true).build(stack, "TestZone");
     const template = Template.fromStack(stack);
     const hostedZones = template.findResources("AWS::Route53::HostedZone");
     const zone = Object.values(hostedZones)[0] as { DependsOn?: string[] };

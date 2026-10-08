@@ -71,6 +71,7 @@
     },
     "release:dryrun": { "command": "node scripts/release-dryrun.mjs", "cache": false },
     "release:gate": { "command": "node scripts/release-gate.mjs", "cache": false },
+    "release:version": { "command": "node scripts/release-version.mjs", "cache": false },
     "release:issue-comments": {
       "command": "node scripts/release-issue-comments.mjs",
       "cache": false

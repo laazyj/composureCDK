@@ -48,17 +48,14 @@ jobs:
       contents: read # read commits and tags
       pull-requests: read # find the release PR's head
     steps:
+      # The default branch, for the gate script; never the commit being
+      # released. Nothing here fetches or checks out that commit: the writes
+      # below name it to the REST API, so no code from it is ever on disk.
       - name: Checkout
-        # Authenticate with RELEASE_PR_TOKEN (a PAT) so the pushes below trigger
-        # workflows: the tag push runs release.yml, a release-branch push runs
-        # deploy-test.yml. Pushes authenticated with GITHUB_TOKEN trigger none.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Deliberate: the pushes below authenticate with the credentials
-          # checkout leaves in .git/config.
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 1
-          token: ${{ secrets.RELEASE_PR_TOKEN }}
 
       # No `npm ci` or setup-node: the script has no dependencies and drives the
       # preinstalled gh CLI, so it is called directly rather than through nx.
@@ -69,14 +66,10 @@ jobs:
           SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
         run: node scripts/release-gate.mjs --sha="$SHA"
 
-      - name: Fetch the release commit
-        if: steps.gate.outputs.decision == 'tag' || steps.gate.outputs.decision == 'deploy'
-        env:
-          SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
-        run: |
-          git fetch --depth=1 origin "$SHA"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      # The two writes authenticate with RELEASE_PR_TOKEN (a PAT), held only in
+      # their own env, so the refs they create trigger workflows: the tag runs
+      # release.yml, a release branch runs deploy-test.yml. Refs written with
+      # GITHUB_TOKEN trigger none. The gate has already confirmed SHA is on main.
 
       # Deploy Test runs on pushes to release/**, so pointing the branch at the
       # merged commit deploys exactly what will ship. Forced: the branch, if it
@@ -84,18 +77,35 @@ jobs:
       - name: Deploy the merged commit
         if: steps.gate.outputs.decision == 'deploy'
         env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN }}
+          REPO: ${{ github.repository }}
           SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
           VERSION: ${{ steps.gate.outputs.version }}
-        run: git push --force origin "$SHA:refs/heads/release/v${VERSION}"
+        run: |
+          ref="heads/release/v${VERSION}"
+          if gh api "repos/$REPO/git/ref/$ref" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$REPO/git/refs/$ref" -f sha="$SHA" -F force=true >/dev/null
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/$ref" -f sha="$SHA" >/dev/null
+          fi
+          echo "Pointed release/v${VERSION} at $SHA; Deploy Test runs on it."
 
       - name: Create and push tag
         if: steps.gate.outputs.decision == 'tag'
         env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN }}
+          REPO: ${{ github.repository }}
           SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
           VERSION: ${{ steps.gate.outputs.version }}
         run: |
           tag="v${VERSION}"
-          git tag -a "$tag" "$SHA" -m "Release $tag"
-          git push origin "$tag"
-          # The push triggers release.yml, which creates the GitHub Release and
-          # publishes to npm.
+          # An annotated tag, as `git tag -a` made: the tag object, then its ref.
+          object=$(gh api -X POST "repos/$REPO/git/tags" \
+            -f tag="$tag" -f message="Release $tag" -f object="$SHA" -f type=commit \
+            -f "tagger[name]=github-actions[bot]" \
+            -f "tagger[email]=41898282+github-actions[bot]@users.noreply.github.com" \
+            --jq .sha)
+          gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$object" >/dev/null
+          echo "Tagged $SHA as $tag."
+          # The new tag triggers release.yml, which creates the GitHub Release
+          # and publishes to npm.

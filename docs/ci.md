@@ -457,4 +457,5 @@ npx nx cdk examples -- destroy --all
 - **Action pinning** — all GitHub Actions are pinned by commit SHA, kept current by Dependabot with a seven-day cooldown.
 - **Workflow audit** — zizmor checks every workflow and the Dependabot config on each PR (see [Auditing the workflows](#auditing-the-workflows)).
 - **Dependency review** — a PR cannot add a dependency version with a known vulnerability (see [Dependency review](#dependency-review)).
+- **No release code on disk with the PAT** — `release-tag.yml` runs on `workflow_run`, so the commit it is handed is chosen by whatever triggered the run. It never fetches or checks out that commit. It checks out the default branch with `persist-credentials: false`, the gate confirms the commit is on `main`, and the tag and release-branch refs are written through the REST API. `RELEASE_PR_TOKEN` is held only in those two steps' env.
 - **Concurrency** — deploy-test uses `cancel-in-progress: false` so an in-flight deployment cannot be interrupted into an inconsistent state.

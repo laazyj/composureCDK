@@ -1,11 +1,30 @@
 name: Release Tag
 
+# Tags a `chore(release): vX.Y.Z` commit on main once it has passed the release
+# gate: CI on that exact commit, and Deploy Test on the same tree. The gate
+# lives in scripts/release-gate.mjs; see docs/ci.md#creating-a-release.
+#
+# Listens to both workflows because either can be the last to finish. Usually
+# CI on main finishes last and the release PR's deploy covers the tree. If main
+# moved before the merge, the gate pushes the merged commit to release/vX.Y.Z,
+# and that Deploy Test's completion brings this back to tag it.
+
 on:
-  push:
-    branches: [main]
+  # zizmor flags every workflow_run. This one checks out only the default
+  # branch, and the gate confirms the commit is on main before anything acts.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI, Deploy Test]
+    types: [completed]
+  # Re-evaluates the gate for one commit, e.g. after re-running a failed check.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Full SHA of the chore(release) commit on main."
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-tag
@@ -14,57 +33,79 @@ concurrency:
 jobs:
   tag:
     name: Create and push release tag
-    # Cheap prefix filter so non-release pushes never spin up a runner; the
-    # strict regex parse below is the authoritative validation. Assumes
-    # squash-merge of the release PR.
-    if: "${{ startsWith(github.event.head_commit.message, 'chore(release): v') }}"
+    # Cheap prefix filter so non-release runs never spin up a runner; the gate
+    # is the authoritative check. A pull_request CI run tests the merge ref, not
+    # a commit on main, so it can never satisfy the gate.
+    if: >-
+      github.event_name == 'workflow_dispatch' || (
+        github.event.workflow_run.event != 'pull_request' &&
+        startsWith(github.event.workflow_run.head_commit.message, 'chore(release): v')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: read # list CI and Deploy Test runs
+      contents: read # read commits and tags
+      pull-requests: read # find the release PR's head
     steps:
-      - name: Parse version from commit subject
-        id: parse
-        env:
-          SUBJECT: ${{ github.event.head_commit.message }}
-        run: |
-          subject=$(printf '%s' "$SUBJECT" | head -n1)
-          # SemVer: MAJOR.MINOR.PATCH with optional -prerelease and +build identifiers.
-          # GitHub squash-merge appends ` (#NN)` to the commit subject — allow it.
-          if [[ "$subject" =~ ^chore\(release\):\ v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)(\ \(#[0-9]+\))?[[:space:]]*$ ]]; then
-            version="${BASH_REMATCH[1]}"
-            echo "version=${version}" >> "$GITHUB_OUTPUT"
-            echo "Detected release commit for v${version}"
-          else
-            echo "::error::Commit subject matched startsWith filter but failed strict regex: $subject"
-            exit 1
-          fi
-
+      # The default branch, for the gate script; never the commit being
+      # released. Nothing here fetches or checks out that commit: the writes
+      # below name it to the REST API, so no code from it is ever on disk.
       - name: Checkout
-        # Authenticate with RELEASE_PR_TOKEN (a PAT) so the tag push below triggers
-        # release.yml's `push: tags` workflow. Pushes authenticated with the default
-        # GITHUB_TOKEN do not trigger downstream workflows.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Deliberate: the tag push below authenticates with the credentials
-          # checkout leaves in .git/config.
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 1
-          token: ${{ secrets.RELEASE_PR_TOKEN }}
 
-      - name: Configure git
+      # No `npm ci` or setup-node: the script has no dependencies and drives the
+      # preinstalled gh CLI, so it is called directly rather than through nx.
+      - name: Check the release gate
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
+        run: node scripts/release-gate.mjs --sha="$SHA"
+
+      # The two writes authenticate with RELEASE_PR_TOKEN (a PAT), held only in
+      # their own env, so the refs they create trigger workflows: the tag runs
+      # release.yml, a release branch runs deploy-test.yml. Refs written with
+      # GITHUB_TOKEN trigger none. The gate has already confirmed SHA is on main.
+
+      # Deploy Test runs on pushes to release/**, so pointing the branch at the
+      # merged commit deploys exactly what will ship. Forced: the branch, if it
+      # still exists, holds the pre-merge head.
+      - name: Deploy the merged commit
+        if: steps.gate.outputs.decision == 'deploy'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
+          VERSION: ${{ steps.gate.outputs.version }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          ref="heads/release/v${VERSION}"
+          if gh api "repos/$REPO/git/ref/$ref" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$REPO/git/refs/$ref" -f sha="$SHA" -F force=true >/dev/null
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/$ref" -f sha="$SHA" >/dev/null
+          fi
+          echo "Pointed release/v${VERSION} at $SHA; Deploy Test runs on it."
 
       - name: Create and push tag
+        if: steps.gate.outputs.decision == 'tag'
         env:
-          VERSION: ${{ steps.parse.outputs.version }}
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
+          VERSION: ${{ steps.gate.outputs.version }}
         run: |
           tag="v${VERSION}"
-          if git ls-remote --exit-code --tags origin "$tag" >/dev/null 2>&1; then
-            echo "Tag $tag already exists on origin; nothing to do."
-            exit 0
-          fi
-          git tag -a "$tag" -m "Release $tag"
-          git push origin "$tag"
-          # The push triggers release.yml, which creates the GitHub Release and
-          # publishes to npm.
+          # An annotated tag, as `git tag -a` made: the tag object, then its ref.
+          object=$(gh api -X POST "repos/$REPO/git/tags" \
+            -f tag="$tag" -f message="Release $tag" -f object="$SHA" -f type=commit \
+            -f "tagger[name]=github-actions[bot]" \
+            -f "tagger[email]=41898282+github-actions[bot]@users.noreply.github.com" \
+            --jq .sha)
+          gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$object" >/dev/null
+          echo "Tagged $SHA as $tag."
+          # The new tag triggers release.yml, which creates the GitHub Release
+          # and publishes to npm.

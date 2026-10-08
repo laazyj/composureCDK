@@ -1,5 +1,9 @@
 name: CI
 
+# scripts/release-gate.mjs finds this workflow's runs by file name, for both
+# release-prepare.yml and release-tag.yml: renaming the file blocks releases.
+# The workflow_run listeners find it by `name`.
+
 on:
   push:
     branches: [main]
@@ -25,7 +29,13 @@ permissions:
 concurrency:
   # The event is part of the group so a scheduled run on `main` cannot cancel a
   # push run there, which would leave that commit's CI check red.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  #
+  # A PR's group is its ref, so a new push supersedes the old run. Every other
+  # event's group is its commit, so each commit on `main` gets a complete run:
+  # release-tag.yml tags a release commit only once CI has passed it. Turning
+  # off cancel-in-progress would not do that, since a group holds one pending
+  # run and a third push still cancels the second.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -350,7 +360,6 @@ jobs:
   # always() rather than !cancelled(): a cancelled run must fail this check,
   # because a required check that is skipped counts as passing.
   result:
-    # release-prepare.yml finds this check by name; renaming it blocks releases.
     name: CI
     if: always()
     needs:

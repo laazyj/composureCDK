@@ -16,7 +16,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  checks: read
+  actions: read # release-gate.mjs lists CI's runs
 
 concurrency:
   group: release-prepare
@@ -37,24 +37,14 @@ jobs:
           echo "::error::bump-peer-deps requires an explicit specifier (the new version to rewrite ranges to)."
           exit 1
 
-      # Versioning skips nx verify; this step stands in for it (see scripts/release-version.mjs).
-      - name: Require main with green CI
+      # Fails in seconds, before checkout. The CI half of the gate follows
+      # checkout, since it runs the shared script.
+      - name: Require main
         env:
-          GH_TOKEN: ${{ github.token }}
           REF: ${{ github.ref }}
-          SHA: ${{ github.sha }}
-          REPO: ${{ github.repository }}
         run: |
           if [ "$REF" != "refs/heads/main" ]; then
             echo "::error::Dispatch release-prepare from main, not $REF."
-            exit 1
-          fi
-          # ci.yml's aggregate "CI" check, from GitHub Actions (app 15368); the
-          # endpoint returns only the latest run per check name.
-          conclusion=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=CI&app_id=15368" \
-            --jq '.check_runs[0].conclusion // "missing"')
-          if [ "$conclusion" != "success" ]; then
-            echo "::error::CI for $SHA is '$conclusion' (missing or still running reads as 'missing'), not success. Wait for CI on main to pass, then re-run."
             exit 1
           fi
 
@@ -68,6 +58,15 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
+
+      # Versioning skips nx verify (see scripts/release-version.mjs); CI having
+      # passed this commit stands in for it. The same check release-tag.yml
+      # applies to the commit it tags.
+      - name: Require green CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: node scripts/release-gate.mjs --sha="$SHA" --ci-only
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

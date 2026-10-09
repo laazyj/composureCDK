@@ -1,7 +1,9 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IGrantable, IRole } from "aws-cdk-lib/aws-iam";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
+import { type CustomResource, RemovalPolicy } from "aws-cdk-lib";
 import {
+  CfnStateMachineVersion,
   DefinitionBody,
   type IChainable,
   LogLevel,
@@ -25,7 +27,18 @@ import { createLogGroupBuilder } from "@composurecdk/logs";
 import type { StateMachineAlarmConfig } from "./state-machine-alarm-config.js";
 import { createSpecAlarms } from "./alarm-specs.js";
 import { STATE_MACHINE_ALARMS } from "./state-machine-alarms.js";
-import { STATE_MACHINE_DEFAULTS, STATE_MACHINE_LOG_DEFAULTS } from "./defaults.js";
+import {
+  DEFAULT_RETAINED_VERSIONS,
+  STATE_MACHINE_DEFAULTS,
+  STATE_MACHINE_LOG_DEFAULTS,
+} from "./defaults.js";
+import {
+  type AddAliasOptions,
+  createStateMachineAlias,
+  type StateMachineAliasResult,
+  validateAlias,
+} from "./state-machine-alias.js";
+import { pruneStateMachineVersions } from "./version-pruner.js";
 import {
   LOG_GROUP_NAME_MAX_LENGTH,
   lazyUniqueName,
@@ -53,6 +66,19 @@ function isChainBody(body: DefinitionBody): boolean {
  * or `combine` to reach the siblings its tasks call.
  */
 export type StateMachineDefinition = (scope: Construct) => IChainable;
+
+/** Options for {@link IStateMachineBuilder.publishVersion}. */
+export interface PublishVersionOptions {
+  /** @default - no description */
+  readonly description?: string;
+  /**
+   * Published versions to keep, newest first. Versions an alias still routes
+   * to are kept as well, and older ones are deleted after each deployment that
+   * publishes a new version. Whole number, 1–1000.
+   * @default DEFAULT_RETAINED_VERSIONS
+   */
+  readonly retain?: number;
+}
 
 /**
  * Configuration properties for the Step Functions state machine builder.
@@ -162,6 +188,24 @@ export interface StateMachineBuilderResult {
    * the recommended alarms and any added via {@link IStateMachineBuilder.addAlarm}.
    */
   alarms: Record<string, Alarm>;
+
+  /**
+   * The version published for this deployment's revision, or `undefined`
+   * unless {@link IStateMachineBuilder.publishVersion} was called.
+   */
+  version?: CfnStateMachineVersion;
+
+  /**
+   * The custom resource that deletes versions beyond the retention limit.
+   * Present with {@link version}.
+   */
+  versionPruner?: CustomResource;
+
+  /** The log group the version pruner's Lambdas write to. Present with {@link version}. */
+  versionPrunerLogGroup?: LogGroup;
+
+  /** Aliases added with {@link IStateMachineBuilder.addAlias}, keyed by name. */
+  aliases: Record<string, StateMachineAliasResult>;
 }
 
 /**
@@ -186,6 +230,8 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
   readonly #customAlarms: AlarmDefinitionBuilder<StateMachine>[] = [];
   readonly #grants = new GrantQueue<IGrantable>();
   #definition?: Resolvable<StateMachineDefinition>;
+  #publishVersion?: PublishVersionOptions;
+  readonly #aliases = new Map<string, AddAliasOptions>();
 
   /**
    * Set the workflow, written in CDK — see {@link StateMachineDefinition}.
@@ -197,6 +243,40 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
    */
   definition(definition: Resolvable<StateMachineDefinition>): this {
     this.#definition = definition;
+    return this;
+  }
+
+  /**
+   * Publish a version of the state machine whenever a deployment changes its
+   * definition or configuration — the immutable snapshot an
+   * {@link addAlias | alias} routes to — retaining as many as
+   * {@link PublishVersionOptions.retain}.
+   *
+   * @see https://docs.aws.amazon.com/step-functions/latest/dg/concepts-state-machine-version.html
+   */
+  publishVersion(options: PublishVersionOptions = {}): this {
+    this.#publishVersion = options;
+    return this;
+  }
+
+  /**
+   * Add an alias that follows the published version. Each deployment that
+   * publishes a version moves the alias to it with
+   * {@link AddAliasOptions.deployment}, and rolls it back if any of its
+   * {@link AddAliasOptions.rollbackAlarms} enters `ALARM`. Requires
+   * {@link publishVersion}.
+   *
+   * Start executions against `aliases[name].alias.attrArn`, granted on the
+   * state machine itself — see the package README.
+   *
+   * @see https://docs.aws.amazon.com/step-functions/latest/dg/concepts-state-machine-alias.html
+   * @throws If an alias of the same name was already added.
+   */
+  addAlias(name: string, options: AddAliasOptions = {}): this {
+    if (this.#aliases.has(name)) {
+      throw new Error(`StateMachineBuilder.addAlias: "${name}" is already an alias.`);
+    }
+    this.#aliases.set(name, options);
     return this;
   }
 
@@ -228,6 +308,8 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
     this.#grants.copyInto(target.#grants);
     target.#definition = this.#definition;
+    target.#publishVersion = this.#publishVersion;
+    for (const [name, options] of this.#aliases) target.#aliases.set(name, options);
   }
 
   build(
@@ -261,6 +343,8 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
           `to allow the maximum deliberately, set Duration.days(365).`,
       );
     }
+
+    this.#validateVersioning(id);
 
     // The log group name and a generated state machine name are both derived
     // from the state machine, which does not exist until the end of build().
@@ -321,7 +405,84 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
       this.#customAlarms,
     );
 
-    return { stateMachine, role: stateMachine.role, logGroup, alarms };
+    return {
+      stateMachine,
+      role: stateMachine.role,
+      logGroup,
+      alarms,
+      ...this.#buildVersioning(scope, id, stateMachine, context),
+    };
+  }
+
+  #validateVersioning(id: string): void {
+    if (this.#aliases.size > 0 && this.#publishVersion === undefined) {
+      throw new Error(
+        `StateMachineBuilder "${id}": an alias routes to published versions; call .publishVersion() too.`,
+      );
+    }
+    const retain = this.#publishVersion?.retain;
+    if (retain !== undefined && (!Number.isInteger(retain) || retain < 1 || retain > 1000)) {
+      throw new Error(
+        `StateMachineBuilder "${id}": publishVersion retain must be a whole number 1–1000, got ${String(retain)}.`,
+      );
+    }
+    for (const [name, options] of this.#aliases) validateAlias(id, name, options);
+  }
+
+  #buildVersioning(
+    scope: IConstruct,
+    id: string,
+    stateMachine: StateMachine,
+    context: Record<string, object>,
+  ): Pick<
+    StateMachineBuilderResult,
+    "version" | "versionPruner" | "versionPrunerLogGroup" | "aliases"
+  > {
+    if (this.#publishVersion === undefined) return { aliases: {} };
+
+    // A new revision ID replaces this resource, which publishes a new version.
+    const version = new CfnStateMachineVersion(scope, `${id}Version`, {
+      stateMachineArn: stateMachine.stateMachineArn,
+      stateMachineRevisionId: stateMachine.stateMachineRevisionId,
+      description: this.#publishVersion.description,
+    });
+    // Keep the replaced version: an alias rolling back needs it, and the pruner
+    // deletes it once it falls outside the retention limit. Retained on stack
+    // deletion too, as SAM's AutoPublishAlias does and as CloudFormation's
+    // validation (W3011) expects: deleting the state machine deletes it anyway.
+    version.applyRemovalPolicy(RemovalPolicy.RETAIN);
+
+    const aliases: Record<string, StateMachineAliasResult> = {};
+    for (const [name, options] of this.#aliases) {
+      aliases[name] = createStateMachineAlias(
+        scope,
+        `${id}Alias${name}`,
+        stateMachine,
+        version.attrArn,
+        name,
+        options,
+      );
+    }
+
+    const versionPrunerLogGroup = createLogGroupBuilder().build(
+      scope,
+      `${id}VersionPrunerLogs`,
+      context,
+    ).logGroup;
+    const versionPruner = pruneStateMachineVersions(
+      scope,
+      `${id}VersionPruner`,
+      stateMachine,
+      version.attrArn,
+      this.#publishVersion.retain ?? DEFAULT_RETAINED_VERSIONS,
+      versionPrunerLogGroup,
+    );
+    // Prune only once every alias has moved: a rolling deployment still routes
+    // to the previous version until it completes. (The version is already a
+    // dependency, through the pruner's VersionArn property.)
+    versionPruner.node.addDependency(...Object.values(aliases).map((a) => a.alias));
+
+    return { version, versionPruner, versionPrunerLogGroup, aliases };
   }
 
   /**

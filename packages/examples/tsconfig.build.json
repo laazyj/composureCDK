@@ -8,6 +8,6 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": ["bin", "src"],
+  "include": ["bin", "src", "probes"],
   "exclude": ["node_modules", "dist"]
 }

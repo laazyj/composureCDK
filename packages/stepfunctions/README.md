@@ -237,6 +237,35 @@ The builder is tagged, which Security Hub [StepFunctions.2](https://docs.aws.ama
 
 `ActivitiesTimedOut` is the metric the Serverless Lens names; the other two complete the ways a worker's task ends badly. As with the state machine alarms, the thresholds are this library's choice. They are tuned, disabled and extended exactly as above, and exported as `ACTIVITY_ALARM_DEFAULTS`.
 
+## Versions and Aliases
+
+A **version** is an immutable, numbered snapshot of the state machine; an **alias** routes executions to a version. With both, each deployment that changes the workflow publishes a new version and moves the alias to it — gradually if you choose — rolling back on its own alarms.
+
+```ts
+createStateMachineBuilder()
+  .timeout(Duration.minutes(5))
+  .definition(/* ... */)
+  .publishVersion({ retain: 5 })
+  .addAlias("live", {
+    deployment: { type: "CANARY", percentage: 10, interval: Duration.minutes(5) },
+  });
+```
+
+- **`.publishVersion()`** publishes a version whenever a deployment changes the state machine's revision, and nothing otherwise. A replaced version is kept, so an alias can roll back to it, and a small custom resource then deletes all but the newest `retain` (default `DEFAULT_RETAINED_VERSIONS`, 5) — plus any version an alias still routes to. Step Functions allows 1,000 versions per state machine and deletes none itself, and CloudFormation can only keep the latest or keep them all, so retaining N takes the custom resource. It adds about eight resources per versioned state machine (a handler Lambda and CDK's provider-framework Lambda, their roles and policies, a log group and the custom resource), exposed as the result's `versionPruner` and `versionPrunerLogGroup` beside `version`. A rolled-back deployment keeps the version it published, unrouted, and it counts toward `retain` until newer versions push it out.
+- **`.addAlias(name, options)`** requires `.publishVersion()`. `deployment` is `ALL_AT_ONCE` (the default), `CANARY` (shift `percentage`, wait `interval`, shift the rest) or `LINEAR` (shift `percentage` every `interval`). CloudFormation [rolls the alias back](https://docs.aws.amazon.com/step-functions/latest/dg/version-rolling-deployment.html) if any rollback alarm enters `ALARM` during the shift. The alarms trail failing executions by one to two minutes, so only a shift that waits can roll back: in sandbox probes a 5-minute canary rolled back, while a 1-minute canary and `ALL_AT_ONCE` completed before their alarms fired.
+- **Rollback alarms** — `executionsFailed` and `executionsTimedOut`, scoped to executions started through the alias (`{StateMachineArn, Alias}`), first occurrence in a minute. Tune them with `rollbackAlarms`, or set it to `false`. They are returned on `result.aliases[name].alarms`, alongside the `alias`. During a canary they see both versions' executions, so a fault in the old version can roll back the new one. A deployment started while one is still in `ALARM` — for a minute or two after a failed rollout — aborts before shifting any traffic, so let them clear before redeploying. CloudFormation reports both cases the same way — "Aborting deployment. The following CloudWatch alarms are in an 'ALARM' state" — so that message alone does not say whether the new version was at fault.
+
+### Starting executions through an alias
+
+Start executions against `result.aliases[name].alias.attrArn`, but **grant on the state machine itself**: Step Functions [authorizes a qualified ARN against the unqualified state machine's](https://docs.aws.amazon.com/step-functions/latest/dg/auth-version-alias.html).
+
+```ts
+const { stateMachine, aliases } = result;
+createFunctionBuilder().grant(stateMachineGrants.startExecution(stateMachine)); // then call StartExecution on aliases.live.alias.attrArn
+```
+
+The builder does not hand back the alias as an `IStateMachine`: given one through `StateMachine.fromStateMachineArn(aliasArn)`, CDK's EventBridge `SfnStateMachine` target and API Gateway's `StepFunctionsIntegration` grant on the alias ARN instead, and the latter also loses its Express-only check. For EventBridge, target the alias ARN with a role granted on the state machine — an L1 `CfnRule` target with your own role does this.
+
 ## Starting executions from other services
 
 The CDK integrations accept the built state machine through a `ref`, with no change to this package:

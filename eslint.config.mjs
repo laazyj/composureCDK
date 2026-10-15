@@ -45,7 +45,6 @@ export default defineConfig(
             "tools/*.mjs",
             "scripts/cdk-floor/*.mjs",
             "packages/examples/test/smoke/*.mjs",
-            "packages/examples/probes/*.mjs",
             "packages/module-compat/check.mjs",
             "vitest.config.base.ts",
             "packages/*/vitest.config.ts",
@@ -64,7 +63,6 @@ export default defineConfig(
       "scripts/cdk-floor/*.mjs",
       "tools/*.mjs",
       "packages/examples/test/smoke/*.mjs",
-      "packages/examples/probes/*.mjs",
       "packages/module-compat/check.mjs",
       "packages/module-compat/checks.mjs",
     ],
@@ -121,7 +119,7 @@ export default defineConfig(
     // The examples are CDK applications: they publish nothing, emit no `.d.ts`
     // anyone compiles against, and ship one module format. So they take the one
     // tier that describes them — which is also what a consumer's own app takes.
-    files: ["packages/examples/src/**/*.ts", "packages/examples/probes/**/*.ts"],
+    files: ["packages/examples/src/**/*.ts"],
     extends: [composurecdk.configs.recommended],
     rules: {
       // Nothing installs an application as a dependency, so it genuinely loads

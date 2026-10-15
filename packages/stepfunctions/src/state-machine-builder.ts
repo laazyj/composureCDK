@@ -201,7 +201,11 @@ export interface StateMachineBuilderResult {
    */
   versionPruner?: CustomResource;
 
-  /** The log group the version pruner's Lambdas write to. Present with {@link version}. */
+  /**
+   * The log group the stack's version pruner writes to. The pruner is shared
+   * by every versioned state machine in the stack, and so is this log group.
+   * Present with {@link version}.
+   */
   versionPrunerLogGroup?: LogGroup;
 
   /** Aliases added with {@link IStateMachineBuilder.addAlias}, keyed by name. */
@@ -464,18 +468,13 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
       );
     }
 
-    const versionPrunerLogGroup = createLogGroupBuilder().build(
-      scope,
-      `${id}VersionPrunerLogs`,
-      context,
-    ).logGroup;
-    const versionPruner = pruneStateMachineVersions(
+    const { versionPruner, versionPrunerLogGroup } = pruneStateMachineVersions(
       scope,
       `${id}VersionPruner`,
       stateMachine,
       version.attrArn,
       this.#publishVersion.retain ?? DEFAULT_RETAINED_VERSIONS,
-      versionPrunerLogGroup,
+      context,
     );
     // Prune only once every alias has moved: a rolling deployment still routes
     // to the previous version until it completes. (The version is already a

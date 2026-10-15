@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Duration } from "aws-cdk-lib";
-import { Annotations, Match, type Template } from "aws-cdk-lib/assertions";
+import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Pass, StateMachineType } from "aws-cdk-lib/aws-stepfunctions";
 import type { Construct } from "constructs";
 import { buildFixture, newStack } from "@composurecdk/cdk-testing";
@@ -13,6 +13,7 @@ import {
   INEFFECTIVE_ROLLBACK_ALARMS_WARNING_ID,
   linearDeployment,
 } from "../src/state-machine-alias.js";
+import { VERSION_PRUNER_TAG_KEY } from "../src/version-pruner.js";
 
 const passThrough = (scope: Construct) => new Pass(scope, "PassThrough");
 
@@ -85,7 +86,7 @@ describe("versions", () => {
     );
   });
 
-  it("scopes the pruner's permissions to the state machine and its versions", () => {
+  it("lets the pruner act only on state machines tagged with its own stack's ID", () => {
     const { template } = versioned();
 
     template.hasResourceProperties("AWS::IAM::Policy", {
@@ -93,14 +94,39 @@ describe("versions", () => {
         Statement: Match.arrayWith([
           Match.objectLike({
             Action: Match.arrayWith(["states:DeleteStateMachineVersion"]),
-            Resource: [
-              { Ref: Match.stringLikeRegexp("^Workflow") },
-              { "Fn::Join": ["", [{ Ref: Match.stringLikeRegexp("^Workflow") }, ":*"]] },
-            ],
+            Resource: {
+              "Fn::Join": ["", Match.arrayWith([Match.stringLikeRegexp(":stateMachine:\\*$")])],
+            },
+            Condition: {
+              StringEquals: {
+                [`aws:ResourceTag/${VERSION_PRUNER_TAG_KEY}`]: { Ref: "AWS::StackId" },
+              },
+            },
           }),
         ]),
       },
     });
+    template.hasResourceProperties("AWS::StepFunctions::StateMachine", {
+      Tags: Match.arrayWith([{ Key: VERSION_PRUNER_TAG_KEY, Value: { Ref: "AWS::StackId" } }]),
+    });
+  });
+
+  it("shares one pruner provider across the stack's versioned state machines", () => {
+    const stack = newStack();
+    const build = (id: string) =>
+      createStateMachineBuilder()
+        .definition(passThrough)
+        .timeout(Duration.minutes(5))
+        .publishVersion()
+        .build(stack, id);
+    const first = build("First");
+    const second = build("Second");
+    const template = Template.fromStack(stack);
+
+    // The pruner's handler and CDK's provider-framework Lambda, once.
+    template.resourceCountIs("AWS::Lambda::Function", 2);
+    template.resourceCountIs("Custom::StepFunctionsVersionPruner", 2);
+    expect(second.versionPrunerLogGroup).toBe(first.versionPrunerLogGroup);
   });
 
   it("supports Express workflows", () => {

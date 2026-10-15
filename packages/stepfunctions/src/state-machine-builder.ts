@@ -261,10 +261,10 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
 
   /**
    * Add an alias that follows the published version. Each deployment that
-   * publishes a version moves the alias to it with
-   * {@link AddAliasOptions.deployment}, and rolls it back if any of its
-   * {@link AddAliasOptions.rollbackAlarms} enters `ALARM`. Requires
-   * {@link publishVersion}.
+   * publishes a version moves the alias to it — all at once by default, or
+   * gradually with `canaryDeployment()` or `linearDeployment()`, which
+   * roll it back if any of its {@link AddAliasOptions.rollbackAlarms} enters
+   * `ALARM`. Requires {@link publishVersion}.
    *
    * Start executions against `aliases[name].alias.attrArn`, granted on the
    * state machine itself — see the package README.

@@ -8,8 +8,8 @@
  *   node probes/stepfunctions-versions.probe.mjs            # every step, in order
  *   node probes/stepfunctions-versions.probe.mjs targets    # one or more named steps
  *
- * PROBE_DEPLOYMENT=all-at-once deploys the alias all at once instead of
- * through the canary; every deploy in a run uses it.
+ * PROBE_DEPLOYMENT=all-at-once deploys the alias all at once, keeping its
+ * rollback alarms, instead of through the canary; every deploy in a run uses it.
  *
  * Steps:
  *   deploy    Deploy both probe stacks with the good variant.
@@ -22,6 +22,12 @@
  *             fire, CloudFormation to roll back, and the alias to stay on the
  *             good version. Waits out any alarm already in ALARM first, then
  *             reads the alarm history to say whether the canary triggered it.
+ *   blocked   With the bad variant live (after rollback) and a rollback alarm held
+ *             in ALARM, deploy the good variant. Reports whether CloudFormation
+ *             refuses the alias update. Needs PROBE_DEPLOYMENT=all-at-once, the
+ *             only mode whose bad deploy stays live.
+ *   metrics   Whether the state machine's own ExecutionsFailed, which its
+ *             recommended alarm watches, counts executions through the alias.
  *   prune     Point 2: publish three more versions (retain 2) and list what survives.
  *   destroy   Tear both stacks down.
  */
@@ -102,16 +108,69 @@ function versions(stack) {
     .sort((a, b) => a - b);
 }
 
+const routing = (stack) =>
+  aws("stepfunctions", "describe-state-machine-alias", "--state-machine-alias-arn", aliasArn(stack))
+    .routingConfiguration;
+
 function aliasRouting(stack) {
-  const { routingConfiguration } = aws(
-    "stepfunctions",
-    "describe-state-machine-alias",
-    "--state-machine-alias-arn",
-    aliasArn(stack),
-  );
-  return routingConfiguration
+  return routing(stack)
     .map((r) => `v${r.stateMachineVersionArn.split(":").pop()}=${r.weight}%`)
     .join(", ");
+}
+
+/** The alias's rollback alarm names; none unless the alias deploys with them. */
+const rollbackAlarms = (stack) =>
+  findStackResources(aws, stack, {
+    type: "AWS::CloudWatch::Alarm",
+    namePattern: /^WorkflowAliaslive/,
+  }).map((r) => r.PhysicalResourceId);
+
+/** How long to wait for a rollback alarm to enter, or leave, ALARM. */
+const ALARM_WAIT = { timeoutMs: 5 * 60_000, intervalMs: 15_000 };
+
+const stackStatus = (stack) =>
+  aws("cloudformation", "describe-stacks", "--stack-name", stack).Stacks[0].StackStatus;
+
+const anyInAlarm = (alarms) =>
+  aws("cloudwatch", "describe-alarms", "--alarm-names", ...alarms).MetricAlarms.some(
+    (a) => a.StateValue === "ALARM",
+  );
+
+/** Whether the alias routes any traffic to the bad variant. */
+function liveIsBad(stack) {
+  return routing(stack).some(
+    (r) =>
+      JSON.parse(
+        aws(
+          "stepfunctions",
+          "describe-state-machine",
+          "--state-machine-arn",
+          r.stateMachineVersionArn,
+        ).definition,
+      ).States.Broken,
+  );
+}
+
+/** Starts an execution through the alias every few seconds. Returns `stop()`, which resolves once the loop has ended. */
+function startTraffic(stack) {
+  let running = true;
+  const loop = (async () => {
+    while (running) {
+      aws(
+        "stepfunctions",
+        "start-execution",
+        "--state-machine-arn",
+        aliasArn(stack),
+        "--input",
+        "{}",
+      );
+      await delay(3_000);
+    }
+  })();
+  return () => {
+    running = false;
+    return loop;
+  };
 }
 
 /** Every step but deploy needs the stacks; say so rather than fail mid-step. */
@@ -214,69 +273,30 @@ const steps = {
     // One stack at a time, Standard first: a single `cdk deploy` of both stops
     // at the first failure, which is the outcome this step expects.
     for (const [type, stack] of Object.entries(STACKS)) {
-      const alarms = findStackResources(aws, stack, {
-        type: "AWS::CloudWatch::Alarm",
-        namePattern: /^WorkflowAliaslive/,
-      }).map((r) => r.PhysicalResourceId);
+      const alarms = rollbackAlarms(stack);
       const short = (name) => name.split("/").pop();
 
       // An alarm already in ALARM makes CloudFormation abort before shifting any
       // traffic, which tests nothing; a re-run can inherit one from the last run.
-      const quiet = await pollUntil(
-        () =>
-          aws("cloudwatch", "describe-alarms", "--alarm-names", ...alarms).MetricAlarms.every(
-            (a) => a.StateValue !== "ALARM",
-          ),
-        { timeoutMs: 5 * 60_000, intervalMs: 15_000 },
-      );
+      const quiet = await pollUntil(() => !anyInAlarm(alarms), ALARM_WAIT);
       if (!quiet) {
         log(`${type}: SKIPPED — a rollback alarm stayed in ALARM for 5 minutes`);
         continue;
       }
-
       // Deploying the bad variant over itself shifts no traffic, so tests nothing.
-      const { routingConfiguration } = aws(
-        "stepfunctions",
-        "describe-state-machine-alias",
-        "--state-machine-alias-arn",
-        aliasArn(stack),
-      );
-      const live = routingConfiguration.map((r) =>
-        aws(
-          "stepfunctions",
-          "describe-state-machine",
-          "--state-machine-arn",
-          r.stateMachineVersionArn,
-        ),
-      );
-      if (live.some((version) => JSON.parse(version.definition).States.Broken)) {
+      if (liveIsBad(stack)) {
         log(`${type}: SKIPPED — live already routes to the bad variant; run the deploy step first`);
         continue;
       }
 
       const before = aliasRouting(stack);
-      let traffic = true;
-      const generator = (async () => {
-        while (traffic) {
-          aws(
-            "stepfunctions",
-            "start-execution",
-            "--state-machine-arn",
-            aliasArn(stack),
-            "--input",
-            "{}",
-          );
-          await delay(3_000);
-        }
-      })();
+      const stopTraffic = startTraffic(stack);
       const started = new Date();
       const code = await deploy("bad", [stack]);
-      traffic = false;
-      await generator;
+      await stopTraffic();
 
-      const { Stacks } = aws("cloudformation", "describe-stacks", "--stack-name", stack);
       log(
-        `${type}: deploy exited ${code} (non-zero expected); stack ${Stacks[0].StackStatus}; live was ${before}, is now ${aliasRouting(stack)}`,
+        `${type}: deploy exited ${code} (non-zero expected); stack ${stackStatus(stack)}; live was ${before}, is now ${aliasRouting(stack)}`,
       );
       // Every alarm was out of ALARM before the deploy, so a transition into
       // ALARM since then came from the canary's traffic.
@@ -315,6 +335,77 @@ const steps = {
       log(`${type}: deploy ran ${started.toISOString()} → ${finished.toISOString()}; ${verdict}`);
       for (const item of items)
         log(`${type}:   ${item.Timestamp} ${item.name}: ${item.HistorySummary}`);
+    }
+  },
+
+  async blocked() {
+    // With the bad variant live and its rollback alarm kept in ALARM, deploy
+    // the fix: does CloudFormation refuse an all-at-once alias update?
+    for (const [type, stack] of Object.entries(STACKS)) {
+      const alarms = rollbackAlarms(stack);
+      if (!alarms.length) {
+        log(`${type}: SKIPPED — no rollback alarms; run with PROBE_DEPLOYMENT=all-at-once`);
+        continue;
+      }
+      if (!liveIsBad(stack)) {
+        log(`${type}: SKIPPED — live must route to the bad variant; run the rollback step first`);
+        continue;
+      }
+      const stopTraffic = startTraffic(stack);
+      try {
+        if (!(await pollUntil(() => anyInAlarm(alarms), ALARM_WAIT))) {
+          log(`${type}: SKIPPED — no rollback alarm reached ALARM within 5 minutes`);
+          continue;
+        }
+        const before = aliasRouting(stack);
+        const code = await deploy("good", [stack]);
+        log(
+          `${type}: fix deployed with a rollback alarm in ALARM: ${code === 0 ? "NOT blocked" : "BLOCKED"} (exit ${code}, stack ${stackStatus(stack)}); live was ${before}, is now ${aliasRouting(stack)}`,
+        );
+      } finally {
+        await stopTraffic();
+      }
+    }
+  },
+
+  async metrics() {
+    // Do the state machine's own metrics, and so its recommended alarms, count
+    // executions started through an alias?
+    const end = new Date();
+    const start = new Date(end.getTime() - 3 * 3_600_000);
+    for (const [type, stack] of Object.entries(STACKS)) {
+      const arn = stateMachineArn(stack);
+      const failed = (...dimensions) =>
+        aws(
+          "cloudwatch",
+          "get-metric-statistics",
+          "--namespace",
+          "AWS/States",
+          "--metric-name",
+          "ExecutionsFailed",
+          "--dimensions",
+          `Name=StateMachineArn,Value=${arn}`,
+          ...dimensions,
+          "--start-time",
+          start.toISOString(),
+          "--end-time",
+          end.toISOString(),
+          "--period",
+          "3600",
+          "--statistics",
+          "Sum",
+        ).Datapoints.reduce((total, d) => total + d.Sum, 0);
+      const all = failed();
+      const viaAlias = failed("Name=Alias,Value=live");
+      const verdict =
+        viaAlias === 0
+          ? "inconclusive — no failed executions through the alias in 3 hours; run rollback first"
+          : all >= viaAlias
+            ? "the state machine's metric INCLUDES executions through the alias"
+            : "the state machine's metric EXCLUDES executions through the alias";
+      log(
+        `${type}: ExecutionsFailed over 3h: state machine ${all}, through the alias ${viaAlias}; ${verdict}`,
+      );
     }
   },
 

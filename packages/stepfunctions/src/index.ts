@@ -27,6 +27,12 @@ export { INAPPLICABLE_ALARM_CONFIG_WARNING_ID } from "./alarm-specs.js";
 export {
   type AddAliasOptions,
   type AliasDeployment,
+  canaryDeployment,
+  DEFAULT_CANARY_DEPLOYMENT,
+  DEFAULT_LINEAR_DEPLOYMENT,
+  type GradualDeploymentOptions,
+  INEFFECTIVE_ROLLBACK_ALARMS_WARNING_ID,
+  linearDeployment,
   STATE_MACHINE_ALIAS_ALARM_DEFAULTS,
   type StateMachineAliasAlarmConfig,
   type StateMachineAliasResult,

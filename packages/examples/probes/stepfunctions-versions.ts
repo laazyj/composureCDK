@@ -6,9 +6,9 @@
  * reports what AWS actually does. Its findings inform the follow-up phase.
  *
  * Two stacks, one per workflow type, each publishing a version, retaining two,
- * and routing a `live` alias with a five-minute 50% canary, or all at once
- * when the `deployment` context value is `all-at-once`. The `variant` context
- * value picks the workflow:
+ * and routing a `live` alias with a five-minute 50% canary — or all at once,
+ * keeping its rollback alarms, when the `deployment` context value is
+ * `all-at-once`. The `variant` context value picks the workflow:
  *
  * - `good` — succeeds.
  * - `bad` — fails, so executions through the alias fail and the canary's
@@ -28,7 +28,8 @@ import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Fail, Pass, Result, StateMachine, StateMachineType } from "aws-cdk-lib/aws-stepfunctions";
 import type { Construct } from "constructs";
 import {
-  type AliasDeployment,
+  type AddAliasOptions,
+  canaryDeployment,
   createStateMachineBuilder,
   stateMachineGrants,
 } from "@composurecdk/stepfunctions";
@@ -48,12 +49,7 @@ function workflow(variant: string) {
       : new Pass(scope, "Done", { result: Result.fromObject({ value: variant }) });
 }
 
-function probeStack(
-  app: App,
-  type: StateMachineType,
-  variant: string,
-  deployment: AliasDeployment,
-) {
+function probeStack(app: App, type: StateMachineType, variant: string, alias: AddAliasOptions) {
   const name = type === StateMachineType.STANDARD ? "Standard" : "Express";
   const stack = new Stack(app, `ComposureCDK-Probe-SfnVersions${name}`);
 
@@ -63,7 +59,7 @@ function probeStack(
     .timeout(Duration.minutes(5))
     .definition(workflow(variant))
     .publishVersion({ retain: 2 })
-    .addAlias("live", { deployment })
+    .addAlias("live", alias)
     .build(stack, "Workflow");
 
   return { stack, result };
@@ -72,15 +68,15 @@ function probeStack(
 const app = exampleApp();
 cleanDeskPolicy(app);
 const variant = (app.node.tryGetContext("variant") as string | undefined) ?? "good";
-// One minute is shorter than the metrics take to reach the alarms: a 1-minute
-// canary completed before its alarms fired. Five matches AWS's own example.
-const deployment: AliasDeployment =
+// All at once keeps its rollback alarms, asked for explicitly, so the probe can
+// test whether one already in ALARM blocks the deployment.
+const alias: AddAliasOptions =
   app.node.tryGetContext("deployment") === "all-at-once"
-    ? { type: "ALL_AT_ONCE" }
-    : { type: "CANARY", percentage: 50, interval: Duration.minutes(5) };
+    ? { rollbackAlarms: {} }
+    : { deployment: canaryDeployment({ percentage: 50 }) };
 
-const { stack, result } = probeStack(app, StateMachineType.STANDARD, variant, deployment);
-probeStack(app, StateMachineType.EXPRESS, variant, deployment);
+const { stack, result } = probeStack(app, StateMachineType.STANDARD, variant, alias);
+probeStack(app, StateMachineType.EXPRESS, variant, alias);
 const aliasArn = result.aliases.live.alias.attrArn;
 
 // Spike A: CDK's own target, given the alias as an IStateMachine. It grants

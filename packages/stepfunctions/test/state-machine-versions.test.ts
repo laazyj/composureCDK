@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { Duration } from "aws-cdk-lib";
-import { Match } from "aws-cdk-lib/assertions";
+import { Annotations, Match, type Template } from "aws-cdk-lib/assertions";
 import { Pass, StateMachineType } from "aws-cdk-lib/aws-stepfunctions";
 import type { Construct } from "constructs";
 import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { DEFAULT_RETAINED_VERSIONS } from "../src/defaults.js";
 import { createStateMachineBuilder } from "../src/state-machine-builder.js";
+import {
+  canaryDeployment,
+  DEFAULT_CANARY_DEPLOYMENT,
+  INEFFECTIVE_ROLLBACK_ALARMS_WARNING_ID,
+  linearDeployment,
+} from "../src/state-machine-alias.js";
 
 const passThrough = (scope: Construct) => new Pass(scope, "PassThrough");
 
@@ -104,6 +110,14 @@ describe("versions", () => {
   });
 });
 
+/** The alarms scoped to the `live` alias, as opposed to the state machine's own. */
+const aliasAlarmsIn = (template: Template) =>
+  Object.keys(
+    template.findResources("AWS::CloudWatch::Alarm", {
+      Properties: { Dimensions: Match.arrayWith([{ Name: "Alias", Value: "live" }]) },
+    }),
+  );
+
 describe("aliases", () => {
   it("requires a published version", () => {
     expect(() => buildAndSynth((b) => b.addAlias("live"))).toThrow(/call \.publishVersion\(\)/);
@@ -115,17 +129,34 @@ describe("aliases", () => {
     );
   });
 
-  it("deploys all at once by default, rolling back on its alarms by name", () => {
-    const { template, result } = versioned((b) => b.addAlias("live"));
+  it("deploys all at once by default, with no rollback alarms", () => {
+    const { template } = versioned((b) => b.addAlias("live"));
+
+    expect(aliasAlarmsIn(template)).toHaveLength(0);
+    template.hasResourceProperties("AWS::StepFunctions::StateMachineAlias", {
+      Name: "live",
+      DeploymentPreference: {
+        Type: "ALL_AT_ONCE",
+        StateMachineVersionArn: { "Fn::GetAtt": ["WorkflowVersion", "Arn"] },
+      },
+    });
+  });
+
+  it("rolls a canary back on its alarms, by name, scoped to the alias", () => {
+    const { template, result } = versioned((b) =>
+      b.addAlias("live", { deployment: canaryDeployment() }),
+    );
 
     expect(Object.keys(result.aliases.live.alarms).sort()).toEqual([
       "executionsFailed",
       "executionsTimedOut",
     ]);
+    expect(aliasAlarmsIn(template)).toHaveLength(2);
     template.hasResourceProperties("AWS::StepFunctions::StateMachineAlias", {
-      Name: "live",
       DeploymentPreference: {
-        Type: "ALL_AT_ONCE",
+        Type: "CANARY",
+        Percentage: DEFAULT_CANARY_DEPLOYMENT.percentage,
+        Interval: DEFAULT_CANARY_DEPLOYMENT.interval.toMinutes(),
         StateMachineVersionArn: { "Fn::GetAtt": ["WorkflowVersion", "Arn"] },
         Alarms: [
           { Ref: Match.stringLikeRegexp("ExecutionsFailedAlarm") },
@@ -135,34 +166,75 @@ describe("aliases", () => {
     });
   });
 
-  it("scopes its alarms to executions through the alias", () => {
-    const { template } = versioned((b) => b.addAlias("live"));
+  it.each([
+    ["a linear shift by default", linearDeployment(), { Type: "LINEAR", Percentage: 20 }],
+    [
+      "a custom canary",
+      canaryDeployment({ percentage: 25, interval: Duration.minutes(15) }),
+      { Type: "CANARY", Percentage: 25, Interval: 15 },
+    ],
+  ])("takes %s", (_label, deployment, expected) => {
+    const { template } = versioned((b) => b.addAlias("live", { deployment }));
 
-    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
-      MetricName: "ExecutionsFailed",
-      Dimensions: Match.arrayWith([{ Name: "Alias", Value: "live" }]),
+    template.hasResourceProperties("AWS::StepFunctions::StateMachineAlias", {
+      DeploymentPreference: Match.objectLike(expected),
     });
   });
 
-  it("shifts traffic gradually with a canary deployment", () => {
+  it("rolls a canary back on nothing when its alarms are disabled", () => {
     const { template } = versioned((b) =>
-      b.addAlias("live", {
-        deployment: { type: "CANARY", percentage: 10, interval: Duration.minutes(5) },
-      }),
+      b.addAlias("live", { deployment: canaryDeployment(), rollbackAlarms: false }),
     );
 
+    expect(aliasAlarmsIn(template)).toHaveLength(0);
     template.hasResourceProperties("AWS::StepFunctions::StateMachineAlias", {
-      DeploymentPreference: Match.objectLike({ Type: "CANARY", Percentage: 10, Interval: 5 }),
+      DeploymentPreference: Match.objectLike({ Type: "CANARY", Alarms: Match.absent() }),
     });
   });
 
-  it("rolls back on nothing when its alarms are disabled", () => {
-    const { template, result } = versioned((b) => b.addAlias("live", { rollbackAlarms: false }));
+  it("creates rollback alarms an all-at-once alias asks for", () => {
+    const { template } = versioned((b) => b.addAlias("live", { rollbackAlarms: {} }));
 
-    expect(result.aliases.live.alarms).toEqual({});
-    template.hasResourceProperties("AWS::StepFunctions::StateMachineAlias", {
-      DeploymentPreference: { Type: "ALL_AT_ONCE", StateMachineVersionArn: Match.anyValue() },
-    });
+    expect(aliasAlarmsIn(template)).toHaveLength(2);
+  });
+
+  const short = canaryDeployment({ interval: Duration.minutes(1) });
+  it.each([
+    [
+      "alarms on an all-at-once alias",
+      { rollbackAlarms: {} },
+      /ALL_AT_ONCE deployment will not roll it back/,
+    ],
+    [
+      "alarms on a short shift",
+      { deployment: short },
+      /a 1 minute deployment interval is likely to complete/,
+    ],
+    ["no alarms on a short shift", { deployment: short, rollbackAlarms: false }, undefined],
+    [
+      "an all-at-once alias's alarms switched off",
+      { rollbackAlarms: { enabled: false } },
+      undefined,
+    ],
+    [
+      "an all-at-once alias's alarms each switched off",
+      { rollbackAlarms: { executionsFailed: false, executionsTimedOut: false } },
+      undefined,
+    ],
+    ["the default", {}, undefined],
+    ["a default canary", { deployment: canaryDeployment() }, undefined],
+  ] as const)("warns accordingly for %s", (_label, options, warning) => {
+    const { stack } = versioned((b) => b.addAlias("live", options));
+
+    const annotations = Annotations.fromStack(stack);
+    if (warning) {
+      annotations.hasWarning(
+        "*",
+        Match.stringLikeRegexp(`${warning.source}.*${INEFFECTIVE_ROLLBACK_ALARMS_WARNING_ID}`),
+      );
+    } else {
+      annotations.hasNoWarning("*", Match.anyValue());
+    }
   });
 
   it.each([

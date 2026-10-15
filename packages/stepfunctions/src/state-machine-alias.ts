@@ -1,4 +1,4 @@
-import { type Duration, Token } from "aws-cdk-lib";
+import { Annotations, Duration, Token } from "aws-cdk-lib";
 import { type Alarm, Metric, Stats } from "aws-cdk-lib/aws-cloudwatch";
 import { CfnStateMachineAlias, type StateMachine } from "aws-cdk-lib/aws-stepfunctions";
 import type { IConstruct } from "constructs";
@@ -7,8 +7,11 @@ import { ANY_OCCURRENCE } from "./alarm-defaults.js";
 import { type AlarmSet, createSpecAlarms } from "./alarm-specs.js";
 
 /**
- * How CloudFormation moves an alias to a newly published version. Any rollback
- * alarm entering `ALARM` during the shift rolls the alias back.
+ * How CloudFormation moves an alias to a newly published version.
+ * `ALL_AT_ONCE` moves every execution at once, as a plain alias does. `CANARY`
+ * and `LINEAR` shift traffic over time and roll the alias back if a rollback
+ * alarm enters `ALARM` during the shift; build them with
+ * {@link canaryDeployment} and {@link linearDeployment}.
  *
  * @see https://docs.aws.amazon.com/step-functions/latest/dg/version-rolling-deployment.html
  */
@@ -25,6 +28,71 @@ export type AliasDeployment =
       /** Time between increments, 1–2100 whole minutes. */
       readonly interval: Duration;
     };
+
+/**
+ * Warning id for rollback alarms unlikely to roll anything back: on an
+ * `ALL_AT_ONCE` alias, or on a shift with an interval under 5 minutes. The
+ * alarms are still created, as asked, but fire after such a deployment
+ * completes — see the package README. Acknowledge via
+ * `Annotations.of(scope).acknowledgeWarning(INEFFECTIVE_ROLLBACK_ALARMS_WARNING_ID)`
+ * where that is intended, so the id must stay stable.
+ */
+export const INEFFECTIVE_ROLLBACK_ALARMS_WARNING_ID =
+  "@composurecdk/stepfunctions:ineffective-rollback-alarms";
+
+/** The shortest shift interval rollback alarms reliably fire within. */
+const MIN_ROLLBACK_INTERVAL = Duration.minutes(5);
+
+/** Options for {@link canaryDeployment} and {@link linearDeployment}. */
+export interface GradualDeploymentOptions {
+  /** Traffic shifted per increment, 1–99. */
+  readonly percentage?: number;
+  /** Time between increments, 1–2100 whole minutes. */
+  readonly interval?: Duration;
+}
+
+/**
+ * {@link canaryDeployment}'s defaults: 10% for five minutes, the shape of AWS's
+ * own example, long enough for the rollback alarms to fire.
+ *
+ * @see https://docs.aws.amazon.com/step-functions/latest/dg/version-rolling-deployment.html
+ */
+export const DEFAULT_CANARY_DEPLOYMENT: Required<GradualDeploymentOptions> = {
+  percentage: 10,
+  interval: Duration.minutes(5),
+};
+
+/** {@link linearDeployment}'s defaults: 20% every five minutes, done in 25. */
+export const DEFAULT_LINEAR_DEPLOYMENT: Required<GradualDeploymentOptions> = {
+  percentage: 20,
+  interval: Duration.minutes(5),
+};
+
+const gradual = (
+  type: "CANARY" | "LINEAR",
+  options: GradualDeploymentOptions,
+  defaults: Required<GradualDeploymentOptions>,
+): AliasDeployment => ({
+  type,
+  percentage: options.percentage ?? defaults.percentage,
+  interval: options.interval ?? defaults.interval,
+});
+
+/**
+ * Shift `percentage` of traffic, wait `interval`, then shift the rest, rolling
+ * back on the alias's rollback alarms. Defaults: {@link DEFAULT_CANARY_DEPLOYMENT}.
+ */
+export function canaryDeployment(options: GradualDeploymentOptions = {}): AliasDeployment {
+  return gradual("CANARY", options, DEFAULT_CANARY_DEPLOYMENT);
+}
+
+/**
+ * Shift `percentage` of traffic every `interval` until it reaches 100%, rolling
+ * back on the alias's rollback alarms. Defaults: {@link DEFAULT_LINEAR_DEPLOYMENT}.
+ */
+export function linearDeployment(options: GradualDeploymentOptions = {}): AliasDeployment {
+  return gradual("LINEAR", options, DEFAULT_LINEAR_DEPLOYMENT);
+}
 
 /**
  * Controls the alarms an alias's deployment rolls back on. Each watches only
@@ -51,7 +119,8 @@ export interface AddAliasOptions {
   readonly deployment?: AliasDeployment;
   /**
    * The alarms the deployment rolls back on, or `false` for none.
-   * @default the executionsFailed and executionsTimedOut alarms, scoped to the alias
+   * @default executionsFailed and executionsTimedOut, scoped to the alias, for
+   * `CANARY` and `LINEAR`; none for `ALL_AT_ONCE`
    */
   readonly rollbackAlarms?: StateMachineAliasAlarmConfig | false;
 }
@@ -129,9 +198,25 @@ export function validateAlias(builderId: string, name: string, options: AddAlias
   }
 }
 
+/** Warns when the alias's rollback alarms will fire after its deployment completes. */
+function warnIfIneffective(target: IConstruct, name: string, deployment: AliasDeployment): void {
+  const problem =
+    deployment.type === "ALL_AT_ONCE"
+      ? "rollbackAlarms on an ALL_AT_ONCE deployment will not roll it back; use canaryDeployment() or linearDeployment()."
+      : deployment.interval.toMinutes() < MIN_ROLLBACK_INTERVAL.toMinutes()
+        ? `a ${deployment.interval.toHumanString()} deployment interval is likely to complete before its rollback alarms fire; use at least ${MIN_ROLLBACK_INTERVAL.toHumanString()}.`
+        : undefined;
+  if (problem) {
+    Annotations.of(target).addWarningV2(
+      INEFFECTIVE_ROLLBACK_ALARMS_WARNING_ID,
+      `alias "${name}": ${problem} Step Functions alarms fire one to two minutes after executions fail.`,
+    );
+  }
+}
+
 /**
  * Creates an alias pointing at `versionArn`, deployed with `options.deployment`
- * and rolled back on its alarms.
+ * and, for a gradual deployment, rolled back on its alarms.
  */
 export function createStateMachineAlias(
   scope: IConstruct,
@@ -141,18 +226,21 @@ export function createStateMachineAlias(
   name: string,
   options: AddAliasOptions,
 ): StateMachineAliasResult {
+  const deployment = options.deployment ?? { type: "ALL_AT_ONCE" };
+  // Rollback alarms default on only where they can act: an ALL_AT_ONCE
+  // deployment completes before they fire.
   const alarms = createSpecAlarms(
     scope,
     id,
     stateMachine,
     aliasAlarms(name),
-    options.rollbackAlarms,
+    options.rollbackAlarms ?? (deployment.type === "ALL_AT_ONCE" ? false : {}),
     [],
   );
   // CloudFormation requires alarm names, not ARNs, here: an ARN is treated as a
   // nonexistent alarm, which reads as OK, and the deployment never rolls back.
   const alarmNames = Object.values(alarms).map((alarm) => alarm.alarmName);
-  const deployment = options.deployment ?? { type: "ALL_AT_ONCE" };
+  if (alarmNames.length > 0) warnIfIneffective(stateMachine, name, deployment);
   const alias = new CfnStateMachineAlias(scope, id, {
     name,
     description: options.description,

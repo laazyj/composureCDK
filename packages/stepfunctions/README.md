@@ -237,6 +237,41 @@ The builder is tagged, which Security Hub [StepFunctions.2](https://docs.aws.ama
 
 `ActivitiesTimedOut` is the metric the Serverless Lens names; the other two complete the ways a worker's task ends badly. As with the state machine alarms, the thresholds are this library's choice. They are tuned, disabled and extended exactly as above, and exported as `ACTIVITY_ALARM_DEFAULTS`.
 
+## Versions and Aliases
+
+A **version** is an immutable, numbered snapshot of the state machine; an **alias** routes executions to a version. With both, each deployment that changes the workflow publishes a new version and moves the alias to it. By default the alias moves all at once, as a plain CloudFormation alias does; opt in to a gradual shift that rolls back on its own alarms when the workflow warrants it.
+
+```ts
+createStateMachineBuilder()
+  .timeout(Duration.minutes(5))
+  .definition(/* ... */)
+  .publishVersion()
+  .addAlias("live"); // all at once
+
+createStateMachineBuilder()
+  .timeout(Duration.minutes(5))
+  .definition(/* ... */)
+  .publishVersion()
+  .addAlias("live", { deployment: canaryDeployment() }); // 10% for 5 minutes, then the rest
+```
+
+- **`.publishVersion()`** publishes a version whenever a deployment changes the state machine's revision, and nothing otherwise. A replaced version is kept, so an alias can roll back to it, and a small custom resource then deletes all but the newest `retain` (default `DEFAULT_RETAINED_VERSIONS`, 5) — plus any version an alias still routes to. Step Functions allows 1,000 versions per state machine and deletes none itself, and CloudFormation can only keep the latest or keep them all, so retaining N takes the custom resource. One provider per stack (two Lambdas, their roles and a log group) serves every versioned state machine in it, so each adds only its custom resource and a `composurecdk:version-pruner` tag, which limits the provider to its own stack's state machines. The result returns them as `versionPruner` and the shared `versionPrunerLogGroup`, beside `version`. A rolled-back deployment keeps the version it published, unrouted, and it counts toward `retain` until newer versions push it out.
+- **`.addAlias(name, options)`** requires `.publishVersion()`. `deployment` defaults to `{ type: "ALL_AT_ONCE" }`. `canaryDeployment({ percentage, interval })` (default `DEFAULT_CANARY_DEPLOYMENT`: 10%, 5 minutes) shifts `percentage`, waits `interval`, then shifts the rest; `linearDeployment({ percentage, interval })` (default `DEFAULT_LINEAR_DEPLOYMENT`: 20%, 5 minutes) shifts `percentage` every `interval`. Both build the plain `{ type, percentage, interval }` object, which `deployment` also takes.
+- **Rollback alarms** come with a gradual deployment: `executionsFailed` and `executionsTimedOut`, scoped to executions started through the alias (`{StateMachineArn, Alias}`), first occurrence in a minute. CloudFormation [rolls the alias back](https://docs.aws.amazon.com/step-functions/latest/dg/version-rolling-deployment.html) if one enters `ALARM` during the shift. Tune them with `rollbackAlarms`, or set it to `false`; they are returned on `result.aliases[name].alarms`, alongside the `alias`. During a canary they see both versions' executions, so a fault in the old version can roll back the new one. Executions through an alias also count toward the state machine's own metrics, so its [recommended alarms](#recommended-alarms) cover them with or without an alias's rollback alarms.
+- **Only a shift that waits can roll back.** The alarms fire one to two minutes after executions start failing: in sandbox tests a 5-minute canary rolled back, while a 1-minute canary and `ALL_AT_ONCE` completed first. So an `ALL_AT_ONCE` alias has no rollback alarms unless `rollbackAlarms` is set, and the builder warns (`INEFFECTIVE_ROLLBACK_ALARMS_WARNING_ID`) when it is, or when a gradual shift's `interval` is under 5 minutes.
+- **A gradual deployment started while a rollback alarm is in `ALARM`** — for a minute or two after a failed rollout — aborts before shifting any traffic, so let them clear before redeploying. An `ALL_AT_ONCE` deployment does not check them, so a fix rolled out all at once goes through. CloudFormation reports both cases the same way — "Aborting deployment. The following CloudWatch alarms are in an 'ALARM' state" — so that message alone does not say whether the new version was at fault.
+
+### Starting executions through an alias
+
+Start executions against `result.aliases[name].alias.attrArn`, but **grant on the state machine itself**: Step Functions [authorizes a qualified ARN against the unqualified state machine's](https://docs.aws.amazon.com/step-functions/latest/dg/auth-version-alias.html).
+
+```ts
+const { stateMachine, aliases } = result;
+createFunctionBuilder().grant(stateMachineGrants.startExecution(stateMachine)); // then call StartExecution on aliases.live.alias.attrArn
+```
+
+The builder does not hand back the alias as an `IStateMachine`: given one through `StateMachine.fromStateMachineArn(aliasArn)`, CDK's EventBridge `SfnStateMachine` target and API Gateway's `StepFunctionsIntegration` grant on the alias ARN instead, and the latter also loses its Express-only check. For EventBridge, target the alias ARN with a role granted on the state machine — an L1 `CfnRule` target with your own role does this.
+
 ## Starting executions from other services
 
 The CDK integrations accept the built state machine through a `ref`, with no change to this package:

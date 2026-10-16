@@ -1,3 +1,14 @@
+## 0.11.1 (2026-10-16)
+
+### 🚀 Features
+
+- **route53:** make DNS query logging opt-in ([#610](https://github.com/laazyj/composureCDK/pull/610), [#142](https://github.com/laazyj/composureCDK/issues/142))
+- **stepfunctions:** publish versions and route aliases to them ([#607](https://github.com/laazyj/composureCDK/pull/607))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.11.0 (2026-10-04)
 
 ### 🚀 Features

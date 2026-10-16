@@ -118,6 +118,10 @@ jobs:
         env:
           BRANCH: ${{ steps.version.outputs.branch }}
           VERSION: ${{ steps.version.outputs.version }}
+          # `npm ci` installs the husky pre-push hook, which would run `nx verify`
+          # on this push. The "Require green CI" step already vouches for the
+          # base commit, and the runner lacks zizmor, which CI refuses to skip.
+          HUSKY: "0"
         run: |
           git checkout -b "$BRANCH"
           git add -A

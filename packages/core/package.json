@@ -51,7 +51,7 @@
     "constructs": "^10.8.1"
   },
   "devDependencies": {
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "ts-fake": "^1.2.1",
     "typescript": "^6.0.3",
     "vitest": "^5.0.0"

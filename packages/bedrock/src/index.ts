@@ -15,7 +15,12 @@ export {
   type InferenceProfileGeography,
   inferenceProfile,
 } from "./inference-profile.js";
-export { type InferenceTarget, invocationArns } from "./inference-target.js";
+export {
+  type InferenceTarget,
+  type InferenceTargetIdOptions,
+  inferenceTarget,
+  invocationArns,
+} from "./inference-target.js";
 export { guardrailGrants, type ModelInvokeGrantOptions, modelGrants } from "./grants.js";
 export {
   createGuardrailBuilder,

@@ -44,8 +44,9 @@ export interface GeographicInferenceProfile {
   /**
    * The Regions the profile routes to from the source Region, as listed by
    * `aws bedrock get-inference-profile`. AWS chooses and extends that list,
-   * so a copy of it is a snapshot: a grant built from it fails for requests
-   * routed to a Region added later.
+   * so a copy of it is a snapshot. Bedrock checks the model in every Region
+   * the profile may route to, so once AWS adds one, a grant built from the
+   * copy denies every call through the profile.
    *
    * Omitted, the grant covers the foundation model in every Region, still
    * only through this profile. List the Regions when the policy must name

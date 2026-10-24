@@ -45,7 +45,7 @@ A profile's id is derived from its model, so the id a caller invokes and the mod
 
 A geographic profile is owned by AWS. AWS chooses the Regions it routes to, which differ by source Region and grow over time without notice. You choose the profile, not its destinations.
 
-By default the grant therefore covers the foundation model in every Region, conditioned on `bedrock:InferenceProfileArn` so it is reachable only through that profile. The profile keeps requests inside its geography, so naming the destinations would not narrow where they run. A copy of the list would only fail requests that AWS routes to a Region added after you wrote it.
+By default the grant therefore covers the foundation model in every Region, conditioned on `bedrock:InferenceProfileArn` so it is reachable only through that profile. The profile keeps requests inside its geography, so naming the destinations would not narrow where they run. A copy of the list would break the profile when AWS adds a Region. Bedrock checks the model in every Region the profile may route to before it routes a request, so one missing Region denies every call, not only those routed there.
 
 Pass `routingRegions` when the policy must name each Region: for a service control policy, or a policy scanner that flags a wildcard in any ARN. Take them from `aws bedrock get-inference-profile`, and re-check them when AWS changes the profile. The source Region is always included.
 
@@ -108,7 +108,7 @@ AWS publishes no recommended alarm thresholds for Bedrock. The [Generative AI Le
 | `timeToFirstToken`       | `TimeToFirstToken` (p90)       | opt-in, threshold required             |
 | `estimatedTpmQuotaUsage` | `EstimatedTPMQuotaUsage` (Max) | opt-in, `quota` required; 80% of quota |
 
-`invocationClientErrors` includes `AccessDenied`, so it catches a stale `routingRegions` list, which fails only for requests routed to the missing Region. Missing data is not breaching. Defaults are exported as `MODEL_ALARM_DEFAULTS`.
+`invocationClientErrors` includes `AccessDenied`, so it catches a stale `routingRegions` list, which denies every call through the profile. Missing data is not breaching. Defaults are exported as `MODEL_ALARM_DEFAULTS`.
 
 ```ts
 createModelAlarmBuilder()

@@ -21,6 +21,7 @@ const CAPABILITIES = [
   ["sign", "kms:Sign"],
   ["verify", "kms:Verify"],
   ["signVerify", "kms:Sign"],
+  ["getPublicKey", "kms:GetPublicKey"],
   ["generateMac", "kms:GenerateMac"],
   ["verifyMac", "kms:VerifyMac"],
   ["admin", "kms:ScheduleKeyDeletion"],
@@ -49,6 +50,15 @@ describe("keyGrants", () => {
     const actions = JSON.stringify(Object.values(policy));
     expect(actions).not.toContain("kms:Encrypt");
     expect(actions).not.toContain("kms:Decrypt");
+  });
+
+  it("keeps kms:GetPublicKey out of verify and signVerify", () => {
+    const { stack, key, role } = setup();
+
+    keyGrants.verify(key).applyTo(role, {});
+    keyGrants.signVerify(key).applyTo(role, {});
+
+    expect(policyJson(stack)).not.toContain("kms:GetPublicKey");
   });
 
   it("resolves a Resolvable key from the build context before granting", () => {

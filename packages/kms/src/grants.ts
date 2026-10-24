@@ -10,13 +10,15 @@ const capability =
 
 /**
  * The sign/verify grant methods only reached {@link IKey} after this package's
- * aws-cdk-lib floor, so these two capabilities name their action instead of
- * delegating. Each is a single well-known action on the construct's own ARN —
- * the narrow form ADR-0013's addendum permits where no delegate is reachable,
- * and exactly what `Key.grantSign` / `Key.grantVerify` pass internally.
+ * aws-cdk-lib floor, and there is no `kms:GetPublicKey` grant method at all, so
+ * these capabilities name their action instead of delegating. Each is a single
+ * well-known action on the construct's own ARN — the narrow form ADR-0013's
+ * addendum permits where no delegate is reachable, and for sign/verify exactly
+ * what `Key.grantSign` / `Key.grantVerify` pass internally.
  */
 const SIGN_ACTION = "kms:Sign";
 const VERIFY_ACTION = "kms:Verify";
+const GET_PUBLIC_KEY_ACTION = "kms:GetPublicKey";
 
 /**
  * Consumer-side grant helpers for a KMS key. Pass one to a grantee builder's
@@ -60,6 +62,15 @@ export const keyGrants = {
   /** Combined sign and verify. */
   signVerify: capability((key, grantee) => {
     key.grant(grantee, SIGN_ACTION, VERIFY_ACTION);
+  }),
+  /**
+   * Download an asymmetric key's public half (`kms:GetPublicKey`) — e.g. to
+   * publish it as a JWKS for verifiers outside AWS. Deliberately not part of
+   * {@link keyGrants.verify}, which a principal verifying through KMS needs
+   * without the public key.
+   */
+  getPublicKey: capability((key, grantee) => {
+    key.grant(grantee, GET_PUBLIC_KEY_ACTION);
   }),
   /** Generate an HMAC (`kms:GenerateMac`). */
   generateMac: capability((key, grantee) => {

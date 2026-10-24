@@ -121,6 +121,7 @@ const handler = createFunctionBuilder().grant(
 | `keyGrants.sign`           | `kms:Sign`                                              |
 | `keyGrants.verify`         | `kms:Verify`                                            |
 | `keyGrants.signVerify`     | both of the above                                       |
+| `keyGrants.getPublicKey`   | `kms:GetPublicKey`                                      |
 | `keyGrants.generateMac`    | `kms:GenerateMac`                                       |
 | `keyGrants.verifyMac`      | `kms:VerifyMac`                                         |
 | `keyGrants.admin`          | key administration only — no cryptographic use          |

@@ -7,7 +7,7 @@ import { newStack, policyJson, TEST_ACCOUNT, testEnv } from "@composurecdk/cdk-t
 import { type Grant, ref } from "@composurecdk/core";
 import { guardrailGrants, modelGrants } from "../src/grants.js";
 import { type ApplicationInferenceProfile, inferenceProfile } from "../src/inference-profile.js";
-import { type InferenceTarget, invocationArns } from "../src/inference-target.js";
+import { type InferenceTarget, inferenceTarget, invocationArns } from "../src/inference-target.js";
 
 const MODEL_ID = "anthropic.claude-haiku-4-5-20251001-v1:0";
 const MODEL = new FoundationModelIdentifier(MODEL_ID);
@@ -78,6 +78,39 @@ describe("modelGrants.invoke", () => {
         Condition: { StringEquals: { "bedrock:InferenceProfileArn": PROFILE_ARN } },
       },
     ]);
+  });
+
+  it("grants a geographic profile's model in every Region, only through the profile, without routing regions", () => {
+    const profile = inferenceProfile.geographic({ model: MODEL, geography: "eu" });
+
+    expect(statementsFor(profile)).toEqual([
+      { Action: ACTIONS, Effect: "Allow", Resource: PROFILE_ARN },
+      {
+        Action: ACTIONS,
+        Effect: "Allow",
+        Resource: fmArn("*"),
+        Condition: { StringEquals: { "bedrock:InferenceProfileArn": PROFILE_ARN } },
+      },
+    ]);
+  });
+
+  it("grants InvokeModel alone when streaming is off", () => {
+    expect(statementsOf(modelGrants.invoke(MODEL, { streaming: false }))).toEqual([
+      { Action: "bedrock:InvokeModel", Effect: "Allow", Resource: fmArn(REGION) },
+    ]);
+  });
+
+  it("grants every target an id list resolves to", () => {
+    const stack = regionalStack();
+    const role = roleIn(stack);
+    for (const id of [MODEL_ID, `eu.${MODEL_ID}`]) {
+      modelGrants.invoke(inferenceTarget.fromId(id)).applyTo(role, {});
+    }
+
+    const json = policyJson(stack);
+    expect(json).toContain(PROFILE_ARN);
+    expect(json).toContain(fmArn("*"));
+    expect(json).toContain(fmArn(REGION));
   });
 
   it("does not repeat the source Region when it is listed", () => {
@@ -164,6 +197,12 @@ describe("invocationArns", () => {
       fmArn(REGION),
       fmArn("eu-west-3"),
     ]);
+  });
+
+  it("lists one Region-wildcard model ARN for a geographic profile without routing regions", () => {
+    const profile = inferenceProfile.geographic({ model: MODEL, geography: "eu" });
+
+    expect(invocationArns(profile, regionalStack())).toEqual([PROFILE_ARN, fmArn("*")]);
   });
 
   it("uses AWS pseudo-parameters without a scope", () => {
@@ -257,10 +296,69 @@ describe("modelGrants.invoke with requireGuardrail", () => {
   });
 });
 
+describe('modelGrants.invoke with requireGuardrail: "any"', () => {
+  const ANY = `arn:aws:bedrock:${REGION}:${TEST_ACCOUNT}:guardrail/*`;
+
+  it("requires some guardrail in the account and Region and lets any be applied", () => {
+    expect(statementsOf(modelGrants.invoke(MODEL, { requireGuardrail: "any" }))).toEqual([
+      {
+        Action: ACTIONS,
+        Effect: "Allow",
+        Resource: fmArn(REGION),
+        Condition: { StringLike: { "bedrock:GuardrailIdentifier": ANY } },
+      },
+      {
+        Action: ACTIONS,
+        Effect: "Deny",
+        Resource: fmArn(REGION),
+        Condition: { StringNotLike: { "bedrock:GuardrailIdentifier": ANY } },
+      },
+      { Action: "bedrock:ApplyGuardrail", Effect: "Allow", Resource: ANY },
+    ]);
+  });
+
+  it("keeps a profile's StringEquals condition beside the StringLike one", () => {
+    const profile = inferenceProfile.geographic({ model: MODEL, geography: "eu" });
+
+    expect(statementsOf(modelGrants.invoke(profile, { requireGuardrail: "any" }))[1]).toEqual({
+      Action: ACTIONS,
+      Effect: "Allow",
+      Resource: fmArn("*"),
+      Condition: {
+        StringEquals: { "bedrock:InferenceProfileArn": PROFILE_ARN },
+        StringLike: { "bedrock:GuardrailIdentifier": ANY },
+      },
+    });
+  });
+});
+
 describe("guardrailGrants.apply", () => {
   it("allows applying the guardrail", () => {
     expect(statementsOf(guardrailGrants.apply(GUARDRAIL))).toEqual([
       { Action: "bedrock:ApplyGuardrail", Effect: "Allow", Resource: GUARDRAIL.guardrailArn },
+    ]);
+  });
+
+  it("accepts a guardrail the app did not build", () => {
+    const imported = {
+      guardrailArn: `arn:aws:bedrock:${REGION}:${TEST_ACCOUNT}:guardrail/abc`,
+      version: "1",
+    };
+
+    expect(statementsOf(guardrailGrants.apply(imported))).toEqual([
+      { Action: "bedrock:ApplyGuardrail", Effect: "Allow", Resource: imported.guardrailArn },
+    ]);
+  });
+});
+
+describe("guardrailGrants.applyAny", () => {
+  it("allows applying any guardrail in the account and Region", () => {
+    expect(statementsOf(guardrailGrants.applyAny())).toEqual([
+      {
+        Action: "bedrock:ApplyGuardrail",
+        Effect: "Allow",
+        Resource: `arn:aws:bedrock:${REGION}:${TEST_ACCOUNT}:guardrail/*`,
+      },
     ]);
   });
 });

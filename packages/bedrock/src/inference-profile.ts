@@ -11,12 +11,22 @@ import { FoundationModelIdentifier } from "aws-cdk-lib/aws-bedrock";
  *
  * @see https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html
  */
-export const INFERENCE_PROFILE_GEOGRAPHIES = ["us", "eu", "apac", "jp", "au", "us-gov"] as const;
+export const INFERENCE_PROFILE_GEOGRAPHIES = [
+  "us",
+  "eu",
+  "apac",
+  "jp",
+  "au",
+  "in",
+  "us-gov",
+] as const;
 
 /** A known geography prefix. See {@link INFERENCE_PROFILE_GEOGRAPHIES}. */
 export type InferenceProfileGeography = (typeof INFERENCE_PROFILE_GEOGRAPHIES)[number];
 
 const GLOBAL_PREFIX = "global";
+
+const PROFILE_PREFIXES: readonly string[] = [GLOBAL_PREFIX, ...INFERENCE_PROFILE_GEOGRAPHIES];
 
 /**
  * A system-defined inference profile that routes requests to Regions within
@@ -32,11 +42,18 @@ export interface GeographicInferenceProfile {
   /** The id to invoke, e.g. `eu.anthropic.claude-haiku-4-5-20251001-v1:0`. */
   readonly profileId: string;
   /**
-   * Every Region the profile may route to from the source Region, as listed
-   * by `aws bedrock get-inference-profile` or the model's page in the Bedrock
-   * user guide. The source Region is always granted, listed or not.
+   * The Regions the profile routes to from the source Region, as listed by
+   * `aws bedrock get-inference-profile`. AWS chooses and extends that list,
+   * so a copy of it is a snapshot. Bedrock checks the model in every Region
+   * the profile may route to, so once AWS adds one, a grant built from the
+   * copy denies every call through the profile.
+   *
+   * Omitted, the grant covers the foundation model in every Region, still
+   * only through this profile. List the Regions when the policy must name
+   * each one, for a service control policy or a policy scanner. The source
+   * Region is always granted.
    */
-  readonly routingRegions: readonly string[];
+  readonly routingRegions?: readonly string[];
 }
 
 /**
@@ -85,35 +102,41 @@ export type GeographicInferenceProfileOptions = Pick<
 const GEOGRAPHY_PATTERN = /^[a-z]+(-[a-z]+)*$/;
 const REGION_PATTERN = /^[a-z]{2}(-[a-z]+)+-\d+$/;
 
-function isProfilePrefix(prefix: string): boolean {
-  return (
-    prefix === GLOBAL_PREFIX ||
-    (INFERENCE_PROFILE_GEOGRAPHIES as readonly string[]).includes(prefix)
-  );
+/**
+ * The segment of `id` before its first dot, and whether it marks a
+ * system-defined profile id. Undefined when `id` has no such segment.
+ * @internal
+ */
+export function idPrefix(id: string): { prefix: string; isProfile: boolean } | undefined {
+  const dot = id.indexOf(".");
+  if (dot <= 0) return undefined;
+  const prefix = id.slice(0, dot);
+  return { prefix, isProfile: PROFILE_PREFIXES.includes(prefix) };
 }
 
-function prefixOf(id: string): string | undefined {
-  const dot = id.indexOf(".");
-  return dot > 0 ? id.slice(0, dot) : undefined;
+/** Throws unless `id` is a non-empty literal string. @internal */
+export function assertLiteralId(id: string, label: string): void {
+  if (Token.isUnresolved(id) || id === "") {
+    throw new Error(`${label} must be a non-empty literal string.`);
+  }
 }
 
 function assertModel(model: FoundationModelIdentifier): void {
   const { modelId } = model;
-  if (Token.isUnresolved(modelId) || modelId === "") {
-    throw new Error("Inference profile model id must be a non-empty literal string.");
-  }
-  const prefix = prefixOf(modelId);
-  if (prefix !== undefined && isProfilePrefix(prefix)) {
+  assertLiteralId(modelId, "Inference profile model id");
+  if (idPrefix(modelId)?.isProfile) {
     throw new Error(
       `"${modelId}" is an inference profile id, not a foundation model id. ` +
-        `Use inferenceProfile.parse("${modelId}", …) instead.`,
+        `Use inferenceProfile.parse("${modelId}") instead.`,
     );
   }
 }
 
 function assertRoutingRegions(profileId: string, regions: readonly string[]): void {
   if (regions.length === 0) {
-    throw new Error(`Inference profile "${profileId}": routingRegions must not be empty.`);
+    throw new Error(
+      `Inference profile "${profileId}": routingRegions must not be empty; omit it to grant every Region.`,
+    );
   }
   for (const region of regions) {
     if (Token.isUnresolved(region) || !REGION_PATTERN.test(region)) {
@@ -125,7 +148,7 @@ function assertRoutingRegions(profileId: string, regions: readonly string[]): vo
 }
 
 function geographic(options: GeographicInferenceProfileOptions): GeographicInferenceProfile {
-  const { model, geography } = options;
+  const { model, geography, routingRegions } = options;
   assertModel(model);
   if (geography === GLOBAL_PREFIX || !GEOGRAPHY_PATTERN.test(geography)) {
     throw new Error(
@@ -133,13 +156,13 @@ function geographic(options: GeographicInferenceProfileOptions): GeographicInfer
     );
   }
   const profileId = `${geography}.${model.modelId}`;
-  assertRoutingRegions(profileId, options.routingRegions);
+  if (routingRegions !== undefined) assertRoutingRegions(profileId, routingRegions);
   return Object.freeze({
     kind: "geographic",
     geography,
     model,
     profileId,
-    routingRegions: Object.freeze([...new Set(options.routingRegions)]),
+    ...(routingRegions && { routingRegions: Object.freeze([...new Set(routingRegions)]) }),
   });
 }
 
@@ -149,18 +172,17 @@ function global(model: FoundationModelIdentifier): GlobalInferenceProfile {
 }
 
 function splitProfileId(profileId: string): { prefix: string; modelId: string } {
-  const prefix = prefixOf(profileId);
-  if (prefix === undefined || !isProfilePrefix(prefix)) {
+  const parsed = idPrefix(profileId);
+  if (!parsed?.isProfile) {
     throw new Error(
       `"${profileId}" is not a system-defined inference profile id. Expected one of the ` +
-        `prefixes: ${[GLOBAL_PREFIX, ...INFERENCE_PROFILE_GEOGRAPHIES].join(", ")}.`,
+        `prefixes: ${PROFILE_PREFIXES.join(", ")}.`,
     );
   }
+  const { prefix } = parsed;
   return { prefix, modelId: profileId.slice(prefix.length + 1) };
 }
 
-function parse(profileId: string): GlobalInferenceProfile;
-function parse(profileId: string, routingRegions: readonly string[]): InferenceProfile;
 function parse(profileId: string, routingRegions?: readonly string[]): InferenceProfile {
   const { prefix, modelId } = splitProfileId(profileId);
   const model = new FoundationModelIdentifier(modelId);
@@ -171,9 +193,6 @@ function parse(profileId: string, routingRegions?: readonly string[]): Inference
       );
     }
     return global(model);
-  }
-  if (routingRegions === undefined) {
-    throw new Error(`Inference profile "${profileId}" is geographic and needs its routingRegions.`);
   }
   return geographic({ model, geography: prefix, routingRegions });
 }
@@ -186,7 +205,6 @@ function parse(profileId: string, routingRegions?: readonly string[]): Inference
  * const haiku = inferenceProfile.geographic({
  *   model: FoundationModelIdentifier.ANTHROPIC_CLAUDE_HAIKU_4_5_20251001_V1_0,
  *   geography: "eu",
- *   routingRegions: ["eu-central-1", "eu-north-1", "eu-south-1", "eu-south-2", "eu-west-1", "eu-west-3"],
  * });
  * haiku.profileId; // "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
  * ```
@@ -199,7 +217,7 @@ export const inferenceProfile = {
   /**
    * Reads a profile id such as `eu.anthropic.claude-haiku-4-5-20251001-v1:0`.
    * Throws unless the id starts with a known geography or `global`. A
-   * geographic id needs its `routingRegions`; a global id takes none.
+   * geographic id may take its `routingRegions`; a global id takes none.
    */
   parse,
 };

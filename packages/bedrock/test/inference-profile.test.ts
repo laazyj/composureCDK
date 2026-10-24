@@ -56,6 +56,18 @@ describe("inferenceProfile.geographic", () => {
     ).toThrow(/not a geography prefix/);
   });
 
+  it("omits routing regions when none are given", () => {
+    const profile = inferenceProfile.geographic({ model: MODEL, geography: "eu" });
+
+    expect(profile).toEqual({
+      kind: "geographic",
+      geography: "eu",
+      model: MODEL,
+      profileId: `eu.${MODEL_ID}`,
+    });
+    expect("routingRegions" in profile).toBe(false);
+  });
+
   it("rejects empty routing regions", () => {
     expect(() =>
       inferenceProfile.geographic({ model: MODEL, geography: "eu", routingRegions: [] }),
@@ -135,10 +147,17 @@ describe("inferenceProfile.parse", () => {
     expect(profile).toMatchObject({ kind: "global", profileId: `global.${MODEL_ID}` });
   });
 
-  it("requires routing regions for a geographic profile", () => {
-    // Exercises the untyped path an id read from configuration takes.
-    const parse = inferenceProfile.parse as (id: string) => unknown;
-    expect(() => parse(`eu.${MODEL_ID}`)).toThrow(/needs its routingRegions/);
+  it("parses a geographic profile without routing regions", () => {
+    expect(inferenceProfile.parse(`eu.${MODEL_ID}`)).toEqual({
+      kind: "geographic",
+      geography: "eu",
+      model: MODEL,
+      profileId: `eu.${MODEL_ID}`,
+    });
+  });
+
+  it("recognises the in geography", () => {
+    expect(inferenceProfile.parse(`in.${MODEL_ID}`)).toMatchObject({ geography: "in" });
   });
 
   it("rejects routing regions for a global profile", () => {

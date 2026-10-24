@@ -13,14 +13,6 @@ import { createModelAlarmBuilder, inferenceProfile, modelGrants } from "@composu
 const haiku = inferenceProfile.geographic({
   model: FoundationModelIdentifier.ANTHROPIC_CLAUDE_HAIKU_4_5_20251001_V1_0,
   geography: "eu",
-  routingRegions: [
-    "eu-central-1",
-    "eu-north-1",
-    "eu-south-1",
-    "eu-south-2",
-    "eu-west-1",
-    "eu-west-3",
-  ],
 });
 
 compose(
@@ -49,36 +41,57 @@ compose(
 
 A profile's id is derived from its model, so the id a caller invokes and the model it is granted cannot drift apart. Use `new FoundationModelIdentifier("…")` for a model newer than the installed CDK's constants.
 
-`routingRegions` are the Regions a geographic profile routes to from your source Region. They vary by source Region and are not derivable from the geography, so they are supplied rather than guessed: take them from the model's page in the Bedrock user guide or from `aws bedrock get-inference-profile`. The source Region is always included.
+### Routing Regions
 
-For an id that arrives as a string, such as from an environment variable:
+A geographic profile is owned by AWS. AWS chooses the Regions it routes to, which differ by source Region and grow over time without notice. You choose the profile, not its destinations.
+
+By default the grant therefore covers the foundation model in every Region, conditioned on `bedrock:InferenceProfileArn` so it is reachable only through that profile. The profile keeps requests inside its geography, so naming the destinations would not narrow where they run. A copy of the list would break the profile when AWS adds a Region. Bedrock checks the model in every Region the profile may route to before it routes a request, so one missing Region denies every call, not only those routed there.
+
+Pass `routingRegions` when the policy must name each Region: for a service control policy, or a policy scanner that flags a wildcard in any ARN. Take them from `aws bedrock get-inference-profile`, and re-check them when AWS changes the profile. The source Region is always included.
 
 ```ts
-const profile = inferenceProfile.parse(
-  "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
-  routingRegions,
-);
-foundationModelFor(profile.profileId).modelId; // "anthropic.claude-haiku-4-5-20251001-v1:0"
+inferenceProfile.geographic({
+  model,
+  geography: "eu",
+  routingRegions: ["eu-central-1", "eu-west-3"],
+});
 ```
 
-`parse` and `foundationModelFor` throw on an id without a known geography or `global` prefix (`INFERENCE_PROFILE_GEOGRAPHIES`), rather than mistake a provider such as `anthropic.` for one.
+The default is not the shape in the Bedrock user guide's example, which lists each Region. It is the same statement with the Region left open, verified against live IAM ([#628](https://github.com/laazyj/composureCDK/issues/628)).
+
+### Ids that arrive as strings
+
+`inferenceTarget.fromId` resolves an id read from configuration or an environment variable:
+
+| Id                                  | Target                   |
+| ----------------------------------- | ------------------------ |
+| `anthropic.claude-…`                | A foundation model       |
+| `eu.anthropic.claude-…`, `global.…` | A system-defined profile |
+| `arn:…:provisioned-model/…`         | A provisioned model      |
+
+```ts
+const ids = ["anthropic.claude-sonnet-5-5", "us.anthropic.claude-haiku-4-5-20251001-v1:0"];
+createFunctionBuilder().grant(...ids.map((id) => modelGrants.invoke(inferenceTarget.fromId(id))));
+```
+
+It throws on a two-part id with an unknown prefix (`INFERENCE_PROFILE_GEOGRAPHIES`) rather than grant it as a model named after a geography. It also throws on an inference profile ARN, because the model the profile routes to cannot be read from it. `inferenceProfile.parse` and `foundationModelFor` accept only profile ids.
 
 Profiles are plain values rather than the alpha `CrossRegionInferenceProfile` L2, for the [reasons given for guardrails](#why-the-l1-constructs-not-the-alpha-l2) and because its grants don't match what live IAM needs ([#536](https://github.com/laazyj/composureCDK/issues/536)).
 
 ## Grants
 
-`modelGrants.invoke(target)` grants `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`, which together cover `InvokeModel`, `Converse` and their streaming variants. Pass it to any grantee builder's `grant(...)`.
+`modelGrants.invoke(target)` grants `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`, which together cover `InvokeModel`, `Converse` and their streaming variants. A caller that never streams can pass `{ streaming: false }` for `bedrock:InvokeModel` alone. Pass the grant to any grantee builder's `grant(...)`.
 
 | Target      | Statements                                                                                                                                                                                                   |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Model       | The foundation model in the source Region                                                                                                                                                                    |
-| Geographic  | The profile; the foundation model in the source Region and every routing Region, conditioned on `bedrock:InferenceProfileArn`                                                                                |
+| Geographic  | The profile; the foundation model in every Region, or in the source Region and each listed routing Region, conditioned on `bedrock:InferenceProfileArn`                                                      |
 | Global      | The profile; the foundation model in the source Region; the Region-less foundation model ARN with `aws:RequestedRegion: unspecified`. Both model statements are conditioned on `bedrock:InferenceProfileArn` |
 | Application | The profile; its source's foundation models, conditioned on `bedrock:InferenceProfileArn` being the application profile                                                                                      |
 
 The model and system-profile rows follow the policies in the Bedrock user guide for [geographic](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html#geographic-cris-iam-setup) and [global](https://docs.aws.amazon.com/bedrock/latest/userguide/global-cross-region-inference.html#global-cris-iam-setup) cross-Region inference. The `bedrock:InferenceProfileArn` condition makes the foundation models reachable only through the profile ([GENSEC01-BP01](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp01.html)); to also call a model directly, grant it separately. The application row was verified against live IAM for a global source: the source profile needs no statement of its own.
 
-`invocationArns(target, scope)` returns the same resource ARNs for policies you write yourself, such as service control policies.
+`invocationArns(target, scope)` returns the same resource ARNs for policies you write yourself, such as service control policies. For a geographic profile without `routingRegions` that is one Region-wildcard model ARN, so list the Regions when the policy needs them.
 
 ## Alarms
 
@@ -95,7 +108,7 @@ AWS publishes no recommended alarm thresholds for Bedrock. The [Generative AI Le
 | `timeToFirstToken`       | `TimeToFirstToken` (p90)       | opt-in, threshold required             |
 | `estimatedTpmQuotaUsage` | `EstimatedTPMQuotaUsage` (Max) | opt-in, `quota` required; 80% of quota |
 
-`invocationClientErrors` includes `AccessDenied`, so it catches an under-granted routing Region, which fails only for requests routed there. Missing data is not breaching. Defaults are exported as `MODEL_ALARM_DEFAULTS`.
+`invocationClientErrors` includes `AccessDenied`, so it catches a stale `routingRegions` list, which denies every call through the profile. Missing data is not breaching. Defaults are exported as `MODEL_ALARM_DEFAULTS`.
 
 ```ts
 createModelAlarmBuilder()
@@ -157,7 +170,14 @@ compose(
 
 By default the guardrail filters every harmful-content category (sexual, violence, hate, insults, misconduct) and prompt attacks at `HIGH`, with the Bedrock console's default blocked message (`GUARDRAIL_DEFAULTS`). Topic, word, sensitive-information and contextual-grounding policies depend on the workload and are not defaulted.
 
-`requireGuardrail` makes the grantee [use the guardrail](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-permissions-id.html): the invoke allow is conditioned on `bedrock:GuardrailIdentifier`, an explicit deny refuses any other call, and the grantee may apply the guardrail. `guardrailGrants.apply` grants `bedrock:ApplyGuardrail` alone.
+`requireGuardrail` makes the grantee [use the guardrail](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-permissions-id.html): the invoke allow is conditioned on `bedrock:GuardrailIdentifier`, an explicit deny refuses any other call, and the grantee may apply the guardrail. `guardrailGrants.apply` grants `bedrock:ApplyGuardrail` alone, and accepts a guardrail the app did not build as `{ guardrailArn, version }`.
+
+For a guardrail chosen at run time, such as one named in configuration:
+
+- `requireGuardrail: "any"` requires every call to carry some guardrail in the grantee's account and Region, and lets the grantee apply any of them.
+- `guardrailGrants.applyAny()` lets the grantee apply any guardrail in its account and Region, without requiring one. Use it where a call may or may not name a guardrail.
+
+Prefer a reference where the guardrail is known at synth.
 
 Guardrail errors and throttles are only published per account, so the guardrail's alarms are opt-in: `invocationsIntervened` (Sum) and `invocationLatency` (p90), each with a threshold you supply.
 

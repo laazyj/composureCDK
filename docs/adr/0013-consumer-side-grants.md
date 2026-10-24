@@ -171,3 +171,13 @@ than one action and statement, provided each is transcribed from AWS's own
 specification — the Service Authorization Reference for actions and ARN
 formats, the service's user guide for the policy shape — rather than chosen by
 the library.
+
+The transcription bar has one exception. Where AWS's documented shape
+enumerates state that AWS owns and changes without notice, so that no stack
+can keep a literal copy correct, the helper may emit a superset of it: the
+same actions and conditions with the changing field left open. The superset
+must keep every condition that does the containing, be verified against live
+IAM, be documented as a departure, and leave the literal shape available as
+an option. A geographic inference profile's routing Regions are the first case
+([#628](https://github.com/laazyj/composureCDK/issues/628)): the model ARN's
+Region is `*`, still conditioned on `bedrock:InferenceProfileArn`.

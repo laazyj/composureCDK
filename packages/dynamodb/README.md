@@ -94,6 +94,28 @@ createTableBuilder()
   .encryptionKey(ref<KeyBuilderResult>("tableKey").get("key"));
 ```
 
+## Grants
+
+`tableGrants` gives a grantee access to a table — declared on the **grantee**, pointing at the table via a `ref` ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). One namespace serves both builders:
+
+```ts
+createFunctionBuilder()
+  // ...
+  .grant(tableGrants.readWrite(ref<TableV2BuilderResult>("orders").get("table")));
+```
+
+| Capability   | Table actions                                                            | Key actions                                                |
+| ------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `read`       | `GetItem`, `Query`, `Scan`, `BatchGetItem`, … `DescribeTable`            | `Decrypt`, `DescribeKey`                                   |
+| `write`      | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `DescribeTable` | `read`'s, plus `Encrypt`, `ReEncrypt*`, `GenerateDataKey*` |
+| `put`        | `PutItem`                                                                | as `write`                                                 |
+| `readWrite`  | `read`'s and `write`'s                                                   | as `write`                                                 |
+| `fullAccess` | `dynamodb:*`                                                             | as `write`                                                 |
+
+`put` is for a write-once store: its grantee may add items but never update or delete them. It leaves out `BatchWriteItem`, which can delete.
+
+Each capability grants the table's customer-managed key, when it has one, in the grantee's identity policy, so a grant stands alone. A key built by [`@composurecdk/kms`](../kms/README.md) keeps CDK's default key policy, which delegates to IAM, so that is enough within the account. Two limits: on a `TableV2` with replicas only the primary Region's key is granted, not a replica's; and a key in another account needs its key policy to allow the grantee.
+
 ## DynamoDB Streams
 
 Enable a stream with `.dynamoStream(StreamViewType…)` (TableV2) or `.stream(StreamViewType…)` (classic). The build result surfaces the stream ARN so a downstream component can wire a consumer:

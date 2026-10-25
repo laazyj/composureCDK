@@ -20,6 +20,15 @@ function ruleMetric(rule: IRule, metricName: string): Metric {
   });
 }
 
+/** Narrows to an `AWS::Events::Rule` L1 without `instanceof` — see ADR-0007/ADR-0011. */
+function isCfnRule(node: IConstruct | undefined): node is CfnRule {
+  return (
+    node !== undefined &&
+    CfnResource.isCfnResource(node) &&
+    node.cfnResourceType === CfnRule.CFN_RESOURCE_TYPE_NAME
+  );
+}
+
 /**
  * Whether any target bound to the rule so far has a dead-letter queue, read
  * off the rule's L1 `CfnRule` rather than the targets' classes, so it holds
@@ -29,13 +38,8 @@ function ruleMetric(rule: IRule, metricName: string): Metric {
  */
 function hasTargetDeadLetterQueue(rule: IRule): boolean {
   const cfnRule = rule.node.defaultChild;
-  if (
-    !CfnResource.isCfnResource(cfnRule) ||
-    cfnRule.cfnResourceType !== CfnRule.CFN_RESOURCE_TYPE_NAME
-  ) {
-    return false;
-  }
-  const targets = Stack.of(rule).resolve((cfnRule as CfnRule).targets) as
+  if (!isCfnRule(cfnRule)) return false;
+  const targets = Stack.of(rule).resolve(cfnRule.targets) as
     { deadLetterConfig?: unknown }[] | undefined;
   return (targets ?? []).some((t) => t.deadLetterConfig !== undefined);
 }

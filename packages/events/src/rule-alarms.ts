@@ -1,6 +1,6 @@
-import { Duration } from "aws-cdk-lib";
+import { CfnResource, Duration, Stack } from "aws-cdk-lib";
 import { type Alarm, ComparisonOperator, Metric } from "aws-cdk-lib/aws-cloudwatch";
-import type { IRule } from "aws-cdk-lib/aws-events";
+import { CfnRule, type IRule } from "aws-cdk-lib/aws-events";
 import type { IConstruct } from "constructs";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
@@ -21,6 +21,26 @@ function ruleMetric(rule: IRule, metricName: string): Metric {
 }
 
 /**
+ * Whether any target bound to the rule so far has a dead-letter queue, read
+ * off the rule's L1 `CfnRule` rather than the targets' classes, so it holds
+ * across the ESM and CJS copies of `aws-cdk-lib`. `Rule` sets `targets` to a
+ * lazy value, so it has to be resolved. An imported rule has no L1, so it
+ * reports `false`.
+ */
+function hasTargetDeadLetterQueue(rule: IRule): boolean {
+  const cfnRule = rule.node.defaultChild;
+  if (
+    !CfnResource.isCfnResource(cfnRule) ||
+    cfnRule.cfnResourceType !== CfnRule.CFN_RESOURCE_TYPE_NAME
+  ) {
+    return false;
+  }
+  const targets = Stack.of(rule).resolve((cfnRule as CfnRule).targets) as
+    { deadLetterConfig?: unknown }[] | undefined;
+  return (targets ?? []).some((t) => t.deadLetterConfig !== undefined);
+}
+
+/**
  * Resolves the recommended alarm configuration into fully-resolved
  * {@link AlarmDefinition}s for an EventBridge rule.
  *
@@ -33,6 +53,10 @@ export function resolveRuleAlarmDefinitions(
   if (config?.enabled === false) return [];
 
   const definitions: AlarmDefinition[] = [];
+  // An omitted DLQ alarm resolves to defaults (`{}`) only when there is a DLQ to watch.
+  const dlqDefault = hasTargetDeadLetterQueue(rule) ? {} : false;
+  const sentToDlq = config?.invocationsSentToDlq ?? dlqDefault;
+  const failedToBeSentToDlq = config?.invocationsFailedToBeSentToDlq ?? dlqDefault;
 
   if (config?.failedInvocations !== false) {
     const cfg = resolveAlarmConfig(
@@ -67,11 +91,8 @@ export function resolveRuleAlarmDefinitions(
     });
   }
 
-  if (config?.invocationsSentToDlq !== false) {
-    const cfg = resolveAlarmConfig(
-      config?.invocationsSentToDlq,
-      RULE_ALARM_DEFAULTS.invocationsSentToDlq,
-    );
+  if (sentToDlq !== false) {
+    const cfg = resolveAlarmConfig(sentToDlq, RULE_ALARM_DEFAULTS.invocationsSentToDlq);
     definitions.push({
       key: "invocationsSentToDlq",
       alarmName: cfg.alarmName,
@@ -85,9 +106,9 @@ export function resolveRuleAlarmDefinitions(
     });
   }
 
-  if (config?.invocationsFailedToBeSentToDlq !== false) {
+  if (failedToBeSentToDlq !== false) {
     const cfg = resolveAlarmConfig(
-      config?.invocationsFailedToBeSentToDlq,
+      failedToBeSentToDlq,
       RULE_ALARM_DEFAULTS.invocationsFailedToBeSentToDlq,
     );
     definitions.push({

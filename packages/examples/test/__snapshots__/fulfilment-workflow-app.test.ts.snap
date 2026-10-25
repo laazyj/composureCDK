@@ -647,54 +647,6 @@ exports[`fulfilment-workflow-app > matches the expected synthesised template 1`]
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
-    "FulfilmentWorkfloworderPlacedInvocationsFailedToBeSentToDlqAlarm50323D60": {
-      "Properties": {
-        "AlarmDescription": "EventBridge rule failed to redrive an event to a target dead-letter queue; events may be lost. Threshold: > 0 failed redrives in 1 minute.",
-        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/order-placed/invocations-failed-to-be-sent-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "RuleName",
-            "Value": {
-              "Ref": "FulfilmentWorkfloworderPlacedE308C09F",
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "InvocationsFailedToBeSentToDlq",
-        "Namespace": "AWS/Events",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
-    "FulfilmentWorkfloworderPlacedInvocationsSentToDlqAlarm648A7985": {
-      "Properties": {
-        "AlarmDescription": "EventBridge rule is redriving events to a target dead-letter queue. Threshold: > 0 redrives in 1 minute.",
-        "AlarmName": "composure-cdk-fulfilment-workflow-stack/fulfilment-workflow/order-placed/invocations-sent-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "RuleName",
-            "Value": {
-              "Ref": "FulfilmentWorkfloworderPlacedE308C09F",
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "InvocationsSentToDlq",
-        "Namespace": "AWS/Events",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
     "FulfilmentWorkfloworderPlacedThrottledRulesAlarm5D48DDD8": {
       "Properties": {
         "AlarmDescription": "EventBridge rule is being throttled, indicating quota or downstream concurrency limits. Threshold: > 0 throttles in 1 minute.",

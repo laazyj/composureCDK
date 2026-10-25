@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { Schedule } from "aws-cdk-lib/aws-events";
+import { Rule, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Queue } from "aws-cdk-lib/aws-sqs";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { newStack } from "@composurecdk/cdk-testing";
+import type { RuleAlarmConfig } from "../src/rule-alarm-config.js";
+import { resolveRuleAlarmDefinitions } from "../src/rule-alarms.js";
 import { createRuleBuilder } from "../src/rule-builder.js";
 
 function makeFn(stack: Stack): LambdaFn {
@@ -17,7 +20,7 @@ function makeFn(stack: Stack): LambdaFn {
 }
 
 describe("RuleBuilder recommended alarms", () => {
-  it("creates the four AWS-recommended alarms by default", () => {
+  it("creates the two non-DLQ recommended alarms by default", () => {
     const stack = newStack();
     const fn = makeFn(stack);
 
@@ -26,15 +29,10 @@ describe("RuleBuilder recommended alarms", () => {
       .addTarget("h", new LambdaFunction(fn))
       .build(stack, "TestRule");
 
-    expect(Object.keys(result.alarms).sort()).toEqual([
-      "failedInvocations",
-      "invocationsFailedToBeSentToDlq",
-      "invocationsSentToDlq",
-      "throttledRules",
-    ]);
+    expect(Object.keys(result.alarms).sort()).toEqual(["failedInvocations", "throttledRules"]);
 
     const template = Template.fromStack(stack);
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 4);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
       MetricName: "FailedInvocations",
       Namespace: "AWS/Events",
@@ -46,11 +44,72 @@ describe("RuleBuilder recommended alarms", () => {
     template.hasResourceProperties("AWS::CloudWatch::Alarm", {
       MetricName: "ThrottledRules",
     });
-    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
-      MetricName: "InvocationsSentToDlq",
+  });
+
+  describe("DLQ alarms", () => {
+    function buildRule(withDlq: boolean, recommendedAlarms?: RuleAlarmConfig) {
+      const stack = newStack();
+      const fn = makeFn(stack);
+      const deadLetterQueue = withDlq ? new Queue(stack, "Dlq") : undefined;
+
+      const result = createRuleBuilder()
+        .schedule(Schedule.rate(Duration.minutes(15)))
+        .addTarget("h", new LambdaFunction(fn, { deadLetterQueue }))
+        .recommendedAlarms(recommendedAlarms)
+        .build(stack, "TestRule");
+
+      return { alarmKeys: Object.keys(result.alarms).sort(), template: Template.fromStack(stack) };
+    }
+
+    it("creates both DLQ alarms when a target has a dead-letter queue", () => {
+      const { alarmKeys, template } = buildRule(true);
+
+      expect(alarmKeys).toEqual([
+        "failedInvocations",
+        "invocationsFailedToBeSentToDlq",
+        "invocationsSentToDlq",
+        "throttledRules",
+      ]);
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        MetricName: "InvocationsSentToDlq",
+      });
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        MetricName: "InvocationsFailedToBeSentToDlq",
+      });
     });
-    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
-      MetricName: "InvocationsFailedToBeSentToDlq",
+
+    it("creates a DLQ alarm without a target DLQ when its config is explicit", () => {
+      const { alarmKeys, template } = buildRule(false, { invocationsSentToDlq: { threshold: 2 } });
+
+      expect(alarmKeys).toEqual(["failedInvocations", "invocationsSentToDlq", "throttledRules"]);
+      template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+        MetricName: "InvocationsSentToDlq",
+        Threshold: 2,
+      });
+    });
+
+    it("keeps the DLQ alarms off when tuning another alarm on a rule without a DLQ", () => {
+      const { alarmKeys } = buildRule(false, { failedInvocations: { threshold: 5 } });
+
+      expect(alarmKeys).toEqual(["failedInvocations", "throttledRules"]);
+    });
+
+    it("leaves the DLQ alarms off by default for an imported rule, which has no L1 to read", () => {
+      const rule = Rule.fromEventRuleArn(
+        newStack(),
+        "Imported",
+        "arn:aws:events:us-east-1:123456789012:rule/imported",
+      );
+
+      const keys = resolveRuleAlarmDefinitions(rule, undefined).map((d) => d.key);
+
+      expect(keys).toEqual(["failedInvocations", "throttledRules"]);
+    });
+
+    it("disables a DLQ alarm set to false even when a target has a DLQ", () => {
+      const { alarmKeys } = buildRule(true, { invocationsFailedToBeSentToDlq: false });
+
+      expect(alarmKeys).toEqual(["failedInvocations", "invocationsSentToDlq", "throttledRules"]);
     });
   });
 
@@ -165,8 +224,6 @@ describe("RuleBuilder recommended alarms", () => {
 
     expect(Object.keys(result.alarms).sort()).toEqual([
       "failedInvocations",
-      "invocationsFailedToBeSentToDlq",
-      "invocationsSentToDlq",
       "retryAttempts",
       "throttledRules",
     ]);

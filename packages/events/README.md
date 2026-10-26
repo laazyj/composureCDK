@@ -43,6 +43,30 @@ When omitted, the rule attaches to the account default bus, matching CDK's `Rule
 
 The prop's inner type is read from CDK's own `RuleProps.eventBus` rather than pinned to `IEventBus`, so it accepts whatever the `aws-cdk-lib` you have installed accepts — including the broader [`events.IEventBusRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_events.IEventBusRef.html) where CDK has widened the prop.
 
+### Cross-component event pattern
+
+The `eventPattern` property also accepts a `Ref`, so a pattern that names a sibling component's resource can be declared in the same `compose` map — for example, matching objects created in one particular bucket:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+
+compose(
+  {
+    bucket: createBucketBuilder().eventBridgeEnabled(true),
+    rule: createRuleBuilder().eventPattern(
+      ref("bucket", (r) => ({
+        source: ["aws.s3"],
+        detailType: ["Object Created"],
+        detail: { bucket: { name: [r.bucket.bucketName] } },
+      })),
+    ),
+  },
+  { bucket: [], rule: ["bucket"] },
+);
+```
+
+The ref covers the whole pattern and is resolved at build time.
+
 ## Recommended Alarms
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#EventBridge) by default. No alarm actions are configured — access alarms from the build result, or use the `alarmActionsPolicy` from `@composurecdk/cloudwatch` to wire them to an SNS topic in one place.

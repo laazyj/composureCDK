@@ -18,12 +18,13 @@ import { createRuleAlarms } from "./rule-alarms.js";
  * Configuration properties for the EventBridge rule builder.
  *
  * Extends the CDK {@link RuleProps} but accepts a {@link Resolvable} for
- * `eventBus` so the rule can be wired to a sibling component (or a custom
- * event bus built elsewhere) via {@link ref} inside a {@link compose}d
- * system. `targets` is excluded — use {@link IRuleBuilder.addTarget} so each
- * target can carry its own `Resolvable` and be exposed in the build result.
+ * `eventBus` and `eventPattern` so the rule can be wired to a sibling
+ * component (a custom event bus, or a resource the pattern matches on) via
+ * {@link ref} inside a {@link compose}d system. `targets` is excluded — use
+ * {@link IRuleBuilder.addTarget} so each target can carry its own
+ * `Resolvable` and be exposed in the build result.
  */
-export interface RuleBuilderProps extends Omit<RuleProps, "targets" | "eventBus"> {
+export interface RuleBuilderProps extends Omit<RuleProps, "targets" | "eventBus" | "eventPattern"> {
   /**
    * The event bus the rule listens on. Accepts a concrete bus or a
    * {@link Ref} to another component's output. When omitted, the rule
@@ -35,6 +36,13 @@ export interface RuleBuilderProps extends Omit<RuleProps, "targets" | "eventBus"
    * migration in either direction — see the note in this package's README.
    */
   eventBus?: Resolvable<NonNullable<RuleProps["eventBus"]>>;
+
+  /**
+   * The event pattern the rule matches. Accepts a concrete pattern or a
+   * {@link Ref} that builds one from another component's output — for
+   * example, matching "Object Created" for a sibling bucket by name.
+   */
+  eventPattern?: Resolvable<NonNullable<RuleProps["eventPattern"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -158,9 +166,9 @@ class RuleBuilder implements Lifecycle<RuleBuilderResult> {
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): RuleBuilderResult {
     const ctx = context ?? {};
-    const { eventBus, recommendedAlarms: alarmConfig, ...rest } = this.props;
+    const { eventBus, eventPattern, recommendedAlarms: alarmConfig, ...rest } = this.props;
 
-    if (rest.schedule === undefined && rest.eventPattern === undefined) {
+    if (rest.schedule === undefined && eventPattern === undefined) {
       throw new Error(
         `RuleBuilder "${id}": at least one of .schedule(...) or .eventPattern(...) must be set. ` +
           "An EventBridge rule with neither is inert and never matches.",
@@ -171,6 +179,7 @@ class RuleBuilder implements Lifecycle<RuleBuilderResult> {
       ...RULE_DEFAULTS,
       ...rest,
       ...(eventBus !== undefined && { eventBus: resolve(eventBus, ctx) }),
+      ...(eventPattern !== undefined && { eventPattern: resolve(eventPattern, ctx) }),
     };
 
     const rule = new Rule(scope, id, mergedProps);

@@ -4,6 +4,7 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { EventBus, type RuleProps, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Bucket } from "aws-cdk-lib/aws-s3";
 import { newStack } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { createRuleBuilder, type RuleBuilderProps } from "../src/rule-builder.js";
@@ -172,6 +173,33 @@ describe("RuleBuilder", () => {
 
       Template.fromStack(stack).hasResourceProperties("AWS::Events::Rule", {
         EventBusName: { Ref: stack.getLogicalId(bus.node.defaultChild as never) },
+      });
+    });
+  });
+
+  describe("eventPattern", () => {
+    it("resolves a Resolvable event pattern, which satisfies the schedule-or-pattern check", () => {
+      const stack = newStack();
+      const bucket = new Bucket(stack, "Bucket");
+
+      createRuleBuilder()
+        .eventPattern(
+          ref("bucket", (r: { bucket: Bucket }) => ({
+            source: ["aws.s3"],
+            detailType: ["Object Created"],
+            detail: { bucket: { name: [r.bucket.bucketName] } },
+          })),
+        )
+        .build(stack, "TestRule", { bucket: { bucket } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::Events::Rule", {
+        EventPattern: {
+          source: ["aws.s3"],
+          "detail-type": ["Object Created"],
+          detail: {
+            bucket: { name: [{ Ref: stack.getLogicalId(bucket.node.defaultChild as never) }] },
+          },
+        },
       });
     });
   });

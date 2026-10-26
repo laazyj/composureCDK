@@ -1,3 +1,17 @@
+## 0.11.2 (2026-10-26)
+
+### 🚀 Features
+
+- **bedrock:** grant model ids that arrive as strings ([#629](https://github.com/laazyj/composureCDK/pull/629))
+- **dynamodb:** add a put-only table grant ([#630](https://github.com/laazyj/composureCDK/pull/630), [#625](https://github.com/laazyj/composureCDK/issues/625))
+- **events:** accept a Resolvable eventPattern on the rule builder ([#640](https://github.com/laazyj/composureCDK/pull/640), [#637](https://github.com/laazyj/composureCDK/issues/637))
+- **events:** create the rule DLQ alarms only when a target has a dead-letter queue ([#639](https://github.com/laazyj/composureCDK/pull/639), [#636](https://github.com/laazyj/composureCDK/issues/636))
+- **kms:** add a keyGrants helper for GetPublicKey ([#631](https://github.com/laazyj/composureCDK/pull/631), [#624](https://github.com/laazyj/composureCDK/issues/624))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.11.1 (2026-10-16)
 
 ### 🚀 Features

@@ -52,14 +52,9 @@ describe("dual-function-app", () => {
     });
   });
 
-  it("creates the four AWS-recommended rule alarms", () => {
-    template.resourcePropertiesCountIs("AWS::CloudWatch::Alarm", { Namespace: "AWS/Events" }, 4);
-    for (const metricName of [
-      "FailedInvocations",
-      "ThrottledRules",
-      "InvocationsSentToDlq",
-      "InvocationsFailedToBeSentToDlq",
-    ]) {
+  it("creates only the non-DLQ rule alarms, as the target has no DLQ", () => {
+    template.resourcePropertiesCountIs("AWS::CloudWatch::Alarm", { Namespace: "AWS/Events" }, 2);
+    for (const metricName of ["FailedInvocations", "ThrottledRules"]) {
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         Namespace: "AWS/Events",
         MetricName: metricName,

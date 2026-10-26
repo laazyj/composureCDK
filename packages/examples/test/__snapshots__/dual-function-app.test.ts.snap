@@ -686,64 +686,6 @@ exports[`dual-function-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
-    "DualFunctionAppworkerScheduleInvocationsFailedToBeSentToDlqAlarmCE3C6E7F": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "DualFunctionAppalerts6076A01F",
-          },
-        ],
-        "AlarmDescription": "EventBridge rule failed to redrive an event to a target dead-letter queue; events may be lost. Threshold: > 0 failed redrives in 1 minute.",
-        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker-schedule/invocations-failed-to-be-sent-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "RuleName",
-            "Value": {
-              "Ref": "DualFunctionAppworkerSchedule05474C69",
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "InvocationsFailedToBeSentToDlq",
-        "Namespace": "AWS/Events",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
-    "DualFunctionAppworkerScheduleInvocationsSentToDlqAlarm37DE1862": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "DualFunctionAppalerts6076A01F",
-          },
-        ],
-        "AlarmDescription": "EventBridge rule is redriving events to a target dead-letter queue. Threshold: > 0 redrives in 1 minute.",
-        "AlarmName": "composure-cdk-dual-function-stack/dual-function-app/worker-schedule/invocations-sent-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "RuleName",
-            "Value": {
-              "Ref": "DualFunctionAppworkerSchedule05474C69",
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "InvocationsSentToDlq",
-        "Namespace": "AWS/Events",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
     "DualFunctionAppworkerScheduleThrottledRulesAlarm6E846F0E": {
       "Properties": {
         "AlarmActions": [

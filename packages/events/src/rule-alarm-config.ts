@@ -2,7 +2,8 @@ import type { AlarmConfig } from "@composurecdk/cloudwatch";
 
 /**
  * Controls which recommended alarms are created for an EventBridge rule.
- * All applicable alarms are enabled by default with AWS-recommended thresholds.
+ * All applicable alarms are enabled by default with AWS-recommended thresholds;
+ * the two DLQ alarms are applicable only when a target has a dead-letter queue.
  * Set individual alarms to `false` to disable them, or provide an
  * {@link AlarmConfig} to tune thresholds.
  *
@@ -38,9 +39,12 @@ export interface RuleAlarmConfig {
 
   /**
    * Alarm when events that could not be delivered are sent to a target's
-   * dead-letter queue. Only emits data when at least one target has a DLQ
-   * attached and EventBridge attempts redrive; {@link TreatMissingData.NOT_BREACHING}
-   * keeps it quiet otherwise.
+   * dead-letter queue. The metric only emits data when at least one target
+   * has a DLQ attached and EventBridge attempts redrive.
+   *
+   * Created by default only when a target added via `addTarget()` has a
+   * `deadLetterQueue`. Provide an {@link AlarmConfig} (`{}` for the defaults)
+   * to create it regardless — e.g. for a DLQ added outside the builder.
    *
    * Metric: `AWS/Events InvocationsSentToDlq`, statistic Sum, period 1 minute.
    * Default threshold: > 0 redrives.
@@ -53,6 +57,8 @@ export interface RuleAlarmConfig {
    * Alarm when events could not even be delivered to a dead-letter queue.
    * Indicates a misconfiguration (e.g. missing EventBridge permission on
    * the DLQ) that results in event loss.
+   *
+   * Created by default under the same rule as `invocationsSentToDlq`.
    *
    * Metric: `AWS/Events InvocationsFailedToBeSentToDlq`, statistic Sum,
    * period 1 minute.

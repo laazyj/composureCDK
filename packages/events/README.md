@@ -71,14 +71,14 @@ The ref covers the whole pattern and is resolved at build time.
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#EventBridge) by default. No alarm actions are configured — access alarms from the build result, or use the `alarmActionsPolicy` from `@composurecdk/cloudwatch` to wire them to an SNS topic in one place.
 
-| Alarm                            | Metric                                      | Default threshold | Created when |
-| -------------------------------- | ------------------------------------------- | ----------------- | ------------ |
-| `failedInvocations`              | FailedInvocations (Sum, 1 min)              | > 0               | Always       |
-| `throttledRules`                 | ThrottledRules (Sum, 1 min)                 | > 0               | Always       |
-| `invocationsSentToDlq`           | InvocationsSentToDlq (Sum, 1 min)           | > 0               | Always[^dlq] |
-| `invocationsFailedToBeSentToDlq` | InvocationsFailedToBeSentToDlq (Sum, 1 min) | > 0               | Always[^dlq] |
+| Alarm                            | Metric                                      | Default threshold | Created when             |
+| -------------------------------- | ------------------------------------------- | ----------------- | ------------------------ |
+| `failedInvocations`              | FailedInvocations (Sum, 1 min)              | > 0               | Always                   |
+| `throttledRules`                 | ThrottledRules (Sum, 1 min)                 | > 0               | Always                   |
+| `invocationsSentToDlq`           | InvocationsSentToDlq (Sum, 1 min)           | > 0               | A target has a DLQ[^dlq] |
+| `invocationsFailedToBeSentToDlq` | InvocationsFailedToBeSentToDlq (Sum, 1 min) | > 0               | A target has a DLQ[^dlq] |
 
-[^dlq]: The DLQ metrics only emit data when at least one target on the rule has a `deadLetterQueue` configured and EventBridge attempts redrive. `TreatMissingData` defaults to `notBreaching`, so the alarm stays quiet on rules without DLQs. Attach a DLQ via the matching target helper's `deadLetterQueue` option — see [Cross-component DLQ wiring](#cross-component-dlq-wiring) below, and the [EventBridge DLQ docs](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-dlq.html).
+[^dlq]: The DLQ metrics only emit data when at least one target on the rule has a `deadLetterQueue` configured and EventBridge attempts redrive, so the builder creates these two alarms only when a target added via `addTarget()` has one. A DLQ attached outside the builder is not seen; pass an explicit config (`{}` for the defaults) to create either alarm regardless. Attach a DLQ via the matching target helper's `deadLetterQueue` option — see [Cross-component DLQ wiring](#cross-component-dlq-wiring) below, and the [EventBridge DLQ docs](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-dlq.html).
 
 The defaults are exported as `RULE_ALARM_DEFAULTS` for visibility and testing:
 

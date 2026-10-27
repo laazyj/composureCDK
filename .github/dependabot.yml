@@ -22,22 +22,11 @@ updates:
     cooldown:
       default-days: 7
     ignore:
-      # 4.0.5 added `"type": "module"` but still ships .d.ts files whose relative
-      # imports carry no extension, so under NodeNext every graphlib type fails
-      # to resolve and core/src/compose.ts drowns in `no-unsafe-*` (tsc itself
-      # passes — skipLibCheck hides it). dagrejs/graphlib#238; fix in
-      # dagrejs/graphlib#239, still open.
-      #
-      # Pinned to the exact bad release, NOT a range: 4.0.6 will be proposed
-      # automatically, and CI on that PR is what tells us the fix shipped.
-      - dependency-name: "@dagrejs/graphlib"
-        versions: ["4.0.5"]
       # typescript-eslint cannot run on TS 7: the parser's peer range is
       # `>=4.8.4 <6.1.0` and the package hard-throws on the TS 7 API, so a TS 7
       # bump fails `npm install` in the cdk-floors matrix and eslint everywhere
       # else. typescript-eslint/typescript-eslint#10940 tracks support for
-      # TS >= 7.1. Unlike the graphlib pin above this has no automatic expiry —
-      # delete it once that issue closes.
+      # TS >= 7.1. Delete this once that issue closes.
       - dependency-name: "typescript"
         versions: [">=7"]
     groups:

@@ -112,8 +112,8 @@ describe("cleanDeskPolicy", () => {
       DeletionPolicy: "Delete",
       UpdateReplacePolicy: "Delete",
     });
-    // 7 days is the AWS minimum for ScheduleKeyDeletion — there is no
-    // immediate delete, so a torn-down sandbox key still bills for a week.
+    // 7 days is the AWS minimum for ScheduleKeyDeletion; there is no
+    // immediate delete. A key waiting to be deleted isn't billed.
     template.hasResourceProperties("AWS::KMS::Key", { PendingWindowInDays: 7 });
   });
 

@@ -3,7 +3,8 @@ import { App, Duration, RemovalPolicy, Stack, Tags } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Key } from "aws-cdk-lib/aws-kms";
-import { Bucket, BucketEncryption, type BucketProps } from "aws-cdk-lib/aws-s3";
+import { Bucket, BucketEncryption, type BucketProps, type CfnBucket } from "aws-cdk-lib/aws-s3";
+import { S3_SERVER_ACCESS_LOGS_USE_BUCKET_POLICY } from "aws-cdk-lib/cx-api";
 import { buildFixture, newStack, tagsPerResource } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
@@ -321,6 +322,36 @@ describe("BucketBuilder", () => {
       const { template } = buildAndSynth((b) => withoutLogging(b));
 
       template.resourceCountIs("AWS::S3::Bucket", 1);
+    });
+
+    it("disables ACLs on the logging bucket even with the app flag off (#502)", () => {
+      const { template } = buildAndSynth((_, stack) => {
+        stack.node.setContext(S3_SERVER_ACCESS_LOGS_USE_BUCKET_POLICY, false);
+      });
+      const logBucket = findLogBucket(template);
+
+      expect(logBucket.Properties.OwnershipControls).toEqual({
+        Rules: [{ ObjectOwnership: "BucketOwnerEnforced" }],
+      });
+      expect(logBucket.Properties.AccessControl).toBeUndefined();
+      template.hasResourceProperties("AWS::S3::BucketPolicy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Principal: { Service: "logging.s3.amazonaws.com" },
+              Action: "s3:PutObject",
+            }),
+          ]),
+        },
+      });
+    });
+
+    it("keeps the logging bucket's logical ID stable across the scoped flag", () => {
+      const { template } = buildAndSynth();
+      const direct = new Bucket(newStack(), "TestBucketAccessLogs");
+      const directId = direct.stack.getLogicalId(direct.node.defaultChild as CfnBucket);
+
+      template.templateMatches({ Resources: { [directId]: { Type: "AWS::S3::Bucket" } } });
     });
 
     it("skips auto logging bucket when user provides their own destination", () => {

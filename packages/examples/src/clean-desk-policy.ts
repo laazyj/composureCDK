@@ -146,13 +146,13 @@ class TableRemovalPolicyInjector implements IPropertyInjector {
  *
  * `@composurecdk/kms` defaults a key to `RETAIN` with the maximum 30-day
  * window, which is right for real data and wrong for a sandbox: every CI
- * deploy would leave behind a key that bills for a month after the stack it
- * belonged to is gone.
+ * deploy would leave behind a key that is never scheduled for deletion, and
+ * bills $1 a month until someone deletes it by hand.
  *
- * Seven days is as short as this gets — AWS enforces a 7-to-30 day waiting
- * period on `ScheduleKeyDeletion` and there is no immediate-delete option, so
- * a torn-down example's key still bills for a week. That is the floor, not a
- * choice.
+ * With `DESTROY`, billing stops when the stack's deletion schedules the key
+ * for deletion; KMS doesn't charge for a key waiting out its window. Seven
+ * days, the AWS minimum for `ScheduleKeyDeletion`, doesn't change the cost.
+ * It only means a torn-down example's key is gone in a week, not a month.
  */
 class KeyRemovalPolicyInjector implements IPropertyInjector {
   readonly constructUniqueId = Key.PROPERTY_INJECTION_ID;

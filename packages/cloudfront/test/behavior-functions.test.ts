@@ -10,6 +10,7 @@ import {
   FunctionEventType,
   FunctionRuntime,
   KeyValueStore,
+  ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
 import { buildFixture, tagsPerResource } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
@@ -312,8 +313,29 @@ describe("additional path-pattern behaviors", () => {
         CacheBehaviors: Match.arrayWith([
           Match.objectLike({
             PathPattern: "/api/*",
+            ViewerProtocolPolicy: "redirect-to-https",
           }),
         ]),
+      }),
+    });
+  });
+
+  it("lets an additional behavior override the viewer protocol policy", () => {
+    const { template } = buildAndSynth((b, stack) => {
+      b.origin(withBucketOrigin(stack))
+        .accessLogs(false)
+        .recommendedAlarms(false)
+        .behavior("/api/*", {
+          origin: new HttpOrigin("api.example.com"),
+          viewerProtocolPolicy: ViewerProtocolPolicy.ALLOW_ALL,
+        });
+    });
+
+    template.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({
+        CacheBehaviors: [
+          Match.objectLike({ PathPattern: "/api/*", ViewerProtocolPolicy: "allow-all" }),
+        ],
       }),
     });
   });

@@ -642,7 +642,7 @@ exports[`static-website-app > stack > matches the expected synthesised template 
               ],
               "PathPattern": "/api/*",
               "TargetOriginId": "ComposureCDKStaticWebsiteStackStaticWebsitecdnOrigin2388BF2F9",
-              "ViewerProtocolPolicy": "allow-all",
+              "ViewerProtocolPolicy": "redirect-to-https",
             },
           ],
           "Comment": "Example static website",

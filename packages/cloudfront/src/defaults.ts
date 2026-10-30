@@ -1,4 +1,5 @@
 import {
+  type AddBehaviorOptions,
   FunctionRuntime,
   HttpVersion,
   PriceClass,
@@ -7,6 +8,23 @@ import {
   ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
 import type { DistributionBuilderProps, InlineFunctionDefinition } from "./distribution-builder.js";
+
+/**
+ * Defaults applied to every cache behavior — the default behavior and each
+ * path behavior added with `.behavior(pathPattern, config)`. User-provided
+ * properties take precedence.
+ *
+ * Set explicitly so the guarantee holds regardless of the
+ * `@aws-cdk/aws-cloudfront:defaultViewerProtocolPolicyRedirectToHttps`
+ * feature flag, without which CDK falls back to `ALLOW_ALL`.
+ */
+export const BEHAVIOR_DEFAULTS: Partial<AddBehaviorOptions> = {
+  /**
+   * Redirect HTTP to HTTPS — ensures all viewer traffic is encrypted in transit.
+   * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-in-transit.html
+   */
+  viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+};
 
 /**
  * Secure, AWS-recommended defaults applied to every CloudFront distribution
@@ -55,11 +73,7 @@ export const DISTRIBUTION_DEFAULTS: Partial<DistributionBuilderProps> = {
   minimumProtocolVersion: SecurityPolicyProtocol.TLS_V1_2_2021,
 
   defaultBehavior: {
-    /**
-     * Redirect HTTP to HTTPS — ensures all viewer traffic is encrypted in transit.
-     * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-in-transit.html
-     */
-    viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+    ...BEHAVIOR_DEFAULTS,
 
     /**
      * Apply the managed security headers policy (HSTS, X-Content-Type-Options,

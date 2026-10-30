@@ -13,7 +13,7 @@ import {
   eventTypePascal,
   pathPatternSlug,
 } from "./behavior-function-alarms.js";
-import { INLINE_FUNCTION_DEFAULTS } from "./defaults.js";
+import { BEHAVIOR_DEFAULTS, INLINE_FUNCTION_DEFAULTS } from "./defaults.js";
 import type {
   AdditionalBehaviorConfig,
   DefaultBehaviorConfig,
@@ -176,6 +176,7 @@ export function resolveBehaviors(input: ResolveBehaviorsInput): ResolveBehaviors
     const resolvedOrigin = resolve(config.origin, context);
     const associations = buildInlineFunctions(pathPattern, config.functions);
     resolvedAdditionalBehaviors[pathPattern] = {
+      ...BEHAVIOR_DEFAULTS,
       ...omit(config, "functions", "origin"),
       origin: resolvedOrigin,
       ...(associations.length > 0 ? { functionAssociations: associations } : {}),

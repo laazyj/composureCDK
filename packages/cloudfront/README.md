@@ -49,6 +49,8 @@ compose({ site: createBucketBuilder(), cdn }, { site: [], cdn: ["site"] }).build
 | `defaultBehavior.viewerProtocolPolicy`  | `REDIRECT_TO_HTTPS`   | Ensures all viewer traffic is encrypted in transit.                                        |
 | `defaultBehavior.responseHeadersPolicy` | `SECURITY_HEADERS`    | Applies managed security headers (HSTS, X-Content-Type-Options, etc.).                     |
 
+Path behaviors added with `.behavior(pathPattern, config)` also default `viewerProtocolPolicy` to `REDIRECT_TO_HTTPS`, exported as `BEHAVIOR_DEFAULTS`; override it per behavior.
+
 These defaults are guided by the [AWS Well-Architected Security Pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-in-transit.html).
 
 The defaults are exported as `DISTRIBUTION_DEFAULTS` for visibility and testing:

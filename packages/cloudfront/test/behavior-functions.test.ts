@@ -10,6 +10,7 @@ import {
   FunctionEventType,
   FunctionRuntime,
   KeyValueStore,
+  ResponseHeadersPolicy,
   ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
 import { buildFixture, tagsPerResource } from "@composurecdk/cdk-testing";
@@ -314,6 +315,7 @@ describe("additional path-pattern behaviors", () => {
           Match.objectLike({
             PathPattern: "/api/*",
             ViewerProtocolPolicy: "redirect-to-https",
+            ResponseHeadersPolicyId: "67f7725c-6f97-4210-82d7-5512b31e9d03",
           }),
         ]),
       }),
@@ -335,6 +337,30 @@ describe("additional path-pattern behaviors", () => {
       DistributionConfig: Match.objectLike({
         CacheBehaviors: [
           Match.objectLike({ PathPattern: "/api/*", ViewerProtocolPolicy: "allow-all" }),
+        ],
+      }),
+    });
+  });
+
+  it("lets an additional behavior override the response headers policy", () => {
+    const { template } = buildAndSynth((b, stack) => {
+      b.origin(withBucketOrigin(stack))
+        .accessLogs(false)
+        .recommendedAlarms(false)
+        .behavior("/api/*", {
+          origin: new HttpOrigin("api.example.com"),
+          responseHeadersPolicy:
+            ResponseHeadersPolicy.CORS_ALLOW_ALL_ORIGINS_WITH_PREFLIGHT_AND_SECURITY_HEADERS,
+        });
+    });
+
+    template.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({
+        CacheBehaviors: [
+          Match.objectLike({
+            PathPattern: "/api/*",
+            ResponseHeadersPolicyId: "eaab4381-ed33-4a86-88ca-d9558dc6cd63",
+          }),
         ],
       }),
     });

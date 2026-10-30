@@ -1,4 +1,9 @@
-# ComposureCDK
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/brand/lockup-dark.svg">
+    <img alt="ComposureCDK" src=".github/brand/lockup-light.svg" height="56">
+  </picture>
+</h1>
 
 **Composable, lifecycle-managed AWS infrastructure.**
 
@@ -126,6 +131,10 @@ The bucket gets ComposureCDK's secure defaults — encryption, blocked public ac
 See [docs/showcase.md](docs/showcase.md) for case studies of projects built with ComposureCDK, and for the badge snippet to add to your own README:
 
 [![Built with ComposureCDK](https://img.shields.io/badge/built%20with-ComposureCDK-0f0d0c?labelColor=b85416)](https://github.com/laazyj/composureCDK)
+
+## Composure Labs
+
+[Composure Labs](https://github.com/composure-labs) builds the tooling around ComposureCDK. Its packages are first-party, published under [`@composure-labs`](https://www.npmjs.com/org/composure-labs), and released on their own schedule rather than in lockstep with the `@composurecdk/*` packages below. [See what it builds](https://github.com/composure-labs).
 
 ## Packages
 

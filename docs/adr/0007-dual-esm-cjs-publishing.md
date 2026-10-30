@@ -110,7 +110,7 @@ cross-realm-safe discriminator.
   across the supported Node range, and it does not fix the `ts-node`/Jest CJS
   case in issue #119.
 - **Enforcement in CI only.** Rejected — it makes the feedback loop a push away.
-  composureCDK's CI already just runs nx targets, so enforcement is
+  ComposureCDK's CI already just runs nx targets, so enforcement is
   implemented as nx targets that run locally and in CI alike.
 
 ## Amendment (2026-09-18): `eslint-plugin` joins the standard

@@ -65,6 +65,11 @@
       "status": "no-effect",
       "recommended": true
     },
+    "@aws-cdk/aws-cloudfront:defaultViewerProtocolPolicyRedirectToHttps": {
+      "status": "no-effect",
+      "recommended": true,
+      "because": "DistributionBuilder sets viewerProtocolPolicy to REDIRECT_TO_HTTPS on the default behavior and on every path behavior (packages/cloudfront/src/defaults.ts), so the guarantee holds without the flag."
+    },
     "@aws-cdk/aws-cloudwatch-actions:changeLambdaPermissionLogicalIdForLambdaAction": {
       "status": "no-effect",
       "recommended": true

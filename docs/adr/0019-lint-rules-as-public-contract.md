@@ -52,7 +52,7 @@ correct, and each rule sits in exactly one tier.**
 | `recommended`    | Anyone writing a `Lifecycle` or a builder, in any shape of project |
 | `libraryAuthor`  | Additionally, a package others compile against                     |
 | `dualPublishing` | Additionally, a package shipping both ESM and CommonJS             |
-| `internal`       | composureCDK itself                                                |
+| `internal`       | ComposureCDK itself                                                |
 
 Which rules sit in which tier is deliberately **not** listed here — that roster
 changes, and this document does not. It lives in the package README's rules

@@ -74,13 +74,13 @@ jobs:
       - name: Lint workflows
         run: npx nx actionlint
 
-      # Hash-pinned in .github/zizmor/requirements.txt, which Dependabot keeps
+      # Hash-pinned in scripts/zizmor/requirements.txt, which Dependabot keeps
       # current; see docs/ci.md#auditing-the-workflows. A venv because the
       # runner's system Python refuses pip installs (PEP 668).
       - name: Install zizmor
         run: |
           python3 -m venv "$RUNNER_TEMP/zizmor"
-          "$RUNNER_TEMP/zizmor/bin/pip" install --disable-pip-version-check --require-hashes --no-deps -r .github/zizmor/requirements.txt
+          "$RUNNER_TEMP/zizmor/bin/pip" install --disable-pip-version-check --require-hashes --no-deps -r scripts/zizmor/requirements.txt
           echo "$RUNNER_TEMP/zizmor/bin" >> "$GITHUB_PATH"
 
       # GH_TOKEN turns on zizmor's online audits.

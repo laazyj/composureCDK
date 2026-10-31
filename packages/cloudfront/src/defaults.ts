@@ -24,6 +24,13 @@ export const BEHAVIOR_DEFAULTS: Partial<AddBehaviorOptions> = {
    * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-in-transit.html
    */
   viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+
+  /**
+   * Apply the managed security headers policy (HSTS, X-Content-Type-Options,
+   * X-Frame-Options, etc.).
+   * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-response-headers-policies.html
+   */
+  responseHeadersPolicy: ResponseHeadersPolicy.SECURITY_HEADERS,
 };
 
 /**
@@ -72,16 +79,7 @@ export const DISTRIBUTION_DEFAULTS: Partial<DistributionBuilderProps> = {
    */
   minimumProtocolVersion: SecurityPolicyProtocol.TLS_V1_2_2021,
 
-  defaultBehavior: {
-    ...BEHAVIOR_DEFAULTS,
-
-    /**
-     * Apply the managed security headers policy (HSTS, X-Content-Type-Options,
-     * X-Frame-Options, etc.).
-     * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-response-headers-policies.html
-     */
-    responseHeadersPolicy: ResponseHeadersPolicy.SECURITY_HEADERS,
-  },
+  defaultBehavior: { ...BEHAVIOR_DEFAULTS },
 };
 
 /**

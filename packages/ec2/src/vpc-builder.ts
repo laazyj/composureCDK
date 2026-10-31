@@ -1,4 +1,12 @@
-import { FlowLogDestination, Vpc, type VpcProps } from "aws-cdk-lib/aws-ec2";
+import { ArnFormat, Stack } from "aws-cdk-lib";
+import {
+  type FlowLog,
+  FlowLogDestination,
+  type FlowLogOptions,
+  Vpc,
+  type VpcProps,
+} from "aws-cdk-lib/aws-ec2";
+import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { type LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import { type Lifecycle } from "@composurecdk/core";
@@ -99,7 +107,12 @@ class VpcBuilder implements Lifecycle<VpcBuilderResult> {
   build(scope: IConstruct, id: string, context?: Record<string, object>): VpcBuilderResult {
     const { flowLogs: flowLogsConfig, ...vpcProps } = this.props;
 
-    const { flowLogsLogGroup, flowLogProps } = resolveFlowLogs(scope, id, flowLogsConfig, context);
+    const { flowLogsLogGroup, flowLogOptions } = resolveFlowLogs(
+      scope,
+      id,
+      flowLogsConfig,
+      context,
+    );
 
     // CDK accepts `availabilityZones` or `maxAzs`, but not both. When the user
     // pins AZs explicitly, the default `maxAzs` must yield to their intent;
@@ -112,20 +125,46 @@ class VpcBuilder implements Lifecycle<VpcBuilderResult> {
       );
     }
 
-    const mergedProps = {
-      ...VPC_DEFAULTS,
-      ...flowLogProps,
-      ...vpcProps,
-    };
+    const mergedProps = { ...VPC_DEFAULTS, ...vpcProps };
     if (userPinnedAzs) {
       delete mergedProps.maxAzs;
     }
 
-    return {
-      vpc: new Vpc(scope, id, mergedProps),
-      flowLogsLogGroup,
-    };
+    const vpc = new Vpc(scope, id, mergedProps);
+    // Same construct id the `flowLogs` prop would use, so logical IDs match.
+    if (flowLogOptions) {
+      grantDescribeLogStreamsOnLogGroup(vpc.addFlowLog(DEFAULT_FLOW_LOG_KEY, flowLogOptions));
+    }
+
+    return { vpc, flowLogsLogGroup };
   }
+}
+
+/**
+ * CDK grants `logs:DescribeLogStreams` only on the Log Stream ARN
+ * (`log-group:<name>:*`), which stops granting Log Group actions on
+ * April 26, 2027 (#652); add it on the bare Log Group ARN. CDK's role is
+ * augmented, not replaced: a new role changes `DeliverLogsPermissionArn` and
+ * so replaces the flow log. See the README for the upstream flag.
+ */
+function grantDescribeLogStreamsOnLogGroup(flowLog: FlowLog): void {
+  const { iamRole, logGroup } = flowLog;
+  if (!iamRole || !logGroup) {
+    return;
+  }
+  iamRole.addToPrincipalPolicy(
+    new PolicyStatement({
+      actions: ["logs:DescribeLogStreams"],
+      resources: [
+        Stack.of(flowLog).formatArn({
+          service: "logs",
+          resource: "log-group",
+          resourceName: logGroup.logGroupName,
+          arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+        }),
+      ],
+    }),
+  );
 }
 
 function resolveFlowLogs(
@@ -133,9 +172,9 @@ function resolveFlowLogs(
   id: string,
   cfg: FlowLogsConfig | undefined,
   context?: Record<string, object>,
-): { flowLogsLogGroup?: LogGroup; flowLogProps: Pick<VpcProps, "flowLogs"> } {
+): { flowLogsLogGroup?: LogGroup; flowLogOptions?: FlowLogOptions } {
   if (cfg === false) {
-    return { flowLogProps: {} };
+    return {};
   }
 
   if (cfg?.destination !== undefined) {
@@ -145,11 +184,7 @@ function resolveFlowLogs(
           "the destination is user-managed and not built by this builder.",
       );
     }
-    return {
-      flowLogProps: {
-        flowLogs: { [DEFAULT_FLOW_LOG_KEY]: { destination: cfg.destination } },
-      },
-    };
+    return { flowLogOptions: { destination: cfg.destination } };
   }
 
   let subBuilder = createLogGroupBuilder();
@@ -164,13 +199,7 @@ function resolveFlowLogs(
 
   return {
     flowLogsLogGroup,
-    flowLogProps: {
-      flowLogs: {
-        [DEFAULT_FLOW_LOG_KEY]: {
-          destination: FlowLogDestination.toCloudWatchLogs(flowLogsLogGroup),
-        },
-      },
-    },
+    flowLogOptions: { destination: FlowLogDestination.toCloudWatchLogs(flowLogsLogGroup) },
   };
 }
 

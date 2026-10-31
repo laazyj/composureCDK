@@ -4,8 +4,8 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { FlowLogDestination } from "aws-cdk-lib/aws-ec2";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import { buildFixture } from "@composurecdk/cdk-testing";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { buildFixture, policyJson } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { createVpcBuilder } from "../src/vpc-builder.js";
 
@@ -64,6 +64,72 @@ describe("VpcBuilder", () => {
         ResourceType: "VPC",
         LogDestinationType: "cloud-watch-logs",
       });
+    });
+  });
+
+  // https://github.com/laazyj/composureCDK/issues/652
+  describe("flow-log role", () => {
+    const describeOnBareArn = (logGroupId: string) => ({
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          {
+            Effect: "Allow",
+            Action: "logs:DescribeLogStreams",
+            Resource: {
+              "Fn::Join": [
+                "",
+                Match.arrayWith([":log-group:", { Ref: Match.stringLikeRegexp(logGroupId) }]),
+              ],
+            },
+          },
+        ]),
+      },
+    });
+
+    it("grants DescribeLogStreams on the bare Log Group ARN", () => {
+      const { template } = buildAndSynth();
+
+      template.hasResourceProperties(
+        "AWS::IAM::Policy",
+        describeOnBareArn("NetworkFlowLogsLogGroup"),
+      );
+    });
+
+    it("keeps CDK's stream-action statement and role", () => {
+      const { template } = buildAndSynth();
+
+      template.hasResourceProperties("AWS::IAM::Policy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"],
+            }),
+          ]),
+        },
+      });
+      template.hasResourceProperties("AWS::EC2::FlowLog", {
+        DeliverLogsPermissionArn: {
+          "Fn::GetAtt": [Match.stringLikeRegexp("DefaultFlowLogIAMRole"), "Arn"],
+        },
+      });
+    });
+
+    it("also covers a user-supplied CloudWatch Logs destination", () => {
+      const { template } = buildAndSynth((b, stack) => {
+        b.flowLogs({
+          destination: FlowLogDestination.toCloudWatchLogs(new LogGroup(stack, "UserLogs")),
+        });
+      });
+
+      template.hasResourceProperties("AWS::IAM::Policy", describeOnBareArn("UserLogs"));
+    });
+
+    it("adds nothing for a non-CloudWatch destination", () => {
+      const { stack } = buildAndSynth((b, s) => {
+        b.flowLogs({ destination: FlowLogDestination.toS3(new Bucket(s, "UserBucket")) });
+      });
+
+      expect(policyJson(stack)).not.toContain("logs:DescribeLogStreams");
     });
   });
 

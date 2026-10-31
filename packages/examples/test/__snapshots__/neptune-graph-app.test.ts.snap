@@ -1005,6 +1005,33 @@ exports[`neptune-graph-app > matches the expected synthesised template 1`] = `
                 ],
               },
             },
+            {
+              "Action": "logs:DescribeLogStreams",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":logs:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":log-group:",
+                    {
+                      "Ref": "NeptuneGraphAppnetworkFlowLogsLogGroup24FFC645",
+                    },
+                  ],
+                ],
+              },
+            },
           ],
           "Version": "2012-10-17",
         },

@@ -56,7 +56,7 @@ One consequence of routing everything through nx: **a gate can only be invoked a
 
 ## Inputs are only ever tracked files
 
-nx hashes tracked files, so a glob that matches only gitignored paths matches nothing. `{projectRoot}/dist/**/*` is such a glob — it contributes zero files to a hash, which makes it look like coverage it is not. Declare `production` (or `src/**`) instead and let `dependsOn` handle ordering; `dependsOn` does not feed the hash either.
+nx hashes tracked files, so a glob that matches only gitignored paths matches nothing. `{projectRoot}/dist/**/*` is such a glob — it contributes zero files to a hash, which makes it look like coverage it is not. Declare `production` (or `src/**`) instead and let `dependsOn` handle ordering; `dependsOn` does not feed the hash either. nx 24 can opt a fileset into ignored files with `"includeIgnored": true`; nothing here uses it yet ([#662](https://github.com/laazyj/composureCDK/issues/662)).
 
 `check:exports` and `validate` were both declared that way, and both replayed cached passes against a `dist` they had never seen: a change under `src/` rebuilt the package and `attw`/`publint` reported success from cache. They now take `production`, plus the external dependencies whose versions decide the verdict.
 
@@ -86,6 +86,8 @@ Two things to know if you change it:
 - **The exclusion list is short because the tree is tidy.** `dist`, `coverage`, `.tshy` and `cdk.out` are gitignored and nx only hashes tracked files, so they are already out. `package.json` must stay in `production` — tshy reads its build config from there.
 
 **The Node version is part of every hash.** `sharedGlobals` carries a `{ "runtime": "node --version" }` input, so no task result can be replayed across Node majors. Without it, switching Node versions locally (with `nvm`, say) would replay results produced on the other version, and report success for checks that never ran on the one in use.
+
+**Worktrees share one cache.** nx keeps the task cache and its database in `~/.nx/<workspace-id>/`, not in the checkout, so every worktree of the repo can replay results another one produced. That is safe because each run hashes its own worktree's files. It also means `npx nx reset` clears the cache for all of them.
 
 ## Installing dependencies
 

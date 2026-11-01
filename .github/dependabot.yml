@@ -84,9 +84,10 @@ updates:
           - "eslint-config-prettier"
   # zizmor, which CI installs from this hash-pinned lock. `uv`, not `pip`:
   # the lock is `uv pip compile` output, and the uv ecosystem regenerates it
-  # the same way, hashes included, from the sibling requirements.in.
+  # the same way, hashes included, from the sibling requirements.in. Not under
+  # .github/: Dependabot rejected the uv PR there (#651); see docs/ci.md.
   - package-ecosystem: uv
-    directory: /.github/zizmor
+    directory: /scripts/zizmor
     schedule:
       interval: weekly
     # Same one-week cooldown, for the same reason, as github-actions above.

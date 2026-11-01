@@ -247,6 +247,17 @@ createVpcBuilder().flowLogs(false);
 
 For multiple flow logs against the same VPC, omit this config and create additional `FlowLog` constructs directly against the returned `vpc`.
 
+#### Flow-log role and the CloudWatch Logs ARN change
+
+CDK's flow-log role grants `logs:DescribeLogStreams` only on the Log Stream ARN (`log-group:<name>:*`). From April 26, 2027, CloudWatch Logs no longer lets that ARN form grant Log Group actions ([#652](https://github.com/laazyj/composureCDK/issues/652)). The builder keeps CDK's role and adds a statement granting `logs:DescribeLogStreams` on the bare Log Group ARN. This covers the auto-managed log group and a `destination: FlowLogDestination.toCloudWatchLogs(...)` you supply yourself. Existing stacks get an in-place policy update and the flow log is not replaced.
+
+Exceptions:
+
+- **An imported role** (`Role.fromRoleArn`) passed to `toCloudWatchLogs` cannot be modified, so you must grant it yourself.
+- **`FlowLog` constructs you create directly** against the returned `vpc` are not touched.
+
+[aws/aws-cdk#39536](https://github.com/aws/aws-cdk/pull/39536) makes the same change upstream, but only behind the `@aws-cdk/aws-ec2:flowLogsCloudWatchLogsPermissionsScoped` feature flag. When both are present, the two statements are identical and the synthesised policy keeps only one.
+
 ## Security Group Builder
 
 ```ts

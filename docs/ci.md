@@ -75,7 +75,7 @@ Two things still need a push once the bottom of a stack merges and the next PR i
 
 ## nx task cache
 
-CI does not carry nx's task cache between runs. Each job starts cold, and the cache helps only within a job: once **Typecheck** has built every package, later steps reuse those builds. Since nx 20, nx refuses cached artifacts its own local database did not record, so restoring `.nx/cache` with `actions/cache` never produced a hit, and it crowded the npm caches out of the repository's Actions cache.
+CI does not carry nx's task cache between runs. Each job starts cold, and the cache helps only within a job: once **Typecheck** has built every package, later steps reuse those builds. Since nx 20, nx refuses cached artifacts its own local database did not record, so restoring nx's cache directory with `actions/cache` never produced a hit, and it crowded the npm caches out of the repository's Actions cache.
 
 The ways around that are worse than a cold build. `NX_REJECT_UNKNOWN_LOCAL_CACHE=0` trusts artifacts written by another run, which is the poisoning risk [zizmor](#auditing-the-workflows) guards against. `@nx/shared-fs-cache` is deprecated over a cache-poisoning CVE. Nx Cloud or a self-hosted cache server would add an external service, which we have decided against for now ([#576](https://github.com/laazyj/composureCDK/issues/576)).
 

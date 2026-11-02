@@ -187,6 +187,8 @@ result.accessLogGroup; // LogGroup | undefined
 
 To provide your own destination instead, set `deployOptions.accessLogDestination` — the auto-created log group is skipped. To disable access logging entirely, set `.accessLogging(false)`.
 
+The auto-created destination renders the log group's ARN without the trailing `:*`, which is the form API Gateway stores, so drift detection reports the stage as `IN_SYNC`. A `LogGroupLogDestination` you supply yourself still depends on the `@aws-cdk/aws-apigateway:logGroupDestinationArnWithoutWildcard` feature flag for that. Stacks that already use the auto-created destination see an in-place stage update on their next deploy.
+
 ## Recommended Alarms
 
 Both builders create [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#ApiGateway) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

@@ -49,6 +49,11 @@
       "recommended": true,
       "because": "The examples assert on the ApiGateway Account and CloudWatch Role that cleanDeskPolicy tears down; adopting it would delete those resources and the assertions with them. A consumer should adopt it \u2014 the role is an account-wide singleton \u2014 and #501 made cleanDeskPolicy survive that."
     },
+    "@aws-cdk/aws-apigateway:logGroupDestinationArnWithoutWildcard": {
+      "status": "no-effect",
+      "recommended": true,
+      "because": "resolveDeployOptions gives the auto-created access log group a destination that renders the ARN without the trailing :* (packages/apigateway/src/deploy-options.ts), so the stage has no false drift without the flag. A LogGroupLogDestination the consumer supplies still follows it."
+    },
     "@aws-cdk/aws-apigateway:requestValidatorUniqueId": {
       "status": "no-effect",
       "recommended": true

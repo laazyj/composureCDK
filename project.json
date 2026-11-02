@@ -17,6 +17,8 @@
       "dependsOn": [{ "projects": ["@composurecdk/eslint-plugin"], "target": "build" }],
       "cache": true
     },
+    "test": { "command": "node --test \"scripts/*.test.mjs\"", "dependsOn": [], "cache": false },
+    "dependency-review": { "command": "node scripts/dependency-review.mjs", "cache": false },
     "prettier:write": { "command": "prettier --write .", "cache": false },
     "prettier:check": { "command": "prettier --check .", "cache": false },
     "actionlint": { "command": "node scripts/actionlint.mjs", "cache": false },

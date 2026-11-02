@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
-import { LogGroupLogDestination, MethodLoggingLevel } from "aws-cdk-lib/aws-apigateway";
+import { LogGroupLogDestination, MethodLoggingLevel, RestApi } from "aws-cdk-lib/aws-apigateway";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
 import { DEPLOY_OPTIONS_DEFAULTS } from "../src/defaults.js";
 import { resolveDeployOptions } from "../src/deploy-options.js";
 
-function buildInStack(accessLogging: boolean | undefined, userDeployOptions = {}) {
-  const app = new App();
+function buildInStack(accessLogging: boolean | undefined, userDeployOptions = {}, context = {}) {
+  const app = new App({ context });
   const stack = new Stack(app, "TestStack");
   const result = resolveDeployOptions(
     stack,
@@ -49,6 +49,36 @@ describe("resolveDeployOptions", () => {
 
       expect(result.accessLogGroup).toBeUndefined();
     });
+
+    // Asserts our own rendering rather than comparing with CDK's: the flag does
+    // not exist on the older aws-cdk-lib floors this suite also runs against.
+    it.each([{}, { "@aws-cdk/aws-apigateway:logGroupDestinationArnWithoutWildcard": true }])(
+      "renders the destination ARN without the trailing wildcard with context %j",
+      (context) => {
+        const { stack, result } = buildInStack(undefined, {}, context);
+        new RestApi(stack, "Api", { deployOptions: result.deployOptions }).root.addMethod("GET");
+
+        Template.fromStack(stack).hasResourceProperties("AWS::ApiGateway::Stage", {
+          AccessLogSetting: {
+            DestinationArn: {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:",
+                  { Ref: "AWS::Partition" },
+                  ":logs:",
+                  { Ref: "AWS::Region" },
+                  ":",
+                  { Ref: "AWS::AccountId" },
+                  ":log-group:",
+                  stack.resolve(result.accessLogGroup?.logGroupName),
+                ],
+              ],
+            },
+          },
+        });
+      },
+    );
 
     it("configures JSON-formatted access log output", () => {
       const { stack } = buildInStack(true);

@@ -143,11 +143,21 @@ The same `check.mjs` runs against the workspace build in `npx nx test module-com
 
 ## Dependency review
 
-The **Dependency review** job runs [`actions/dependency-review-action`](https://github.com/actions/dependency-review-action) on every pull request. It compares the dependency graph of the PR's base and head, npm packages and GitHub Actions alike, and fails if the PR adds a dependency, or moves one to a version, with a known vulnerability of **moderate** severity or worse. Dependabot only reports a vulnerability after it has merged; this stops one arriving through a PR.
+The **Dependency review** job runs on every pull request. It compares the dependency graph of the PR's base and head, npm packages and GitHub Actions alike, and fails if the PR introduces a known vulnerability of **moderate** severity or worse. Dependabot only reports a vulnerability after it has merged; this stops one arriving through a PR.
 
-- **Development dependencies count**, unlike the action's default: nearly every dependency here is one, and they run in CI.
-- **Only changes are checked.** A vulnerability already on `main` does not fail unrelated PRs; Dependabot's alerts and security updates deal with those.
-- **To accept a specific advisory**, add its GHSA ID to the job's `allow-ghsas` input, with a comment saying why.
+**Introduces** means an added package version has an advisory that no removed version of that package had. [`actions/dependency-review-action`](https://github.com/actions/dependency-review-action) can't express this: it fails on any added version with an advisory, including a bump between two versions that share one, which blocks upgrades that leave the risk unchanged. So the action runs with `warn-only` and still reports every advisory in the job summary, and [`scripts/dependency-review.mjs`](../scripts/dependency-review.mjs) decides the result.
+
+| Change in the PR                                             | Result |
+| ------------------------------------------------------------ | ------ |
+| Package moves to a version with the same advisory            | Passes |
+| Package moves to a version with a different advisory         | Fails  |
+| New package, or a new copy alongside the old one, with one   | Fails  |
+| Upgrade closes a severe advisory but introduces a lesser one | Fails  |
+| Package the PR doesn't touch                                 | Passes |
+
+- **Development dependencies count**: nearly every dependency here is one, and they run in CI.
+- **Vulnerabilities already on `main`** are left to Dependabot's alerts and security updates.
+- **To accept a specific advisory**, add its GHSA ID to `ALLOWED_GHSAS` in [`scripts/net-new-advisories.mjs`](../scripts/net-new-advisories.mjs), with a comment saying why.
 - **Skipped on `push`**, which has no base to compare; see [Required checks](#required-checks).
 
 ## Trimming CI for deploy-test
@@ -456,6 +466,6 @@ npx nx cdk examples -- destroy --all
 - **npm provenance** — published packages include provenance attestations linking them to this repo and workflow run.
 - **Action pinning** — all GitHub Actions are pinned by commit SHA, kept current by Dependabot with a seven-day cooldown.
 - **Workflow audit** — zizmor checks every workflow and the Dependabot config on each PR (see [Auditing the workflows](#auditing-the-workflows)).
-- **Dependency review** — a PR cannot add a dependency version with a known vulnerability (see [Dependency review](#dependency-review)).
+- **Dependency review** — a PR cannot introduce a known vulnerability (see [Dependency review](#dependency-review)).
 - **No release code on disk with the PAT** — `release-tag.yml` runs on `workflow_run`, so the commit it is handed is chosen by whatever triggered the run. It never fetches or checks out that commit. It checks out the default branch with `persist-credentials: false`, the gate confirms the commit is on `main`, and the tag and release-branch refs are written through the REST API. `RELEASE_PR_TOKEN` is held only in those two steps' env.
 - **Concurrency** — deploy-test uses `cancel-in-progress: false` so an in-flight deployment cannot be interrupted into an inconsistent state.

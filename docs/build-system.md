@@ -50,7 +50,7 @@ Three things about that file are deliberate:
 
 **They are named `prettier:check` / `prettier:write`, not `format:check` / `format`.** `nx format` and `nx format:check` are built-in nx commands, and the builtin wins: with the targets named that way, `npx nx format:check` silently ran nx's own affected-files check and exited 0 without checking anything.
 
-One consequence of routing everything through nx: **a gate can only be invoked as an nx target where `node_modules` exists.** Two CI jobs deliberately run without installing — `cdk-floors-enforce`, whose script does its own floor-pinned install and needs the clean checkout, and `release-notify`, which has no dependencies at all and drives the preinstalled `gh`. Both call `node scripts/…` directly, and say why inline. The nx target still exists for everyone else.
+One consequence of routing everything through nx: **a gate can only be invoked as an nx target where `node_modules` exists.** Three CI jobs deliberately run without installing — `cdk-floors-enforce`, whose script does its own floor-pinned install and needs the clean checkout, and `release-notify` and `dependency-review`, which have no dependencies at all and drive the preinstalled `gh`. All three call `node scripts/…` directly, and say why inline. The nx target still exists for everyone else.
 
 `verify` is an `nx:noop` target whose `dependsOn` lists every gate. It is one unordered graph, so the old cheap-gates-first fail-fast is gone; the pre-push hook passes `--nxBail` to stop at the first failure, and CI keeps one step per gate, which is where ordering now lives. `scripts/ci-covers-verify.mjs` reads that `dependsOn` and fails if a gate has no CI step, or if a job in `ci.yml` is missing from the aggregate **CI** job's `needs` ([required checks](ci.md#required-checks)).
 
@@ -64,7 +64,7 @@ nx hashes tracked files, so a glob that matches only gitignored paths matches no
 
 `nx run-many -t lint` caches per project, so unchanged packages fast-succeed. These make that correct rather than merely fast.
 
-**Loose top-level files** (`eslint.config.mjs`, `scripts/**`, `tools/**`, `vitest.config.base.ts`) belong to no package, so the `workspace-root` project in the root [`project.json`](../project.json) lints them. A plain `.mjs` module there also needs a line in `eslint.config.mjs` — both in `allowDefaultProject` and in the `disableTypeChecked` block, since these are untyped node modules; without the second, type-aware rules fire on inferred `any` and the file cannot lint clean.
+**Loose top-level files** (`eslint.config.mjs`, `scripts/**`, `tools/**`, `vitest.config.base.ts`) belong to no package, so the `workspace-root` project in the root [`project.json`](../project.json) lints them. A plain `.mjs` module there also needs a line in `eslint.config.mjs` — both in `allowDefaultProject` and in the `disableTypeChecked` block, since these are untyped node modules; without the second, type-aware rules fire on inferred `any` and the file cannot lint clean. Tests for `scripts/` are `scripts/*.test.mjs`, run with `node --test` so the scripts stay dependency-free; the `workspace-root` `test` target picks them up.
 
 **The custom rules** in `@composurecdk/eslint-plugin` drive every package's lint result, so `targetDefaults.lint` both depends on that package's `build` (the flat config imports its compiled output) and lists its `src/**` as a lint input, so a rule change busts the dependent lint caches.
 

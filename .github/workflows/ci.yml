@@ -97,12 +97,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Review dependency changes
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      # Reports only. It would fail a bump between two versions with the same
+      # advisory, so the next step decides the result.
+      - name: Report dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          fail-on-severity: moderate
-          # Development too: nearly every dependency here is one, and runs in CI.
+          warn-only: true
+          # Shapes the report only: the next step counts every scope.
           fail-on-scopes: runtime, development
+
+      # `node` directly: the script has no dependencies, so this job installs none.
+      - name: Fail on net-new advisories
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/dependency-review.mjs
 
   # The `verify` gates other than the workflow checks, on the Node the dev
   # toolchain is developed against.

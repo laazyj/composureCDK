@@ -184,3 +184,80 @@ const telemetry = createStreamBuilder()
       .description("No telemetry has arrived in five minutes."),
   );
 ```
+
+## Enhanced fan-out consumers
+
+`createStreamConsumerBuilder()` registers an [enhanced fan-out](https://docs.aws.amazon.com/streams/latest/dev/enhanced-consumers.html) (EFO) consumer with a stream. It wraps the CDK [StreamConsumer](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kinesis.StreamConsumer.html) construct, and is its own component rather than an option on the stream builder, so the consumer has its own place in the `compose` graph, its own alarm and its own grant.
+
+A standard consumer shares each shard's 2 MB/s of read throughput with every other consumer and polls with `GetRecords`. An EFO consumer gets a dedicated 2 MB/s per shard, pushed to it over HTTP/2 with `SubscribeToShard`. Reach for one when:
+
+- **several applications read the same stream in parallel**, and would otherwise contend for the shared read throughput; or
+- **the consumer needs sub-200 ms propagation delay**.
+
+It is not free, and the limits are per stream:
+
+- **Cost.** An EFO consumer is billed per consumer-shard-hour and per GB of data retrieved, on top of the stream's own charges — see [Kinesis Data Streams pricing](https://aws.amazon.com/kinesis/data-streams/pricing/).
+- **Quota.** A stream takes up to 20 registered EFO consumers (50 under On-demand Advantage).
+
+`stream` and `streamConsumerName` are both required; the builder throws at build if either is missing. `stream` accepts a `Ref`, so the consumer wires to a composed stream:
+
+```ts
+import { compose, ref } from "@composurecdk/core";
+import {
+  createStreamBuilder,
+  createStreamConsumerBuilder,
+  type StreamBuilderResult,
+} from "@composurecdk/kinesis";
+
+const system = compose(
+  {
+    telemetry: createStreamBuilder().streamName("telemetry"),
+    alerter: createStreamConsumerBuilder()
+      .streamConsumerName("anomaly-alerter")
+      .stream(ref<StreamBuilderResult>("telemetry").get("stream")),
+  },
+  { telemetry: [], alerter: ["telemetry"] },
+);
+```
+
+The result is `{ consumer, alarms }`:
+
+| Field      | Type                    | Description                                                 |
+| ---------- | ----------------------- | ----------------------------------------------------------- |
+| `consumer` | `StreamConsumer`        | The registered consumer.                                    |
+| `alarms`   | `Record<string, Alarm>` | Alarms created for the consumer, keyed by name (see below). |
+
+Builder tags reach the consumer itself from aws-cdk-lib 2.205.0, the release in which `AWS::Kinesis::StreamConsumer` gained `Tags` in CDK. On earlier releases they reach only its alarms.
+
+### Consumer grant
+
+`streamConsumerGrants.read` delegates to the consumer's native `grantRead`: `kinesis:SubscribeToShard` and `kinesis:DescribeStreamConsumer` on the consumer, plus everything `streamGrants.read` grants on its stream, including `kms:Decrypt` for a customer-managed key.
+
+```ts
+import { streamConsumerGrants, type StreamConsumerBuilderResult } from "@composurecdk/kinesis";
+
+handler.grant(
+  streamConsumerGrants.read(ref<StreamConsumerBuilderResult>("alerter").get("consumer")),
+);
+```
+
+To invoke a Lambda function from the consumer, use `kinesisConsumerEventSource` in [`@composurecdk/lambda`](../lambda/README.md). It is coming in a later release.
+
+### Consumer alarm
+
+`recommendedAlarms` takes a `StreamConsumerAlarmConfig` or `false`, and `addAlarm()` takes an `AlarmDefinitionBuilder` typed to `IStreamConsumer`, as on the stream builder.
+
+| Key                                       | Metric (statistic)                                   | Default                                   | On by default |
+| ----------------------------------------- | ---------------------------------------------------- | ----------------------------------------- | ------------- |
+| `subscribeToShardEventMillisBehindLatest` | `SubscribeToShardEvent.MillisBehindLatest` (Maximum) | > 60,000 ms for 5 of 5 one-minute periods | yes           |
+
+The metric is published per consumer, with the dimensions `StreamName` and `ConsumerName`. It measures how far the consumer's subscription is behind the newest record on the stream, so a sustained breach means the consumer cannot keep up and unread records are moving towards the end of the stream's retention. Missing data is not breaching, because the metric is only published while a subscription is delivering events. Tune the threshold to the consumer's latency target:
+
+```ts
+createStreamConsumerBuilder()
+  .streamConsumerName("anomaly-alerter")
+  .stream(ref<StreamBuilderResult>("telemetry").get("stream"))
+  .recommendedAlarms({ subscribeToShardEventMillisBehindLatest: { threshold: 5_000 } });
+```
+
+`constraints.validate.streamConsumerName` validates the name at build against the [RegisterStreamConsumer](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_RegisterStreamConsumer.html) rules — 1 to 128 characters from `[a-zA-Z0-9_.-]`, the same as a stream name.

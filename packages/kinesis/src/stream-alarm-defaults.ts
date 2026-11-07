@@ -33,6 +33,12 @@ export const SUSTAINED_FIVE_MINUTES = {
 /**
  * AWS-recommended default alarm configuration for Kinesis data streams.
  *
+ * Statistic, period, datapoints and comparison follow the AWS
+ * recommended-alarms page exactly. AWS publishes no numeric threshold for
+ * any Kinesis alarm ("depends on your situation"), so each threshold here
+ * is this library's starting point, chosen against AWS's stated threshold
+ * justification — tune it to the workload via `recommendedAlarms`.
+ *
  * There is no entry for `putRecordsFailedRecords`: no generic threshold
  * suits every workload's volume, so enabling it requires an explicit
  * threshold.

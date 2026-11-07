@@ -1,7 +1,10 @@
 name: Claude Code
 
 on:
-  issue_comment:
+  # zizmor flags every issue_comment trigger. The job's `if:` runs only for an
+  # @claude comment by an OWNER or MEMBER; it checks out the default branch,
+  # never PR code, with persist-credentials: false and read-only permissions.
+  issue_comment: # zizmor: ignore[dangerous-triggers]
     types: [created]
   pull_request_review_comment:
     types: [created]

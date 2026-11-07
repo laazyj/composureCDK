@@ -35,6 +35,9 @@ function fail(message) {
 }
 
 function pack(dir) {
+  // Start empty, so a tarball from an earlier version is neither installed by
+  // `check` nor stored in the nx cache with this run's.
+  rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const names = Object.keys(packPublishablePackages(resolve(dir)));
   // check.mjs probes module-compat's peers, so a package missing there would

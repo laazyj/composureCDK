@@ -54,7 +54,15 @@
     "consumer:pack": {
       "command": "node scripts/consumer-compat.mjs pack dist/consumer",
       "dependsOn": [{ "projects": "*", "target": "build" }],
-      "cache": false
+      "inputs": [
+        "{workspaceRoot}/scripts/consumer-compat.mjs",
+        "{workspaceRoot}/scripts/cdk-floor/packages.mjs",
+        { "input": "default", "projects": "@composurecdk/*" },
+        { "dependentTasksOutputFiles": "**/*" },
+        { "runtime": "npm --version" }
+      ],
+      "outputs": ["{workspaceRoot}/dist/consumer"],
+      "cache": true
     },
     "consumer:check": {
       "command": "node scripts/consumer-compat.mjs check dist/consumer",

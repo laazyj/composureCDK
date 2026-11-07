@@ -1,5 +1,5 @@
 import type { ConstraintNamespace } from "@composurecdk/cloudformation";
-import { validateStreamName } from "./stream-name.js";
+import { validateStreamConsumerName, validateStreamName } from "./stream-name.js";
 
 export {
   createStreamBuilder,
@@ -12,6 +12,17 @@ export { STREAM_DEFAULTS } from "./defaults.js";
 export { type StreamAlarmConfig } from "./stream-alarm-config.js";
 export { STREAM_ALARM_DEFAULTS } from "./stream-alarm-defaults.js";
 
+// Enhanced fan-out consumers.
+export {
+  createStreamConsumerBuilder,
+  type StreamConsumerBuilderProps,
+  type StreamConsumerBuilderResult,
+  type IStreamConsumerBuilder,
+} from "./stream-consumer-builder.js";
+export { streamConsumerGrants } from "./grants.js";
+export { type StreamConsumerAlarmConfig } from "./stream-consumer-alarm-config.js";
+export { STREAM_CONSUMER_ALARM_DEFAULTS } from "./stream-consumer-alarm-defaults.js";
+
 /**
  * This package's AWS-property constraints, grouped by application strategy.
  * The `constraints.validate.*` / `constraints.sanitize.*` shape is identical
@@ -23,6 +34,7 @@ export { STREAM_ALARM_DEFAULTS } from "./stream-alarm-defaults.js";
 export const constraints = {
   validate: {
     streamName: validateStreamName,
+    streamConsumerName: validateStreamConsumerName,
   },
   sanitize: {},
 } satisfies ConstraintNamespace;

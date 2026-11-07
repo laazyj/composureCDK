@@ -116,7 +116,7 @@ describe("StreamConsumerBuilder", () => {
       template.hasResourceProperties("AWS::CloudWatch::Alarm", {
         Namespace: "AWS/Kinesis",
         MetricName: "SubscribeToShardEvent.MillisBehindLatest",
-        Statistic: "Maximum",
+        Statistic: "Average",
         Period: 60,
         Dimensions: Match.arrayEquals([
           {

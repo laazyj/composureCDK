@@ -1,4 +1,9 @@
-import { findStackResources, resolveLambdaLogGroup, waitForLogEvents } from "./_helpers.mjs";
+import {
+  eventSourceMappingState,
+  findStackResources,
+  resolveLambdaLogGroup,
+  waitForLogEvents,
+} from "./_helpers.mjs";
 
 const STACK = "ComposureCDK-DynamoStreamProcessorStack";
 
@@ -77,19 +82,8 @@ export default {
 
     // Nothing arrived across every round — report the mapping's own view, which
     // distinguishes "poller never attached" from "poller ran and failed".
-    const { EventSourceMappings } = aws(
-      "lambda",
-      "list-event-source-mappings",
-      "--function-name",
-      fnName,
-      "--output",
-      "json",
-    );
-    const state = (EventSourceMappings ?? [])
-      .map((m) => `${m.State} / ${m.LastProcessingResult}`)
-      .join(", ");
     fail(
-      `${logGroup} — no change record ${marker}-* processed across ${WRITE_ROUNDS} writes; event source mapping: ${state || "none found"}`,
+      `${logGroup} — no change record ${marker}-* processed across ${WRITE_ROUNDS} writes; event source mapping: ${eventSourceMappingState(aws, fnName)}`,
     );
   },
 };

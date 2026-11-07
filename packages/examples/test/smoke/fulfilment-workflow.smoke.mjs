@@ -1,4 +1,4 @@
-import { findStackResources, pollUntil } from "./_helpers.mjs";
+import { findStackResources, getDynamoItem, pollUntil } from "./_helpers.mjs";
 
 const STACK = "ComposureCDK-FulfilmentWorkflowStack";
 // Must match ORDER_EVENT_SOURCE in src/fulfilment-workflow-app.ts.
@@ -31,18 +31,7 @@ function placeOrders(aws, orders) {
 
 /** The status the workflow recorded for `orderId`, or `undefined` while there is none. */
 function recordedStatus(aws, tableName, orderId) {
-  const { Item } = aws(
-    "dynamodb",
-    "get-item",
-    "--table-name",
-    tableName,
-    "--key",
-    JSON.stringify({ orderId: { S: orderId } }),
-    "--consistent-read",
-    "--output",
-    "json",
-  );
-  return Item?.status?.S;
+  return getDynamoItem(aws, tableName, { orderId: { S: orderId } })?.status?.S;
 }
 
 export default {

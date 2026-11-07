@@ -1,0 +1,1433 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`telemetry-pipeline-app > matches the expected synthesised template 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "TelemetryPipelineanomalyAlerterConsumerEB9086EF": {
+      "Properties": {
+        "ConsumerName": "anomaly-alerter",
+        "StreamARN": {
+          "Fn::GetAtt": [
+            "TelemetryPipelinereadings23A4133F",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Kinesis::StreamConsumer",
+    },
+    "TelemetryPipelineanomalyAlerterConsumerSubscribeToShardEventMillisBehindLatestAlarm99BC4D0B": {
+      "Properties": {
+        "AlarmDescription": "Kinesis enhanced fan-out consumer is falling behind the stream. Threshold: > 60000 ms behind latest (average per minute).",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/anomaly-alerter-consumer/subscribe-to-shard-event-millis-behind-latest",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "ConsumerName",
+            "Value": {
+              "Fn::GetAtt": [
+                "TelemetryPipelineanomalyAlerterConsumerEB9086EF",
+                "ConsumerName",
+              ],
+            },
+          },
+          {
+            "Name": "StreamName",
+            "Value": {
+              "Ref": "TelemetryPipelinereadings23A4133F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "SubscribeToShardEvent.MillisBehindLatest",
+        "Namespace": "AWS/Kinesis",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 60000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelineanomalyAlerterE47E9270": {
+      "DependsOn": [
+        "TelemetryPipelineanomalyAlerterExecutionRoleDefaultPolicyA2DAB2C9",
+        "TelemetryPipelineanomalyAlerterExecutionRole812D25EA",
+      ],
+      "Properties": {
+        "Code": {
+          "ZipFile": "
+const THRESHOLD = Number(process.env.THRESHOLD_CELSIUS);
+
+exports.handler = async (event) => {
+  for (const record of event.Records) {
+    let reading;
+    try {
+      reading = JSON.parse(Buffer.from(record.kinesis.data, "base64").toString("utf8"));
+    } catch {
+      console.warn("skipping malformed record", record.kinesis.sequenceNumber);
+      continue;
+    }
+    if (reading.temperature > THRESHOLD) {
+      console.log("ANOMALY device=" + reading.deviceId + " temperature=" + reading.temperature);
+    }
+  }
+};
+",
+        },
+        "Description": "Telemetry pipeline - logs readings over the anomaly threshold",
+        "Environment": {
+          "Variables": {
+            "THRESHOLD_CELSIUS": "80",
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "TelemetryPipelineanomalyAlerterLogGroup6660CED4",
+          },
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "TelemetryPipelineanomalyAlerterExecutionRole812D25EA",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "TelemetryPipelineanomalyAlerterErrorsAlarm3C9867E9": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/anomaly-alerter/errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "TelemetryPipelineanomalyAlerterE47E9270",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelineanomalyAlerterExecutionRole812D25EA": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "TelemetryPipelineanomalyAlerterLogGroup6660CED4",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "TelemetryPipelineanomalyAlerterLogGroup6660CED4",
+                              "Arn",
+                            ],
+                          },
+                          ":log-stream:*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "LogsWriter",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "TelemetryPipelineanomalyAlerterExecutionRoleDefaultPolicyA2DAB2C9": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "kinesis:DescribeStreamSummary",
+                "kinesis:GetRecords",
+                "kinesis:GetShardIterator",
+                "kinesis:ListShards",
+                "kinesis:SubscribeToShard",
+                "kinesis:DescribeStream",
+                "kinesis:ListStreams",
+                "kinesis:DescribeStreamConsumer",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TelemetryPipelinereadings23A4133F",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "kms:Decrypt",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TelemetryPipelinestreamKey768AD0C2",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "kinesis:DescribeStreamConsumer",
+                "kinesis:SubscribeToShard",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TelemetryPipelineanomalyAlerterConsumerEB9086EF",
+                  "ConsumerARN",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "TelemetryPipelineanomalyAlerterExecutionRoleDefaultPolicyA2DAB2C9",
+        "Roles": [
+          {
+            "Ref": "TelemetryPipelineanomalyAlerterExecutionRole812D25EA",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "TelemetryPipelineanomalyAlerterIteratorAgeAlarm24C315E5": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is falling behind its stream event source (IteratorAge). Threshold: > 60000ms for 3 consecutive 1 minute periods.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/anomaly-alerter/iterator-age",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "TelemetryPipelineanomalyAlerterE47E9270",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "IteratorAge",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 60000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelineanomalyAlerterKinesisConsumerEventSourceComposureCDKTelemetryPipelineStackTelemetryPipelineanomalyAlerterConsumerC4DEE8F39F6F1327": {
+      "Properties": {
+        "BatchSize": 100,
+        "BisectBatchOnFunctionError": true,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "TelemetryPipelineanomalyAlerterConsumerEB9086EF",
+            "ConsumerARN",
+          ],
+        },
+        "FunctionName": {
+          "Ref": "TelemetryPipelineanomalyAlerterE47E9270",
+        },
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures",
+        ],
+        "MetricsConfig": {
+          "Metrics": [
+            "EventCount",
+          ],
+        },
+        "StartingPosition": "LATEST",
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
+    },
+    "TelemetryPipelineanomalyAlerterLogGroup6660CED4": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "TelemetryPipelineanomalyAlerterReadingsDroppedEventsAlarm90B5D670": {
+      "Properties": {
+        "AlarmDescription": "Lambda event source "readings" is dropping events after exhausting retries or TTL. Threshold: > 0 dropped events in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/anomaly-alerter/readings-dropped-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "EventSourceMappingUUID",
+            "Value": {
+              "Ref": "TelemetryPipelineanomalyAlerterKinesisConsumerEventSourceComposureCDKTelemetryPipelineStackTelemetryPipelineanomalyAlerterConsumerC4DEE8F39F6F1327",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "DroppedEventCount",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelineanomalyAlerterReadingsFailedInvocationsAlarm10FA8ED0": {
+      "Properties": {
+        "AlarmDescription": "Lambda event source "readings" is failing to invoke the function. Threshold: > 0 failed invocations in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/anomaly-alerter/readings-failed-invocations",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "EventSourceMappingUUID",
+            "Value": {
+              "Ref": "TelemetryPipelineanomalyAlerterKinesisConsumerEventSourceComposureCDKTelemetryPipelineStackTelemetryPipelineanomalyAlerterConsumerC4DEE8F39F6F1327",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FailedInvokeEventCount",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelineanomalyAlerterThrottlesAlarm7F5917F0": {
+      "Properties": {
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/anomaly-alerter/throttles",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "TelemetryPipelineanomalyAlerterE47E9270",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingDlq1B03AE6D": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "QueueName": "telemetry-latest-reading-dlq",
+        "ReceiveMessageWaitTimeSeconds": 20,
+        "SqsManagedSseEnabled": true,
+      },
+      "Type": "AWS::SQS::Queue",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "TelemetryPipelinelatestReadingDlqApproximateAgeOfOldestMessageAlarmF7997412": {
+      "Properties": {
+        "AlarmDescription": "Dead-letter queue's oldest message is approaching the queue's retentionPeriod - investigate and redrive it before SQS deletes it. Threshold: > 907200 seconds in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-reading-dlq/approximate-age-of-oldest-message",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "TelemetryPipelinelatestReadingDlq1B03AE6D",
+                "QueueName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ApproximateAgeOfOldestMessage",
+        "Namespace": "AWS/SQS",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 907200,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingDlqApproximateNumberOfMessagesVisibleAlarmA4C539FC": {
+      "Properties": {
+        "AlarmDescription": "Dead-letter queue has messages present - any message here indicates a delivery failure that needs investigation. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-reading-dlq/approximate-number-of-messages-visible",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "QueueName",
+            "Value": {
+              "Fn::GetAtt": [
+                "TelemetryPipelinelatestReadingDlq1B03AE6D",
+                "QueueName",
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Namespace": "AWS/SQS",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingDlqPolicyD9D6C9AC": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TelemetryPipelinelatestReadingDlq1B03AE6D",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Queues": [
+          {
+            "Ref": "TelemetryPipelinelatestReadingDlq1B03AE6D",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::QueuePolicy",
+    },
+    "TelemetryPipelinelatestReadingWriterD780ACED": {
+      "DependsOn": [
+        "TelemetryPipelinelatestReadingWriterExecutionRoleDefaultPolicyCD2326AB",
+        "TelemetryPipelinelatestReadingWriterExecutionRole1043E011",
+      ],
+      "Properties": {
+        "Code": {
+          "ZipFile": "
+const { DynamoDBClient, PutItemCommand } = require("@aws-sdk/client-dynamodb");
+const dynamodb = new DynamoDBClient({});
+
+exports.handler = async (event) => {
+  for (const record of event.Records) {
+    try {
+      const reading = JSON.parse(Buffer.from(record.kinesis.data, "base64").toString("utf8"));
+      await dynamodb.send(new PutItemCommand({
+        TableName: process.env.TABLE_NAME,
+        Item: {
+          deviceId: { S: String(reading.deviceId) },
+          temperature: { N: String(reading.temperature) },
+          ts: { N: String(reading.ts) },
+        },
+        ConditionExpression: "attribute_not_exists(deviceId) OR ts < :ts",
+        ExpressionAttributeValues: { ":ts": { N: String(reading.ts) } },
+      }));
+      console.log("stored latest reading device=" + reading.deviceId);
+    } catch (err) {
+      if (err.name === "ConditionalCheckFailedException") continue;
+      console.error("failed record", record.kinesis.sequenceNumber, err);
+      return { batchItemFailures: [{ itemIdentifier: record.kinesis.sequenceNumber }] };
+    }
+  }
+  return { batchItemFailures: [] };
+};
+",
+        },
+        "Description": "Telemetry pipeline - stores each device's latest reading",
+        "Environment": {
+          "Variables": {
+            "TABLE_NAME": {
+              "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+            },
+          },
+        },
+        "Handler": "index.handler",
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "TelemetryPipelinelatestReadingWriterLogGroup56E2EBD3",
+          },
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "TelemetryPipelinelatestReadingWriterExecutionRole1043E011",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 30,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "TelemetryPipelinelatestReadingWriterDurationAlarm512CCE1A": {
+      "Properties": {
+        "AlarmDescription": "Lambda function p99 duration is approaching the configured timeout. Threshold: > 27000ms (90% of 30000ms timeout).",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-reading-writer/duration",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "TelemetryPipelinelatestReadingWriterD780ACED",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "ExtendedStatistic": "p99",
+        "MetricName": "Duration",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Threshold": 27000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingWriterErrorsAlarmF553343A": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is producing invocation errors. Threshold: > 0 errors in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-reading-writer/errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "TelemetryPipelinelatestReadingWriterD780ACED",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingWriterExecutionRole1043E011": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "MaxSessionDuration": 3600,
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "TelemetryPipelinelatestReadingWriterLogGroup56E2EBD3",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Fn::GetAtt": [
+                              "TelemetryPipelinelatestReadingWriterLogGroup56E2EBD3",
+                              "Arn",
+                            ],
+                          },
+                          ":log-stream:*",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "LogsWriter",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "TelemetryPipelinelatestReadingWriterExecutionRoleDefaultPolicyCD2326AB": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": "dynamodb:PutItem",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TelemetryPipelinelatestReadings2B8A71F8",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TelemetryPipelinelatestReadingDlq1B03AE6D",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "kinesis:DescribeStreamSummary",
+                "kinesis:GetRecords",
+                "kinesis:GetShardIterator",
+                "kinesis:ListShards",
+                "kinesis:SubscribeToShard",
+                "kinesis:DescribeStream",
+                "kinesis:ListStreams",
+                "kinesis:DescribeStreamConsumer",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TelemetryPipelinereadings23A4133F",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "kms:Decrypt",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TelemetryPipelinestreamKey768AD0C2",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "TelemetryPipelinelatestReadingWriterExecutionRoleDefaultPolicyCD2326AB",
+        "Roles": [
+          {
+            "Ref": "TelemetryPipelinelatestReadingWriterExecutionRole1043E011",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "TelemetryPipelinelatestReadingWriterIteratorAgeAlarm732F6E70": {
+      "Properties": {
+        "AlarmDescription": "Lambda function is falling behind its stream event source (IteratorAge). Threshold: > 60000ms for 3 consecutive 1 minute periods.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-reading-writer/iterator-age",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 3,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "TelemetryPipelinelatestReadingWriterD780ACED",
+            },
+          },
+        ],
+        "EvaluationPeriods": 3,
+        "MetricName": "IteratorAge",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 60000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingWriterKinesisEventSourceComposureCDKTelemetryPipelineStackTelemetryPipelinereadings8BC159DA283D7B50": {
+      "Properties": {
+        "BatchSize": 100,
+        "BisectBatchOnFunctionError": true,
+        "DestinationConfig": {
+          "OnFailure": {
+            "Destination": {
+              "Fn::GetAtt": [
+                "TelemetryPipelinelatestReadingDlq1B03AE6D",
+                "Arn",
+              ],
+            },
+          },
+        },
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "TelemetryPipelinereadings23A4133F",
+            "Arn",
+          ],
+        },
+        "FunctionName": {
+          "Ref": "TelemetryPipelinelatestReadingWriterD780ACED",
+        },
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures",
+        ],
+        "MaximumRecordAgeInSeconds": 3600,
+        "MaximumRetryAttempts": 3,
+        "MetricsConfig": {
+          "Metrics": [
+            "EventCount",
+          ],
+        },
+        "StartingPosition": "LATEST",
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
+    },
+    "TelemetryPipelinelatestReadingWriterLogGroup56E2EBD3": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "TelemetryPipelinelatestReadingWriterReadingsDroppedEventsAlarmC745C616": {
+      "Properties": {
+        "AlarmDescription": "Lambda event source "readings" is dropping events after exhausting retries or TTL. Threshold: > 0 dropped events in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-reading-writer/readings-dropped-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "EventSourceMappingUUID",
+            "Value": {
+              "Ref": "TelemetryPipelinelatestReadingWriterKinesisEventSourceComposureCDKTelemetryPipelineStackTelemetryPipelinereadings8BC159DA283D7B50",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "DroppedEventCount",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingWriterReadingsFailedInvocationsAlarm5EE0D917": {
+      "Properties": {
+        "AlarmDescription": "Lambda event source "readings" is failing to invoke the function. Threshold: > 0 failed invocations in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-reading-writer/readings-failed-invocations",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "EventSourceMappingUUID",
+            "Value": {
+              "Ref": "TelemetryPipelinelatestReadingWriterKinesisEventSourceComposureCDKTelemetryPipelineStackTelemetryPipelinereadings8BC159DA283D7B50",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "FailedInvokeEventCount",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingWriterThrottlesAlarm55E2B8A7": {
+      "Properties": {
+        "AlarmDescription": "Lambda function invocations are being throttled. Threshold: > 0 throttles in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-reading-writer/throttles",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "TelemetryPipelinelatestReadingWriterD780ACED",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "Throttles",
+        "Namespace": "AWS/Lambda",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadings2B8A71F8": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "deviceId",
+            "AttributeType": "S",
+          },
+        ],
+        "BillingMode": "PAY_PER_REQUEST",
+        "KeySchema": [
+          {
+            "AttributeName": "deviceId",
+            "KeyType": "HASH",
+          },
+        ],
+        "Replicas": [
+          {
+            "DeletionProtectionEnabled": true,
+            "PointInTimeRecoverySpecification": {
+              "PointInTimeRecoveryEnabled": true,
+            },
+            "Region": {
+              "Ref": "AWS::Region",
+            },
+          },
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS",
+        },
+      },
+      "Type": "AWS::DynamoDB::GlobalTable",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "TelemetryPipelinelatestReadingsReadThrottleEventsAlarmBD6BB49E": {
+      "Properties": {
+        "AlarmDescription": "DynamoDB table read requests are being throttled, indicating a hot partition or insufficient read capacity. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-readings/read-throttle-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": {
+              "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "ReadThrottleEvents",
+        "Namespace": "AWS/DynamoDB",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingsSystemErrorsAlarmA34EB948": {
+      "Properties": {
+        "AlarmDescription": "DynamoDB table is returning server-side (HTTP 500) errors, summed across the core data-plane operations. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-readings/system-errors",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "EvaluationPeriods": 1,
+        "Metrics": [
+          {
+            "Expression": "getitem + batchgetitem + query + scan + putitem + updateitem + deleteitem + batchwriteitem + transactgetitems + transactwriteitems",
+            "Id": "expr_1",
+            "Label": "Sum of errors across all operations",
+            "ReturnData": true,
+          },
+          {
+            "Id": "getitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "GetItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "batchgetitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "BatchGetItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "query",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "Query",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "scan",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "Scan",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "putitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "PutItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "updateitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "UpdateItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "deleteitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "DeleteItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "batchwriteitem",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "BatchWriteItem",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "transactgetitems",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "TransactGetItems",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+          {
+            "Id": "transactwriteitems",
+            "MetricStat": {
+              "Metric": {
+                "Dimensions": [
+                  {
+                    "Name": "Operation",
+                    "Value": "TransactWriteItems",
+                  },
+                  {
+                    "Name": "TableName",
+                    "Value": {
+                      "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+                    },
+                  },
+                ],
+                "MetricName": "SystemErrors",
+                "Namespace": "AWS/DynamoDB",
+              },
+              "Period": 60,
+              "Stat": "Sum",
+            },
+            "ReturnData": false,
+          },
+        ],
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinelatestReadingsWriteThrottleEventsAlarm60033A4E": {
+      "Properties": {
+        "AlarmDescription": "DynamoDB table write requests are being throttled, indicating a hot partition or insufficient write capacity. Threshold: > 0 in 1 minute.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/latest-readings/write-throttle-events",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": {
+              "Ref": "TelemetryPipelinelatestReadings2B8A71F8",
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "WriteThrottleEvents",
+        "Namespace": "AWS/DynamoDB",
+        "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinereadings23A4133F": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "Name": "ComposureCDK-telemetry-readings",
+        "RetentionPeriodHours": 168,
+        "ShardCount": 1,
+        "StreamEncryption": {
+          "EncryptionType": "KMS",
+          "KeyId": {
+            "Fn::GetAtt": [
+              "TelemetryPipelinestreamKey768AD0C2",
+              "Arn",
+            ],
+          },
+        },
+      },
+      "Type": "AWS::Kinesis::Stream",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "TelemetryPipelinereadingsGetRecordsIteratorAgeMillisecondsAlarm204C4B32": {
+      "Properties": {
+        "AlarmDescription": "Kinesis stream consumers are reading records close to the end of the stream's retention period; records older than the retention period are deleted unread. Threshold: > 302400000 ms (50% of the stream's 604800000 ms retention period), for 15 of 15 1-minute periods.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/readings/get-records-iterator-age-milliseconds",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 15,
+        "Dimensions": [
+          {
+            "Name": "StreamName",
+            "Value": {
+              "Ref": "TelemetryPipelinereadings23A4133F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 15,
+        "MetricName": "GetRecords.IteratorAgeMilliseconds",
+        "Namespace": "AWS/Kinesis",
+        "Period": 60,
+        "Statistic": "Maximum",
+        "Threshold": 302400000,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinereadingsGetRecordsSuccessAlarm1E680A6E": {
+      "Properties": {
+        "AlarmDescription": "Kinesis stream GetRecords calls are failing. Threshold: < 0.99, for 5 of 5 1-minute periods.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/readings/get-records-success",
+        "ComparisonOperator": "LessThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "StreamName",
+            "Value": {
+              "Ref": "TelemetryPipelinereadings23A4133F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "GetRecords.Success",
+        "Namespace": "AWS/Kinesis",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.99,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinereadingsPutRecordSuccessAlarmDD7C71D6": {
+      "Properties": {
+        "AlarmDescription": "Kinesis stream PutRecord calls are failing. Threshold: < 0.99, for 5 of 5 1-minute periods.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/readings/put-record-success",
+        "ComparisonOperator": "LessThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "StreamName",
+            "Value": {
+              "Ref": "TelemetryPipelinereadings23A4133F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "PutRecord.Success",
+        "Namespace": "AWS/Kinesis",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.99,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinereadingsReadProvisionedThroughputExceededAlarm9539A135": {
+      "Properties": {
+        "AlarmDescription": "Kinesis stream GetRecords calls are being throttled for exceeding read throughput. Threshold: > 0.01, for 5 of 5 1-minute periods.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/readings/read-provisioned-throughput-exceeded",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "StreamName",
+            "Value": {
+              "Ref": "TelemetryPipelinereadings23A4133F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "ReadProvisionedThroughputExceeded",
+        "Namespace": "AWS/Kinesis",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.01,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinereadingsWriteProvisionedThroughputExceededAlarmD7A1EE5B": {
+      "Properties": {
+        "AlarmDescription": "Kinesis stream writes are being throttled for exceeding write throughput. Threshold: > 0.01, for 5 of 5 1-minute periods.",
+        "AlarmName": "composure-cdk-telemetry-pipeline-stack/telemetry-pipeline/readings/write-provisioned-throughput-exceeded",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 5,
+        "Dimensions": [
+          {
+            "Name": "StreamName",
+            "Value": {
+              "Ref": "TelemetryPipelinereadings23A4133F",
+            },
+          },
+        ],
+        "EvaluationPeriods": 5,
+        "MetricName": "WriteProvisionedThroughputExceeded",
+        "Namespace": "AWS/Kinesis",
+        "Period": 60,
+        "Statistic": "Average",
+        "Threshold": 0.01,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "TelemetryPipelinestreamKey768AD0C2": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "Description": "Encrypts the telemetry stream at rest.",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Statement": [
+            {
+              "Action": "kms:*",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PendingWindowInDays": 30,
+      },
+      "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "TelemetryPipelinestreamKeyAliasFBA3A261": {
+      "Properties": {
+        "AliasName": "alias/composurecdk-examples/telemetry-pipeline/readings",
+        "TargetKeyId": {
+          "Fn::GetAtt": [
+            "TelemetryPipelinestreamKey768AD0C2",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::KMS::Alias",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;

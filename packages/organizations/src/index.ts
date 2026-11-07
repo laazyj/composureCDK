@@ -15,6 +15,7 @@ export {
 } from "./service-control-policy-builder.js";
 export { SERVICE_CONTROL_POLICY_QUOTAS } from "./scp-checks.js";
 export { target, type PolicyTarget } from "./target.js";
+export * as guardrails from "./guardrails.js";
 
 /**
  * This package's AWS-property constraints, grouped by application strategy.

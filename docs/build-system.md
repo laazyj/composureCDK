@@ -44,7 +44,7 @@ The workspace-wide gates — `prettier:check`, `actionlint`, `zizmor`, `ci:cover
 
 Three things about that file are deliberate:
 
-**They are all `cache: false`.** Measured directly, every one of them is sub-second — `catalogue:check` and `licenses:check` are 30ms each; only `prettier:check` (~4s) is not trivial, and its inputs are every tracked file, so its cache could never hit. nx's own overhead on a cache hit exceeds the work, which is the argument [`ci.md`](ci.md#linting-the-workflows) already made for `actionlint`. Declaring `inputs` for an uncached target buys nothing and is a live hazard: an input list that misses a file the script reads turns into a stale pass the moment someone adds `cache: true`.
+**They are `cache: false`, bar `consumer:pack`.** Measured directly, every one of them is sub-second — `catalogue:check` and `licenses:check` are 30ms each; only `prettier:check` (~4s) is not trivial, and its inputs are every tracked file, so its cache could never hit. nx's own overhead on a cache hit exceeds the work, which is the argument [`ci.md`](ci.md#linting-the-workflows) already made for `actionlint`. Declaring `inputs` for an uncached target buys nothing and is a live hazard: an input list that misses a file the script reads turns into a stale pass the moment someone adds `cache: true`. `consumer:pack` is the exception: it runs `npm pack` 26 times, about 10s, against under a second for a cache hit, and `npx nx consumer:check` re-ran it every time. CI keeps no nx cache, so CI does not gain from this. `consumer:check` stays uncached because it installs from the registry, and `coverage:summary` does too, because a cache hit would skip its write to `$GITHUB_STEP_SUMMARY`.
 
 **Their scheduling is inline rather than in `targetDefaults`.** That is the one exception to the rule above, and it is because these targets are singletons — a `targetDefaults` entry per gate would be a worse version of the same thing.
 
@@ -56,7 +56,9 @@ One consequence of routing everything through nx: **a gate can only be invoked a
 
 ## Inputs are only ever tracked files
 
-nx hashes tracked files, so a glob that matches only gitignored paths matches nothing. `{projectRoot}/dist/**/*` is such a glob — it contributes zero files to a hash, which makes it look like coverage it is not. Declare `production` (or `src/**`) instead and let `dependsOn` handle ordering; `dependsOn` does not feed the hash either. nx 24 can opt a fileset into ignored files with `"includeIgnored": true`; nothing here uses it yet ([#662](https://github.com/laazyj/composureCDK/issues/662)).
+nx hashes tracked files, so a glob that matches only gitignored paths matches nothing. `{projectRoot}/dist/**/*` is such a glob — it contributes zero files to a hash, which makes it look like coverage it is not. Declare `production` (or `src/**`) instead and let `dependsOn` handle ordering; `dependsOn` does not feed the hash either.
+
+The exception is a fileset that sets `"includeIgnored": true` (nx 24+), which nx hashes straight from disk. Use it only where the build output itself is the input and no tracked file stands in for it. `consumer:pack` is the one place that does this: it packs each package's `dist`, so its inputs are `packages/*/dist/**/*` with `includeIgnored`, the other files the tarballs ship (`package.json`, `README.md`, `LICENSE`, `docs/`), the two scripts, and `npm --version` ([#662](https://github.com/laazyj/composureCDK/issues/662)). The list mirrors the packages' `files` fields, so a package that adds to `files` must add the path to the inputs too.
 
 `check:exports` and `validate` were both declared that way, and both replayed cached passes against a `dist` they had never seen: a change under `src/` rebuilt the package and `attw`/`publint` reported success from cache. They now take `production`, plus the external dependencies whose versions decide the verdict.
 

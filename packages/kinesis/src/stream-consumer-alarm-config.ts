@@ -26,9 +26,12 @@ export interface StreamConsumerAlarmConfig {
    * end of the stream's retention period.
    *
    * Default threshold: > 60,000 ms (1 minute), 5 of 5 one-minute periods.
+   * AWS gives no numeric threshold ("depends on the delay that your
+   * application can tolerate"), so 1 minute is this library's starting
+   * point; tune it to the consumer's latency target.
    *
    * Metric: `AWS/Kinesis SubscribeToShardEvent.MillisBehindLatest`, statistic
-   * Maximum, dimensions `StreamName` and `ConsumerName`, period 1 minute.
+   * Average (as AWS recommends), dimensions `StreamName` and `ConsumerName`, period 1 minute.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Kinesis
    * @see https://docs.aws.amazon.com/streams/latest/dev/monitoring-with-cloudwatch.html

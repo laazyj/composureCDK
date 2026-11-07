@@ -24,7 +24,7 @@ function millisBehindLatest(consumer: IStreamConsumer): Metric {
       StreamName: consumer.stream.streamName,
       ConsumerName: consumer.streamConsumerName,
     },
-    statistic: "Maximum",
+    statistic: "Average",
     period: METRIC_PERIOD,
   });
 }
@@ -54,7 +54,7 @@ export function resolveStreamConsumerAlarmDefinitions(
       evaluationPeriods: cfg.evaluationPeriods,
       datapointsToAlarm: cfg.datapointsToAlarm,
       treatMissingData: cfg.treatMissingData,
-      description: `Kinesis enhanced fan-out consumer is falling behind the stream. Threshold: > ${String(cfg.threshold)} ms behind latest (maximum per minute).`,
+      description: `Kinesis enhanced fan-out consumer is falling behind the stream. Threshold: > ${String(cfg.threshold)} ms behind latest (average per minute).`,
     },
   ];
 }

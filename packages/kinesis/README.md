@@ -249,9 +249,9 @@ To invoke a Lambda function from the consumer, use `kinesisConsumerEventSource` 
 
 | Key                                       | Metric (statistic)                                   | Default                                   | On by default |
 | ----------------------------------------- | ---------------------------------------------------- | ----------------------------------------- | ------------- |
-| `subscribeToShardEventMillisBehindLatest` | `SubscribeToShardEvent.MillisBehindLatest` (Maximum) | > 60,000 ms for 5 of 5 one-minute periods | yes           |
+| `subscribeToShardEventMillisBehindLatest` | `SubscribeToShardEvent.MillisBehindLatest` (Average) | > 60,000 ms for 5 of 5 one-minute periods | yes           |
 
-The metric is published per consumer, with the dimensions `StreamName` and `ConsumerName`. It measures how far the consumer's subscription is behind the newest record on the stream, so a sustained breach means the consumer cannot keep up and unread records are moving towards the end of the stream's retention. Missing data is not breaching, because the metric is only published while a subscription is delivering events. Tune the threshold to the consumer's latency target:
+The metric is published per consumer, with the dimensions `StreamName` and `ConsumerName`. It measures how far the consumer's subscription is behind the newest record on the stream, so a sustained breach means the consumer cannot keep up and unread records are moving towards the end of the stream's retention. Missing data is not breaching, because the metric is only published while a subscription is delivering events. AWS gives no numeric threshold for this alarm, so 1 minute is a starting point. Tune the threshold to the consumer's latency target:
 
 ```ts
 createStreamConsumerBuilder()

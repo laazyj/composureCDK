@@ -124,7 +124,7 @@ export interface FunctionAlarmConfig {
    * Alarm when the function is falling behind a stream event source.
    *
    * Contextual: a single alarm is created when at least one stream event
-   * source (currently DynamoDB streams) is attached via
+   * source (DynamoDB streams or Kinesis) is attached via
    * {@link IFunctionBuilder.addEventSource}. Unlike the per-mapping
    * {@link FunctionAlarmConfig.eventSourceFailedInvocations} /
    * {@link FunctionAlarmConfig.eventSourceDroppedEvents} alarms, `IteratorAge`

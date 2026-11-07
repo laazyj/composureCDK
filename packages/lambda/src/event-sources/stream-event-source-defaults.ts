@@ -3,7 +3,7 @@ import type { StreamEventSourceProps } from "aws-cdk-lib/aws-lambda-event-source
 
 /**
  * Secure, AWS-recommended defaults shared by every polling **stream** event
- * source — DynamoDB Streams today, Kinesis when that source lands. Each field
+ * source — DynamoDB Streams and Kinesis Data Streams. Each field
  * lives on {@link StreamEventSourceProps} (the common base of
  * `DynamoEventSourceProps` and `KinesisEventSourceProps`), so a per-source
  * factory spreads this constant and adds only its source-specific overrides.
@@ -22,6 +22,7 @@ export const DEFAULT_STREAM_EVENT_SOURCE_PROPS: Pick<
    * with {@link StartingPosition.TRIM_HORIZON} to reprocess from the oldest
    * record in the stream.
    * @see https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html
+   * @see https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-parameters.html
    */
   startingPosition: StartingPosition.LATEST,
 
@@ -30,6 +31,7 @@ export const DEFAULT_STREAM_EVENT_SOURCE_PROPS: Pick<
    * whole batch and force redelivery of already-processed records. CDK
    * defaults this to `false`.
    * @see https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html#services-ddb-batchfailurereporting
+   * @see https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-batchfailurereporting.html
    */
   reportBatchItemFailures: true,
 

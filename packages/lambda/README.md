@@ -435,6 +435,11 @@ attaches it through a registered **enhanced fan-out** (EFO) consumer
 sibling's output — and bind with the stream's (or consumer's) `grantRead`,
 which includes `kms:Decrypt` for a customer-managed key.
 
+To build the stream and its consumer as composed components, with
+well-architected defaults and recommended alarms, use `createStreamBuilder()`
+and `createStreamConsumerBuilder()` from [`@composurecdk/kinesis`](../kinesis/README.md)
+and pass `ref("stream", (r) => r.stream)` or `ref("consumer", (r) => r.consumer)`.
+
 ```ts
 import { Duration } from "aws-cdk-lib";
 import { Stream } from "aws-cdk-lib/aws-kinesis";

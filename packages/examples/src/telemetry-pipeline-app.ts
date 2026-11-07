@@ -146,10 +146,15 @@ export function createTelemetryPipelineApp(app = exampleApp()) {
         .description("Encrypts the telemetry stream at rest.")
         .alias("composurecdk-examples/telemetry-pipeline/readings"),
 
-      // On demand, a week's retention, RETAIN — all library defaults. Supplying
-      // the key switches encryption from the AWS-managed key to KMS.
+      // A week's retention and RETAIN are library defaults; supplying the key
+      // switches encryption from the AWS-managed key to KMS. Capacity mode is
+      // a workload decision the library leaves to you: a fleet's steady
+      // trickle of readings fits one provisioned shard (1 MB/s, 1,000
+      // records/s of writes) — the cheapest idle stream. A spiky or unknown
+      // load would use `.streamMode(StreamMode.ON_DEMAND)` instead.
       readings: createStreamBuilder()
         .streamName(TELEMETRY_STREAM_NAME)
+        .shardCount(1)
         .encryptionKey(ref<KeyBuilderResult>("streamKey").get("key")),
 
       latestReadings: createTableV2Builder().partitionKey({

@@ -111,7 +111,8 @@ function withPrincipalExemption(
   };
 }
 
-function collapse(values: string[]): string | string[] {
+/** A one-item list as its item, as AWS's examples write a single value. */
+export function collapse(values: string[]): string | string[] {
   return values.length === 1 ? values[0] : values;
 }
 

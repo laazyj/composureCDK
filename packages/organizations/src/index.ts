@@ -19,6 +19,7 @@ export {
   type ServiceControlPolicyStatement,
 } from "./policy-content.js";
 export { target, type PolicyTarget } from "./target.js";
+export * as guardrails from "./guardrails.js";
 
 /**
  * This package's AWS-property constraints, grouped by application strategy.

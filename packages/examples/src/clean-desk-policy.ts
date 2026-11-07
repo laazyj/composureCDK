@@ -13,6 +13,7 @@ import { APIGATEWAY_DISABLE_CLOUDWATCH_ROLE } from "aws-cdk-lib/cx-api";
 import { Bucket, CfnBucket, type BucketProps } from "aws-cdk-lib/aws-s3";
 import { Table, TableV2, type TableProps, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { Key, type KeyProps } from "aws-cdk-lib/aws-kms";
+import { Stream, type StreamProps } from "aws-cdk-lib/aws-kinesis";
 import { CfnFunction } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays, type LogGroupProps } from "aws-cdk-lib/aws-logs";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
@@ -352,11 +353,15 @@ class FunctionLogGroupAspect implements IAspect {
  * - `aws-cdk-lib/aws-dynamodb.Table` (also clears `deletionProtection`)
  * - `aws-cdk-lib/aws-kms.Key` (also shortens the pending-deletion window to
  *   the 7-day AWS minimum)
+ * - `aws-cdk-lib/aws-kinesis.Stream`
  *
  * `@composurecdk/bedrock` needs no injector of its own: its model invocation
  * log group is an L2 `LogGroup` (covered above), and the guardrail, guardrail
  * version and application inference profile are L1s with no removal policy,
  * so CloudFormation deletes them by default.
+ *
+ * Nor does a Kinesis `StreamConsumer`: it has no removal policy, so
+ * CloudFormation deregisters it with the stack (and its stream).
  *
  * If new stateful construct types are added to example stacks (e.g.
  * SQS queues), add a corresponding injector here.
@@ -374,6 +379,7 @@ export function cleanDeskPolicy(scope: IConstruct): void {
   injectors.add(new TableV2RemovalPolicyInjector());
   injectors.add(new TableRemovalPolicyInjector());
   injectors.add(new KeyRemovalPolicyInjector());
+  injectors.add(new RemovalPolicyInjector<StreamProps>(Stream.PROPERTY_INJECTION_ID));
 
   Aspects.of(scope).add(new DisableSourceLoggingOnDeleteAspect());
   Aspects.of(scope).add(new FunctionLogGroupAspect());

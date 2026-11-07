@@ -25,3 +25,9 @@ Cross-cutting tag key/value validation is not listed here; it is applied automat
 | `@composurecdk/cloudwatch`     | `alarmName`                | `constraints.validate.alarmName`                | —                                   |
 | `@composurecdk/ec2`            | `securityGroupDescription` | `constraints.validate.securityGroupDescription` | —                                   |
 | `@composurecdk/ec2`            | `securityGroupName`        | `constraints.validate.securityGroupName`        | —                                   |
+| `@composurecdk/organizations`  | `accountId`                | `constraints.validate.accountId`                | —                                   |
+| `@composurecdk/organizations`  | `organizationalUnitId`     | `constraints.validate.organizationalUnitId`     | —                                   |
+| `@composurecdk/organizations`  | `policyDescription`        | `constraints.validate.policyDescription`        | —                                   |
+| `@composurecdk/organizations`  | `policyName`               | `constraints.validate.policyName`               | —                                   |
+| `@composurecdk/organizations`  | `policyTargetId`           | `constraints.validate.policyTargetId`           | —                                   |
+| `@composurecdk/organizations`  | `rootId`                   | `constraints.validate.rootId`                   | —                                   |

@@ -69,8 +69,9 @@ export const EVENT_SOURCE_RELATIONSHIP_GUARDS: Record<
 > = {
   sqs: [guardSqsVisibilityTimeout],
   // `guardStreamFailureDestination` is source-agnostic — it reads only the
-  // mapping's own failure config — so a future `kinesis` kind reuses it as-is.
+  // mapping's own failure config — so every stream kind shares it.
   dynamodb: [guardStreamFailureDestination],
+  kinesis: [guardStreamFailureDestination],
   unknown: [],
 };
 
@@ -169,7 +170,7 @@ function isFiniteBound(value: number | undefined): boolean {
  * source does not re-expose them), regardless of build order (ADR-0011).
  *
  * Source-agnostic: it inspects only the mapping's own failure config, so it
- * applies unchanged to any polling stream kind (DynamoDB now, Kinesis later).
+ * applies unchanged to every polling stream kind (DynamoDB and Kinesis).
  * SQS mappings never set these stream-only properties, so the guard stays
  * silent even though the Aspect visits them.
  */
@@ -200,7 +201,9 @@ function guardStreamFailureDestination(fn: LambdaFunction, id: string): void {
           `retries/record-age but has no onFailure destination — records that exhaust the bound ` +
           `are dropped silently. Set onFailure to a dead-letter queue (e.g. the sqs "dlq" queue ` +
           `builder) or acknowledge "${STREAM_DLQ_WARNING_ID}". ` +
-          `See https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html#services-ddb-errors`,
+          `See https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html#services-ddb-errors ` +
+          `(DynamoDB) or https://docs.aws.amazon.com/lambda/latest/dg/kinesis-on-failure-destination.html ` +
+          `(Kinesis)`,
       );
     },
   });

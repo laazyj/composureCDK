@@ -174,21 +174,21 @@ Opt back into CDK's auto-created role attached to `AWSLambdaBasicExecutionRole`.
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.
 
-| Alarm                    | Metric                            | Default threshold           | Created when                           |
-| ------------------------ | --------------------------------- | --------------------------- | -------------------------------------- |
-| `errors`                 | Errors (Sum, 1 min)               | > 0                         | Always                                 |
-| `throttles`              | Throttles (Sum, 1 min)            | > 0                         | Always                                 |
-| `duration`               | Duration (p99, 1 min)             | > 90% of configured timeout | `timeout` is set                       |
-| `concurrentExecutions`   | ConcurrentExecutions (Max, 1 min) | >= 80% of reserved limit    | `reservedConcurrentExecutions` is set  |
-| `<key>FailedInvocations` | FailedInvokeEventCount (Sum)      | > 0                         | An SQS or DynamoDB source is attached  |
-| `<key>DroppedEvents`     | DroppedEventCount (Sum)           | > 0                         | An SQS or DynamoDB source is attached  |
-| `iteratorAge`            | IteratorAge (Max, 1 min)          | > 60000 ms for 3 min¹       | A stream source (DynamoDB) is attached |
+| Alarm                    | Metric                            | Default threshold           | Created when                                      |
+| ------------------------ | --------------------------------- | --------------------------- | ------------------------------------------------- |
+| `errors`                 | Errors (Sum, 1 min)               | > 0                         | Always                                            |
+| `throttles`              | Throttles (Sum, 1 min)            | > 0                         | Always                                            |
+| `duration`               | Duration (p99, 1 min)             | > 90% of configured timeout | `timeout` is set                                  |
+| `concurrentExecutions`   | ConcurrentExecutions (Max, 1 min) | >= 80% of reserved limit    | `reservedConcurrentExecutions` is set             |
+| `<key>FailedInvocations` | FailedInvokeEventCount (Sum)      | > 0                         | An SQS, DynamoDB or Kinesis source is attached    |
+| `<key>DroppedEvents`     | DroppedEventCount (Sum)           | > 0                         | An SQS, DynamoDB or Kinesis source is attached    |
+| `iteratorAge`            | IteratorAge (Max, 1 min)          | > 60000 ms for 3 min¹       | A stream source (DynamoDB or Kinesis) is attached |
 
 ¹ AWS recommends alarming on `IteratorAge` for stream consumers but prescribes no fixed threshold — it is workload dependent. The 60s/3-minute default is deliberately conservative; tune it per workload via `eventSourceIteratorAge`.
 
 The per-mapping event-source alarms are contextual: one pair is created per event source attached via `addEventSource` (see [Event sources](#event-sources)) whose kind emits per-mapping ESM metrics. Each alarm's key is the event source's key suffixed with `FailedInvocations` / `DroppedEvents` — e.g. an event source added as `"orders"` produces `ordersFailedInvocations` and `ordersDroppedEvents`. The `eventSourceFailedInvocations` / `eventSourceDroppedEvents` fields on `recommendedAlarms` tune every such alarm.
 
-`iteratorAge` is different: `IteratorAge` is a function-level metric, so a single alarm (keyed `iteratorAge`) is created whenever at least one stream source (currently DynamoDB streams) is attached, regardless of how many. It warns when the consumer falls behind its stream. Tune or disable it via the `eventSourceIteratorAge` field on `recommendedAlarms`.
+`iteratorAge` is different: `IteratorAge` is a function-level metric, so a single alarm (keyed `iteratorAge`) is created whenever at least one stream source (DynamoDB streams or Kinesis, shared-throughput or enhanced fan-out) is attached, regardless of how many. It warns when the consumer falls behind its stream. Tune or disable it via the `eventSourceIteratorAge` field on `recommendedAlarms`.
 
 The defaults are exported as `FUNCTION_ALARM_DEFAULTS` for visibility and testing:
 
@@ -305,7 +305,7 @@ const system = compose(
 
 The source is attached _after_ the function and its least-privilege execution
 role exist, so the `source.bind(fn)` that `addEventSource` performs grants the
-consume permission (SQS `ReceiveMessage`, or DynamoDB `grantStreamRead`) onto
+consume permission (SQS `ReceiveMessage`, DynamoDB `grantStreamRead`, or Kinesis `grantRead`) onto
 the builder's role rather than CDK's auto-role.
 
 `dynamoEventSource(table, props?)` mirrors the SQS factory for DynamoDB streams.
@@ -356,7 +356,7 @@ second `props` argument and exported as `DEFAULT_SQS_EVENT_SOURCE_PROPS`:
 
 `dynamoEventSource` applies the same defaults plus `startingPosition` and
 `bisectBatchOnError`, exported as `DEFAULT_DYNAMO_EVENT_SOURCE_PROPS` (the shared
-`DEFAULT_STREAM_EVENT_SOURCE_PROPS`, which a future `kinesisEventSource` reuses):
+`DEFAULT_STREAM_EVENT_SOURCE_PROPS`, which the [Kinesis helpers](#kinesis-data-streams) share):
 
 | Property                  | Default                     | Rationale                                                                                                            |
 | ------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -404,9 +404,10 @@ way:
 )
 ```
 
-An S3 destination on a **DynamoDB stream** mapping needs **aws-cdk-lib ≥ 2.184.0**,
-above this package's [floor](../../docs/adr/0008-aws-cdk-lib-version-floors.md) of
-2.168.0. `DynamoEventSource` only opts into S3 destinations from that release;
+An S3 destination on a **DynamoDB stream** (or [Kinesis](#kinesis-data-streams))
+mapping needs **aws-cdk-lib ≥ 2.184.0**, above this package's
+[floor](../../docs/adr/0008-aws-cdk-lib-version-floors.md) of 2.180.0.
+`DynamoEventSource` only opts into S3 destinations from that release;
 below it CDK rejects the pairing at synth with `S3 onFailure Destination is not
 supported for this event source`. The limit is CDK's, not this package's — a
 queue destination works at the floor.
@@ -425,8 +426,104 @@ today (the queue often arrives as an unresolved `ref()`); they are tracked in
 [#123](https://github.com/laazyj/composureCDK/issues/123) and
 [#124](https://github.com/laazyj/composureCDK/issues/124).
 
-`kinesisEventSource` is still deferred — see
-[#120](https://github.com/laazyj/composureCDK/issues/120).
+### Kinesis Data Streams
+
+`kinesisEventSource(stream, props?)` attaches a Kinesis data stream through
+**shared-throughput** iterators; `kinesisConsumerEventSource(consumer, props?)`
+attaches it through a registered **enhanced fan-out** (EFO) consumer
+(`StreamConsumer`). Both take aws-cdk-lib types — concrete or a `ref()` to a
+sibling's output — and bind with the stream's (or consumer's) `grantRead`,
+which includes `kms:Decrypt` for a customer-managed key.
+
+```ts
+import { Duration } from "aws-cdk-lib";
+import { Stream } from "aws-cdk-lib/aws-kinesis";
+import { compose, ref } from "@composurecdk/core";
+import { createFunctionBuilder, kinesisEventSource } from "@composurecdk/lambda";
+import { createQueueBuilder } from "@composurecdk/sqs";
+
+const telemetry = new Stream(stack, "Telemetry");
+
+compose(
+  {
+    dlq: createQueueBuilder("dlq"),
+    processor: createFunctionBuilder()
+      .runtime(Runtime.NODEJS_22_X)
+      .handler("index.handler")
+      .code(Code.fromAsset("lambda"))
+      .addEventSource(
+        "telemetry",
+        kinesisEventSource(telemetry, {
+          retryAttempts: 3,
+          maxRecordAge: Duration.hours(1),
+          onFailure: ref("dlq", (r) => r.queue),
+        }),
+      ),
+  },
+  { dlq: [], processor: ["dlq"] },
+);
+```
+
+Both apply `DEFAULT_KINESIS_EVENT_SOURCE_PROPS` — the same
+`DEFAULT_STREAM_EVENT_SOURCE_PROPS` as `dynamoEventSource`, each overridable via
+`props`:
+
+| Property                  | Default                     | Rationale                                                                                                            |
+| ------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `startingPosition`        | `LATEST`                    | A newly-attached consumer reads from the stream tip instead of replaying the whole retention window.                 |
+| `reportBatchItemFailures` | `true`                      | A single poison record fails only its own record, not the whole batch. CDK defaults this `false`.                    |
+| `bisectBatchOnError`      | `true`                      | Split and retry a failing batch, isolating a poison record instead of blocking the shard. CDK defaults this `false`. |
+| `metricsConfig`           | `{ metrics: [EventCount] }` | Enables the per-mapping ESM metrics that back the event-source contextual alarms.                                    |
+
+`startingPosition` is optional (CDK's `KinesisEventSourceProps` requires it);
+`AT_TIMESTAMP` also needs `startingPositionTimestamp`. Sources:
+[Lambda Kinesis parameters](https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-parameters.html),
+[batch item failures](https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-batchfailurereporting.html).
+
+**Failure handling and retention.** Lambda processes each shard in order, so by
+default a failing batch is retried until its records expire — blocking that
+shard for up to the stream's **retention period**: 24 h with CDK's `Stream`
+default, **7 days** with the `@composurecdk/kinesis` default. Bisecting isolates
+the poison record but does not stop it being retried. Bound `retryAttempts`
+and/or `maxRecordAge` **together with** `onFailure`, so a record that never
+succeeds is moved aside and the shard keeps flowing. `onFailure` is widened
+exactly as for `dynamoEventSource` — a queue (wrapped in `SqsDlq`), any
+`IEventSourceDlq` such as `SnsDlq` or `S3OnFailureDestination`, or a `ref()` to
+either — and the [`STREAM_DLQ_WARNING_ID`](#failure-handling-dead-letter-queue)
+warning fires when retries are bounded without one. The bound is not defaulted:
+bounding without a destination would drop records silently. A queue or topic
+destination receives the batch's metadata (shard and sequence-number range),
+not the records — read them back from the stream before they age out. An S3
+destination captures the whole batch, and needs **aws-cdk-lib ≥ 2.184.0**
+(below it CDK rejects it at synth, as for DynamoDB). See
+[on-failure destinations](https://docs.aws.amazon.com/lambda/latest/dg/kinesis-on-failure-destination.html).
+
+**Shared throughput or enhanced fan-out.** A shard's 2 MB/s of read throughput
+is shared by every shared-throughput consumer. An EFO consumer gets a dedicated
+2 MB/s per shard, pushed over HTTP/2 with lower propagation delay, and is
+billed per consumer-shard-hour and per GB retrieved. Use `kinesisEventSource`
+for one or a few consumers; reach for `kinesisConsumerEventSource` when several
+applications read the same stream or latency matters. See
+[enhanced fan-out consumers](https://docs.aws.amazon.com/streams/latest/dev/enhanced-consumers.html).
+
+```ts
+import { StreamConsumer } from "aws-cdk-lib/aws-kinesis";
+import { kinesisConsumerEventSource } from "@composurecdk/lambda";
+
+const consumer = new StreamConsumer(stack, "AlertsConsumer", {
+  streamConsumerName: "alerts",
+  stream: telemetry,
+});
+
+createFunctionBuilder()
+  // ...
+  .addEventSource("alerts", kinesisConsumerEventSource(consumer));
+```
+
+`KinesisConsumerEventSource` arrived in aws-cdk-lib 2.180.0, which sets this
+package's floor. Either helper adds the function-level `iteratorAge` alarm and
+the per-mapping `<key>FailedInvocations` / `<key>DroppedEvents` alarms (see
+[Recommended Alarms](#recommended-alarms)).
 
 ## Deploy-time invocation: `.invokeOnDeploy()`
 

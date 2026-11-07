@@ -271,6 +271,8 @@ const system = compose(
 
 CDK's `Subscription` construct adds the queue policy that lets `sns.amazonaws.com` write to the DLQ (scoped to the topic ARN), so no extra grant is needed.
 
+If the DLQ is encrypted with a customer-managed KMS key (`createQueueBuilder("dlq").encryptionMasterKey(key)`), SNS also needs `kms:Decrypt` and `kms:GenerateDataKey` on that key, which CDK does not grant. Without them the deploy succeeds but every redrive fails. Both builders add that statement to the key policy, scoped by `aws:SourceArn` to the topic. The DLQ default, SSE-SQS, needs no key grant. An imported key's policy can't be changed from the app, so the builders emit a `@composurecdk/sns:subscription-dlq-key-not-granted` warning (`SUBSCRIPTION_DLQ_KEY_WARNING_ID`) instead. Make the grant where the key is owned, then acknowledge the warning.
+
 The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached. Pair them with the DLQ's own depth alarm — that pair is what turns an undelivered notification into a page.
 
 [`ComposureCDK-OrderProcessorStack`](../examples/src/order-processor-app.ts) deploys this shape end to end and its [smoke test](../examples/test/smoke/order-processor.smoke.mjs) proves the delivery path against live AWS.

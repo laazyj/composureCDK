@@ -1,4 +1,4 @@
-import { type ITopic, type ITopicSubscription, Subscription } from "aws-cdk-lib/aws-sns";
+import { type ITopic, type ITopicSubscription, type Subscription } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
 import {
   Builder,
@@ -7,7 +7,7 @@ import {
   type Resolvable,
   resolve,
 } from "@composurecdk/core";
-import { applySubscriptionDefaults } from "./subscription-defaults.js";
+import { bindSubscription } from "./subscription-defaults.js";
 
 /**
  * Configuration properties for the SNS subscription builder.
@@ -103,20 +103,14 @@ class SubscriptionBuilder implements Lifecycle<SubscriptionBuilderResult> {
       );
     }
 
-    const resolvedTopic = resolve(topic, context);
-    const resolvedSubscription = resolve(subscription, context);
-    const subscriptionConfig = applySubscriptionDefaults(
-      scope,
-      id,
-      resolvedSubscription.bind(resolvedTopic),
-    );
-
-    const built = new Subscription(scope, id, {
-      topic: resolvedTopic,
-      ...subscriptionConfig,
-    });
-
-    return { subscription: built };
+    return {
+      subscription: bindSubscription(
+        scope,
+        id,
+        resolve(topic, context),
+        resolve(subscription, context),
+      ),
+    };
   }
 }
 

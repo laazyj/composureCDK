@@ -10,7 +10,7 @@ import {
   CfnTopicPolicy,
   type ITopic,
   type ITopicSubscription,
-  Subscription,
+  type Subscription,
   Topic,
   type TopicPolicy,
   type TopicProps,
@@ -22,7 +22,7 @@ import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TopicAlarmConfig } from "./topic-alarm-config.js";
 import { createTopicAlarms } from "./topic-alarms.js";
 import { TOPIC_DEFAULTS } from "./defaults.js";
-import { applySubscriptionDefaults } from "./subscription-defaults.js";
+import { bindSubscription } from "./subscription-defaults.js";
 
 /**
  * Configuration properties for the SNS topic builder.
@@ -241,15 +241,7 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
     for (const entry of this.#subscriptions) {
       const resolvedSub = resolve(entry.subscription, context ?? {});
       const subscriptionId = `${id}${entry.key[0].toUpperCase()}${entry.key.slice(1)}Subscription`;
-      const subscriptionConfig = applySubscriptionDefaults(
-        scope,
-        subscriptionId,
-        resolvedSub.bind(topic),
-      );
-      subscriptions[entry.key] = new Subscription(scope, subscriptionId, {
-        topic,
-        ...subscriptionConfig,
-      });
+      subscriptions[entry.key] = bindSubscription(scope, subscriptionId, topic, resolvedSub);
     }
 
     return { topic, alarms, subscriptions, policy: findTopicPolicy(topic) };

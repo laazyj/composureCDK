@@ -12,12 +12,12 @@ describe("telemetry-pipeline-app", () => {
   const streamId = Object.keys(template.findResources("AWS::Kinesis::Stream"))[0];
   const consumerId = Object.keys(template.findResources("AWS::Kinesis::StreamConsumer"))[0];
 
-  it("creates an on-demand stream with week-long retention, encrypted with the composed key", () => {
+  it("creates a one-shard provisioned stream with week-long retention, encrypted with the composed key", () => {
     template.resourceCountIs("AWS::KMS::Key", 1);
     template.resourceCountIs("AWS::Kinesis::Stream", 1);
     template.hasResourceProperties("AWS::Kinesis::Stream", {
       Name: TELEMETRY_STREAM_NAME,
-      StreamModeDetails: { StreamMode: "ON_DEMAND" },
+      ShardCount: 1,
       RetentionPeriodHours: 168,
       StreamEncryption: {
         EncryptionType: "KMS",

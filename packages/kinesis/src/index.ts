@@ -10,6 +10,7 @@ export {
 export { streamGrants } from "./grants.js";
 export { STREAM_DEFAULTS } from "./defaults.js";
 export { type StreamAlarmConfig } from "./stream-alarm-config.js";
+export { STREAM_ALARM_DEFAULTS } from "./stream-alarm-defaults.js";
 
 /**
  * This package's AWS-property constraints, grouped by application strategy.

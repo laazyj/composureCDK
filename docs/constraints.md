@@ -25,3 +25,4 @@ Cross-cutting tag key/value validation is not listed here; it is applied automat
 | `@composurecdk/cloudwatch`     | `alarmName`                | `constraints.validate.alarmName`                | —                                   |
 | `@composurecdk/ec2`            | `securityGroupDescription` | `constraints.validate.securityGroupDescription` | —                                   |
 | `@composurecdk/ec2`            | `securityGroupName`        | `constraints.validate.securityGroupName`        | —                                   |
+| `@composurecdk/kinesis`        | `streamName`               | `constraints.validate.streamName`               | —                                   |

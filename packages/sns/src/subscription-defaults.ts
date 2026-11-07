@@ -1,6 +1,13 @@
 import { Annotations } from "aws-cdk-lib";
-import { SubscriptionProtocol, type TopicSubscriptionConfig } from "aws-cdk-lib/aws-sns";
+import {
+  type ITopic,
+  type ITopicSubscription,
+  Subscription,
+  SubscriptionProtocol,
+  type TopicSubscriptionConfig,
+} from "aws-cdk-lib/aws-sns";
 import type { IConstruct } from "constructs";
+import { grantSubscriptionDlqKey } from "./subscription-dlq-key-grant.js";
 
 /**
  * Per-protocol overrides applied to a {@link TopicSubscriptionConfig}.
@@ -95,4 +102,28 @@ export function applySubscriptionDefaults(
   }
 
   return merged;
+}
+
+/**
+ * Bind `subscription` to `topic` and create the {@link Subscription}
+ * construct — the one path both `createSubscriptionBuilder` and
+ * `TopicBuilder.addSubscription` use, so every subscription gets the same
+ * treatment:
+ *
+ * 1. `ITopicSubscription.bind(topic)` — CDK's endpoint wire-up (Lambda
+ *    invoke permission, SQS queue policy, endpoint KMS grant).
+ * 2. {@link applySubscriptionDefaults} — per-protocol defaults and
+ *    transport-security warnings.
+ * 3. {@link grantSubscriptionDlqKey} — the dead-letter queue KMS grant
+ *    CDK's `Subscription` omits.
+ */
+export function bindSubscription(
+  scope: IConstruct,
+  id: string,
+  topic: ITopic,
+  subscription: ITopicSubscription,
+): Subscription {
+  const config = applySubscriptionDefaults(scope, id, subscription.bind(topic));
+  grantSubscriptionDlqKey(scope, id, topic, config);
+  return new Subscription(scope, id, { topic, ...config });
 }

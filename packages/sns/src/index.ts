@@ -16,6 +16,7 @@ export {
   type SubscriptionBuilderResult,
 } from "./subscription-builder.js";
 export { SUBSCRIPTION_DEFAULTS, type SubscriptionDefaults } from "./subscription-defaults.js";
+export { SUBSCRIPTION_DLQ_KEY_WARNING_ID } from "./subscription-dlq-key-grant.js";
 export {
   topicPolicyConflictPolicy,
   TOPIC_POLICY_CONFLICT_WARNING_ID,

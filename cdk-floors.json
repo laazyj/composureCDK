@@ -17,6 +17,10 @@
       "floor": "2.93.0",
       "gatedBy": "Annotations.addWarningV2 used by queue-builder.ts (introduced 2.93.0); also QueueEncryption.SQS_MANAGED (~2.45) and QueueProps.enforceSSL (~2.50) builder defaults"
     },
+    "kinesis": {
+      "floor": "2.140.0",
+      "gatedBy": "aws-kinesis.StreamProps.removalPolicy, which the RemovalPolicy.RETAIN builder default sets — introduced in 2.140.0 (absent in 2.139.0). Below it the prop is silently ignored and the retain default no-ops. StreamMode and StreamEncryption.MANAGED are lower (both present at 2.93.0). Note StreamBuilderProps.encryptionKey deliberately re-declares the prop as Resolvable<NonNullable<StreamProps[\"encryptionKey\"]>> rather than naming a key interface (ADR-0018); do not 'simplify' it to IKey or IKeyRef."
+    },
     "kms": {
       "floor": "2.93.0",
       "gatedBy": "Not bisected below 2.93.0, the floor it inherits from @composurecdk/cloudwatch (peered for its recommended alarms) — so this entry is an upper bound on kms's own floor, not a measurement. The aws-kms APIs the builder uses are all lower — Key/KeyProps (alias, enableKeyRotation, pendingWindow, removalPolicy), Alias, KeySpec, Key.grantAdmin, and IKey's grantEncrypt/grantDecrypt/grantEncryptDecrypt/grantGenerateMac/grantVerifyMac — as is the AWS/KMS Metric the expiry alarm is built from. Note IKey.grantSign/grantVerify/grantSignVerify do NOT exist at this floor (verified by `enforce 2.93.0`), which is why keyGrants.sign/verify name kms:Sign / kms:Verify via IKey.grant instead of delegating; do not 'simplify' them to the native methods without raising the floor."

@@ -30,6 +30,7 @@ The key-consuming props on the library's stateful resources accept a `Resolvable
 | `@composurecdk/dynamodb` | `encryptionKey`         | `Resolvable<IKey>` (classic `Table`) |
 | `@composurecdk/sqs`      | `encryptionMasterKey`   | `Resolvable<IKey>`                   |
 | `@composurecdk/sns`      | `masterKey`             | `Resolvable<IKey>`                   |
+| `@composurecdk/kinesis`  | `encryptionKey`         | `Resolvable<IKey>`                   |
 | `@composurecdk/logs`     | `encryptionKey`         | `Resolvable<IKey>`                   |
 | `@composurecdk/lambda`   | `environmentEncryption` | `Resolvable<IKey>`                   |
 | `@composurecdk/neptune`  | `kmsKey`                | `Resolvable<IKey>`                   |
@@ -70,7 +71,7 @@ compose(
 ).build(stack, "Persistence");
 ```
 
-Both `encryptionKey`-style props infer the customer-managed encryption mode when a key is supplied, so there is no second prop to remember: `@composurecdk/s3` switches from `BucketEncryption.S3_MANAGED` to `KMS`, `@composurecdk/sqs` from `QueueEncryption.SQS_MANAGED` to `KMS`, and the classic DynamoDB `Table` from `AWS_MANAGED` to `CUSTOMER_MANAGED` (ADR-0009).
+Both `encryptionKey`-style props infer the customer-managed encryption mode when a key is supplied, so there is no second prop to remember: `@composurecdk/s3` switches from `BucketEncryption.S3_MANAGED` to `KMS`, `@composurecdk/sqs` from `QueueEncryption.SQS_MANAGED` to `KMS`, `@composurecdk/kinesis` from `StreamEncryption.MANAGED` to `KMS`, and the classic DynamoDB `Table` from `AWS_MANAGED` to `CUSTOMER_MANAGED` (ADR-0009).
 
 ## Secure Defaults
 

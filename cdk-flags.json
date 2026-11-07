@@ -18,6 +18,7 @@
     "events": ["aws-events", "aws-events-targets"],
     "examples": [],
     "iam": ["aws-iam"],
+    "kinesis": ["aws-kinesis"],
     "kms": ["aws-kms"],
     "lambda": ["aws-lambda", "aws-lambda-nodejs", "aws-lambda-event-sources", "triggers"],
     "logs": ["aws-logs"],

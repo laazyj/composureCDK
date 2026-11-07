@@ -1,13 +1,13 @@
 import type { ITable } from "aws-cdk-lib/aws-dynamodb";
-import type { IEventSource, StartingPosition } from "aws-cdk-lib/aws-lambda";
+import type { StartingPosition } from "aws-cdk-lib/aws-lambda";
 import {
   DynamoEventSource,
   type DynamoEventSourceProps,
-  SqsDlq,
 } from "aws-cdk-lib/aws-lambda-event-sources";
 import type { IQueue } from "aws-cdk-lib/aws-sqs";
-import { combine, isRef, type Resolvable } from "@composurecdk/core";
-import { type ComposureEventSource, composureEventSource } from "./composure-event-source.js";
+import type { Resolvable } from "@composurecdk/core";
+import type { ComposureEventSource } from "./composure-event-source.js";
+import { streamEventSource } from "./stream-event-source.js";
 import { DEFAULT_STREAM_EVENT_SOURCE_PROPS } from "./stream-event-source-defaults.js";
 
 /**
@@ -52,15 +52,6 @@ export interface DynamoStreamEventSourceProps extends Omit<
    * @see https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html#services-ddb-errors
    */
   onFailure?: Resolvable<IQueue | NonNullable<DynamoEventSourceProps["onFailure"]>>;
-}
-
-/** Wraps a raw queue in an {@link SqsDlq}; passes an existing destination through. */
-function toDlq(
-  destination: IQueue | NonNullable<DynamoEventSourceProps["onFailure"]>,
-): NonNullable<DynamoEventSourceProps["onFailure"]> {
-  // Duck-type the queue rather than `instanceof` — the ESM and CommonJS copies
-  // of a package can both load in one process (ADR-0007).
-  return "queueArn" in destination ? new SqsDlq(destination) : destination;
 }
 
 /**
@@ -126,27 +117,10 @@ export function dynamoEventSource(
   table: Resolvable<ITable>,
   props?: DynamoStreamEventSourceProps,
 ): ComposureEventSource {
-  const { onFailure, ...rest } = props ?? {};
-  const merged: Omit<DynamoEventSourceProps, "onFailure"> = {
-    ...DEFAULT_DYNAMO_EVENT_SOURCE_PROPS,
-    ...rest,
-  };
-
-  let source: Resolvable<IEventSource>;
-  if (onFailure === undefined) {
-    // No DLQ: only the table can be lazy — preserve the single-ref fast path.
-    source = isRef(table)
-      ? table.map((resolved) => new DynamoEventSource(resolved, merged))
-      : new DynamoEventSource(table, merged);
-  } else {
-    // Table and DLQ are two siblings feeding one source — combine both refs
-    // (either may be concrete) into a single deferred value (ADR-0015).
-    source = combine(
-      { table, onFailure },
-      ({ table: resolvedTable, onFailure: resolvedDlq }) =>
-        new DynamoEventSource(resolvedTable, { ...merged, onFailure: toDlq(resolvedDlq) }),
-    );
-  }
-
-  return composureEventSource("dynamodb", source);
+  return streamEventSource(
+    "dynamodb",
+    table,
+    props,
+    (resolved, merged) => new DynamoEventSource(resolved, merged),
+  );
 }

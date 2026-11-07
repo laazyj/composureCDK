@@ -44,7 +44,7 @@ interface EventSourceAlarmSpec {
  */
 /**
  * Per-mapping ESM alarms shared by every kind that emits the `EventCount`
- * metrics — both SQS and DynamoDB streams report `FailedInvokeEventCount` and
+ * metrics — SQS, DynamoDB streams and Kinesis all report `FailedInvokeEventCount` and
  * `DroppedEventCount` when the mapping opts into `MetricType.EVENT_COUNT`.
  */
 const ESM_EVENT_COUNT_SPECS: EventSourceAlarmSpec[] = [
@@ -69,14 +69,18 @@ const ESM_EVENT_COUNT_SPECS: EventSourceAlarmSpec[] = [
 const EVENT_SOURCE_ALARM_SPECS: Record<AttachedEventSource["kind"], EventSourceAlarmSpec[]> = {
   sqs: ESM_EVENT_COUNT_SPECS,
   dynamodb: ESM_EVENT_COUNT_SPECS,
+  kinesis: ESM_EVENT_COUNT_SPECS,
   unknown: [],
 };
 
 /**
  * Source kinds backed by a stream, for which the function-level `IteratorAge`
- * alarm is created. Extensible to `"kinesis"` when that source lands.
+ * alarm is created.
  */
-const STREAM_EVENT_SOURCE_KINDS: ReadonlySet<AttachedEventSource["kind"]> = new Set(["dynamodb"]);
+const STREAM_EVENT_SOURCE_KINDS: ReadonlySet<AttachedEventSource["kind"]> = new Set([
+  "dynamodb",
+  "kinesis",
+]);
 
 /**
  * Resolves the recommended alarm configuration into fully-resolved

@@ -25,11 +25,11 @@ describe("StreamBuilder", () => {
       template.resourceCountIs("AWS::Kinesis::Stream", 1);
     });
 
-    it("returns the stream and an empty alarms record", () => {
+    it("returns the stream and its recommended alarms", () => {
       const { result } = buildAndSynth();
 
       expect(result.stream).toBeDefined();
-      expect(result.alarms).toEqual({});
+      expect(Object.keys(result.alarms)).toHaveLength(5);
     });
   });
 
@@ -212,9 +212,11 @@ describe("StreamBuilder", () => {
   describe("addAlarm", () => {
     it("creates a custom alarm using the supplied metric and threshold", () => {
       const { result, template } = buildAndSynth((b) =>
-        b.addAlarm("noIncomingRecords", (a) =>
-          a.metric(incomingRecords).threshold(1).lessThan().description("No records arriving."),
-        ),
+        b
+          .recommendedAlarms(false)
+          .addAlarm("noIncomingRecords", (a) =>
+            a.metric(incomingRecords).threshold(1).lessThan().description("No records arriving."),
+          ),
       );
 
       expect(Object.keys(result.alarms)).toEqual(["noIncomingRecords"]);
@@ -240,7 +242,7 @@ describe("StreamBuilder", () => {
   describe("copy", () => {
     it("preserves custom alarms across .copy()", () => {
       assertCopyPreservesState({
-        factory: () => createStreamBuilder(),
+        factory: () => createStreamBuilder().recommendedAlarms(false),
         configure: (b) => {
           b.addAlarm("firstCustom", (a) => a.metric(incomingRecords).threshold(1).lessThan());
         },

@@ -34,9 +34,13 @@ export interface StreamBuilderProps extends Omit<StreamProps, "encryptionKey"> {
   encryptionKey?: Resolvable<NonNullable<StreamProps["encryptionKey"]>>;
 
   /**
-   * Configuration for AWS-recommended CloudWatch alarms. Set to `false` to
-   * disable the recommended alarms; custom alarms added via `addAlarm()` are
-   * still created.
+   * Configuration for AWS-recommended CloudWatch alarms.
+   *
+   * By default, the builder creates the recommended alarms in
+   * {@link STREAM_ALARM_DEFAULTS}, with the iterator-age threshold derived
+   * from the stream's `retentionPeriod`. Individual alarms can be customized
+   * or disabled. Set to `false` to disable the recommended alarms; custom
+   * alarms added via `addAlarm()` are still created.
    *
    * No alarm actions are configured by default since notification methods are
    * user-specific. Access alarms from the build result or use an `afterBuild`
@@ -56,8 +60,12 @@ export interface StreamBuilderResult {
   stream: Stream;
 
   /**
-   * CloudWatch alarms created for the stream, keyed by alarm name. Includes
-   * any custom alarms added via {@link IStreamBuilder.addAlarm}.
+   * CloudWatch alarms created for the stream, keyed by alarm name.
+   *
+   * Includes both AWS-recommended alarms and any custom alarms added via
+   * {@link IStreamBuilder.addAlarm}. Access individual alarms by key (e.g.,
+   * `result.alarms.getRecordsIteratorAgeMilliseconds`); see
+   * {@link StreamAlarmConfig} for the recommended keys.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
@@ -120,13 +128,21 @@ class StreamBuilder implements Lifecycle<StreamBuilderResult> {
     // The validator skips unresolved tokens (ADR-0010).
     if (configured.streamName !== undefined) validateStreamName(configured.streamName);
 
-    const stream = new Stream(scope, id, {
+    const streamProps: StreamProps = {
       ...STREAM_DEFAULTS,
       ...configured,
       ...encryptionKeyProps(encryptionKey, configured.encryption, context),
-    });
+    };
+    const stream = new Stream(scope, id, streamProps);
 
-    const alarms = createStreamAlarms(scope, id, stream, recommendedAlarms, this.#customAlarms);
+    const alarms = createStreamAlarms(
+      scope,
+      id,
+      stream,
+      recommendedAlarms,
+      streamProps.retentionPeriod,
+      this.#customAlarms,
+    );
 
     return { stream, alarms, key: stream.encryptionKey };
   }

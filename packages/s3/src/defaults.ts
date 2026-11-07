@@ -68,7 +68,11 @@ export const BUCKET_DEFAULTS: Partial<Omit<BucketBuilderProps, "encryptionKey">>
    * of all object-level operations for security monitoring and
    * troubleshooting.
    *
+   * The logging bucket has ACLs disabled and receives logs through its
+   * bucket policy.
+   *
    * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_detect_investigate_events_app_service_logging.html
+   * @see https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html
    */
   serverAccessLogs: { prefix: "logs/" },
 

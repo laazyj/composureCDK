@@ -99,6 +99,47 @@ Organizational units are not created by this package. Pass their IDs in, for exa
 
 Each root, OU and account can have [at most 10 SCPs attached](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_reference_limits.html), and `FullAWSAccess` takes one of them. To save attachment slots, put several guardrails in one policy. The size check is what makes this safe.
 
+## Guardrails
+
+`guardrails.*` are curated `Deny` statements for the common deny-list SCPs. Each call returns a fresh `@composurecdk/iam` statement builder, so a guardrail can be its own policy or share one with others:
+
+```ts
+import { createServiceControlPolicyBuilder, guardrails, target } from "@composurecdk/organizations";
+
+// Org-wide baseline, in one policy to save attachment slots.
+createServiceControlPolicyBuilder()
+  .name("OrgBaseline")
+  .addStatements([
+    guardrails.denyLeaveOrganization(),
+    guardrails.denyIamUsers(),
+    guardrails.denyDisablingSecurityServices(),
+  ])
+  .attachTo([target.root("r-ab12")]);
+
+// Sandbox OU only.
+createServiceControlPolicyBuilder()
+  .name("SandboxLimits")
+  .addStatements([
+    guardrails.restrictRegions(["eu-west-2"]),
+    guardrails.restrictInstanceTypes(["t3.*", "t4g.*"]),
+  ])
+  .attachTo([target.ou("ou-ab12-cdef3456")]);
+```
+
+| Guardrail                         | Denies                                                                                                                                                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `denyLeaveOrganization()`         | `organizations:LeaveOrganization`.                                                                                                                                                                                   |
+| `denyIamUsers()`                  | Creating IAM users, access keys and console passwords, so access goes through IAM Identity Center and roles. Existing users are untouched.                                                                           |
+| `denyDisablingSecurityServices()` | Stopping, deleting or narrowing CloudTrail, AWS Config and GuardDuty. This includes `cloudtrail:UpdateTrail` and `cloudtrail:PutEventSelectors`, and both the current and deprecated GuardDuty disassociate actions. |
+| `restrictRegions(regions, opts?)` | Every action requested outside `regions`, except the global services in `guardrails.GLOBAL_SERVICE_ACTIONS`. `opts.exemptActions` adds to that list.                                                                 |
+| `restrictInstanceTypes(types)`    | `ec2:RunInstances` for instance types outside `types`. Entries can be wildcards (`"t4g.*"`), matched with `StringNotLike`.                                                                                           |
+
+Each factory's JSDoc links the AWS example it follows. Extend one with the statement builder's setters, or write your own statements alongside them. The set is kept small on purpose, because each list needs maintaining as AWS adds actions and services.
+
+**`guardrails.GLOBAL_SERVICE_ACTIONS` includes `budgets:*`.** Budgets is a global service served from `us-east-1`. Without the exemption, a region-pinned account could not deploy an `AWS::Budgets::Budget`, a cost kill-switch for example.
+
+Use `exceptPrincipals` on the policy to exempt break-glass and pipeline roles from every guardrail at once.
+
 ## Constraints
 
 `constraints.validate` exposes this package's validators: `policyName`, `policyDescription`, `rootId`, `organizationalUnitId`, `accountId` and `policyTargetId`. See [ADR-0010](../../docs/adr/0010-aws-property-constraints.md).

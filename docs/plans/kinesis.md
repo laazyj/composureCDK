@@ -37,10 +37,14 @@ carries the `@see` link in its JSDoc, per [architecture.md](../architecture.md#d
 | Lambda consumer tuning                           | [Best practices for consuming Kinesis with Lambda](https://aws.amazon.com/blogs/big-data/best-practices-for-consuming-amazon-kinesis-data-streams-using-aws-lambda/)                                                                                                                                                                     |
 | Pricing (extended retention, on-demand)          | [Kinesis Data Streams pricing](https://aws.amazon.com/kinesis/data-streams/pricing/)                                                                                                                                                                                                                                                     |
 
-> **Verification caveat.** `docs.aws.amazon.com` was not reachable from the
-> planning session, so the alarm-page details below come from search excerpts
-> and recall of the page, not a fresh read. Thresholds marked † should be
-> checked against the live page during review.
+> **Verified (review round 1).** The alarm table, Kinesis.1 / Kinesis.3 and
+> the KMS encryption-context key were checked against the live AWS pages.
+> Statistic, period, datapoints and comparison match for every stream alarm.
+> AWS gives **no numeric threshold** for any Kinesis alarm ("depends on your
+> situation"), so every threshold below is the library's starting point,
+> chosen against AWS's stated threshold justification and documented as such.
+> One discrepancy was found and fixed: `SubscribeToShardEvent.MillisBehindLatest`
+> uses **Average**, not Maximum.
 
 ## Package: `@composurecdk/kinesis`
 
@@ -80,12 +84,13 @@ packages/kinesis/src/
 | Prop              | Default                    | CDK default                                                 | Why                                                                                                                                                        |
 | ----------------- | -------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `encryption`      | `StreamEncryption.MANAGED` | `alias/aws/kinesis`, gated by a China-region `CfnCondition` | Satisfies Kinesis.1 at no key cost and needs no extra grants. Explicit, so the template has no region `CfnCondition` and stays stable across CDK versions. |
-| `streamMode`      | `StreamMode.ON_DEMAND`     | `PROVISIONED`, 1 shard                                      | AWS positions on-demand for new or unpredictable workloads. No shard maths, and no silent throttling on a 1 MB/s single shard. **See decision D1.**        |
 | `retentionPeriod` | `Duration.hours(168)`      | 24 h                                                        | Kinesis.3 fails anything under 168 h. It also gives a consumer outage a week of replay instead of a day. **Costs money — see decision D2.**                |
 | `removalPolicy`   | `RemovalPolicy.RETAIN`     | `RETAIN`                                                    | Same as CDK; stated explicitly so it is discoverable and stable.                                                                                           |
 
 Not defaulted (opt-in, documented in the README):
 
+- **Capacity mode** (D1, revised in review). CDK's provisioned, 1-shard
+  default is kept; the README explains how to choose on-demand vs provisioned.
 - `shardLevelMetrics`. Enhanced monitoring is billed per shard per metric and AWS
   does not recommend it by default.
 - Resource policy. Not needed for same-account access. Grants add statements
@@ -96,9 +101,6 @@ Not defaulted (opt-in, documented in the README):
 
 Mutually-exclusive siblings (ADR-0009, the same as `@composurecdk/sqs`):
 
-- Setting `shardCount` drops the `ON_DEMAND` default and implies `PROVISIONED`.
-  An explicit `streamMode: ON_DEMAND` together with `shardCount` is left for CDK
-  to reject.
 - Setting `encryptionKey` drops the `MANAGED` default and implies `KMS`. An
   explicit `encryption` still wins.
 
@@ -116,14 +118,15 @@ consumer metrics are absent while nobody calls the API.
 
 | Key                                  | Metric (stat)                              | Default                                                                   | On by default |
 | ------------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------- | ------------- |
-| `getRecordsIteratorAgeMilliseconds`  | `GetRecords.IteratorAgeMilliseconds` (Max) | > **50 % of `retentionPeriod`**, 15 of 15 † — derived, see D3             | yes           |
-| `readProvisionedThroughputExceeded`  | `ReadProvisionedThroughputExceeded` (Avg)  | > 0.01, 5 of 5 †                                                          | yes           |
-| `writeProvisionedThroughputExceeded` | `WriteProvisionedThroughputExceeded` (Avg) | > 0.01, 5 of 5 †                                                          | yes           |
-| `putRecordSuccess`                   | `PutRecord.Success` (Avg)                  | < 0.99, 5 of 5 †                                                          | yes           |
+| `getRecordsIteratorAgeMilliseconds`  | `GetRecords.IteratorAgeMilliseconds` (Max) | > **50 % of `retentionPeriod`**, 15 of 15 — derived, see D3               | yes           |
+| `readProvisionedThroughputExceeded`  | `ReadProvisionedThroughputExceeded` (Avg)  | > 0.01, 5 of 5                                                            | yes           |
+| `writeProvisionedThroughputExceeded` | `WriteProvisionedThroughputExceeded` (Avg) | > 0.01, 5 of 5                                                            | yes           |
+| `putRecordSuccess`                   | `PutRecord.Success` (Avg)                  | < 0.99, 5 of 5                                                            | yes           |
 | `putRecordsFailedRecords`            | `PutRecords.FailedRecords` (Sum)           | no generic threshold; enabling it without one throws, like SQS `…Visible` | no            |
-| `getRecordsSuccess`                  | `GetRecords.Success` (Avg)                 | < 0.99, 5 of 5 †                                                          | yes           |
+| `getRecordsSuccess`                  | `GetRecords.Success` (Avg)                 | < 0.99, 5 of 5                                                            | yes           |
 
-Throughput-exceeded alarms stay on in on-demand mode too. On-demand still
+Throughput-exceeded alarms are the "add shards" signal on a provisioned
+stream, and stay on in on-demand mode too: on-demand still
 throttles traffic that more than doubles the previous peak within 15 minutes,
 or exceeds the per-partition-key limit.
 
@@ -136,8 +139,8 @@ be placed independently.
 - Props: `streamConsumerName`, `stream: Resolvable<IStream>`, `recommendedAlarms`.
 - Result: `{ consumer: StreamConsumer; alarms: Record<string, Alarm> }`.
 - Alarm: `subscribeToShardEventMillisBehindLatest`, on
-  `SubscribeToShardEvent.MillisBehindLatest` (Max, dimensions `StreamName` +
-  `ConsumerName`). Default > 60 000 ms, 5 of 5 †, on by default.
+  `SubscribeToShardEvent.MillisBehindLatest` (Average, dimensions `StreamName` +
+  `ConsumerName`). Default > 60 000 ms, 5 of 5, on by default.
 - `constraints.validate.streamConsumerName` shares the stream-name pattern
   (`[a-zA-Z0-9_.-]{1,128}`).
 
@@ -174,7 +177,7 @@ The exact release is measured during implementation.
 ## Example (decision D6)
 
 `ComposureCDK-TelemetryPipelineStack` is an IoT telemetry pipeline. Devices
-`PutRecord` readings onto an on-demand stream encrypted with a composed CMK.
+`PutRecord` readings onto a one-shard provisioned stream encrypted with a composed CMK.
 Two consumers read it:
 
 1. **Latest-reading writer.** A shared-throughput consumer:
@@ -198,7 +201,7 @@ injector, and `cdk-flags:audit` is re-run.
 
 | #   | Decision                                                         | Recommendation                                                                                                                                                                                                                                                                                                                                   | Alternative                                                                                   |
 | --- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| D1  | Default capacity mode                                            | **On-demand.** Elastic, no shard sizing. It does carry a per-stream-hour charge, roughly $29/month idle against roughly $11 for one provisioned shard.                                                                                                                                                                                           | Keep CDK's provisioned, 1 shard: cheaper idle, but throttles at 1 MB/s or 1000 rec/s writes.  |
+| D1  | Default capacity mode                                            | ~~On-demand~~ → **Revised in review: keep CDK's provisioned, 1-shard default.** A cost-diverging default surprises users coming from vanilla CDK; power users tune capacity anyway, and for casual users the cost matters more than the throughput cap.                                                                                          | Keep CDK's provisioned, 1 shard: cheaper idle, but throttles at 1 MB/s or 1000 rec/s writes.  |
 | D2  | Default retention                                                | **168 h**, to pass Kinesis.3. Extended retention is billed (about $0.02 per shard-hour provisioned, or per GB-month on-demand).                                                                                                                                                                                                                  | 24 h, the free tier, which fails Kinesis.3.                                                   |
 | D3  | Iterator-age threshold                                           | **Derived: 50 % of retention.** This is AWS's own "risk of data loss" line, so it stays correct when retention changes. Consumer _lag_ SLAs are workload-specific and are covered by Lambda's function-level `IteratorAge` alarm (60 s).                                                                                                         | A fixed value such as 60 s: noisy for batch consumers, and meaningless relative to retention. |
 | D4  | Lambda Kinesis defaults: bound `retryAttempts` / `maxRecordAge`? | **No default bound**, the same as `dynamoEventSource`. AWS warns that a poison record can block a shard for the whole retention period, but bounding without a DLQ silently drops records. The existing `STREAM_DLQ_WARNING_ID` guard already steers bounded retries toward `onFailure`, and the README will call out the retention interaction. | Default `maxRecordAge` to, say, 1 day and require `onFailure`.                                |

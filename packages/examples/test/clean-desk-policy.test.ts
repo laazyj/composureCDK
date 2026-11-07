@@ -17,6 +17,7 @@ import { createMockApiApp } from "../src/mock-api-app.js";
 import { createNeptuneGraphApp } from "../src/neptune-graph-app.js";
 import { createOrderProcessorApp } from "../src/order-processor-app.js";
 import { createStaticWebsiteApp } from "../src/static-website/app.js";
+import { createTelemetryPipelineApp } from "../src/telemetry-pipeline-app.js";
 
 function restApi(stack: Stack, props: Partial<RestApiProps> = {}): void {
   const api = new RestApi(stack, "Api", { restApiName: "TestApi", ...props });
@@ -134,6 +135,23 @@ describe("cleanDeskPolicy", () => {
     // Deletion protection is the half a DeletionPolicy sweep cannot see.
     template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
       Replicas: Match.arrayWith([Match.objectLike({ DeletionProtectionEnabled: false })]),
+    });
+  });
+
+  it("sets the telemetry-pipeline stack's Kinesis stream to Delete", () => {
+    const app = new App();
+    cleanDeskPolicy(app);
+    const { stack } = createTelemetryPipelineApp(app);
+    const template = Template.fromStack(stack);
+
+    // The stream builder defaults to RETAIN, like CDK.
+    template.hasResource("AWS::Kinesis::Stream", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+    });
+    // A StreamConsumer has no removal policy: CloudFormation's default deletes it.
+    template.hasResource("AWS::Kinesis::StreamConsumer", {
+      DeletionPolicy: Match.absent(),
     });
   });
 

@@ -16,6 +16,7 @@ import { createOpenApiPetstoreApp } from "./openapi-petstore-app.js";
 import { createOrderProcessorApp } from "./order-processor-app.js";
 import { createStaticWebsiteApp } from "./static-website/app.js";
 import { createTaggedSystemApp } from "./tagged-system-app.js";
+import { createTelemetryPipelineApp } from "./telemetry-pipeline-app.js";
 
 /**
  * Builds every example stack into one CDK app — the single registry of
@@ -42,6 +43,7 @@ export function buildExampleApp(app = exampleApp()): App {
   createOrderProcessorApp(app);
   createStaticWebsiteApp(app);
   createTaggedSystemApp(app);
+  createTelemetryPipelineApp(app);
 
   return app;
 }

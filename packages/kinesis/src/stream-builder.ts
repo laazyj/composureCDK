@@ -1,11 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import {
-  type IStream,
-  Stream,
-  StreamEncryption,
-  StreamMode,
-  type StreamProps,
-} from "aws-cdk-lib/aws-kinesis";
+import { type IStream, Stream, StreamEncryption, type StreamProps } from "aws-cdk-lib/aws-kinesis";
 import { type IKey } from "aws-cdk-lib/aws-kms";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
@@ -129,7 +123,6 @@ class StreamBuilder implements Lifecycle<StreamBuilderResult> {
     const stream = new Stream(scope, id, {
       ...STREAM_DEFAULTS,
       ...configured,
-      ...shardCountProps(configured),
       ...encryptionKeyProps(encryptionKey, configured.encryption, context),
     });
 
@@ -137,21 +130,6 @@ class StreamBuilder implements Lifecycle<StreamBuilderResult> {
 
     return { stream, alarms, key: stream.encryptionKey };
   }
-}
-
-/**
- * Infers the capacity mode a `shardCount` implies.
- *
- * The `ON_DEMAND` default is mutually exclusive with a shard count — CDK
- * rejects the pair — and a shard count is an unambiguous request for
- * provisioned capacity, so the default yields (ADR-0009). An explicit
- * `streamMode` still wins, and an incompatible explicit pairing is left for
- * CDK to reject.
- */
-function shardCountProps(configured: Partial<StreamProps>): Partial<StreamProps> {
-  return configured.shardCount !== undefined && configured.streamMode === undefined
-    ? { streamMode: StreamMode.PROVISIONED }
-    : {};
 }
 
 /**

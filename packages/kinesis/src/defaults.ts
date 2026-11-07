@@ -1,13 +1,20 @@
 import { Duration, RemovalPolicy } from "aws-cdk-lib";
-import { StreamEncryption, StreamMode, type StreamProps } from "aws-cdk-lib/aws-kinesis";
+import { StreamEncryption, type StreamProps } from "aws-cdk-lib/aws-kinesis";
 
 /**
  * Secure, AWS-recommended defaults applied to every Kinesis data stream built
  * with {@link createStreamBuilder}. Each property can be individually
  * overridden via the builder's fluent API.
  *
- * `streamMode` yields to a user-set `shardCount`, and `encryption` to a
- * user-set `encryptionKey` — see the builder (ADR-0009).
+ * `encryption` yields to a user-set `encryptionKey` — see the builder
+ * (ADR-0009).
+ *
+ * Capacity mode is deliberately not defaulted: CDK's provisioned, single-shard
+ * default is kept. The right mode depends on the workload's traffic shape and
+ * budget, an on-demand stream carries a per-stream-hour charge that a casual
+ * user would not expect, and a default that silently diverges from vanilla CDK
+ * on cost is a surprise. Choose with `.streamMode(...)` / `.shardCount(...)`.
+ * @see https://docs.aws.amazon.com/streams/latest/dev/how-do-i-size-a-stream.html
  */
 export const STREAM_DEFAULTS: Partial<StreamProps> = {
   /**
@@ -20,16 +27,6 @@ export const STREAM_DEFAULTS: Partial<StreamProps> = {
    * @see https://docs.aws.amazon.com/streams/latest/dev/costs-performance.html
    */
   encryption: StreamEncryption.MANAGED,
-
-  /**
-   * On-demand capacity: the stream scales with traffic, with no shard sizing
-   * and no silent throttling at a single provisioned shard's 1 MB/s or 1,000
-   * records/s write limit. AWS positions it for new and unpredictable
-   * workloads. It carries a per-stream-hour charge, so a steady, well-sized
-   * workload may be cheaper provisioned — set `shardCount` to opt in.
-   * @see https://docs.aws.amazon.com/streams/latest/dev/how-do-i-size-a-stream.html
-   */
-  streamMode: StreamMode.ON_DEMAND,
 
   /**
    * Keep records for 7 days. Security Hub control Kinesis.3 fails a stream

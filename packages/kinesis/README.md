@@ -25,7 +25,6 @@ The result is `{ stream, alarms, key? }`:
 | Property          | Default                    | CDK default                                          | Rationale                                                                                                                                                                                                                                                                                                                                                                                      |
 | ----------------- | -------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `encryption`      | `StreamEncryption.MANAGED` | `alias/aws/kinesis`, behind a China-region condition | Encrypts records at rest with the AWS-managed key — Security Hub [Kinesis.1](https://docs.aws.amazon.com/securityhub/latest/userguide/kinesis-controls.html) at [no key cost](https://docs.aws.amazon.com/streams/latest/dev/costs-performance.html) and no extra grants. Stated, so the template has no region `CfnCondition`. Yields to `KMS` when `.encryptionKey(key)` is set — see below. |
-| `streamMode`      | `StreamMode.ON_DEMAND`     | `PROVISIONED`, 1 shard                               | Scales with traffic, with no shard sizing and no silent throttling at one shard's 1 MB/s or 1,000 records/s write limit ([capacity modes](https://docs.aws.amazon.com/streams/latest/dev/how-do-i-size-a-stream.html)). Yields to `PROVISIONED` when `.shardCount(n)` is set — see below.                                                                                                      |
 | `retentionPeriod` | `Duration.hours(168)`      | 24 hours                                             | Security Hub [Kinesis.3](https://docs.aws.amazon.com/config/latest/developerguide/kinesis-stream-backup-retention-check.html) fails anything under 168 hours, and a week of replay lets a consumer recover from a long outage. **Costs money** — see below.                                                                                                                                    |
 | `removalPolicy`   | `RemovalPolicy.RETAIN`     | `RETAIN`                                             | Keeps the stream, and the records still in it, when it leaves the stack. Same as CDK; stated so it is discoverable and stable.                                                                                                                                                                                                                                                                 |
 
@@ -43,13 +42,17 @@ Not defaulted:
 
 ### Capacity mode
 
-On-demand carries a per-stream-hour charge, so an idle on-demand stream costs more than an idle single-shard provisioned one ([pricing](https://aws.amazon.com/kinesis/data-streams/pricing/)). For a steady, well-understood workload, set a shard count:
+Capacity mode is **not** defaulted: the builder keeps CDK's default of a provisioned stream with one shard, which is the cheapest idle stream and what a CDK user expects. Choose the mode for your workload ([capacity modes](https://docs.aws.amazon.com/streams/latest/dev/how-do-i-size-a-stream.html), [pricing](https://aws.amazon.com/kinesis/data-streams/pricing/)):
+
+- **Provisioned** — set `.shardCount(n)`. Each shard takes 1 MB/s or 1,000 records/s of writes and 2 MB/s of reads; beyond that, requests are throttled (the `writeProvisionedThroughputExceeded` / `readProvisionedThroughputExceeded` alarms fire). Cheapest for a steady, well-understood workload.
+- **On-demand** — set `.streamMode(StreamMode.ON_DEMAND)` and no shard count. Scales with traffic with no shard sizing, but carries a per-stream-hour charge, so an idle on-demand stream costs more than an idle single-shard one. Suits new or unpredictable workloads.
 
 ```ts
-const telemetry = createStreamBuilder().streamName("telemetry").shardCount(4);
-```
+import { StreamMode } from "aws-cdk-lib/aws-kinesis";
 
-Setting `shardCount` switches `streamMode` from the `ON_DEMAND` default to `StreamMode.PROVISIONED` — the two are mutually exclusive, so the default yields rather than making you set both ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)). An explicit `streamMode(StreamMode.ON_DEMAND)` together with `shardCount` is left for CDK to reject.
+const steady = createStreamBuilder().streamName("telemetry").shardCount(4);
+const spiky = createStreamBuilder().streamName("clickstream").streamMode(StreamMode.ON_DEMAND);
+```
 
 ### Retention cost
 

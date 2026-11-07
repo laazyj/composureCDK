@@ -52,12 +52,12 @@ describe("StreamBuilder", () => {
       expect(template.toJSON().Conditions).toBeUndefined();
     });
 
-    it("uses on-demand capacity with no shard count", () => {
+    it("keeps CDK's provisioned, single-shard capacity default", () => {
       const { template } = buildAndSynth();
 
       template.hasResourceProperties("AWS::Kinesis::Stream", {
-        StreamModeDetails: { StreamMode: "ON_DEMAND" },
-        ShardCount: Match.absent(),
+        ShardCount: 1,
+        StreamModeDetails: Match.absent(),
       });
     });
 
@@ -113,29 +113,20 @@ describe("StreamBuilder", () => {
     });
   });
 
-  describe("shardCount yields the ON_DEMAND default (ADR-0009)", () => {
-    it("implies provisioned capacity", () => {
+  describe("capacity mode", () => {
+    it("passes a user-set shard count through", () => {
       const { template } = buildAndSynth((b) => b.shardCount(4));
 
-      template.hasResourceProperties("AWS::Kinesis::Stream", {
-        ShardCount: 4,
-        StreamModeDetails: { StreamMode: "PROVISIONED" },
-      });
+      template.hasResourceProperties("AWS::Kinesis::Stream", { ShardCount: 4 });
     });
 
-    it("keeps an explicit streamMode", () => {
-      const { template } = buildAndSynth((b) => b.streamMode(StreamMode.PROVISIONED).shardCount(2));
+    it("passes a user-set on-demand mode through", () => {
+      const { template } = buildAndSynth((b) => b.streamMode(StreamMode.ON_DEMAND));
 
       template.hasResourceProperties("AWS::Kinesis::Stream", {
-        ShardCount: 2,
-        StreamModeDetails: { StreamMode: "PROVISIONED" },
+        StreamModeDetails: { StreamMode: "ON_DEMAND" },
+        ShardCount: Match.absent(),
       });
-    });
-
-    it("leaves a conflicting explicit pair for CDK to reject", () => {
-      expect(() => buildAndSynth((b) => b.streamMode(StreamMode.ON_DEMAND).shardCount(2))).toThrow(
-        /shardCount/,
-      );
     });
   });
 

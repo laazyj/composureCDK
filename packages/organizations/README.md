@@ -25,7 +25,7 @@ SCPs [grant nothing](https://docs.aws.amazon.com/organizations/latest/userguide/
 import { createStatementBuilder } from "@composurecdk/iam";
 import { createServiceControlPolicyBuilder, target } from "@composurecdk/organizations";
 
-const { policy, content } = createServiceControlPolicyBuilder()
+const { policy, document } = createServiceControlPolicyBuilder()
   .name("SandboxGuardrails")
   .description("Guardrails for the sandbox OU")
   .addStatements([
@@ -47,7 +47,7 @@ const { policy, content } = createServiceControlPolicyBuilder()
   .build(stack, "SandboxGuardrails");
 ```
 
-`Type` is always `SERVICE_CONTROL_POLICY`. The result exposes the `CfnPolicy` and the policy document written to its `Content`.
+`Type` is always `SERVICE_CONTROL_POLICY`. The result exposes the `CfnPolicy` and the `PolicyDocument` that is its `Content`.
 
 | Method                         | Purpose                                                                                                                                                     |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -65,17 +65,6 @@ SCPs [support the full IAM policy language](https://aws.amazon.com/about-aws/wha
 
 `Principal` and `NotPrincipal` are the one part of the IAM grammar SCPs [do not support](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_syntax.html). Scope principals with an `aws:PrincipalArn` condition instead, which is what `exceptPrincipals` writes. `exceptPrincipals` merges with any conditions a statement already has, and leaves the caller's `PolicyStatement` unchanged.
 
-### Content layout
-
-The builder writes `Content` itself rather than through CDK's `PolicyDocument`, and follows the layout of AWS's SCP examples:
-
-- `Version` comes first.
-- Statement keys come in reading order: `Sid`, `Effect`, `Action`, `Resource`, `Condition`.
-- `Action` and `NotAction` are always lists.
-- A single `Resource` or `NotResource` is written as a string.
-
-CDK's `PolicyDocument` sorts keys and collapses every one-item list. An SCP written by hand in AWS's layout therefore synthesises unchanged when you move it onto the builder.
-
 ### Targets
 
 `target.root`, `target.ou` and `target.account` check the ID's format where you call them, so a typo fails at synth with the expected format in the message, not at deploy. A value holding an unresolved token is passed through unchecked. The builder checks every target again at build, which also covers values from a `ref`.
@@ -91,7 +80,7 @@ Organizational units are not created by this package. Pass their IDs in, for exa
 - a statement has a `Principal` or `NotPrincipal`, or no action;
 - a target ID is malformed;
 - the policy has no targets and `detached()` wasn't called, or has targets and `detached()` was called;
-- the document is longer than `SERVICE_CONTROL_POLICY_QUOTAS.maxCharacters`. That's 10,240 characters, measured as CloudFormation sends the document, which is minified. AWS [raised the limit from 5,120 in May 2026](https://aws.amazon.com/about-aws/whats-new/2026/05/aws-organizations-increased-scp-quotas/). The check is skipped when the document holds an unresolved token.
+- the document is longer than `SERVICE_CONTROL_POLICY_QUOTAS.maxCharacters`. That's 10,240 characters, measured as CloudFormation sends the document: resolved, so merged where `@aws-cdk/aws-iam:minimizePolicies` is on, and minified. AWS [raised the limit from 5,120 in May 2026](https://aws.amazon.com/about-aws/whats-new/2026/05/aws-organizations-increased-scp-quotas/). The check is skipped when the document holds an unresolved token.
 
 **Why a policy with no targets throws.** A detached SCP deploys and does nothing, and nothing reports that it does nothing. Call `detached()` when you mean it, for example to stage a policy before you attach it.
 

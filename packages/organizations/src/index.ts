@@ -13,11 +13,7 @@ export {
   type ServiceControlPolicyBuilderProps,
   type ServiceControlPolicyBuilderResult,
 } from "./service-control-policy-builder.js";
-export {
-  SERVICE_CONTROL_POLICY_QUOTAS,
-  type ServiceControlPolicyContent,
-  type ServiceControlPolicyStatement,
-} from "./policy-content.js";
+export { SERVICE_CONTROL_POLICY_QUOTAS } from "./policy-statements.js";
 export { target, type PolicyTarget } from "./target.js";
 
 /**

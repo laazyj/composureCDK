@@ -1,15 +1,10 @@
-import { Token } from "aws-cdk-lib";
 import { CfnPolicy } from "aws-cdk-lib/aws-organizations";
-import type { PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { PolicyDocument, type PolicyStatement } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, type Resolvable, resolve } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { isStatementBuilder, type StatementBuilder } from "@composurecdk/iam";
-import {
-  SERVICE_CONTROL_POLICY_QUOTAS,
-  type ServiceControlPolicyContent,
-  toServiceControlPolicyContent,
-} from "./policy-content.js";
+import { assertWithinSizeQuota, toServiceControlPolicyStatement } from "./policy-statements.js";
 import { validatePolicyDescription, validatePolicyName } from "./policy-constraints.js";
 import { type PolicyTarget, validatePolicyTargetId } from "./target.js";
 
@@ -29,8 +24,8 @@ export interface ServiceControlPolicyBuilderProps {
 export interface ServiceControlPolicyBuilderResult {
   /** The `AWS::Organizations::Policy` construct. */
   policy: CfnPolicy;
-  /** The policy document written to the policy's `Content`, exactly as sent to AWS. */
-  content: ServiceControlPolicyContent;
+  /** The policy document, which is the policy's `Content`. */
+  document: PolicyDocument;
 }
 
 /**
@@ -155,31 +150,25 @@ class ServiceControlPolicyBuilder implements Lifecycle<ServiceControlPolicyBuild
       );
     }
 
-    const content = toServiceControlPolicyContent(
-      this.#statements.map((s) => (isStatementBuilder(s) ? s.build() : s)),
-      this.#exceptPrincipals,
-    );
-    // Measured as CloudFormation sends it: minified. A document holding a
-    // token cannot be measured at synth (ADR-0010 rule 6).
-    const json = JSON.stringify(content);
-    const { maxCharacters } = SERVICE_CONTROL_POLICY_QUOTAS;
-    if (!Token.isUnresolved(json) && json.length > maxCharacters) {
-      throw new Error(
-        `${label}: the policy document is ${String(json.length)} characters; service control policies ` +
-          `allow at most ${String(maxCharacters)}. Split the statements across more than one policy. ` +
-          `See https://docs.aws.amazon.com/organizations/latest/userguide/orgs_reference_limits.html.`,
-      );
-    }
+    const document = new PolicyDocument({
+      statements: this.#statements.map((s) =>
+        toServiceControlPolicyStatement(
+          isStatementBuilder(s) ? s.build() : s,
+          this.#exceptPrincipals,
+        ),
+      ),
+    });
+    assertWithinSizeQuota(label, scope, document);
 
     const policy = new CfnPolicy(scope, id, {
       name,
       description,
       type: "SERVICE_CONTROL_POLICY",
-      content,
+      content: document,
       targetIds: targetIds.length > 0 ? targetIds : undefined,
     });
 
-    return { policy, content };
+    return { policy, document };
   }
 }
 

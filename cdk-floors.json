@@ -102,7 +102,7 @@
     },
     "organizations": {
       "floor": "2.70.0",
-      "gatedBy": "aws-organizations.CfnPolicyProps.content typed `any` (introduced 2.70.0), so the builder can write Content as a JSON object. The module itself ships in 2.51.0, but there content is typed `string`; serialising it would put a JSON string in the template instead of an object, which changes the synthesised template for anyone moving a hand-written CfnPolicy onto the builder. Do not 'simplify' to JSON.stringify to lower the floor."
+      "gatedBy": "aws-organizations.CfnPolicyProps.content typed `any | IResolvable` (introduced 2.70.0), so the builder can pass a PolicyDocument as Content. The module itself ships in 2.51.0, but there content is typed `string`; serialising the document to a string would put a JSON string in the template instead of an object."
     }
   }
 }

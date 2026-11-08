@@ -10,7 +10,7 @@ import {
   createServiceControlPolicyBuilder,
   type IServiceControlPolicyBuilder,
 } from "../src/service-control-policy-builder.js";
-import { SERVICE_CONTROL_POLICY_QUOTAS } from "../src/policy-content.js";
+import { SERVICE_CONTROL_POLICY_QUOTAS } from "../src/policy-statements.js";
 import { type PolicyTarget, target } from "../src/target.js";
 
 const ROOT = target.root("r-ab12");
@@ -27,6 +27,14 @@ const buildAndSynth = buildFixture(
   () => createServiceControlPolicyBuilder().name("Guardrails"),
   "Guardrails",
 );
+
+interface StatementJson {
+  Condition?: Record<string, Record<string, unknown>>;
+}
+
+/** The policy document as CloudFormation receives it. */
+const contentOf = ({ stack, result }: ReturnType<typeof buildAndSynth>) =>
+  stack.resolve(result.document) as { Statement: StatementJson[] };
 
 /** A minimal valid builder, for tests that vary one thing. */
 const valid = (b: IServiceControlPolicyBuilder) => b.addStatements([denyLeave()]).attachTo([ROOT]);
@@ -49,50 +57,14 @@ describe("ServiceControlPolicyBuilder", () => {
           {
             Sid: "DenyLeaveOrg",
             Effect: "Deny",
-            Action: ["organizations:LeaveOrganization"],
+            Action: "organizations:LeaveOrganization",
             Resource: "*",
           },
         ],
       },
     });
     expect(result.policy.cfnResourceType).toBe("AWS::Organizations::Policy");
-    expect(result.content.Statement).toHaveLength(1);
-  });
-
-  it("writes Content in AWS's example layout: Version first, statement keys in reading order", () => {
-    const { result } = buildAndSynth((b) =>
-      b
-        .addStatements([
-          new PolicyStatement({
-            sid: "DenyOutsideRegions",
-            effect: Effect.DENY,
-            notActions: ["iam:*", "sts:*"],
-            resources: ["*"],
-            conditions: { StringNotEquals: { "aws:RequestedRegion": "eu-west-2" } },
-          }),
-          createStatementBuilder()
-            .allow()
-            .actions(["s3:*"])
-            .notResources(["arn:aws:s3:::a", "arn:aws:s3:::b"]),
-        ])
-        .attachTo([ROOT]),
-    );
-
-    expect(JSON.stringify(result.content)).toBe(
-      JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [
-          {
-            Sid: "DenyOutsideRegions",
-            Effect: "Deny",
-            NotAction: ["iam:*", "sts:*"],
-            Resource: "*",
-            Condition: { StringNotEquals: { "aws:RequestedRegion": "eu-west-2" } },
-          },
-          { Effect: "Allow", Action: ["s3:*"], NotResource: ["arn:aws:s3:::a", "arn:aws:s3:::b"] },
-        ],
-      }),
-    );
+    expect(result.document.statementCount).toBe(1);
   });
 
   it("runs the StatementBuilder wildcard guard", () => {
@@ -109,16 +81,20 @@ describe("ServiceControlPolicyBuilder", () => {
     const breakGlass = "arn:aws:iam::*:role/BreakGlass";
 
     it("adds an ArnNotLike aws:PrincipalArn condition to Deny statements only", () => {
-      const { result } = buildAndSynth((b) =>
-        valid(b)
-          .addStatements([createStatementBuilder().allow().actions(["ec2:*"]).resources(["arn:x"])])
-          .exceptPrincipals([breakGlass]),
+      const { Statement } = contentOf(
+        buildAndSynth((b) =>
+          valid(b)
+            .addStatements([
+              createStatementBuilder().allow().actions(["ec2:*"]).resources(["arn:x"]),
+            ])
+            .exceptPrincipals([breakGlass]),
+        ),
       );
 
-      expect(result.content.Statement[0].Condition).toEqual({
+      expect(Statement[0].Condition).toEqual({
         ArnNotLike: { "aws:PrincipalArn": [breakGlass] },
       });
-      expect(result.content.Statement[1].Condition).toBeUndefined();
+      expect(Statement[1].Condition).toBeUndefined();
     });
 
     it("merges with existing conditions without mutating the caller's statement", () => {
@@ -132,14 +108,16 @@ describe("ServiceControlPolicyBuilder", () => {
         },
       });
 
-      const { result } = buildAndSynth((b) =>
-        b
-          .addStatements([statement])
-          .attachTo([ROOT])
-          .exceptPrincipals([breakGlass, "arn:aws:iam::*:role/Pipeline"]),
+      const { Statement } = contentOf(
+        buildAndSynth((b) =>
+          b
+            .addStatements([statement])
+            .attachTo([ROOT])
+            .exceptPrincipals([breakGlass, "arn:aws:iam::*:role/Pipeline"]),
+        ),
       );
 
-      expect(result.content.Statement[0].Condition).toEqual({
+      expect(Statement[0].Condition).toEqual({
         StringEquals: { "aws:RequestedRegion": "eu-west-2" },
         ArnNotLike: {
           "aws:PrincipalArn": ["arn:aws:iam::*:role/Pipeline", breakGlass],
@@ -229,14 +207,14 @@ describe("ServiceControlPolicyBuilder", () => {
     it("accepts a document exactly at the quota", () => {
       const statement = (pad: string) =>
         createStatementBuilder().sid(pad).deny().actions(["s3:*"]).resources(["*"]);
-      const base = buildAndSynth((b) => valid(b).addStatements([statement("S")])).result.content;
+      const base = contentOf(buildAndSynth((b) => valid(b).addStatements([statement("S")])));
       // Replace the one-character Sid "S" with padding that brings the document to the quota.
       const pad = "S".repeat(
         SERVICE_CONTROL_POLICY_QUOTAS.maxCharacters - JSON.stringify(base).length + 1,
       );
 
-      const { result } = buildAndSynth((b) => valid(b).addStatements([statement(pad)]));
-      expect(JSON.stringify(result.content)).toHaveLength(
+      const built = buildAndSynth((b) => valid(b).addStatements([statement(pad)]));
+      expect(JSON.stringify(contentOf(built))).toHaveLength(
         SERVICE_CONTROL_POLICY_QUOTAS.maxCharacters,
       );
     });
@@ -285,7 +263,7 @@ describe("ServiceControlPolicyBuilder", () => {
 
   it("copy() preserves statements, exemptions, targets and detachment", () => {
     const build = (b: IServiceControlPolicyBuilder) => b.build(newStack(), "P");
-    const inspect = (r: ReturnType<typeof build>) => r.content;
+    const inspect = (r: ReturnType<typeof build>): unknown => r.document.toJSON();
 
     assertCopyPreservesState({
       factory: () => createServiceControlPolicyBuilder().name("P"),

@@ -100,7 +100,7 @@ exports.handler = async (event) => {
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "TracingConfig": {
           "Mode": "Active",
         },
@@ -538,7 +538,7 @@ exports.handler = async (event) => {
             "Arn",
           ],
         },
-        "Runtime": "nodejs22.x",
+        "Runtime": "nodejs24.x",
         "Timeout": 30,
         "TracingConfig": {
           "Mode": "Active",

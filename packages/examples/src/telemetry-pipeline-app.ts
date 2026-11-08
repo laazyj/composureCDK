@@ -165,7 +165,7 @@ export function createTelemetryPipelineApp(app = exampleApp()) {
       latestReadingDlq: createQueueBuilder("dlq").queueName("telemetry-latest-reading-dlq"),
 
       latestReadingWriter: createFunctionBuilder()
-        .runtime(Runtime.NODEJS_22_X)
+        .runtime(Runtime.NODEJS_24_X)
         .handler("index.handler")
         .code(Code.fromInline(LATEST_READING_HANDLER))
         .timeout(Duration.seconds(30))
@@ -192,7 +192,7 @@ export function createTelemetryPipelineApp(app = exampleApp()) {
         .stream(ref<StreamBuilderResult>("readings").get("stream")),
 
       anomalyAlerter: createFunctionBuilder()
-        .runtime(Runtime.NODEJS_22_X)
+        .runtime(Runtime.NODEJS_24_X)
         .handler("index.handler")
         .code(Code.fromInline(ANOMALY_ALERTER_HANDLER))
         .description("Telemetry pipeline - logs readings over the anomaly threshold")

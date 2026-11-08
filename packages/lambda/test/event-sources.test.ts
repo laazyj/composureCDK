@@ -634,7 +634,7 @@ describe("SQS visibility-timeout relationship guard", () => {
  * Whether the installed aws-cdk-lib accepts an S3 on-failure destination on a
  * DynamoDB stream mapping. CDK's `enrichMappingOptions` rejects one unless the
  * source opts in via `supportS3OnFailureDestination`, which `DynamoEventSource`
- * only passes from 2.184.0 — above this package's 2.168.0 floor, so `cdk-floors
+ * only passes from 2.184.0 — above this package's 2.180.0 floor, so `cdk-floors
  * enforce` runs this suite on versions that refuse it. Probed by synthesis
  * rather than by version string, per ADR-0008's graceful-degradation pattern.
  */

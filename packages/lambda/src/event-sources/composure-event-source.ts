@@ -1,5 +1,10 @@
 import type { IEventSource } from "aws-cdk-lib/aws-lambda";
-import type { DynamoEventSource, SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import type {
+  DynamoEventSource,
+  KinesisConsumerEventSource,
+  KinesisEventSource,
+  SqsEventSource,
+} from "aws-cdk-lib/aws-lambda-event-sources";
 import type { Resolvable } from "@composurecdk/core";
 
 /**
@@ -11,7 +16,7 @@ import type { Resolvable } from "@composurecdk/core";
  * straight to {@link IFunctionBuilder.addEventSource} as an escape hatch —
  * the builder still attaches it, but cannot reason about it.
  */
-export type EventSourceKind = "sqs" | "dynamodb" | "unknown";
+export type EventSourceKind = "sqs" | "dynamodb" | "kinesis" | "unknown";
 
 /** @internal — brands {@link ComposureEventSource} so the guard is unambiguous. */
 const COMPOSURE_EVENT_SOURCE = Symbol.for("composurecdk.lambda.eventSource");
@@ -53,7 +58,7 @@ export function composureEventSource(
 /**
  * Reads the event source mapping UUID off a bound CDK source, keyed by
  * {@link EventSourceKind}. Defined only for kinds whose per-mapping ESM
- * metrics back contextual alarms (SQS and DynamoDB streams); `FunctionBuilder`
+ * metrics back contextual alarms (SQS, DynamoDB and Kinesis streams); `FunctionBuilder`
  * invokes the reader after `addEventSource` so the binding exists. Keying off
  * `kind` — like {@link EVENT_SOURCE_ALARM_SPECS} — keeps the builder from
  * `instanceof`-ing CDK source classes.
@@ -72,6 +77,11 @@ export const EVENT_SOURCE_MAPPING_ID_READERS: Record<
   // which constructs the `DynamoEventSource` in the same call — kind and
   // concrete class move in lockstep.
   dynamodb: (bound) => (bound as DynamoEventSource).eventSourceMappingId,
+  // Safe: the `"kinesis"` kind is only ever assigned by `kinesisEventSource()`
+  // and `kinesisConsumerEventSource()`, which construct the matching CDK
+  // source in the same call.
+  kinesis: (bound) =>
+    (bound as KinesisEventSource | KinesisConsumerEventSource).eventSourceMappingId,
   unknown: undefined,
 };
 
@@ -101,7 +111,7 @@ export interface AttachedEventSource {
 
   /**
    * The event source mapping UUID, populated for kinds whose per-mapping
-   * ESM metrics back contextual alarms (currently SQS only). The contextual
+   * ESM metrics back contextual alarms (SQS and the stream kinds). The contextual
    * alarms key off this dimension.
    */
   eventSourceMappingId?: string;

@@ -241,7 +241,7 @@ handler.grant(
 );
 ```
 
-To invoke a Lambda function from the consumer, use `kinesisConsumerEventSource` in [`@composurecdk/lambda`](../lambda/README.md). It is coming in a later release.
+To invoke a Lambda function from the consumer, attach it with [`kinesisConsumerEventSource`](../lambda/README.md#kinesis-data-streams) from `@composurecdk/lambda`, passing `ref("consumer", (r) => r.consumer)`. Use [`kinesisEventSource`](../lambda/README.md#kinesis-data-streams) for a shared-throughput consumer of the stream itself.
 
 ### Consumer alarm
 

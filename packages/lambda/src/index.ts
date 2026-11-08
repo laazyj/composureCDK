@@ -31,3 +31,9 @@ export {
   DEFAULT_DYNAMO_EVENT_SOURCE_PROPS,
   type DynamoStreamEventSourceProps,
 } from "./event-sources/dynamodb-event-source.js";
+export {
+  kinesisEventSource,
+  kinesisConsumerEventSource,
+  DEFAULT_KINESIS_EVENT_SOURCE_PROPS,
+  type KinesisStreamEventSourceProps,
+} from "./event-sources/kinesis-event-source.js";

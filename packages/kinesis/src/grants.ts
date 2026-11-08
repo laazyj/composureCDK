@@ -1,5 +1,5 @@
 import type { IGrantable } from "aws-cdk-lib/aws-iam";
-import type { IStream } from "aws-cdk-lib/aws-kinesis";
+import type { IStream, IStreamConsumer } from "aws-cdk-lib/aws-kinesis";
 import { type Grant, grantVia, type Resolvable } from "@composurecdk/core";
 
 /** Wraps one of {@link IStream}'s native grant methods as a capability helper. */
@@ -30,4 +30,23 @@ export const streamGrants = {
   readWrite: capability((stream, grantee) => {
     stream.grantReadWrite(grantee);
   }),
+};
+
+/**
+ * Consumer-side grant helpers for a Kinesis enhanced fan-out stream consumer.
+ * Pass one to a grantee builder's `grant(...)` — e.g.
+ * `handler.grant(streamConsumerGrants.read(ref("alerter", (r) => r.consumer)))`.
+ *
+ * Delegates to the consumer's native `grantRead`. See ADR-0013.
+ */
+export const streamConsumerGrants = {
+  /**
+   * Read records through the consumer (`kinesis:SubscribeToShard`,
+   * `DescribeStreamConsumer` on the consumer), plus everything
+   * `streamGrants.read` grants on its stream, including `kms:Decrypt`.
+   */
+  read: (consumer: Resolvable<IStreamConsumer>): Grant<IGrantable> =>
+    grantVia(consumer, (c, grantee) => {
+      c.grantRead(grantee);
+    }),
 };

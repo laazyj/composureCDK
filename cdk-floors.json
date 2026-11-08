@@ -18,8 +18,8 @@
       "gatedBy": "Annotations.addWarningV2 used by queue-builder.ts (introduced 2.93.0); also QueueEncryption.SQS_MANAGED (~2.45) and QueueProps.enforceSSL (~2.50) builder defaults"
     },
     "kinesis": {
-      "floor": "2.140.0",
-      "gatedBy": "aws-kinesis.StreamProps.removalPolicy, which the RemovalPolicy.RETAIN builder default sets — introduced in 2.140.0 (absent in 2.139.0). Below it the prop is silently ignored and the retain default no-ops. StreamMode and StreamEncryption.MANAGED are lower (both present at 2.93.0). Note StreamBuilderProps.encryptionKey deliberately re-declares the prop as Resolvable<NonNullable<StreamProps[\"encryptionKey\"]>> rather than naming a key interface (ADR-0018); do not 'simplify' it to IKey or IKeyRef."
+      "floor": "2.180.0",
+      "gatedBy": "aws-kinesis.StreamConsumer, which createStreamConsumerBuilder constructs — introduced in 2.180.0 (absent in 2.179.0). CfnStreamConsumer only accepts Tags from 2.205.0 (absent in 2.204.0); below that, builder tags reach the consumer's alarms but CDK's tag aspect skips the consumer itself. The stream builder alone needs 2.140.0: aws-kinesis.StreamProps.removalPolicy, which the RemovalPolicy.RETAIN builder default sets — introduced in 2.140.0 (absent in 2.139.0). Below it the prop is silently ignored and the retain default no-ops. StreamMode and StreamEncryption.MANAGED are lower (both present at 2.93.0). Note StreamBuilderProps.encryptionKey deliberately re-declares the prop as Resolvable<NonNullable<StreamProps[\"encryptionKey\"]>> rather than naming a key interface (ADR-0018); do not 'simplify' it to IKey or IKeyRef."
     },
     "kms": {
       "floor": "2.93.0",

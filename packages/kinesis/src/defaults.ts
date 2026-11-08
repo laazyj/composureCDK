@@ -2,6 +2,13 @@ import { Duration, RemovalPolicy } from "aws-cdk-lib";
 import { StreamEncryption, type StreamProps } from "aws-cdk-lib/aws-kinesis";
 
 /**
+ * The default `retentionPeriod`, named so the iterator-age alarm baseline in
+ * {@link STREAM_ALARM_DEFAULTS} can derive from it without a non-null
+ * assertion on the `Partial` defaults.
+ */
+export const DEFAULT_RETENTION_PERIOD = Duration.hours(168);
+
+/**
  * Secure, AWS-recommended defaults applied to every Kinesis data stream built
  * with {@link createStreamBuilder}. Each property can be individually
  * overridden via the builder's fluent API.
@@ -36,7 +43,7 @@ export const STREAM_DEFAULTS: Partial<StreamProps> = {
    * @see https://docs.aws.amazon.com/config/latest/developerguide/kinesis-stream-backup-retention-check.html
    * @see https://aws.amazon.com/kinesis/data-streams/pricing/
    */
-  retentionPeriod: Duration.hours(168),
+  retentionPeriod: DEFAULT_RETENTION_PERIOD,
 
   /**
    * Retain the stream, and the records still in it, when it is removed from

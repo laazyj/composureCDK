@@ -124,9 +124,48 @@ constraints.validate.streamName("telemetry"); // throws on an invalid name
 
 ## Alarms
 
-Alarms are returned in the build result as `Record<string, Alarm>`. No alarm actions are configured — apply them from the result or with [`alarmActionsPolicy`](../cloudwatch/README.md).
+The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Kinesis) by default. Alarms are returned in the build result as `Record<string, Alarm>`, keyed as below. No alarm actions are configured — apply them from the result or with [`alarmActionsPolicy`](../cloudwatch/README.md).
 
-`recommendedAlarms` takes a `StreamAlarmConfig` or `false`. Set it to `false` (or `{ enabled: false }`) to turn off the [AWS-recommended alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Kinesis); custom alarms are still created.
+Each alarm's metric, statistic, period, datapoints and comparison follow the AWS page exactly. AWS gives no numeric threshold for any Kinesis alarm — every one is "depends on your situation" — so the thresholds below are this library's starting points, chosen against AWS's threshold justification for each (for example, iterator age past 50% of retention is where AWS says data loss becomes a risk, and throttling should alarm when sustained but not at zero, since throttled requests are retried). Tune them to your workload via `recommendedAlarms`.
+
+Every alarm uses a 1-minute period and treats missing data as not breaching: producer and consumer metrics are only emitted while the API is called, so an idle stream has no data rather than bad data.
+
+| Alarm                                | Metric                                     | Default threshold                                   | On  | Rationale                                                                                                                                                      |
+| ------------------------------------ | ------------------------------------------ | --------------------------------------------------- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getRecordsIteratorAgeMilliseconds`  | `GetRecords.IteratorAgeMilliseconds` (Max) | > 50% of `retentionPeriod`, in ms; 15 of 15 minutes | yes | A consumer half-way through the retention window is at risk of reading records Kinesis has already deleted. Derived, so it stays right when retention changes. |
+| `readProvisionedThroughputExceeded`  | `ReadProvisionedThroughputExceeded` (Avg)  | > 0.01; 5 of 5 minutes                              | yes | Sustained read throttling: consumers fall behind.                                                                                                              |
+| `writeProvisionedThroughputExceeded` | `WriteProvisionedThroughputExceeded` (Avg) | > 0.01; 5 of 5 minutes                              | yes | Sustained write throttling: producers must retry, or drop records.                                                                                             |
+| `putRecordSuccess`                   | `PutRecord.Success` (Avg)                  | < 0.99; 5 of 5 minutes                              | yes | Fewer than 99% of `PutRecord` calls succeed.                                                                                                                   |
+| `getRecordsSuccess`                  | `GetRecords.Success` (Avg)                 | < 0.99; 5 of 5 minutes                              | yes | Fewer than 99% of `GetRecords` calls succeed.                                                                                                                  |
+| `putRecordsFailedRecords`            | `PutRecords.FailedRecords` (Sum)           | none — you supply it; 5 of 5 minutes                | no  | Occasional internal failures are expected and retried; how many a workload tolerates depends on its volume.                                                    |
+
+The two throughput-exceeded alarms matter most for a provisioned stream (the CDK default), where they are the signal to add shards, and stay on for on-demand streams too: on-demand capacity still throttles traffic that more than doubles the stream's previous peak within 15 minutes, and a single partition key is still bound by one shard's write limit, so a hot key throttles however the stream scales ([capacity modes](https://docs.aws.amazon.com/streams/latest/dev/how-do-i-size-a-stream.html)).
+
+The iterator-age threshold is derived from the stream's merged `retentionPeriod` — 302,400,000 ms (3.5 days) for the default 168 hours. A `threshold` you supply wins. When the retention period is an unresolved token (e.g. a `CfnParameter`), there is nothing to derive from, so the alarm is skipped with an acknowledgeable warning (`@composurecdk/kinesis:iterator-age-alarm-token-retention`) unless you supply a threshold. Consumer-lag SLAs are workload-specific; a Lambda consumer's own `IteratorAge` alarm covers those.
+
+`PutRecords.FailedRecords` has no generic threshold, so enabling it without one throws at build:
+
+```ts
+createStreamBuilder().recommendedAlarms({ putRecordsFailedRecords: { threshold: 100 } });
+```
+
+The defaults are exported as `STREAM_ALARM_DEFAULTS` for visibility and testing.
+
+### Customizing and disabling alarms
+
+`recommendedAlarms` takes a `StreamAlarmConfig` or `false`. Override any field of an individual alarm, set an alarm to `false` to disable it, or set `recommendedAlarms` to `false` (or `{ enabled: false }`) to turn off the recommended set. Custom alarms are still created.
+
+```ts
+import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+
+const telemetry = createStreamBuilder()
+  .streamName("telemetry")
+  .recommendedAlarms({
+    getRecordsIteratorAgeMilliseconds: { threshold: 60_000 },
+    putRecordSuccess: { evaluationPeriods: 10, treatMissingData: TreatMissingData.MISSING },
+    getRecordsSuccess: false,
+  });
+```
 
 ### Custom alarms
 

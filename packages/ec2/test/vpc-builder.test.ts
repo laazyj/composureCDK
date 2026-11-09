@@ -155,15 +155,19 @@ describe("VpcBuilder", () => {
       },
     };
 
-    /** Every role's trust policy that names the flow-logs service. */
+    interface TrustPolicy {
+      Statement: { Principal?: { Service?: unknown } }[];
+    }
+
+    /** Every role's trust policy with a statement for the flow-logs service. */
     const trustPolicies = (template: Template) =>
       Object.values(template.findResources("AWS::IAM::Role"))
         .map(
           (r) =>
-            (r as { Properties: { AssumeRolePolicyDocument: unknown } }).Properties
+            (r as { Properties: { AssumeRolePolicyDocument: TrustPolicy } }).Properties
               .AssumeRolePolicyDocument,
         )
-        .filter((doc) => JSON.stringify(doc).includes(FLOW_LOGS));
+        .filter((doc) => doc.Statement.some((s) => s.Principal?.Service === FLOW_LOGS));
 
     const trust = (condition?: object) => ({
       Version: "2012-10-17",

@@ -250,38 +250,6 @@ exports[`static-website-app > stack > matches the expected synthesised template 
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
-    "StaticWebsitealertsNumberOfNotificationsFailedToRedriveToDlqAlarmE9EDE3B8": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "StaticWebsitealertsBD655E35",
-          },
-        ],
-        "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
-        "AlarmName": "composure-cdk-static-website-stack/static-website/alerts/number-of-notifications-failed-to-redrive-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "StaticWebsitealertsBD655E35",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsFailedToRedriveToDlq",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
     "StaticWebsitealertsNumberOfNotificationsFilteredOutInvalidAttributesAlarmD7DE960B": {
       "Properties": {
         "AlarmActions": [
@@ -306,38 +274,6 @@ exports[`static-website-app > stack > matches the expected synthesised template 
         ],
         "EvaluationPeriods": 1,
         "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
-    "StaticWebsitealertsNumberOfNotificationsRedrivenToDlqAlarm6A74E13A": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "StaticWebsitealertsBD655E35",
-          },
-        ],
-        "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
-        "AlarmName": "composure-cdk-static-website-stack/static-website/alerts/number-of-notifications-redriven-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "StaticWebsitealertsBD655E35",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsRedrivenToDlq",
         "Namespace": "AWS/SNS",
         "Period": 60,
         "Statistic": "Sum",

@@ -75,14 +75,14 @@ Do not create another `TopicPolicy` for a topic built here: each policy resource
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.
 
-| Alarm                                               | Metric                                                          | Default threshold | Created when |
-| --------------------------------------------------- | --------------------------------------------------------------- | ----------------- | ------------ |
-| `numberOfNotificationsFailed`                       | NumberOfNotificationsFailed (Sum, 1 min)                        | > 0               | Always       |
-| `numberOfNotificationsFilteredOutInvalidAttributes` | NumberOfNotificationsFilteredOut-InvalidAttributes (Sum, 1 min) | > 0               | Always       |
-| `numberOfNotificationsRedrivenToDlq`                | NumberOfNotificationsRedrivenToDlq (Sum, 1 min)                 | > 0               | Always[^dlq] |
-| `numberOfNotificationsFailedToRedriveToDlq`         | NumberOfNotificationsFailedToRedriveToDlq (Sum, 1 min)          | > 0               | Always[^dlq] |
+| Alarm                                               | Metric                                                          | Default threshold | Created when                   |
+| --------------------------------------------------- | --------------------------------------------------------------- | ----------------- | ------------------------------ |
+| `numberOfNotificationsFailed`                       | NumberOfNotificationsFailed (Sum, 1 min)                        | > 0               | Always                         |
+| `numberOfNotificationsFilteredOutInvalidAttributes` | NumberOfNotificationsFilteredOut-InvalidAttributes (Sum, 1 min) | > 0               | Always                         |
+| `numberOfNotificationsRedrivenToDlq`                | NumberOfNotificationsRedrivenToDlq (Sum, 1 min)                 | > 0               | A subscription has a DLQ[^dlq] |
+| `numberOfNotificationsFailedToRedriveToDlq`         | NumberOfNotificationsFailedToRedriveToDlq (Sum, 1 min)          | > 0               | A subscription has a DLQ[^dlq] |
 
-[^dlq]: Metric only emits when a subscription on the topic has a dead-letter queue attached and SNS attempts redrive. `TreatMissingData` defaults to `notBreaching`, so the alarm stays quiet on topics without DLQs. Attach a DLQ on the `ITopicSubscription` itself (e.g. `new LambdaSubscription(fn, { deadLetterQueue: dlq })`) — see [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html).
+[^dlq]: The redrive metrics only emit data when a subscription on the topic has a dead-letter queue attached and SNS attempts redrive, so the builder creates these two alarms only when a subscription added via `addSubscription()` has one. A DLQ on a subscription made with `createSubscriptionBuilder` is not seen, so a topic whose DLQ subscriptions are all built that way gets neither alarm unless you ask: pass an explicit config (`{}` for the defaults) to create either alarm regardless. Attach a DLQ on the `ITopicSubscription` itself (e.g. `new LambdaSubscription(fn, { deadLetterQueue: dlq })`) — see [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html).
 
 The defaults are exported as `TOPIC_ALARM_DEFAULTS` for visibility and testing:
 
@@ -273,7 +273,7 @@ CDK's `Subscription` construct adds the queue policy that lets `sns.amazonaws.co
 
 If the DLQ is encrypted with a customer-managed KMS key (`createQueueBuilder("dlq").encryptionMasterKey(key)`), SNS also needs `kms:Decrypt` and `kms:GenerateDataKey` on that key, which CDK does not grant. Without them the deploy succeeds but every redrive fails. Both builders add that statement to the key policy, scoped by `aws:SourceArn` to the topic. The DLQ default, SSE-SQS, needs no key grant. An imported key's policy can't be changed from the app, so the builders emit a `@composurecdk/sns:subscription-dlq-key-not-granted` warning (`SUBSCRIPTION_DLQ_KEY_WARNING_ID`) instead. Make the grant where the key is owned, then acknowledge the warning.
 
-The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above) and only report data once at least one subscription has a DLQ attached. Pair them with the DLQ's own depth alarm — that pair is what turns an undelivered notification into a page.
+The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above). It creates them when a subscription added via `addSubscription()` has a DLQ; see the footnote there for a DLQ on a subscription made with `createSubscriptionBuilder`. Pair them with the DLQ's own depth alarm — that pair is what turns an undelivered notification into a page.
 
 [`ComposureCDK-OrderProcessorStack`](../examples/src/order-processor-app.ts) deploys this shape end to end and its [smoke test](../examples/test/smoke/order-processor.smoke.mjs) proves the delivery path against live AWS.
 

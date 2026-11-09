@@ -13,14 +13,23 @@ const METRIC_PERIOD_LABEL = `${String(METRIC_PERIOD.toMinutes())} minute`;
 /**
  * Resolves the recommended alarm configuration into fully-resolved
  * {@link AlarmDefinition}s for an SNS topic.
+ *
+ * @param hasDeadLetterQueue - Whether a subscription the builder bound has a
+ *   dead-letter queue, which decides whether the two redrive alarms are created
+ *   by default — see {@link TopicAlarmConfig.numberOfNotificationsRedrivenToDlq}.
  */
 export function resolveTopicAlarmDefinitions(
   topic: ITopic,
   config: TopicAlarmConfig | undefined,
+  hasDeadLetterQueue: boolean,
 ): AlarmDefinition[] {
   if (config?.enabled === false) return [];
 
   const definitions: AlarmDefinition[] = [];
+  // An omitted redrive alarm resolves to defaults (`{}`) only when there is a DLQ to watch.
+  const dlqDefault = hasDeadLetterQueue ? {} : false;
+  const redrivenToDlq = config?.numberOfNotificationsRedrivenToDlq ?? dlqDefault;
+  const failedToRedriveToDlq = config?.numberOfNotificationsFailedToRedriveToDlq ?? dlqDefault;
 
   if (config?.numberOfNotificationsFailed !== false) {
     const cfg = resolveAlarmConfig(
@@ -60,9 +69,9 @@ export function resolveTopicAlarmDefinitions(
     });
   }
 
-  if (config?.numberOfNotificationsRedrivenToDlq !== false) {
+  if (redrivenToDlq !== false) {
     const cfg = resolveAlarmConfig(
-      config?.numberOfNotificationsRedrivenToDlq,
+      redrivenToDlq,
       TOPIC_ALARM_DEFAULTS.numberOfNotificationsRedrivenToDlq,
     );
     definitions.push({
@@ -81,9 +90,9 @@ export function resolveTopicAlarmDefinitions(
     });
   }
 
-  if (config?.numberOfNotificationsFailedToRedriveToDlq !== false) {
+  if (failedToRedriveToDlq !== false) {
     const cfg = resolveAlarmConfig(
-      config?.numberOfNotificationsFailedToRedriveToDlq,
+      failedToRedriveToDlq,
       TOPIC_ALARM_DEFAULTS.numberOfNotificationsFailedToRedriveToDlq,
     );
     definitions.push({
@@ -115,6 +124,7 @@ export function resolveTopicAlarmDefinitions(
  * @param config - User-provided alarm configuration, or `false` to disable the
  *   recommended alarms.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
+ * @param hasDeadLetterQueue - See {@link resolveTopicAlarmDefinitions}.
  * @returns A record mapping alarm keys to their created Alarm constructs.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS
@@ -124,12 +134,13 @@ export function createTopicAlarms(
   id: string,
   topic: ITopic,
   config: TopicAlarmConfig | false | undefined,
-  customAlarms: AlarmDefinitionBuilder<ITopic>[] = [],
+  customAlarms: AlarmDefinitionBuilder<ITopic>[],
+  hasDeadLetterQueue: boolean,
 ): Record<string, Alarm> {
   const recommended =
     config === false || config?.enabled === false
       ? []
-      : resolveTopicAlarmDefinitions(topic, config);
+      : resolveTopicAlarmDefinitions(topic, config, hasDeadLetterQueue);
   const custom = customAlarms.map((b) => b.resolve(topic));
 
   return createAlarms(scope, id, [...recommended, ...custom]);

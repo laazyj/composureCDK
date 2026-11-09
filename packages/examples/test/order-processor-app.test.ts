@@ -248,7 +248,8 @@ describe("order-processor-app", () => {
   });
 
   it("creates the topic, queue, consumer, model and logging recommended alarms", () => {
-    // topics 8 + queues 5 + Lambda 5 + model 3 + logging 1
-    template.resourceCountIs("AWS::CloudWatch::Alarm", 22);
+    // topics 6 (the alerts topic has no DLQ subscription, so no redrive
+    // alarms) + queues 5 + Lambda 5 + model 3 + logging 1
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 20);
   });
 });

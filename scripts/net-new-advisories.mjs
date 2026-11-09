@@ -7,7 +7,16 @@
  * Advisories accepted repo-wide, so they never fail a PR. Each needs a comment
  * saying why, and when it can go.
  */
-const ALLOWED_GHSAS = new Set([]);
+const ALLOWED_GHSAS = new Set([
+  // minimatch: DoS via globparts amplification. Needs an attacker-supplied
+  // pattern compiled with `optimizationLevel` >= 2. eslint and aws-cdk-lib's
+  // bundled copy use the default level of 1, on patterns written by us or the
+  // app author; the only level-2 caller (glob, via tshy) runs fixed build
+  // patterns. No published package ships minimatch. Patched only in 11.0.1, and
+  // npm overrides cannot reach aws-cdk-lib's bundled copy. Remove once eslint
+  // and aws-cdk-lib both depend on minimatch >= 11.0.1.
+  "GHSA-g3hv-75wg-m249",
+]);
 
 /**
  * The advisories a PR introduces: those on an added package version that no

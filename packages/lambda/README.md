@@ -419,12 +419,18 @@ when dropping is intended — with
 
 ### Cross-component invariants
 
-AWS Well-Architected guidance spans the queue and the function — the source
-queue's visibility timeout should be ≥ 6× the function timeout, and its redrive
-`maxReceiveCount` should be ≥ 5 before the DLQ. These are **not** enforced
-today (the queue often arrives as an unresolved `ref()`); they are tracked in
-[#123](https://github.com/laazyj/composureCDK/issues/123) and
-[#124](https://github.com/laazyj/composureCDK/issues/124).
+AWS Well-Architected guidance spans the queue and the function. Both rules are
+suppressible synth-time warnings:
+
+- **Visibility timeout ≥ 6× the function timeout** — a relationship guard in
+  this package, checked even when the queue arrives as a `ref()` (see
+  [ADR-0011](../../docs/adr/0011-cross-component-relationship-guards.md)). It
+  stays quiet for imported queues and token values. Silence it with
+  `Annotations.of(scope).acknowledgeWarning(SQS_VISIBILITY_TIMEOUT_WARNING_ID)`.
+- **Redrive `maxReceiveCount` ≥ 5 before the DLQ** — checked by
+  `@composurecdk/sqs`'s `QueueBuilder`, so only for queues it builds. See
+  [its dead-letter docs](../sqs/README.md#dead-letter-queues-dlq-fifo-dlq) for
+  the warning id.
 
 ### Kinesis Data Streams
 

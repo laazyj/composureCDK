@@ -58,8 +58,9 @@ export type EventSourceRelationshipGuard = (
 /**
  * Per-kind relationship guards, keyed by {@link EventSourceKind}. A kind maps to
  * the (possibly empty) list of relationships to guard for a source of that kind
- * — SQS gains a second entry for the `maxReceiveCount` floor (#124), and a bare
- * escape-hatch source attached as `"unknown"` has none.
+ * — a bare escape-hatch source attached as `"unknown"` has none. The SQS
+ * `maxReceiveCount` floor is not a relationship guard: it concerns the queue
+ * alone, so `@composurecdk/sqs`'s `QueueBuilder` checks it.
  *
  * @internal
  */

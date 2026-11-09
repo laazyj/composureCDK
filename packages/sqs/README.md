@@ -83,6 +83,8 @@ DLQ-specific behaviour:
 - **`deadLetterQueue` is excluded** from the type (and rejected at build): a DLQ is the terminal destination for failed messages. A queue with its own redrive policy is a primary queue.
 - Consider restricting which queues may redrive into the DLQ via `.redriveAllowPolicy(...)`.
 
+A primary queue whose redrive `maxReceiveCount` is below 5 gets a suppressible synth-time warning — AWS recommends at least 5 so the consumer can retry before messages reach the DLQ. Silence it with `Annotations.of(scope).acknowledgeWarning("@composurecdk/sqs:redrive-low-max-receive-count")`.
+
 ### DLQ alarms
 
 The recommended-alarm set inverts relative to a primary queue — the defaults are exported as `DLQ_ALARM_DEFAULTS`:

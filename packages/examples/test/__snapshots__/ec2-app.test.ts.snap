@@ -146,38 +146,6 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
-    "Ec2AppalertsNumberOfNotificationsFailedToRedriveToDlqAlarmD0066E38": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "Ec2Appalerts262D0F75",
-          },
-        ],
-        "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
-        "AlarmName": "composure-cdk-ec2-stack/ec2-app/alerts/number-of-notifications-failed-to-redrive-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "Ec2Appalerts262D0F75",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsFailedToRedriveToDlq",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
     "Ec2AppalertsNumberOfNotificationsFilteredOutInvalidAttributesAlarm428DC53E": {
       "Properties": {
         "AlarmActions": [
@@ -202,38 +170,6 @@ exports[`ec2-app > matches the expected synthesised template 1`] = `
         ],
         "EvaluationPeriods": 1,
         "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
-    "Ec2AppalertsNumberOfNotificationsRedrivenToDlqAlarm1513FC46": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "Ec2Appalerts262D0F75",
-          },
-        ],
-        "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
-        "AlarmName": "composure-cdk-ec2-stack/ec2-app/alerts/number-of-notifications-redriven-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "Ec2Appalerts262D0F75",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsRedrivenToDlq",
         "Namespace": "AWS/SNS",
         "Period": 60,
         "Statistic": "Sum",

@@ -235,14 +235,25 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
       );
     }
 
-    const alarms = createTopicAlarms(scope, id, topic, alarmConfig, this.#customAlarms);
-
     const subscriptions: Record<string, Subscription> = {};
     for (const entry of this.#subscriptions) {
       const resolvedSub = resolve(entry.subscription, context ?? {});
       const subscriptionId = `${id}${entry.key[0].toUpperCase()}${entry.key.slice(1)}Subscription`;
       subscriptions[entry.key] = bindSubscription(scope, subscriptionId, topic, resolvedSub);
     }
+
+    // Subscriptions are bound first so the redrive alarms can see their DLQs.
+    const hasDeadLetterQueue = Object.values(subscriptions).some(
+      (s) => s.deadLetterQueue !== undefined,
+    );
+    const alarms = createTopicAlarms(
+      scope,
+      id,
+      topic,
+      alarmConfig,
+      this.#customAlarms,
+      hasDeadLetterQueue,
+    );
 
     return { topic, alarms, subscriptions, policy: findTopicPolicy(topic) };
   }

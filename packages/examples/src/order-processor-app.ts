@@ -116,8 +116,8 @@ export function createOrderProcessorApp(app = exampleApp()) {
 
       // Intake topic. Its recommended alarms include the two redrive
       // metrics (NumberOfNotificationsRedrivenToDlq, ...FailedToRedrive),
-      // which only report data once a subscription has a DLQ attached —
-      // as the orders subscription below does.
+      // which the builder creates because the orders subscription below
+      // has a DLQ — the alerts topic above has none, so it gets neither.
       orderEvents: createTopicBuilder()
         .displayName("Order Events")
         // Fan-out to the work queue. `SqsSubscription` carries the

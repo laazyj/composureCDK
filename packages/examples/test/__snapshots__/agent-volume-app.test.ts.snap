@@ -359,38 +359,6 @@ exports[`agent-volume-app > matches the expected synthesised template 1`] = `
       },
       "Type": "AWS::CloudWatch::Alarm",
     },
-    "AgentVolumeAppalertsNumberOfNotificationsFailedToRedriveToDlqAlarm91AA69A1": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "AgentVolumeAppalerts0D02612E",
-          },
-        ],
-        "AlarmDescription": "SNS topic failed to redrive a message to a subscription dead-letter queue; messages may be lost. Threshold: > 0 failed redrives in 1 minute.",
-        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/alerts/number-of-notifications-failed-to-redrive-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "AgentVolumeAppalerts0D02612E",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsFailedToRedriveToDlq",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
     "AgentVolumeAppalertsNumberOfNotificationsFilteredOutInvalidAttributesAlarm4D9BA4F6": {
       "Properties": {
         "AlarmActions": [
@@ -415,38 +383,6 @@ exports[`agent-volume-app > matches the expected synthesised template 1`] = `
         ],
         "EvaluationPeriods": 1,
         "MetricName": "NumberOfNotificationsFilteredOut-InvalidAttributes",
-        "Namespace": "AWS/SNS",
-        "Period": 60,
-        "Statistic": "Sum",
-        "Threshold": 0,
-        "TreatMissingData": "notBreaching",
-      },
-      "Type": "AWS::CloudWatch::Alarm",
-    },
-    "AgentVolumeAppalertsNumberOfNotificationsRedrivenToDlqAlarmB5342705": {
-      "Properties": {
-        "AlarmActions": [
-          {
-            "Ref": "AgentVolumeAppalerts0D02612E",
-          },
-        ],
-        "AlarmDescription": "SNS topic is redriving messages to a subscription dead-letter queue, indicating delivery failures. Threshold: > 0 redrives in 1 minute.",
-        "AlarmName": "composure-cdk-agent-volume-stack/agent-volume-app/alerts/number-of-notifications-redriven-to-dlq",
-        "ComparisonOperator": "GreaterThanThreshold",
-        "DatapointsToAlarm": 1,
-        "Dimensions": [
-          {
-            "Name": "TopicName",
-            "Value": {
-              "Fn::GetAtt": [
-                "AgentVolumeAppalerts0D02612E",
-                "TopicName",
-              ],
-            },
-          },
-        ],
-        "EvaluationPeriods": 1,
-        "MetricName": "NumberOfNotificationsRedrivenToDlq",
         "Namespace": "AWS/SNS",
         "Period": 60,
         "Statistic": "Sum",

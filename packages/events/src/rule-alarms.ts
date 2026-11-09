@@ -1,11 +1,12 @@
-import { CfnResource, Duration, Stack } from "aws-cdk-lib";
+import { Duration, Stack } from "aws-cdk-lib";
 import { type Alarm, ComparisonOperator, Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { CfnRule, type IRule } from "aws-cdk-lib/aws-events";
+import { type IRule } from "aws-cdk-lib/aws-events";
 import type { IConstruct } from "constructs";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
 import type { RuleAlarmConfig } from "./rule-alarm-config.js";
 import { RULE_ALARM_DEFAULTS } from "./rule-alarm-defaults.js";
+import { isCfnRule } from "./cfn-rule.js";
 
 const METRIC_PERIOD = Duration.minutes(1);
 const METRIC_PERIOD_LABEL = `${String(METRIC_PERIOD.toMinutes())} minute`;
@@ -18,15 +19,6 @@ function ruleMetric(rule: IRule, metricName: string): Metric {
     statistic: "Sum",
     period: METRIC_PERIOD,
   });
-}
-
-/** Narrows to an `AWS::Events::Rule` L1 without `instanceof` — see ADR-0007/ADR-0011. */
-function isCfnRule(node: IConstruct | undefined): node is CfnRule {
-  return (
-    node !== undefined &&
-    CfnResource.isCfnResource(node) &&
-    node.cfnResourceType === CfnRule.CFN_RESOURCE_TYPE_NAME
-  );
 }
 
 /**

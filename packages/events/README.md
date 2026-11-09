@@ -240,6 +240,18 @@ compose(
 );
 ```
 
+### KMS-encrypted queues
+
+For a queue with a customer-managed KMS key, CDK's `SqsQueue` target drops the `aws:SourceArn` condition from the queue policy and grants `events.amazonaws.com` unconditioned use of the key — scoping it to the rule would make a key → rule → queue → key dependency cycle. That lets any EventBridge rule send to the queue. `sqsTarget` keeps both grants scoped to the rule instead:
+
+- **The rule gets a literal name** when it has none (from `Names.uniqueResourceName`), so its ARN can be written as a string without referencing the rule resource. A name set with `.ruleName(...)` is kept. A rule on a custom bus is scoped by `rule/<bus>/<name>`. Adding a keyed queue target to a deployed, unnamed rule therefore renames it, which replaces the rule on the next deploy.
+- **Queue policy:** `sqs:SendMessage` only, with `ArnEquals aws:SourceArn` on the rule.
+- **Key policy:** `kms:GenerateDataKey` and `kms:Decrypt` only, with `ArnEquals aws:SourceArn` on the rule and `StringEquals aws:SourceAccount`.
+
+If the key is imported or AWS-managed, its policy can't be changed from the app; the target emits a warning (`SQS_TARGET_KEY_WARNING_ID`) carrying the statement to add where the key is owned. Delivery fails, and the rule records `FailedInvocations`, until it is.
+
+A queue without a key (or with SSE-SQS) binds exactly as CDK's `SqsQueue` does, and the rule stays unnamed.
+
 ### Cross-component DLQ wiring
 
 Each helper takes a single `Resolvable` for its primary resource. Secondary props such as `deadLetterQueue` accept the concrete CDK type (`IQueue` for most targets). When the DLQ is also a sibling-component output, construct the helper inside `ref().map()` and have the dependency component expose both the resource and the queue:

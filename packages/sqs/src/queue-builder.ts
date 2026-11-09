@@ -44,7 +44,7 @@ export interface QueueBuilderResult {
  * role.
  */
 interface InternalQueueBuilderProps
-  extends Omit<QueueProps, "encryptionMasterKey">, QueueBuilderExtensionProps {
+  extends Omit<QueueProps, keyof QueueBuilderExtensionProps>, QueueBuilderExtensionProps {
   /**
    * The queue's role, set by `createQueueBuilder(role)`. Stored as a
    * prop (not a private field) so it is data: `.copy()` preserves it
@@ -108,7 +108,12 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): QueueBuilderResult {
-    const { queueRole: role = "standard", encryptionMasterKey, ...configured } = this.props;
+    const {
+      queueRole: role = "standard",
+      encryptionMasterKey,
+      deadLetterQueue,
+      ...configured
+    } = this.props;
     const fifo = isFifoRole(role);
     const dlq = isDlqRole(role);
 
@@ -117,6 +122,10 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
       ...(dlq ? DLQ_QUEUE_DEFAULTS : {}),
       ...configured,
       ...encryptionMasterKeyProps(encryptionMasterKey, configured.encryption, context),
+      // Resolved before validation so the redrive checks see the real queue.
+      ...(deadLetterQueue === undefined
+        ? {}
+        : { deadLetterQueue: resolve(deadLetterQueue, context) }),
       ...(fifo ? { fifo: true } : {}),
     };
 

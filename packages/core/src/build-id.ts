@@ -12,6 +12,13 @@ import { type Lifecycle } from "./lifecycle.js";
 export const BUILD_ID = Symbol.for("composurecdk.buildId");
 
 /**
+ * @internal Names the method by which {@link compose}'s systems build with
+ * key-only component ids. Only `scoped()` calls it. Registered globally for the
+ * same dual-package reason as {@link BUILD_ID}.
+ */
+export const SCOPED_BUILD = Symbol.for("composurecdk.scopedBuild");
+
+/**
  * Tags a {@link Lifecycle} with an explicit construct id, decoupling the id it
  * builds under from the key it is registered under in {@link compose}.
  *

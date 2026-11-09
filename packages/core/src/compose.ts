@@ -1,6 +1,6 @@
 import { Graph, alg, json } from "@dagrejs/graphlib";
 import { type IConstruct } from "constructs";
-import { buildIdOf } from "./build-id.js";
+import { buildIdOf, SCOPED_BUILD } from "./build-id.js";
 import { CyclicDependencyError } from "./cyclic-dependency-error.js";
 import { DuplicateConstructIdError } from "./duplicate-construct-id-error.js";
 import { type Lifecycle } from "./lifecycle.js";
@@ -219,23 +219,23 @@ class ComposedLifecycle<
   }
 
   withStacks(stacks: { [K in keyof Components]?: IConstruct }): ConfiguredSystem<Components> {
-    return new ConfiguredLifecycle((scope, id, parentContext) =>
-      this.#buildWith(scope, id, stacks, parentContext),
+    return new ConfiguredLifecycle((scope, id, parentContext, keyed) =>
+      this.#buildWith(scope, id, stacks, parentContext, keyed),
     );
   }
 
   withStackStrategy(strategy: StackStrategy): ConfiguredSystem<Components> {
-    return new ConfiguredLifecycle((scope, id, parentContext) => {
+    return new ConfiguredLifecycle((scope, id, parentContext, keyed) => {
       const stacks = Object.fromEntries(
         Object.keys(this.#components).map((key) => [key, strategy.resolve(scope, id, key)]),
       ) as { [K in keyof Components]?: IConstruct };
-      return this.#buildWith(scope, id, stacks, parentContext);
+      return this.#buildWith(scope, id, stacks, parentContext, keyed);
     });
   }
 
   afterBuild(hook: AfterBuildHook<BuildResult<Components>>): ConfiguredSystem<Components> {
-    return new ConfiguredLifecycle<Components>((scope, id, parentContext) =>
-      this.#buildWith(scope, id, undefined, parentContext),
+    return new ConfiguredLifecycle<Components>((scope, id, parentContext, keyed) =>
+      this.#buildWith(scope, id, undefined, parentContext, keyed),
     ).afterBuild(hook);
   }
 
@@ -244,14 +244,30 @@ class ComposedLifecycle<
     id: string,
     parentContext?: Record<string, object>,
   ): BuildResult<Components> {
-    return this.#buildWith(scope, id, undefined, parentContext).results;
+    return this.#buildWith(scope, id, undefined, parentContext, false).results;
   }
 
+  /** @internal Builds with key-only ids; see {@link scoped}. */
+  [SCOPED_BUILD](
+    scope: IConstruct,
+    id: string,
+    parentContext?: Record<string, object>,
+  ): BuildResult<Components> {
+    return this.#buildWith(scope, id, undefined, parentContext, true).results;
+  }
+
+  /**
+   * @param keyed - Derive a component's id from its key alone when it builds
+   *   into `scope`, which {@link scoped} has created for this system. A
+   *   component routed to another scope keeps the prefixed id, since `scope`
+   *   does not namespace it there.
+   */
   #buildWith(
     scope: IConstruct,
     id: string,
-    stacks?: { [K in keyof Components]?: IConstruct },
-    parentContext?: Record<string, object>,
+    stacks: { [K in keyof Components]?: IConstruct } | undefined,
+    parentContext: Record<string, object> | undefined,
+    keyed: boolean,
   ): BuildOutcome<Components> {
     const results: Record<string, object> = {};
     const componentScopes: Record<string, IConstruct> = {};
@@ -269,7 +285,8 @@ class ComposedLifecycle<
       const context = { ...parentContext, ...innerContext };
       const component = this.#components[key];
       // An at()-tagged component pins its own id; otherwise derive it from the key.
-      const componentId = buildIdOf(component) ?? `${id}/${key}`;
+      const componentId =
+        buildIdOf(component) ?? (keyed && componentScope === scope ? key : `${id}/${key}`);
 
       let usedIds = idsByScope.get(componentScope);
       if (!usedIds) idsByScope.set(componentScope, (usedIds = new Set<string>()));
@@ -296,7 +313,8 @@ interface BuildOutcome<Components extends Record<string, Lifecycle>> {
 type BuildFn<Components extends Record<string, Lifecycle>> = (
   scope: IConstruct,
   id: string,
-  parentContext?: Record<string, object>,
+  parentContext: Record<string, object> | undefined,
+  keyed: boolean,
 ) => BuildOutcome<Components>;
 
 /**
@@ -325,7 +343,25 @@ class ConfiguredLifecycle<
     id: string,
     parentContext?: Record<string, object>,
   ): BuildResult<Components> {
-    const { results, componentScopes } = this.#buildFn(scope, id, parentContext);
+    return this.#build(scope, id, parentContext, false);
+  }
+
+  /** @internal Builds with key-only ids; see {@link scoped}. */
+  [SCOPED_BUILD](
+    scope: IConstruct,
+    id: string,
+    parentContext?: Record<string, object>,
+  ): BuildResult<Components> {
+    return this.#build(scope, id, parentContext, true);
+  }
+
+  #build(
+    scope: IConstruct,
+    id: string,
+    parentContext: Record<string, object> | undefined,
+    keyed: boolean,
+  ): BuildResult<Components> {
+    const { results, componentScopes } = this.#buildFn(scope, id, parentContext, keyed);
     for (const hook of this.#hooks) {
       hook(scope, id, results, componentScopes);
     }

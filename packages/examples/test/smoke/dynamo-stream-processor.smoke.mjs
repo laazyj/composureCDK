@@ -6,6 +6,11 @@ import {
 } from "./_helpers.mjs";
 
 const STACK = "ComposureCDK-DynamoStreamProcessorStack";
+// The consumer is built with scoped(): its resources deploy under this
+// construct, and its tags() hook reaches them and nothing else.
+const CONSUMER_PATH = `${STACK}/DynamoStreamProcessor--consumer/`;
+const CONSUMER_TAG_KEY = "Component";
+const CONSUMER_TAG_VALUE = "orders-consumer";
 
 // The example consumes the stream with the library default,
 // `StartingPosition.LATEST` — the poller starts at the tip of each shard at
@@ -37,7 +42,10 @@ export default {
       );
       return;
     }
-    const logGroup = resolveLambdaLogGroup(aws, fnName);
+    // One read serves both the tag check and the log group lookup.
+    const fn = aws("lambda", "get-function", "--function-name", fnName, "--output", "json");
+    checkConsumerScope(aws, { fnName, tags: fn.Tags, pass, fail });
+    const logGroup = resolveLambdaLogGroup(aws, fnName, fn.Configuration);
 
     // Unique per run so the log poll can't match a stale change record from a
     // previous run. Every round's key carries this prefix, so one filter
@@ -87,3 +95,41 @@ export default {
     );
   },
 };
+
+/**
+ * Proves scoped() held in the deployed stack: the consumer's queue and function
+ * sit under one construct while the table does not, and the subtree's tag
+ * reached the live function.
+ */
+function checkConsumerScope(aws, { fnName, tags, pass, fail }) {
+  const { TemplateBody } = aws(
+    "cloudformation",
+    "get-template",
+    "--stack-name",
+    STACK,
+    "--output",
+    "json",
+  );
+  const pathOf = (type) =>
+    Object.values(TemplateBody.Resources).find((r) => r.Type === type)?.Metadata?.[
+      "aws:cdk:path"
+    ] ?? "";
+  const nested = ["AWS::SQS::Queue", "AWS::Lambda::Function"].every((t) =>
+    pathOf(t).startsWith(CONSUMER_PATH),
+  );
+  if (nested && !pathOf("AWS::DynamoDB::GlobalTable").startsWith(CONSUMER_PATH)) {
+    pass(
+      `${STACK} — consumer queue and function deployed under ${CONSUMER_PATH}, table outside it`,
+    );
+  } else {
+    fail(`${STACK} — expected the queue and function, and only them, under ${CONSUMER_PATH}`);
+  }
+
+  if (tags?.[CONSUMER_TAG_KEY] === CONSUMER_TAG_VALUE) {
+    pass(`${fnName} — carries the consumer's ${CONSUMER_TAG_KEY}=${CONSUMER_TAG_VALUE} tag`);
+  } else {
+    fail(
+      `${fnName} — expected tag ${CONSUMER_TAG_KEY}=${CONSUMER_TAG_VALUE}, found ${JSON.stringify(tags ?? {})}`,
+    );
+  }
+}

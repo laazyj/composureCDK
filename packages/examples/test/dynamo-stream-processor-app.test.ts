@@ -67,6 +67,22 @@ describe("dynamo-stream-processor-app", () => {
     ).toEqual([]);
   });
 
+  it("builds the consumer under one construct, each part at its key", () => {
+    const consumer = stack.node.findChild("DynamoStreamProcessor--consumer");
+    expect(consumer.node.tryFindChild("dlq")).toBeDefined();
+    expect(consumer.node.tryFindChild("processor")).toBeDefined();
+    expect(stack.node.tryFindChild("DynamoStreamProcessor--orders")).toBeDefined();
+  });
+
+  it("tags the consumer's resources, and not the table", () => {
+    const tag = { Key: "Component", Value: "orders-consumer" };
+    template.hasResourceProperties("AWS::Lambda::Function", { Tags: Match.arrayWith([tag]) });
+    template.hasResourceProperties("AWS::SQS::Queue", { Tags: Match.arrayWith([tag]) });
+    template.hasResourceProperties("AWS::DynamoDB::GlobalTable", {
+      Replicas: [Match.not(Match.objectLike({ Tags: Match.arrayWith([tag]) }))],
+    });
+  });
+
   it("matches the expected synthesised template", () => {
     expect(template.toJSON()).toMatchSnapshot();
   });

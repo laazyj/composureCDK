@@ -89,6 +89,10 @@ compose(
 
 The id rides on a `Symbol.for` brand that only `compose` reads; the wiring key (used in the dependency map and in `ref()`) is unaffected. A pinned id shares the sibling namespace of the scope it builds into, so `compose` throws if it collides with another component's id. See [ADR-0012](adr/0012-explicit-build-id-decoupled-from-compose-key.md).
 
+### Encapsulating a system with `scoped`
+
+The derived `` `${parentId}/${key}` `` is not real nesting: `constructs` rewrites the `/` to `--`, so a nested system's components land beside the parent's as siblings. `scoped(system)` creates `new Construct(scope, id)` and builds the system into it with each component at its key, so `App--failures--bucket` becomes `App--failures/bucket`. A composite builder uses it to keep what it creates under one node, which `Tags.of()` and Aspects can then target alone: its `build` returns `scoped(compose(...)).build(scope, id, context)`. Unwrapped systems derive ids as before. See [ADR-0020](adr/0020-scoped-system-construct.md).
+
 ### Dependency declarations are exhaustive
 
 Every component must appear as a key in the dependencies record, even if it has no dependencies (in which case the value is `[]`). This is enforced by the type system. The alternative — making the dependencies record partial and defaulting missing keys to no dependencies — was rejected because it makes it too easy to forget a component and mask a missing dependency declaration.

@@ -12,6 +12,7 @@ export { CyclicDependencyError } from "./cyclic-dependency-error.js";
 export { DuplicateConstructIdError } from "./duplicate-construct-id-error.js";
 export { type Grant, grantVia, GrantQueue } from "./grant.js";
 export { type Lifecycle } from "./lifecycle.js";
+export { scoped } from "./scoped.js";
 export { Ref, ref, combine, resolve, isRef, type Resolvable, type Resolved } from "./ref.js";
 export {
   type StackStrategy,

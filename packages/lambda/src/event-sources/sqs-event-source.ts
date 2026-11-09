@@ -55,8 +55,8 @@ export const DEFAULT_SQS_EVENT_SOURCE_PROPS: Pick<
  * guard**: when this source is attached to a {@link IFunctionBuilder}, the
  * builder reads the queue's resolved `visibilityTimeout` off its L1 `CfnQueue`
  * (the `Queue` construct does not re-expose it) and warns, suppressibly, on an
- * actual violation — see ADR-0011. The `maxReceiveCount` floor is tracked in
- * laazyj/composureCDK#124.
+ * actual violation (`SQS_VISIBILITY_TIMEOUT_WARNING_ID`) — see ADR-0011. The
+ * `maxReceiveCount` floor is checked by `@composurecdk/sqs`'s `QueueBuilder`.
  *
  * @param queue - The source queue, concrete or a `ref()` to a sibling.
  * @param props - Overrides for {@link DEFAULT_SQS_EVENT_SOURCE_PROPS} and any

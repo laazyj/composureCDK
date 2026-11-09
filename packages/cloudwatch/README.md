@@ -126,7 +126,9 @@ If an alarm's name is an unresolved CDK token that does not resolve to a string 
 
 ### Alarm names
 
-Every alarm a ComposureCDK builder creates gets an explicit, hierarchical name of the form `${stackName}/${kebab(id)}/${kebab(key)}` (e.g. `payments-prod/checkout-fn/errors`), instead of CloudFormation's default name with a random suffix. The console shows the slashes as a hierarchy, and kebab-cased segments read cleanly in dashboards, on-call pages and email subjects. [`defaultAlarmName`](./src/default-alarm-name.ts) builds it, including the nested-stack case.
+Every alarm a ComposureCDK builder creates gets an explicit, hierarchical name of the form `${stackName}/${path}/${kebab(id)}/${kebab(key)}` (e.g. `payments-prod/checkout-fn/errors`), instead of CloudFormation's default name with a random suffix. The console shows the slashes as a hierarchy, and kebab-cased segments read cleanly in dashboards, on-call pages and email subjects. [`defaultAlarmName`](./src/default-alarm-name.ts) builds it, including the nested-stack case.
+
+`path` is the ids of the constructs between the stack and the builder's scope, and is empty for a builder built straight into the stack, as `compose()` does. It keeps two composites that each build a `queue` under their own construct (`…/orders/queue/…`, `…/refunds/queue/…`) from producing the same name, which CloudFormation rejects.
 
 To name one alarm yourself, pass an `AlarmName` in its config. `alarmName()` checks a string against [CloudWatch's naming rules](./src/alarm-name.ts) and returns the branded `AlarmName` type. It trims surrounding whitespace and otherwise uses the value as written.
 

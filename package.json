@@ -61,10 +61,5 @@
     "publint": "^0.3.25",
     "tshy": "^4.1.3",
     "typescript-eslint": "^8.72.1"
-  },
-  "overrides": {
-    "eslint": {
-      "minimatch": "^11.0.1"
-    }
   }
 }

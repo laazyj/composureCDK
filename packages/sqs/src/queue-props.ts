@@ -57,6 +57,17 @@ export interface QueueBuilderExtensionProps {
   encryptionMasterKey?: Resolvable<NonNullable<QueueProps["encryptionMasterKey"]>>;
 
   /**
+   * The dead-letter queue that messages are redriven to after
+   * `maxReceiveCount` failed receives.
+   *
+   * Accepts a concrete `DeadLetterQueue` or a {@link Resolvable} — typically
+   * a {@link Ref} to a composed dead-letter queue builder, so the DLQ is a
+   * component of the system. The inner type is read from CDK's own prop
+   * (ADR-0018).
+   */
+  deadLetterQueue?: Resolvable<NonNullable<QueueProps["deadLetterQueue"]>>;
+
+  /**
    * Configuration for AWS-recommended CloudWatch alarms.
    *
    * By default, the builder creates recommended alarms with sensible
@@ -81,7 +92,9 @@ export interface QueueBuilderExtensionProps {
  * (`createQueueBuilder("fifo")`), not a prop.
  */
 export interface QueueBuilderProps
-  extends Omit<QueueProps, FifoOnlyPropKey | "encryptionMasterKey">, QueueBuilderExtensionProps {}
+  extends
+    Omit<QueueProps, FifoOnlyPropKey | keyof QueueBuilderExtensionProps>,
+    QueueBuilderExtensionProps {}
 
 /**
  * Prop surface of `createQueueBuilder("fifo")`. `fifo` itself is not
@@ -91,7 +104,7 @@ export interface QueueBuilderProps
  */
 export interface FifoQueueBuilderProps
   extends
-    Omit<QueueProps, "fifo" | "queueName" | "encryptionMasterKey">,
+    Omit<QueueProps, "fifo" | "queueName" | keyof QueueBuilderExtensionProps>,
     QueueBuilderExtensionProps {
   /**
    * Physical name of the FIFO queue. Must end in `.fifo` (AWS

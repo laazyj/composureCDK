@@ -5,9 +5,9 @@ import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type IQueue, Queue, QueueEncryption, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
+import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createQueueBuilder } from "../src/queue-builder.js";
+import { createQueueBuilder, type QueueBuilderResult } from "../src/queue-builder.js";
 import type { QueueBuilderProps } from "../src/queue-props.js";
 import { setUntypedProp } from "./_helpers.js";
 
@@ -138,6 +138,29 @@ describe("QueueBuilder", () => {
     });
   });
 
+  describe("dead-letter queue", () => {
+    it("wires a composed dead-letter queue through a ref", () => {
+      const stack = newStack();
+      const { orders, ordersDlq } = compose(
+        {
+          ordersDlq: createQueueBuilder("dlq"),
+          orders: createQueueBuilder().deadLetterQueue(
+            ref("ordersDlq", (r: QueueBuilderResult) => ({ queue: r.queue, maxReceiveCount: 5 })),
+          ),
+        },
+        { ordersDlq: [], orders: ["ordersDlq"] },
+      ).build(stack, "System");
+
+      expect(orders.queue.deadLetterQueue?.queue).toBe(ordersDlq.queue);
+      Template.fromStack(stack).hasResourceProperties("AWS::SQS::Queue", {
+        RedrivePolicy: {
+          deadLetterTargetArn: stack.resolve(ordersDlq.queue.queueArn) as unknown,
+          maxReceiveCount: 5,
+        },
+      });
+    });
+  });
+
   describe("synthesised output", () => {
     it("creates a queue with the specified queue name", () => {
       const { template } = buildAndSynth((b) => b.queueName("orders"));
@@ -161,15 +184,21 @@ describe("QueueBuilder", () => {
       );
     });
 
-    it("throws when the redrive target is a FIFO queue", () => {
-      const app = new App();
-      const stack = new Stack(app, "TestStack");
+    it.each([
+      ["a concrete", (queue: Queue) => ({ queue, maxReceiveCount: 5 })],
+      // Resolved before validation, so the guard sees the real queue.
+      [
+        "a ref'd",
+        () => ref("dlq", (r: { queue: Queue }) => ({ queue: r.queue, maxReceiveCount: 5 })),
+      ],
+    ])("throws when %s redrive target is a FIFO queue", (_, deadLetterQueue) => {
+      const stack = newStack();
       const fifoDlq = new Queue(stack, "Dlq", { fifo: true });
 
       expect(() =>
         createQueueBuilder()
-          .deadLetterQueue({ queue: fifoDlq, maxReceiveCount: 5 })
-          .build(stack, "Orders"),
+          .deadLetterQueue(deadLetterQueue(fifoDlq))
+          .build(stack, "Orders", { dlq: { queue: fifoDlq } }),
       ).toThrow(/standard queue cannot redrive to the FIFO dead-letter queue "Dlq"/);
     });
 

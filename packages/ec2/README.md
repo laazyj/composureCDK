@@ -258,6 +258,26 @@ Exceptions:
 
 [aws/aws-cdk#39536](https://github.com/aws/aws-cdk/pull/39536) makes the same change upstream, but only behind the `@aws-cdk/aws-ec2:flowLogsCloudWatchLogsPermissionsScoped` feature flag. When both are present, the two statements are identical and the synthesised policy keeps only one.
 
+#### Flow-log role trust policy
+
+CDK's flow-log role trusts `vpc-flow-logs.amazonaws.com` with no conditions, so the service could assume it on behalf of any account ([#661](https://github.com/laazyj/composureCDK/issues/661)). The builder adds the [confused-deputy](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html) conditions AWS [recommends for this role](https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-iam-role.html):
+
+```json
+"Condition": {
+  "StringEquals": { "aws:SourceAccount": "<account>" },
+  "ArnLike": { "aws:SourceArn": "arn:<partition>:ec2:<region>:<account>:vpc-flow-log/*" }
+}
+```
+
+`ServicePrincipal` conditions cannot be added once a role exists, so they are set as an L1 override on CDK's role. It is an in-place update of the role, and the flow log is not replaced. This covers the auto-managed log group and a `destination: FlowLogDestination.toCloudWatchLogs(logGroup)` that you supply without a role.
+
+The override depends on CDK building the role with a single trust statement. If a future `aws-cdk-lib` builds it differently, the build throws instead of conditioning the wrong statement. Each condition key is a separate override. If CDK adds these conditions itself, the output is unchanged, and any other condition keys CDK adds are kept. The upstream request is [aws/aws-cdk#39674](https://github.com/aws/aws-cdk/issues/39674).
+
+Exceptions:
+
+- **A role you pass to `toCloudWatchLogs(logGroup, role)`** is yours to condition, so the builder leaves it untouched.
+- **`FlowLog` constructs you create directly** against the returned `vpc` are not touched.
+
 ## Security Group Builder
 
 ```ts

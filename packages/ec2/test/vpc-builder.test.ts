@@ -1,11 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { App, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { FlowLogDestination } from "aws-cdk-lib/aws-ec2";
+import { FlowLogDestination, Vpc } from "aws-cdk-lib/aws-ec2";
+import {
+  PolicyDocument,
+  PrincipalPolicyFragment,
+  Role,
+  ServicePrincipal,
+} from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
-import { buildFixture, policyJson } from "@composurecdk/cdk-testing";
+import { buildFixture, newStack, policyJson, testEnv } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { createVpcBuilder } from "../src/vpc-builder.js";
 
@@ -130,6 +136,126 @@ describe("VpcBuilder", () => {
       });
 
       expect(policyJson(stack)).not.toContain("logs:DescribeLogStreams");
+    });
+  });
+
+  // https://github.com/laazyj/composureCDK/issues/661
+  describe("flow-log role trust policy", () => {
+    const FLOW_LOGS = "vpc-flow-logs.amazonaws.com";
+    const env = testEnv("eu-west-2");
+    const CONFUSED_DEPUTY_CONDITIONS = {
+      StringEquals: { "aws:SourceAccount": env.account },
+      ArnLike: {
+        "aws:SourceArn": {
+          "Fn::Join": [
+            "",
+            ["arn:", { Ref: "AWS::Partition" }, `:ec2:${env.region}:${env.account}:vpc-flow-log/*`],
+          ],
+        },
+      },
+    };
+
+    interface TrustPolicy {
+      Statement: { Principal?: { Service?: unknown } }[];
+    }
+
+    /** Every role's trust policy with a statement for the flow-logs service. */
+    const trustPolicies = (template: Template) =>
+      Object.values(template.findResources("AWS::IAM::Role"))
+        .map(
+          (r) =>
+            (r as { Properties: { AssumeRolePolicyDocument: TrustPolicy } }).Properties
+              .AssumeRolePolicyDocument,
+        )
+        .filter((doc) => doc.Statement.some((s) => s.Principal?.Service === FLOW_LOGS));
+
+    const trust = (condition?: object) => ({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Action: "sts:AssumeRole",
+          Effect: "Allow",
+          Principal: { Service: FLOW_LOGS },
+          ...(condition && { Condition: condition }),
+        },
+      ],
+    });
+
+    const build = (configure?: Parameters<typeof buildAndSynth>[0]) =>
+      buildAndSynth(configure, { stackProps: { env } }).template;
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    /**
+     * Makes CDK's own `ServicePrincipal("vpc-flow-logs…")` carry `conditions`,
+     * which is how an upstream fix would most likely arrive.
+     */
+    function simulateUpstreamConditions(conditions: Record<string, unknown>): void {
+      vi.spyOn(ServicePrincipal.prototype, "policyFragment", "get").mockImplementation(function (
+        this: ServicePrincipal,
+      ) {
+        return new PrincipalPolicyFragment(
+          { Service: [this.service] },
+          this.service === FLOW_LOGS ? conditions : {},
+        );
+      });
+    }
+
+    it("conditions CDK's role with aws:SourceAccount and aws:SourceArn", () => {
+      expect(trustPolicies(build())).toEqual([trust(CONFUSED_DEPUTY_CONDITIONS)]);
+    });
+
+    // Pins the upstream shape the override depends on: one trust statement, at
+    // index 0, with no conditions. If this fails, aws-cdk-lib has changed how it
+    // builds the flow-log role — re-check `conditionCdkRoleTrust`. If CDK now
+    // adds these conditions itself, the override has become redundant.
+    it("pins the unconditioned trust policy aws-cdk-lib synthesises", () => {
+      const stack = newStack({ env });
+      new Vpc(stack, "Vpc", { natGateways: 0 }).addFlowLog("FlowLog");
+
+      expect(trustPolicies(Template.fromStack(stack))).toEqual([trust()]);
+    });
+
+    it("conditions CDK's role for a user-supplied CloudWatch Logs destination", () => {
+      const template = build((b, stack) => {
+        b.flowLogs({
+          destination: FlowLogDestination.toCloudWatchLogs(new LogGroup(stack, "UserLogs")),
+        });
+      });
+
+      expect(trustPolicies(template)).toEqual([trust(CONFUSED_DEPUTY_CONDITIONS)]);
+    });
+
+    it("leaves a user-supplied role as the user wrote it", () => {
+      const template = build((b, stack) => {
+        const role = new Role(stack, "UserRole", { assumedBy: new ServicePrincipal(FLOW_LOGS) });
+        b.flowLogs({
+          destination: FlowLogDestination.toCloudWatchLogs(new LogGroup(stack, "UserLogs"), role),
+        });
+      });
+
+      expect(trustPolicies(template)).toEqual([trust()]);
+    });
+
+    describe("if aws-cdk-lib conditions the role upstream", () => {
+      it("synthesises the same conditions and keeps keys the builder does not set", () => {
+        const orgCondition = { "aws:SourceOrgID": "o-example" };
+        const upstream = {
+          ...CONFUSED_DEPUTY_CONDITIONS,
+          StringEquals: { ...orgCondition, ...CONFUSED_DEPUTY_CONDITIONS.StringEquals },
+        };
+        simulateUpstreamConditions(upstream);
+
+        expect(trustPolicies(build())).toEqual([trust(upstream)]);
+      });
+
+      it("throws rather than condition the wrong statement", () => {
+        vi.spyOn(PolicyDocument.prototype, "statementCount", "get").mockReturnValue(2);
+
+        expect(() => build()).toThrow(/one trust statement, found 2/);
+      });
     });
   });
 

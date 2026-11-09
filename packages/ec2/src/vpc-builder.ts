@@ -1,4 +1,4 @@
-import { ArnFormat, Stack } from "aws-cdk-lib";
+import { ArnFormat, CfnResource, Stack } from "aws-cdk-lib";
 import {
   type FlowLog,
   FlowLogDestination,
@@ -6,7 +6,7 @@ import {
   Vpc,
   type VpcProps,
 } from "aws-cdk-lib/aws-ec2";
-import { PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { PolicyStatement, Role } from "aws-cdk-lib/aws-iam";
 import { type LogGroup } from "aws-cdk-lib/aws-logs";
 import { type IConstruct } from "constructs";
 import { type Lifecycle } from "@composurecdk/core";
@@ -133,7 +133,9 @@ class VpcBuilder implements Lifecycle<VpcBuilderResult> {
     const vpc = new Vpc(scope, id, mergedProps);
     // Same construct id the `flowLogs` prop would use, so logical IDs match.
     if (flowLogOptions) {
-      grantDescribeLogStreamsOnLogGroup(vpc.addFlowLog(DEFAULT_FLOW_LOG_KEY, flowLogOptions));
+      const flowLog = vpc.addFlowLog(DEFAULT_FLOW_LOG_KEY, flowLogOptions);
+      grantDescribeLogStreamsOnLogGroup(flowLog);
+      conditionCdkRoleTrust(flowLog);
     }
 
     return { vpc, flowLogsLogGroup };
@@ -164,6 +166,45 @@ function grantDescribeLogStreamsOnLogGroup(flowLog: FlowLog): void {
         }),
       ],
     }),
+  );
+}
+
+/**
+ * CDK's flow-log role trusts `vpc-flow-logs.amazonaws.com` with no
+ * confused-deputy conditions (#661). `ServicePrincipal` conditions cannot be
+ * added once the role exists, so they are set on the L1 trust statement.
+ * Each condition key is its own override, so an upstream fix that adds the
+ * same keys is overwritten with the same value and any other keys it adds
+ * survive. Only the role CDK creates is touched: a role the user passed to
+ * `toCloudWatchLogs` is theirs to condition. Upstream: aws/aws-cdk#39674.
+ */
+function conditionCdkRoleTrust(flowLog: FlowLog): void {
+  const role = flowLog.iamRole;
+  if (!Role.isRole(role) || role.node.scope !== flowLog) {
+    return;
+  }
+  // No L1 when synthesis is prevented (`Role.customizeRoles`).
+  const cfnRole = role.node.defaultChild;
+  if (!CfnResource.isCfnResource(cfnRole)) {
+    return;
+  }
+  // The override targets statement 0. CDK builds the role with its `assumedBy`
+  // statement as the only one; if that changes, fail rather than condition
+  // the wrong statement or leave a second one open.
+  const statements = role.assumeRolePolicy?.statementCount;
+  if (statements !== 1) {
+    throw new Error(
+      `VpcBuilder: expected CDK's flow-log role "${role.node.path}" to have one trust ` +
+        `statement, found ${String(statements)}. aws-cdk-lib has changed how it builds ` +
+        "this role; see https://github.com/laazyj/composureCDK/issues/661.",
+    );
+  }
+  const stack = Stack.of(flowLog);
+  const condition = "AssumeRolePolicyDocument.Statement.0.Condition";
+  cfnRole.addPropertyOverride(`${condition}.StringEquals.aws:SourceAccount`, stack.account);
+  cfnRole.addPropertyOverride(
+    `${condition}.ArnLike.aws:SourceArn`,
+    stack.formatArn({ service: "ec2", resource: "vpc-flow-log", resourceName: "*" }),
   );
 }
 

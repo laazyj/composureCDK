@@ -113,6 +113,69 @@ export function findStackResources(aws, stackName, { type, namePattern } = {}) {
 }
 
 /**
+ * Reads one DynamoDB item with a strongly consistent read. `key` is in the
+ * attribute-value form (`{ id: { S: "…" } }`). Returns `undefined` while there
+ * is no such item.
+ */
+export function getDynamoItem(aws, tableName, key) {
+  const { Item } = aws(
+    "dynamodb",
+    "get-item",
+    "--table-name",
+    tableName,
+    "--key",
+    JSON.stringify(key),
+    "--consistent-read",
+    "--output",
+    "json",
+  );
+  return Item;
+}
+
+/**
+ * Puts one JSON record onto a Kinesis data stream, as a producer would.
+ * `raw-in-base64-out` lets the CLI take the JSON as-is and base64-encode it
+ * for the API, as the dual-function check does for a Lambda payload.
+ */
+export function putKinesisRecord(aws, { streamName, partitionKey, data }) {
+  return aws(
+    "kinesis",
+    "put-record",
+    "--stream-name",
+    streamName,
+    "--partition-key",
+    partitionKey,
+    "--data",
+    JSON.stringify(data),
+    "--cli-binary-format",
+    "raw-in-base64-out",
+    "--output",
+    "json",
+  );
+}
+
+/**
+ * A one-line summary of a function's event source mappings, as
+ * `State / LastProcessingResult` per mapping. A stream check that saw nothing
+ * reports it, which distinguishes "poller never attached" from "poller ran and
+ * failed" (e.g. a KMS AccessDenied).
+ */
+export function eventSourceMappingState(aws, fnName) {
+  const { EventSourceMappings } = aws(
+    "lambda",
+    "list-event-source-mappings",
+    "--function-name",
+    fnName,
+    "--output",
+    "json",
+  );
+  return (
+    (EventSourceMappings ?? []).map((m) => `${m.State} / ${m.LastProcessingResult}`).join(", ") ||
+    "none found"
+  );
+}
+
+/**
  * Resolves a Lambda function's CloudWatch log group from its live config.
  * Lambda's default log group is `/aws/lambda/<name>`, but examples may
  * override it via `LoggingConfig` — resolve from the live config rather

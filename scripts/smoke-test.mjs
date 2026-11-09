@@ -22,7 +22,11 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SMOKE_DIR = resolve(SCRIPT_DIR, "../packages/examples/test/smoke");
 
 function aws(...args) {
-  return JSON.parse(execFileSync("aws", args, { encoding: "utf8" }));
+  const out = execFileSync("aws", args, { encoding: "utf8" });
+  // The CLI prints nothing for an empty response body — e.g. `dynamodb
+  // get-item` on a key with no item yet — so read that as the `{}` it is,
+  // letting a check poll for something that has not appeared.
+  return out.trim() === "" ? {} : JSON.parse(out);
 }
 
 function getRegion() {

@@ -271,7 +271,7 @@ CDK's flow-log role trusts `vpc-flow-logs.amazonaws.com` with no conditions, so 
 
 `ServicePrincipal` conditions cannot be added once a role exists, so they are set as an L1 override on CDK's role. It is an in-place update of the role, and the flow log is not replaced. This covers the auto-managed log group and a `destination: FlowLogDestination.toCloudWatchLogs(logGroup)` that you supply without a role.
 
-The override depends on CDK building the role with a single trust statement. If a future `aws-cdk-lib` builds it differently, the build throws instead of conditioning the wrong statement. Each condition key is a separate override. If CDK adds these conditions itself, the output is unchanged, and any other condition keys CDK adds are kept.
+The override depends on CDK building the role with a single trust statement. If a future `aws-cdk-lib` builds it differently, the build throws instead of conditioning the wrong statement. Each condition key is a separate override. If CDK adds these conditions itself, the output is unchanged, and any other condition keys CDK adds are kept. The upstream request is [aws/aws-cdk#39674](https://github.com/aws/aws-cdk/issues/39674).
 
 Exceptions:
 

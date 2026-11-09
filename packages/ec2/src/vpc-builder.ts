@@ -176,7 +176,7 @@ function grantDescribeLogStreamsOnLogGroup(flowLog: FlowLog): void {
  * Each condition key is its own override, so an upstream fix that adds the
  * same keys is overwritten with the same value and any other keys it adds
  * survive. Only the role CDK creates is touched: a role the user passed to
- * `toCloudWatchLogs` is theirs to condition.
+ * `toCloudWatchLogs` is theirs to condition. Upstream: aws/aws-cdk#39674.
  */
 function conditionCdkRoleTrust(flowLog: FlowLog): void {
   const role = flowLog.iamRole;

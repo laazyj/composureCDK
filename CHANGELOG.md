@@ -1,3 +1,27 @@
+## 0.12.0 (2026-11-09)
+
+### 🚀 Features
+
+- **examples:** add Kinesis telemetry pipeline example ([#676](https://github.com/laazyj/composureCDK/pull/676))
+- **kinesis:** add @composurecdk/kinesis with createStreamBuilder ([#672](https://github.com/laazyj/composureCDK/pull/672))
+- **kinesis:** add recommended stream alarms ([#689](https://github.com/laazyj/composureCDK/pull/689))
+- **kinesis:** add createStreamConsumerBuilder for enhanced fan-out ([#690](https://github.com/laazyj/composureCDK/pull/690))
+- **lambda:** add kinesisEventSource and kinesisConsumerEventSource ([#691](https://github.com/laazyj/composureCDK/pull/691))
+
+### 🩹 Fixes
+
+- **apigateway:** avoid false drift on access logs ([#667](https://github.com/laazyj/composureCDK/pull/667), [#665](https://github.com/laazyj/composureCDK/issues/665))
+- **ci:** move the zizmor pin out of .github/ so Dependabot can bump it ([#659](https://github.com/laazyj/composureCDK/pull/659), [#651](https://github.com/laazyj/composureCDK/issues/651))
+- **ci:** only fail on net-new advisories ([#668](https://github.com/laazyj/composureCDK/pull/668), [#666](https://github.com/laazyj/composureCDK/issues/666))
+- **cloudfront:** redirect HTTP to HTTPS on path behaviors ([#655](https://github.com/laazyj/composureCDK/pull/655), [#654](https://github.com/laazyj/composureCDK/issues/654))
+- **cloudfront:** apply security response headers on path behaviors ([#656](https://github.com/laazyj/composureCDK/pull/656))
+- **ec2:** grant flow-log DescribeLogStreams on the bare log-group ARN ([#658](https://github.com/laazyj/composureCDK/pull/658), [#652](https://github.com/laazyj/composureCDK/issues/652))
+- **sns:** grant SNS the KMS key of a subscription dead-letter queue ([#680](https://github.com/laazyj/composureCDK/pull/680), [#679](https://github.com/laazyj/composureCDK/issues/679))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.11.2 (2026-10-26)
 
 ### 🚀 Features

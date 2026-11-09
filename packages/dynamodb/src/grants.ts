@@ -23,6 +23,16 @@ const KEY_WRITE_ACTIONS = [
 ];
 
 /**
+ * A capability granting `action` alone, via `ITable.grant`, plus the key
+ * actions `write` grants — which `ITable.grant` does not add itself.
+ */
+const itemWrite = (action: string) =>
+  capability((table, grantee) => {
+    table.grant(grantee, action);
+    table.encryptionKey?.grant(grantee, ...KEY_WRITE_ACTIONS);
+  });
+
+/**
  * Consumer-side grant helpers for a DynamoDB table. Pass one to a grantee
  * builder's `grant(...)` — e.g.
  * `role.grant(tableGrants.readWrite(ref("table", (r) => r.table)))`.
@@ -49,10 +59,14 @@ export const tableGrants = {
    * whose writer must not update or delete. `BatchWriteItem` is left out
    * because it can delete.
    */
-  put: capability((table, grantee) => {
-    table.grant(grantee, "dynamodb:PutItem");
-    table.encryptionKey?.grant(grantee, ...KEY_WRITE_ACTIONS);
-  }),
+  put: itemWrite("dynamodb:PutItem"),
+  /**
+   * Update existing items, and nothing else (`dynamodb:UpdateItem`) — for a
+   * grantee that changes items but must not create or delete them. An
+   * `UpdateItem` on a missing key creates the item, so pair it with a
+   * condition expression such as `attribute_exists(pk)`.
+   */
+  update: itemWrite("dynamodb:UpdateItem"),
   /** Combined read and write access. */
   readWrite: capability((table, grantee) => {
     table.grantReadWriteData(grantee);

@@ -109,10 +109,13 @@ createFunctionBuilder()
 | `read`       | `GetItem`, `Query`, `Scan`, `BatchGetItem`, … `DescribeTable`            | `Decrypt`, `DescribeKey`                                   |
 | `write`      | `PutItem`, `UpdateItem`, `DeleteItem`, `BatchWriteItem`, `DescribeTable` | `read`'s, plus `Encrypt`, `ReEncrypt*`, `GenerateDataKey*` |
 | `put`        | `PutItem`                                                                | as `write`                                                 |
+| `update`     | `UpdateItem`                                                             | as `write`                                                 |
 | `readWrite`  | `read`'s and `write`'s                                                   | as `write`                                                 |
 | `fullAccess` | `dynamodb:*`                                                             | as `write`                                                 |
 
 `put` is for a write-once store: its grantee may add items but never update or delete them. It leaves out `BatchWriteItem`, which can delete.
+
+`update` is for a grantee that changes existing items but must never delete them — a worker moving a record's status, beside a separate writer granted `put`. IAM cannot stop an `UpdateItem` on a missing key from creating the item, so guard each call with a condition expression such as `attribute_exists(id)`.
 
 Each capability grants the table's customer-managed key, when it has one, in the grantee's identity policy, so a grant stands alone. A key built by [`@composurecdk/kms`](../kms/README.md) keeps CDK's default key policy, which delegates to IAM, so that is enough within the account. Two limits: on a `TableV2` with replicas only the primary Region's key is granted, not a replica's; and a key in another account needs its key policy to allow the grantee.
 

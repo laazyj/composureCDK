@@ -63,6 +63,7 @@ const CAPABILITIES = [
   ["read", ["dynamodb:GetItem"], KEY_READ_ACTIONS],
   ["write", ["dynamodb:PutItem"], KEY_WRITE_ACTIONS],
   ["put", ["dynamodb:PutItem"], KEY_WRITE_ACTIONS],
+  ["update", ["dynamodb:UpdateItem"], KEY_WRITE_ACTIONS],
   ["readWrite", ["dynamodb:GetItem", "dynamodb:PutItem"], KEY_WRITE_ACTIONS],
   ["fullAccess", ["dynamodb:*"], KEY_WRITE_ACTIONS],
 ] as const;
@@ -107,16 +108,20 @@ describe("tableGrants", () => {
     template.resourceCountIs("AWS::IAM::Policy", 1);
   });
 
-  it("put grants PutItem alone, not the other write actions", () => {
+  it.each([
+    ["put", "PutItem"],
+    ["update", "UpdateItem"],
+  ] as const)("%s grants %s alone, not the other write actions", (capability, granted) => {
     const { stack, table, role } = setup();
 
-    tableGrants.put(table).applyTo(role, {});
+    tableGrants[capability](table).applyTo(role, {});
 
     const json = policyJson(stack);
-    expect(json).toContain("dynamodb:PutItem");
-    for (const action of ["UpdateItem", "DeleteItem", "BatchWriteItem"]) {
-      expect(json).not.toContain(`dynamodb:${action}`);
-    }
+    expect(json).toContain(`dynamodb:${granted}`);
+    const withheld = ["PutItem", "UpdateItem", "DeleteItem", "BatchWriteItem"].filter(
+      (action) => action !== granted,
+    );
+    for (const action of withheld) expect(json).not.toContain(`dynamodb:${action}`);
   });
 
   it.each(CAPABILITIES)("%s grants nothing on a key when the table has none", (capability) => {

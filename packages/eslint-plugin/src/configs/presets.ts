@@ -54,7 +54,6 @@ export const dualPublishingRules: Linter.RulesRecord = {
  * recommendation.
  */
 export const internalRules: Linter.RulesRecord = {
-  "composurecdk/add-alarm-requires-add-alarms": "error",
   "composurecdk/builder-must-be-tagged": "error",
   "composurecdk/constraint-metadata-required": "error",
   "composurecdk/no-cdk-api-above-floor": "error",

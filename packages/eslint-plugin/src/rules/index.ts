@@ -1,5 +1,4 @@
 import type { Rule } from "eslint";
-import { rule as addAlarmRequiresAddAlarms } from "./add-alarm-requires-add-alarms.js";
 import { rule as builderMustBeTagged } from "./builder-must-be-tagged.js";
 import { rule as builderMustImplementCopyState } from "./builder-must-implement-copy-state.js";
 import { rule as constraintMetadataRequired } from "./constraint-metadata-required.js";
@@ -45,7 +44,6 @@ function withDocsUrl<T extends Record<string, Rule.RuleModule>>(entries: T): T {
 }
 
 export const rules = withDocsUrl({
-  "add-alarm-requires-add-alarms": addAlarmRequiresAddAlarms,
   "builder-must-be-tagged": builderMustBeTagged,
   "builder-must-implement-copy-state": builderMustImplementCopyState,
   "constraint-metadata-required": constraintMetadataRequired,

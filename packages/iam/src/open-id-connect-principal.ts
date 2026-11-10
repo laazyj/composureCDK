@@ -11,9 +11,9 @@ import { type IOpenIdConnectProvider, OpenIdConnectPrincipal } from "aws-cdk-lib
  *
  * A key that already contains `:` is treated as fully qualified and passed
  * through unchanged — global and STS keys such as `sts:RoleSessionName` or
- * `aws:SourceIp`, and claim keys that already carry the issuer host. Prefixing
- * those would yield a key no request ever carries, so the condition would
- * silently never match.
+ * `aws:RequestTag/team`, and claim keys that already carry the issuer host.
+ * Prefixing those would yield a key no request ever carries, so the condition
+ * would silently never match.
  */
 export interface OpenIdConnectPrincipalOptions {
   /** The OIDC provider the role federates with. */

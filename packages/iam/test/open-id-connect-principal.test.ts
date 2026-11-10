@@ -86,7 +86,7 @@ describe("openIdConnectPrincipal", () => {
             },
             stringLike: {
               [`${ISSUER_HOST}:sub`]: ["repo:acme/app:*"],
-              "aws:SourceIp": "203.0.113.0/24",
+              "aws:RequestTag/team": "platform-*",
             },
           }),
         )
@@ -104,7 +104,7 @@ describe("openIdConnectPrincipal", () => {
               },
               StringLike: {
                 "token.actions.githubusercontent.com:sub": ["repo:acme/app:*"],
-                "aws:SourceIp": "203.0.113.0/24",
+                "aws:RequestTag/team": "platform-*",
               },
             },
           }),

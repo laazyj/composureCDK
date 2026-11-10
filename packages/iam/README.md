@@ -116,6 +116,16 @@ const principal = openIdConnectPrincipal({
 createRoleBuilder().assumedBy(principal).build(stack, "DeployRole");
 ```
 
+The result is a CDK `OpenIdConnectPrincipal`, so its own methods cover what the two options don't: `.withConditions(...)` for other operators, and `.withSessionTags()` to add `sts:TagSession`. For example, a multi-valued claim such as `amr` needs a set operator, and its key must be written fully qualified:
+
+```ts
+const principal = openIdConnectPrincipal({
+  provider,
+  issuerHost: "oidc.example.com",
+  stringEquals: { aud: "sts.amazonaws.com" },
+}).withConditions({ "ForAnyValue:StringLike": { "oidc.example.com:amr": "mfa" } });
+```
+
 The builder wraps the L2 [OpenIdConnectProvider](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_iam.OpenIdConnectProvider.html), which auto-fetches the provider's root-CA thumbprint, so a URL and audience are usually all you need.
 
 ### GitHub Actions

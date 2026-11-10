@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/bedrockagentcore",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Composable Amazon Bedrock AgentCore: runtimes, memory, gateways and evaluations with secure defaults, grants and alarms",
   "repository": {
     "type": "git",

@@ -1,3 +1,21 @@
+## 0.12.1 (2026-11-10)
+
+### 🚀 Features
+
+- **dynamodb:** add an update-only table grant ([#698](https://github.com/laazyj/composureCDK/pull/698), [#669](https://github.com/laazyj/composureCDK/issues/669))
+- **events:** scope sqsTarget's grants to the rule when the queue has a KMS key ([#701](https://github.com/laazyj/composureCDK/pull/701), [#648](https://github.com/laazyj/composureCDK/issues/648))
+- **sns:** create the topic redrive alarms only when a subscription has a dead-letter queue ([#697](https://github.com/laazyj/composureCDK/pull/697), [#678](https://github.com/laazyj/composureCDK/issues/678))
+
+### 🩹 Fixes
+
+- **cloudwatch:** include construct path in default alarm names ([#700](https://github.com/laazyj/composureCDK/pull/700), [#649](https://github.com/laazyj/composureCDK/issues/649))
+- **ec2:** condition the default VPC flow-log role's trust policy ([#699](https://github.com/laazyj/composureCDK/pull/699), [#661](https://github.com/laazyj/composureCDK/issues/661))
+- **sqs:** resolve a Resolvable deadLetterQueue at build ([#696](https://github.com/laazyj/composureCDK/pull/696), [#695](https://github.com/laazyj/composureCDK/issues/695))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.12.0 (2026-11-09)
 
 ### 🚀 Features

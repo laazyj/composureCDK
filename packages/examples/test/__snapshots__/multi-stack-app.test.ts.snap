@@ -160,6 +160,7 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
     "MultiStackAppapiDeploymentStageprod995AB209": {
       "DependsOn": [
         "MultiStackAppapiAccountDAC4D66F",
+        "MultiStackAppapiExecutionLogs06E10F87",
       ],
       "Properties": {
         "AccessLogSetting": {
@@ -212,6 +213,32 @@ exports[`multi-stack-app > matches the expected api stack template 1`] = `
         "TracingEnabled": true,
       },
       "Type": "AWS::ApiGateway::Stage",
+    },
+    "MultiStackAppapiExecutionLogs06E10F87": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "API-Gateway-Execution-Logs_",
+              {
+                "Ref": "MultiStackAppapiFB7EC5DD",
+              },
+              "/prod",
+            ],
+          ],
+        },
+        "RetentionInDays": 731,
+        "Tags": [
+          {
+            "Key": "project",
+            "Value": "multi-stack-example",
+          },
+        ],
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "MultiStackAppapiFB7EC5DD": {
       "Properties": {

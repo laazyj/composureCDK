@@ -2,6 +2,7 @@ import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { RestApiBase } from "aws-cdk-lib/aws-apigateway";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import type { RestApiAlarmConfig } from "./alarm-config.js";
+import type { ExecutionLoggingConfig } from "./execution-logging.js";
 
 /**
  * Builder-specific properties shared by both {@link RestApiBuilderProps}
@@ -23,6 +24,13 @@ export interface RestApiBuilderPropsBase {
    * provided — the user-supplied destination takes precedence.
    */
   accessLogging?: boolean;
+
+  /**
+   * Whether the builder manages the stage's execution log group. On by
+   * default; see {@link ExecutionLoggingConfig}. The group is returned in the
+   * build result as `executionLogGroup`.
+   */
+  executionLogging?: ExecutionLoggingConfig;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -56,6 +64,12 @@ export interface RestApiBuilderResultBase<T extends RestApiBase> {
    * access logging was disabled or the user provided their own destination.
    */
   accessLogGroup?: LogGroup;
+
+  /**
+   * The CloudWatch log group created for the stage's execution logs, or
+   * `undefined` if execution logging is off or `executionLogging` is `false`.
+   */
+  executionLogGroup?: LogGroup;
 
   /**
    * CloudWatch alarms created for the API, keyed by alarm name.

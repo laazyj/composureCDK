@@ -295,6 +295,7 @@ exports[`openapi-petstore-app > matches the expected synthesised template 1`] = 
     "OpenApiPetstoreAppapiDeploymentStageprod0B59E801": {
       "DependsOn": [
         "OpenApiPetstoreAppapiAccount06B16B71",
+        "OpenApiPetstoreAppapiExecutionLogs7337E6F8",
       ],
       "Properties": {
         "AccessLogSetting": {
@@ -341,6 +342,26 @@ exports[`openapi-petstore-app > matches the expected synthesised template 1`] = 
         "TracingEnabled": true,
       },
       "Type": "AWS::ApiGateway::Stage",
+    },
+    "OpenApiPetstoreAppapiExecutionLogs7337E6F8": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "API-Gateway-Execution-Logs_",
+              {
+                "Ref": "OpenApiPetstoreAppapi546E4463",
+              },
+              "/prod",
+            ],
+          ],
+        },
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
     "OpenApiPetstoreAppapiGatewayRoleDefaultPolicy09F93E63": {
       "Properties": {

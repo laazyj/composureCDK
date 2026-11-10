@@ -6,6 +6,7 @@ import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { SPEC_REST_API_DEFAULTS } from "./defaults.js";
 import { resolveDeployOptions } from "./deploy-options.js";
+import { resolveExecutionLogGroup } from "./execution-logging.js";
 import { createRestApiAlarms } from "./rest-api-alarms.js";
 
 /**
@@ -99,6 +100,7 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
   build(scope: IConstruct, id: string, context?: Record<string, object>): SpecRestApiBuilderResult {
     const {
       accessLogging,
+      executionLogging,
       recommendedAlarms: alarmConfig,
       apiDefinition,
       ...specRestApiProps
@@ -130,9 +132,18 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
       deployOptions,
     });
 
+    const executionLogGroup = resolveExecutionLogGroup(
+      scope,
+      id,
+      api,
+      executionLogging,
+      deployOptions,
+      context,
+    );
+
     const alarms = createRestApiAlarms(scope, id, api, alarmConfig, this.#customAlarms);
 
-    return { api, accessLogGroup, alarms };
+    return { api, accessLogGroup, executionLogGroup, alarms };
   }
 }
 

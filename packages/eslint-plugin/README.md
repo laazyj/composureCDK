@@ -79,6 +79,7 @@ Each rule has a documentation page with its rationale, examples, deliberate excl
 
 | Rule                                                                                                      | Preset           | What it flags                                                                                                                             |
 | --------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| [`composurecdk/add-alarm-requires-add-alarms`](docs/rules/add-alarm-requires-add-alarms.md)               | `internal`       | A class declaring `addAlarm` without the batch `addAlarms` beside it.                                                                     |
 | [`composurecdk/builder-must-be-tagged`](docs/rules/builder-must-be-tagged.md)                             | `internal`       | `Builder` / `IBuilder` from `@composurecdk/core` in a library builder — use the tagged equivalents.                                       |
 | [`composurecdk/builder-must-implement-copy-state`](docs/rules/builder-must-implement-copy-state.md)       | `recommended`    | A builder class holding private state with no `[COPY_STATE]` hook, so `.copy()` silently drops it.                                        |
 | [`composurecdk/constraint-metadata-required`](docs/rules/constraint-metadata-required.md)                 | `internal`       | A `stringConstraint({ … })` call with an empty `name`, `allowed` or `source`, degrading every error it produces.                          |
@@ -95,6 +96,7 @@ Each rule has a documentation page with its rationale, examples, deliberate excl
 Rule names, messages and default severities are public API ([ADR-0019](../../docs/adr/0019-lint-rules-as-public-contract.md)):
 
 - **A new rule ships registered but in no preset**, so you can enable it the day it lands. It **joins a preset in a major**: a caret range — what `npm install` writes — picks up minors automatically, so a new rule in a preset turns green CI red on unchanged code.
+- **`internal` is the exception**: it describes composureCDK itself and has no outside consumers, so a new house rule joins it as it lands.
 - **Tightening an existing rule is breaking**, including a widened selector or a narrowed exemption. New code failing an unchanged rule is not.
 - **Loosening a rule, removing one, or renaming one is breaking.** A removed or renamed rule id in your own `rules:` block is a hard config error, not a silent gap.
 - **Moving a rule between presets, or renaming a preset, is breaking.** Adding a new preset is not.

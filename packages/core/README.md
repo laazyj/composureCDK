@@ -67,6 +67,26 @@ system
   .build(stack, "MySystem");
 ```
 
+### Encapsulating a system: `scoped`
+
+By default a nested system's components build beside their parent's, as `App--failures--bucket`. `scoped(system)` builds the system under a construct of its own instead, with each component at its key. Use it in a composite builder so everything the composite creates sits under one node:
+
+```ts
+import { type IConstruct } from "constructs";
+import { compose, scoped, type Lifecycle } from "@composurecdk/core";
+
+class FailureCaptureBuilder implements Lifecycle<FailureCaptureResult> {
+  build(scope: IConstruct, id: string, context?: Record<string, object>) {
+    return scoped(compose({ bucket, queue, rule }, deps)).build(scope, id, context);
+  }
+}
+// App--failures/bucket, App--failures/queue, App--failures/rule
+```
+
+The new construct is a target for `Tags.of()` and Aspects that reaches only the system. Hooks added with `afterBuild` on the wrapped system get it as their scope, so `tags()` there tags the system's resources alone. `at()` pins still win over keys, and a component routed to another stack keeps its prefixed id.
+
+Wrapping a system that is already deployed changes its construct paths, which replaces its resources. See [ADR-0020](../../docs/adr/0020-scoped-system-construct.md).
+
 ## Ref
 
 Lazy cross-component references that are resolved at build time. Use `ref` to reference a dependency's output at configuration time — the value is resolved when the system is built.
@@ -118,3 +138,4 @@ It backs `dependsOn` in [`@composurecdk/custom-resources`](../custom-resources/R
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`
 - [StaticWebsiteStack](../examples/src/static-website/app.ts) — S3 + CloudFront composed system with `ref` and `afterBuild`
+- [DynamoStreamProcessorStack](../examples/src/dynamo-stream-processor-app.ts) — Stream consumer and its DLQ built under one construct with `scoped`, tagged as a unit

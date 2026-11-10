@@ -4,6 +4,7 @@ import {
   DynamoEventSource,
   type DynamoEventSourceProps,
 } from "aws-cdk-lib/aws-lambda-event-sources";
+import type { IBucket } from "aws-cdk-lib/aws-s3";
 import type { IQueue } from "aws-cdk-lib/aws-sqs";
 import type { Resolvable } from "@composurecdk/core";
 import type { ComposureEventSource } from "./composure-event-source.js";
@@ -40,18 +41,22 @@ export interface DynamoStreamEventSourceProps extends Omit<
 
   /**
    * Destination for records that exhaust `retryAttempts` or exceed
-   * `maxRecordAge`. Pass an {@link IQueue} (wrapped in {@link SqsDlq}
-   * automatically), a concrete destination, or a `ref()` to a sibling that
-   * produces either.
+   * `maxRecordAge`. Pass an {@link IQueue} (wrapped in an `SqsDlq`
+   * automatically), an {@link IBucket} (wrapped in a least-privilege S3
+   * destination — see below), a concrete destination, or a `ref()` to a
+   * sibling that produces any of them.
+   *
+   * A bucket's destination grants the function write access only; pass
+   * `new S3OnFailureDestination(bucket)` to opt into CDK's read/write grant.
    *
    * The destination arm is read from CDK's own prop rather than named as
    * `IEventSourceDlq`, so it keeps tracking that type as CDK moves it
    * (ADR-0018). The `IQueue` arm is the builder's own convenience and has no
-   * CDK prop to read from.
+   * CDK prop to read from; nor does the `IBucket` arm.
    *
    * @see https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html#services-ddb-errors
    */
-  onFailure?: Resolvable<IQueue | NonNullable<DynamoEventSourceProps["onFailure"]>>;
+  onFailure?: Resolvable<IQueue | IBucket | NonNullable<DynamoEventSourceProps["onFailure"]>>;
 }
 
 /**

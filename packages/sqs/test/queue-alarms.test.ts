@@ -203,3 +203,19 @@ describe("resolveQueueAlarmDefinitions", () => {
     );
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) => {
+      b.recommendedAlarms(false).addAlarms({
+        backlogDepth: (alarm) =>
+          alarm.metric((queue) => queue.metricApproximateNumberOfMessagesVisible()).threshold(1000),
+        oldestMessage: (alarm) =>
+          alarm.metric((queue) => queue.metricApproximateAgeOfOldestMessage()).threshold(600),
+      });
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["backlogDepth", "oldestMessage"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

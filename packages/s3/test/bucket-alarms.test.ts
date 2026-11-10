@@ -321,3 +321,26 @@ describe("resolveBucketAlarmDefinitions", () => {
     ).toEqual([]);
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const s3Metric = (metricName: string) => (bucket: { bucketName: string }) =>
+      new Metric({
+        namespace: "AWS/S3",
+        metricName,
+        dimensionsMap: { BucketName: bucket.bucketName, FilterId: "EntireBucket" },
+        period: Duration.minutes(5),
+      });
+    const { result, template } = buildAndSynth((b) => {
+      b.recommendedAlarms(false)
+        .serverAccessLogs(false)
+        .addAlarms({
+          getRequests: (alarm) => alarm.metric(s3Metric("GetRequests")).threshold(100).lessThan(),
+          putRequests: (alarm) => alarm.metric(s3Metric("PutRequests")).threshold(100).lessThan(),
+        });
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["getRequests", "putRequests"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

@@ -255,3 +255,17 @@ describe("StreamBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) =>
+      b.recommendedAlarms(false).addAlarms({
+        noIncomingRecords: (a) => a.metric(incomingRecords).threshold(1).lessThan(),
+        highIncomingRecords: (a) => a.metric(incomingRecords).threshold(100_000),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["noIncomingRecords", "highIncomingRecords"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

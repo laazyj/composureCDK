@@ -5,7 +5,11 @@ import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
-import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  createAlarms,
+} from "@composurecdk/cloudwatch";
 import type { HealthCheckAlarmConfig } from "./health-check-alarm-config.js";
 import { resolveHealthCheckAlarmDefinitions } from "./health-check-alarms.js";
 import type { HealthCheckBuilderResult } from "./health-check-builder.js";
@@ -146,13 +150,19 @@ class HealthCheckAlarmBuilder implements Lifecycle<HealthCheckAlarmBuilderResult
    * cross-region setups where you want all health-check alarms to live with
    * the recommended ones.
    */
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<IHealthCheck>,
-    ) => AlarmDefinitionBuilder<IHealthCheck>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<IHealthCheck>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IHealthCheck>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<IHealthCheck>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

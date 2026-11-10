@@ -11,7 +11,7 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { InstanceAlarmConfig } from "./instance-alarm-config.js";
 import { createInstanceAlarms } from "./instance-alarms.js";
 import { INSTANCE_DEFAULTS } from "./instance-defaults.js";
@@ -237,11 +237,19 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
    * @param configure - Callback that configures the alarm definition.
    * @returns This builder for chaining.
    */
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<Instance>) => AlarmDefinitionBuilder<Instance>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<Instance>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Instance>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<Instance>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

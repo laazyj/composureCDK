@@ -234,3 +234,17 @@ describe("recommended alarms", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) => {
+      b.recommendedAlarms(false).addAlarms({
+        ec2EstimatedCharges: customCpuAlarm,
+        ec2EstimatedChargesHigh: (a) => customCpuAlarm(a).threshold(900),
+      });
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["ec2EstimatedCharges", "ec2EstimatedChargesHigh"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

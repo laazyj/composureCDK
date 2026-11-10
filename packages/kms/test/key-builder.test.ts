@@ -226,3 +226,17 @@ describe("KeyBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) =>
+      b.recommendedAlarms(false).addAlarms({
+        urgentExpiry: (alarm) => expiryAlarm(alarm, 1),
+        soonExpiry: (alarm) => expiryAlarm(alarm, 7),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["urgentExpiry", "soonExpiry"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

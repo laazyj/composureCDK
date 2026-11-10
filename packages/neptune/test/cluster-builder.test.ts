@@ -420,3 +420,25 @@ describe("ClusterBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) =>
+      b.recommendedAlarms(false).addAlarms({
+        gremlinErrors: (a) =>
+          a
+            .metric((cluster) => cluster.metric("NumGremlinErrorsPerSec"))
+            .threshold(0)
+            .greaterThan(),
+        sparqlErrors: (a) =>
+          a
+            .metric((cluster) => cluster.metric("NumSparqlErrorsPerSec"))
+            .threshold(0)
+            .greaterThan(),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["gremlinErrors", "sparqlErrors"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

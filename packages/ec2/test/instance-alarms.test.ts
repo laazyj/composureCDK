@@ -308,3 +308,25 @@ describe("addAlarm", () => {
     template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const ec2Metric = (metricName: string) => (instance: Instance) =>
+      new Metric({
+        namespace: "AWS/EC2",
+        metricName,
+        dimensionsMap: { InstanceId: instance.instanceId },
+        statistic: Stats.AVERAGE,
+        period: Duration.minutes(1),
+      });
+    const { result, template } = buildAndSynth((b) => {
+      b.recommendedAlarms(false).addAlarms({
+        networkIn: (alarm) => alarm.metric(ec2Metric("NetworkIn")).threshold(1_000_000_000),
+        networkOut: (alarm) => alarm.metric(ec2Metric("NetworkOut")).threshold(1_000_000_000),
+      });
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["networkIn", "networkOut"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

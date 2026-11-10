@@ -148,3 +148,17 @@ describe("state machine alarms", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) =>
+      b.recommendedAlarms(false).addAlarms({
+        aborted: (a) => a.metric((sm) => sm.metricAborted()).threshold(0),
+        throttled: (a) => a.metric((sm) => sm.metricThrottled()).threshold(0),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["aborted", "throttled"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

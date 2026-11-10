@@ -8,7 +8,7 @@ import {
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createSecurityGroupBuilder } from "./security-group-builder.js";
 import { INTERFACE_ENDPOINT_DEFAULTS } from "./interface-endpoint-defaults.js";
 import type { InterfaceEndpointAlarmConfig } from "./interface-endpoint-alarm-config.js";
@@ -164,13 +164,19 @@ class InterfaceEndpointBuilder implements Lifecycle<InterfaceEndpointBuilderResu
    * `InterfaceVpcEndpoint` construct, giving access to the endpoint at
    * build time for metric dimension wiring.
    */
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<InterfaceVpcEndpoint>,
-    ) => AlarmDefinitionBuilder<InterfaceVpcEndpoint>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<InterfaceVpcEndpoint>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<InterfaceVpcEndpoint>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<InterfaceVpcEndpoint>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

@@ -22,7 +22,7 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createLogGroupBuilder } from "@composurecdk/logs";
 import type { StateMachineAlarmConfig } from "./state-machine-alarm-config.js";
 import { createSpecAlarms } from "./alarm-specs.js";
@@ -284,13 +284,19 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
     return this;
   }
 
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<StateMachine>,
-    ) => AlarmDefinitionBuilder<StateMachine>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<StateMachine>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<StateMachine>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<StateMachine>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

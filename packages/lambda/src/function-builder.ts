@@ -18,7 +18,7 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import {
   createServiceRoleBuilder,
   createStatementBuilder,
@@ -301,13 +301,19 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
   #useCdkAutoRole = false;
   #invokeOnDeploy?: InvokeOnDeployOptions;
 
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<LambdaFunction>,
-    ) => AlarmDefinitionBuilder<LambdaFunction>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<LambdaFunction>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<LambdaFunction>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<LambdaFunction>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

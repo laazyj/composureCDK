@@ -223,3 +223,25 @@ describe("volume addAlarm", () => {
     template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
   });
 });
+
+describe("volume addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const ebsMetric = (metricName: string) => (volume: Volume) =>
+      new Metric({
+        namespace: "AWS/EBS",
+        metricName,
+        dimensionsMap: { VolumeId: volume.volumeId },
+        statistic: Stats.AVERAGE,
+        period: Duration.minutes(5),
+      });
+    const { result, template } = buildBurstable((b) =>
+      b.recommendedAlarms(false).addAlarms({
+        volumeQueueLength: (alarm) => alarm.metric(ebsMetric("VolumeQueueLength")).threshold(10),
+        volumeIdleTime: (alarm) => alarm.metric(ebsMetric("VolumeIdleTime")).threshold(250),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["volumeQueueLength", "volumeIdleTime"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

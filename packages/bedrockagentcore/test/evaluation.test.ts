@@ -184,6 +184,28 @@ describe("createOnlineEvaluationBuilder", () => {
       expect(Object.keys(base.build(newStack(), "Quality").alarms)).toEqual([]);
       expect(Object.keys(copy.build(newStack(), "Quality").alarms)).toEqual(["samples"]);
     });
+
+    describe("addAlarms", () => {
+      it("adds each entry as a custom alarm under its key", () => {
+        const { result, template } = buildAndSynth((b) =>
+          b.addAlarms({
+            samples: (a) =>
+              a
+                .metric((m) => m.metric("Builtin.Helpfulness", { statistic: "SampleCount" }))
+                .threshold(1)
+                .lessThan(),
+            lowScore: (a) =>
+              a
+                .metric((m) => m.metric("Builtin.Helpfulness", { statistic: "Average" }))
+                .threshold(0.5)
+                .lessThan(),
+          }),
+        );
+
+        expect(Object.keys(result.alarms)).toEqual(["samples", "lowScore"]);
+        template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+      });
+    });
   });
 
   it("gives its execution role no model access", () => {

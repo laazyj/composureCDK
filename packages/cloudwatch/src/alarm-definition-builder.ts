@@ -131,3 +131,16 @@ export class AlarmDefinitionBuilder<TConstruct> {
     return definition;
   }
 }
+
+/**
+ * Configures one custom alarm: receives a fresh {@link AlarmDefinitionBuilder}
+ * for the alarm's key and returns it configured. This is the callback that
+ * builders' `addAlarm(key, configure)` takes, and the value type of the record
+ * that `addAlarms(alarms)` takes, so an app can type a reusable alarm set as
+ * `Record<string, AlarmConfigurer<IQueue>>`.
+ *
+ * @typeParam TConstruct - The construct type the metric factory receives.
+ */
+export type AlarmConfigurer<TConstruct> = (
+  alarm: AlarmDefinitionBuilder<TConstruct>,
+) => AlarmDefinitionBuilder<TConstruct>;

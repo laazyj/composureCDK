@@ -18,7 +18,7 @@ import {
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TopicAlarmConfig } from "./topic-alarm-config.js";
 import { createTopicAlarms } from "./topic-alarms.js";
 import { TOPIC_DEFAULTS } from "./defaults.js";
@@ -160,11 +160,19 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
   readonly #subscriptions: SubscriptionEntry[] = [];
   readonly #servicePublishers: ServicePublisher[] = [];
 
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<ITopic>) => AlarmDefinitionBuilder<ITopic>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<ITopic>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<ITopic>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<ITopic>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

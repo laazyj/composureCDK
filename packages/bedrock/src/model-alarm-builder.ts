@@ -2,7 +2,11 @@ import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  createAlarms,
+} from "@composurecdk/cloudwatch";
 import type { ModelAlarmConfig } from "./model-alarm-config.js";
 import {
   type ModelAlarmTarget,
@@ -50,13 +54,19 @@ class ModelAlarmBuilder implements Lifecycle<ModelAlarmBuilderResult> {
    * {@link ModelMetrics}, e.g.
    * `(a) => a.metric((m) => m.metric("OutputTokenCount", { statistic: "Sum" })).threshold(1e6)`.
    */
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<ModelMetrics>,
-    ) => AlarmDefinitionBuilder<ModelMetrics>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<ModelMetrics>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<ModelMetrics>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<ModelMetrics>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

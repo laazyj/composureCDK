@@ -3,7 +3,7 @@ import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { ITopic, TopicPolicy } from "aws-cdk-lib/aws-sns";
 import type { IConstruct } from "constructs";
 import { Builder, COPY_STATE, type IBuilder, type Lifecycle } from "@composurecdk/core";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BudgetAlarmConfig } from "./alarm-config.js";
 import { buildBudgetAlarms } from "./budget-alarm-builder.js";
 import { assertValidBudgetCurrency, warnIfNonUsdCurrency } from "./currency.js";
@@ -234,11 +234,19 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
    * For non-`us-east-1` stacks, route alarms via
    * {@link createBudgetAlarmBuilder} into a `us-east-1` stack.
    */
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<CfnBudget>) => AlarmDefinitionBuilder<CfnBudget>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<CfnBudget>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<CfnBudget>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<CfnBudget>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

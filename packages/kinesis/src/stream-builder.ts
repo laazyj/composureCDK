@@ -4,7 +4,7 @@ import { type IKey } from "aws-cdk-lib/aws-kms";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { STREAM_DEFAULTS } from "./defaults.js";
 import type { StreamAlarmConfig } from "./stream-alarm-config.js";
 import { createStreamAlarms } from "./stream-alarms.js";
@@ -108,11 +108,19 @@ class StreamBuilder implements Lifecycle<StreamBuilderResult> {
   props: Partial<StreamBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IStream>[] = [];
 
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<IStream>) => AlarmDefinitionBuilder<IStream>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<IStream>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IStream>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<IStream>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

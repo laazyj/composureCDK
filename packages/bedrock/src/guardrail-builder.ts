@@ -4,7 +4,11 @@ import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  createAlarms,
+} from "@composurecdk/cloudwatch";
 import {
   type GuardrailAlarmConfig,
   type GuardrailMetrics,
@@ -68,13 +72,19 @@ class GuardrailBuilder implements Lifecycle<GuardrailBuilderResult> {
    * Adds a custom alarm. The metric factory receives the guardrail version's
    * {@link GuardrailMetrics}.
    */
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<GuardrailMetrics>,
-    ) => AlarmDefinitionBuilder<GuardrailMetrics>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<GuardrailMetrics>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<GuardrailMetrics>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<GuardrailMetrics>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

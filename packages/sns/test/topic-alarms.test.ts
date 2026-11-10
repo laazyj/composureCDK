@@ -349,3 +349,19 @@ describe("resolveTopicAlarmDefinitions", () => {
     expect(resolveTopicAlarmDefinitions(topic, { enabled: false }, true)).toEqual([]);
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) => {
+      b.recommendedAlarms(false).addAlarms({
+        numberOfMessagesPublished: (alarm) =>
+          alarm.metric((topic) => topic.metricNumberOfMessagesPublished()).threshold(10000),
+        publishSize: (alarm) =>
+          alarm.metric((topic) => topic.metricPublishSize()).threshold(200_000),
+      });
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["numberOfMessagesPublished", "publishSize"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

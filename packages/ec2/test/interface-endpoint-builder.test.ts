@@ -438,3 +438,28 @@ describe("InterfaceEndpointBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const endpointMetric = (metricName: string) => (endpoint: { vpcEndpointId: string }) =>
+      new Metric({
+        namespace: "AWS/PrivateLinkEndpoints",
+        metricName,
+        dimensionsMap: { "VPC Endpoint Id": endpoint.vpcEndpointId },
+        statistic: "Sum",
+      });
+    const { stack, vpc } = freshScope();
+    const result = createInterfaceEndpointBuilder()
+      .vpc(vpc)
+      .service(InterfaceVpcEndpointAwsService.SSM)
+      .recommendedAlarms(false)
+      .addAlarms({
+        rstPacketsSent: (alarm) => alarm.metric(endpointMetric("RstPacketsSent")).threshold(1),
+        newConnections: (alarm) => alarm.metric(endpointMetric("NewConnections")).threshold(1000),
+      })
+      .build(stack, "Endpoint");
+
+    expect(Object.keys(result.alarms)).toEqual(["rstPacketsSent", "newConnections"]);
+    Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

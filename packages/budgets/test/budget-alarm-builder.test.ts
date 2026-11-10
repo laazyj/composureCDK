@@ -311,3 +311,22 @@ describe("createBudgetAlarmBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { stack, result } = buildBudget();
+    const alarmResult = createBudgetAlarmBuilder()
+      .budget(result)
+      .addAlarms({
+        ec2EstimatedCharges,
+        ec2EstimatedChargesHigh: (a) => ec2EstimatedCharges(a).threshold(900),
+      })
+      .build(stack, "Alarms");
+
+    expect(Object.keys(alarmResult.alarms)).toEqual([
+      "ec2EstimatedCharges",
+      "ec2EstimatedChargesHigh",
+    ]);
+    Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

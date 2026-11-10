@@ -3,7 +3,7 @@ import { Activity, type ActivityProps } from "aws-cdk-lib/aws-stepfunctions";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { ActivityAlarmConfig } from "./activity-alarm-config.js";
 import { ACTIVITY_ALARMS } from "./activity-alarms.js";
 import { createSpecAlarms } from "./alarm-specs.js";
@@ -51,11 +51,19 @@ class ActivityBuilder implements Lifecycle<ActivityBuilderResult> {
   props: Partial<ActivityBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Activity>[] = [];
 
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<Activity>) => AlarmDefinitionBuilder<Activity>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<Activity>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Activity>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<Activity>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

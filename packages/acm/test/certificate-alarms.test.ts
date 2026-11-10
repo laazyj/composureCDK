@@ -217,3 +217,25 @@ describe("resolveCertificateAlarmDefinitions", () => {
     expect(resolveCertificateAlarmDefinitions(certificate, { enabled: false })).toEqual([]);
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const daysToExpiry = (cert: ICertificate) =>
+      new Metric({
+        namespace: "AWS/CertificateManager",
+        metricName: "DaysToExpiry",
+        dimensionsMap: { CertificateArn: cert.certificateArn },
+        statistic: "Minimum",
+        period: Duration.days(1),
+      });
+    const { result, template } = buildAndSynth((b) => {
+      b.recommendedAlarms(false).addAlarms({
+        expiringSoon: (alarm) => alarm.metric(daysToExpiry).threshold(30).lessThanOrEqual(),
+        expiringNow: (alarm) => alarm.metric(daysToExpiry).threshold(7).lessThanOrEqual(),
+      });
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["expiringSoon", "expiringNow"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

@@ -6,6 +6,7 @@ import {
   MockIntegration,
   PassthroughBehavior,
   RestApi,
+  type RestApiBase,
 } from "aws-cdk-lib/aws-apigateway";
 import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { buildFixture, newStack } from "@composurecdk/cdk-testing";
@@ -380,5 +381,28 @@ describe("SpecRestApiBuilder alarms", () => {
     expect(result.alarms.serverError).toBeDefined();
     expect(result.alarms.latency).toBeDefined();
     template.resourceCountIs("AWS::CloudWatch::Alarm", 3);
+  });
+});
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const apiMetric = (metricName: string) => (api: RestApiBase) =>
+      new Metric({
+        namespace: "AWS/ApiGateway",
+        metricName,
+        dimensionsMap: { ApiName: api.restApiName },
+        period: Duration.minutes(1),
+      });
+    const { result, template } = buildAndSynth((b) => {
+      withStubMethod(b);
+      b.recommendedAlarms(false).addAlarms({
+        integrationLatency: (alarm) =>
+          alarm.metric(apiMetric("IntegrationLatency")).threshold(2000),
+        cacheMisses: (alarm) => alarm.metric(apiMetric("CacheMissCount")).threshold(100),
+      });
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["integrationLatency", "cacheMisses"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
   });
 });

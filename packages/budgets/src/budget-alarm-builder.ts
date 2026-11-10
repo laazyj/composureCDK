@@ -5,7 +5,11 @@ import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
-import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  createAlarms,
+} from "@composurecdk/cloudwatch";
 import type { BudgetAlarmConfig } from "./alarm-config.js";
 import { resolveBudgetAlarmDefinitions } from "./budget-alarms.js";
 import type { BudgetBuilderResult } from "./budget-builder.js";
@@ -162,11 +166,19 @@ class BudgetAlarmBuilder implements Lifecycle<BudgetAlarmBuilderResult> {
    * for cross-region setups where you want all billing-related alarms to
    * live with the recommended one.
    */
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<CfnBudget>) => AlarmDefinitionBuilder<CfnBudget>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<CfnBudget>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<CfnBudget>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<CfnBudget>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

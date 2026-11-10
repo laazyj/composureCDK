@@ -8,6 +8,12 @@ import { type IOpenIdConnectProvider, OpenIdConnectPrincipal } from "aws-cdk-lib
  * key (e.g. `token.actions.githubusercontent.com:sub`). This removes the two
  * error-prone, security-critical steps of hand-writing the issuer prefix and
  * choosing the condition operator.
+ *
+ * A key that already contains `:` is treated as fully qualified and passed
+ * through unchanged — global and STS keys such as `sts:RoleSessionName` or
+ * `aws:SourceIp`, and claim keys that already carry the issuer host. Prefixing
+ * those would yield a key no request ever carries, so the condition would
+ * silently never match.
  */
 export interface OpenIdConnectPrincipalOptions {
   /** The OIDC provider the role federates with. */
@@ -20,16 +26,16 @@ export interface OpenIdConnectPrincipalOptions {
    */
   readonly issuerHost: string;
 
-  /** Exact-match (`StringEquals`) claim conditions, keyed by bare claim name. */
+  /** Exact-match (`StringEquals`) conditions, keyed by bare claim name or fully-qualified key. */
   readonly stringEquals?: Record<string, string | string[]>;
 
-  /** Pattern-match (`StringLike`) claim conditions, keyed by bare claim name. */
+  /** Pattern-match (`StringLike`) conditions, keyed by bare claim name or fully-qualified key. */
   readonly stringLike?: Record<string, string | string[]>;
 }
 
 /**
  * Builds an {@link OpenIdConnectPrincipal} for a web-identity (OIDC) trust
- * policy, prefixing every supplied claim key with `${issuerHost}:`.
+ * policy, prefixing every bare claim key with `${issuerHost}:`.
  *
  * Provider-agnostic: use it directly for any OIDC IdP, or reach for the
  * {@link githubActions} helpers which layer the GitHub constants on top. The
@@ -52,7 +58,10 @@ export function openIdConnectPrincipal(
 ): OpenIdConnectPrincipal {
   const prefix = (claims: Record<string, string | string[]>): Record<string, string | string[]> =>
     Object.fromEntries(
-      Object.entries(claims).map(([claim, value]) => [`${opts.issuerHost}:${claim}`, value]),
+      Object.entries(claims).map(([key, value]) => [
+        key.includes(":") ? key : `${opts.issuerHost}:${key}`,
+        value,
+      ]),
     );
 
   const conditions: Record<string, Record<string, string | string[]>> = {};

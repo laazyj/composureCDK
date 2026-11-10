@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/logs",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "description": "Composable CloudWatch log group builder with secure defaults",
   "repository": {
     "type": "git",
@@ -40,8 +40,8 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.12.0",
-    "@composurecdk/core": "^0.12.0",
+    "@composurecdk/cloudformation": "^0.13.0",
+    "@composurecdk/core": "^0.13.0",
     "aws-cdk-lib": "^2.1.0",
     "constructs": "^10.0.0"
   },

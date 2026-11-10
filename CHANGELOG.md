@@ -1,3 +1,13 @@
+## 0.13.0 (2026-11-10)
+
+### 🚀 Features
+
+- **core:** add scoped() to build a composed system under its own construct ([#702](https://github.com/laazyj/composureCDK/pull/702), [#644](https://github.com/laazyj/composureCDK/issues/644))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.12.1 (2026-11-10)
 
 ### 🚀 Features

@@ -17,6 +17,7 @@ Everything this package exports is public API. It is not a place for code that C
 | [`alarmNamePolicy`](#alarmnamepolicy)                                        | Decorate or rewrite alarm names across a scope                 |
 | [`alarmName`, `AlarmName`](#alarm-names)                                     | Validate an explicit alarm name                                |
 | [`AlarmDefinitionBuilder`](#custom-alarms)                                   | Define a custom alarm in an `addAlarm()` callback              |
+| [`AlarmConfigurer`](#alarm-sets)                                             | Type an `addAlarm()` callback, or a set of them                |
 | [`AlarmConfig`, `AlarmConfigDefaults`](#alarmconfig-and-alarmconfigdefaults) | Type a recommended alarm's user overrides and its defaults     |
 | [`resolveAlarmConfig`](#resolvealarmconfig)                                  | Merge user overrides onto defaults                             |
 | [`resolveAlarmThresholdBasis`](#resolvealarmthresholdbasis)                  | Skip an alarm whose threshold derives from an unresolved token |
@@ -171,6 +172,32 @@ alarm.description((def) => `Alert when invocations >= ${def.threshold} per minut
 ```
 
 The other methods are `alarmName`, `constructId` (see [Construct IDs](#construct-ids)), `greaterThan`, `lessThan`, `lessThanOrEqual` and `treatMissingData`.
+
+#### Alarm sets
+
+Every builder with `addAlarm` also has `addAlarms(alarms)`, which takes a record of callbacks and adds each one under its key, exactly as one `addAlarm(key, configure)` call per entry would. Use it to keep a component's alarm set in one step of the chain. `AlarmConfigurer<T>` types the callbacks:
+
+```ts
+import type { AlarmConfigurer } from "@composurecdk/cloudwatch";
+import type { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
+
+function processorAlarms(): Record<string, AlarmConfigurer<LambdaFunction>> {
+  return {
+    highInvocations: (alarm) => alarm.metric((fn) => fn.metricInvocations()).threshold(1000),
+    noInvocations: (alarm) =>
+      alarm
+        .metric((fn) => fn.metricInvocations())
+        .threshold(0)
+        .lessThanOrEqual(),
+  };
+}
+
+createFunctionBuilder()
+  // …
+  .addAlarms(processorAlarms());
+```
+
+Alarms are added in the record's iteration order. JavaScript iterates integer-like keys (`"500"`) first, in numeric order, so give such alarms a word key (`"status500"`) if the order matters.
 
 #### Rate and ratio alarms
 

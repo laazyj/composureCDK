@@ -260,3 +260,17 @@ describe("createHealthCheckAlarmBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { stack, result } = buildHealthCheck();
+    const alarmResult = createHealthCheckAlarmBuilder()
+      .healthCheck(result)
+      .recommendedAlarms(false)
+      .addAlarms({ connectionTime: connectionTimeAlarm, slowConnection: connectionTimeAlarm })
+      .build(stack, "Alarms");
+
+    expect(Object.keys(alarmResult.alarms)).toEqual(["connectionTime", "slowConnection"]);
+    Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

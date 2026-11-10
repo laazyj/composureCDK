@@ -408,3 +408,27 @@ describe("SpecRestApiBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const apiMetric = (metricName: string) => (api: RestApiBase) =>
+      new Metric({
+        namespace: "AWS/ApiGateway",
+        metricName,
+        dimensionsMap: { ApiName: api.restApiName },
+        period: Duration.minutes(1),
+      });
+    const { result, template } = buildAndSynth((b) => {
+      withStubDefinition(b)
+        .recommendedAlarms(false)
+        .addAlarms({
+          integrationLatency: (alarm) =>
+            alarm.metric(apiMetric("IntegrationLatency")).threshold(2000),
+          cacheMisses: (alarm) => alarm.metric(apiMetric("CacheMissCount")).threshold(100),
+        });
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["integrationLatency", "cacheMisses"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

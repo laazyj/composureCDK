@@ -9,7 +9,7 @@ import type { IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
 import { combine, COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { CertificateAlarmConfig } from "./alarm-config.js";
 import { createCertificateAlarms } from "./certificate-alarms.js";
 import { CERTIFICATE_DEFAULTS } from "./defaults.js";
@@ -126,13 +126,19 @@ class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
   props: Partial<CertificateBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ICertificate>[] = [];
 
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<ICertificate>,
-    ) => AlarmDefinitionBuilder<ICertificate>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<ICertificate>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<ICertificate>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<ICertificate>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

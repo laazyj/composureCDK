@@ -180,3 +180,19 @@ describe("createGuardrailBuilder", () => {
     ]);
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) =>
+      b.addAlarms({
+        textUnits: (a) =>
+          a.metric((m) => m.metric("TextUnitCount", { statistic: "Sum" })).threshold(1_000),
+        invocations: (a) =>
+          a.metric((m) => m.metric("Invocations", { statistic: "Sum" })).threshold(100),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["textUnits", "invocations"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

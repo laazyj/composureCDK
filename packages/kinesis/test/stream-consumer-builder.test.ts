@@ -242,3 +242,17 @@ describe("StreamConsumerBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) =>
+      b.recommendedAlarms(false).addAlarms({
+        noRecords: (a) => a.metric(subscribeToShardRate).threshold(1).lessThan(),
+        manyRecords: (a) => a.metric(subscribeToShardRate).threshold(100_000),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["noRecords", "manyRecords"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

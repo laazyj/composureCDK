@@ -278,3 +278,32 @@ describe("RuleBuilder recommended alarms", () => {
     template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const eventsMetric = (metricName: string) => (rule: { ruleName: string }) =>
+      new Metric({
+        namespace: "AWS/Events",
+        metricName,
+        dimensionsMap: { RuleName: rule.ruleName },
+        statistic: "Sum",
+        period: Duration.minutes(1),
+      });
+    const stack = newStack();
+    const fn = makeFn(stack);
+
+    const result = createRuleBuilder()
+      .schedule(Schedule.rate(Duration.minutes(15)))
+      .addTarget("h", new LambdaFunction(fn))
+      .recommendedAlarms(false)
+      .addAlarms({
+        retryAttempts: (alarm) =>
+          alarm.metric(eventsMetric("RetryInvocationAttempts")).threshold(10),
+        invocations: (alarm) => alarm.metric(eventsMetric("Invocations")).threshold(1000),
+      })
+      .build(stack, "TestRule");
+
+    expect(Object.keys(result.alarms)).toEqual(["retryAttempts", "invocations"]);
+    Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

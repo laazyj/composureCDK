@@ -3,7 +3,7 @@ import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { VolumeAlarmConfig } from "./volume-alarm-config.js";
 import { createVolumeAlarms } from "./volume-alarms.js";
 import { VOLUME_DEFAULTS } from "./volume-defaults.js";
@@ -154,11 +154,19 @@ class VolumeBuilder implements Lifecycle<VolumeBuilderResult> {
    * @param configure - Callback that configures the alarm definition.
    * @returns This builder for chaining.
    */
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<Volume>) => AlarmDefinitionBuilder<Volume>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<Volume>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Volume>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<Volume>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

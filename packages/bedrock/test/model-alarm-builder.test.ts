@@ -229,3 +229,19 @@ describe("createModelAlarmBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) =>
+      b.recommendedAlarms(false).addAlarms({
+        outputTokens: (a) =>
+          a.metric((m) => m.metric("OutputTokenCount", { statistic: "Sum" })).threshold(1_000_000),
+        inputTokens: (a) =>
+          a.metric((m) => m.metric("InputTokenCount", { statistic: "Sum" })).threshold(1_000_000),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["outputTokens", "inputTokens"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

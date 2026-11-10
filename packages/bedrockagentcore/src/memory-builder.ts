@@ -3,7 +3,11 @@ import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  createAlarms,
+} from "@composurecdk/cloudwatch";
 import { type AgentCoreMetricSource, perMinute } from "./alarms.js";
 
 /** Configuration properties for {@link createMemoryBuilder}. */
@@ -41,13 +45,19 @@ class MemoryBuilder implements Lifecycle<MemoryBuilderResult> {
    * so pass one, e.g.
    * `m.metric("Errors", { dimensionsMap: { Operation: "CreateEvent" } })`.
    */
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<AgentCoreMetricSource>,
-    ) => AlarmDefinitionBuilder<AgentCoreMetricSource>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<AgentCoreMetricSource>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<AgentCoreMetricSource>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<AgentCoreMetricSource>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

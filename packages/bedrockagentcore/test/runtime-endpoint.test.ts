@@ -65,3 +65,29 @@ describe("createRuntimeEndpointBuilder", () => {
     expect(Object.keys(build(copy))).toEqual(["a", "b"]);
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b, stack) =>
+      b
+        .runtime(importedRuntime(stack))
+        .endpointName("prod")
+        .recommendedAlarms(false)
+        .addAlarms({
+          invocations: (a) =>
+            a
+              .metric((m) => m.metric("Invocations"))
+              .threshold(1000)
+              .greaterThan(),
+          sessions: (a) =>
+            a
+              .metric((m) => m.metric("SessionCount"))
+              .threshold(10)
+              .greaterThan(),
+        }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["invocations", "sessions"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

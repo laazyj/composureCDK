@@ -3,7 +3,7 @@ import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { HealthCheckAlarmConfig } from "./health-check-alarm-config.js";
 import { buildHealthCheckAlarms } from "./health-check-alarm-builder.js";
 import { HEALTH_CHECK_DEFAULTS } from "./defaults.js";
@@ -86,13 +86,19 @@ class HealthCheckBuilder implements Lifecycle<HealthCheckBuilderResult> {
   props: Partial<HealthCheckBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IHealthCheck>[] = [];
 
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<IHealthCheck>,
-    ) => AlarmDefinitionBuilder<IHealthCheck>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<IHealthCheck>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IHealthCheck>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<IHealthCheck>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

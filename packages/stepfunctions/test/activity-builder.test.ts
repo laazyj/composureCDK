@@ -105,3 +105,18 @@ describe("ActivityBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const { result, template } = buildAndSynth((b) =>
+      b.recommendedAlarms(false).addAlarms({
+        scheduled: (a) => a.metric((activity) => activity.metricScheduled()).threshold(0),
+        scheduleTime: (a) =>
+          a.metric((activity) => activity.metricScheduleTime()).threshold(60_000),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["scheduled", "scheduleTime"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

@@ -5,7 +5,11 @@ import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import type { AlarmDefinition } from "@composurecdk/cloudwatch";
-import { AlarmDefinitionBuilder, createAlarms } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  createAlarms,
+} from "@composurecdk/cloudwatch";
 import type { DistributionAlarmConfig } from "./alarm-config.js";
 import { resolveDistributionAlarmDefinitions } from "./distribution-alarms.js";
 import { resolveBehaviorFunctionAlarmDefinitions } from "./behavior-function-alarms.js";
@@ -160,13 +164,19 @@ class CloudFrontAlarmBuilder implements Lifecycle<CloudFrontAlarmBuilderResult> 
    * cross-region setups where you want all CloudFront alarms to live with the
    * recommended ones.
    */
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<Distribution>,
-    ) => AlarmDefinitionBuilder<Distribution>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<Distribution>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Distribution>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<Distribution>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

@@ -247,3 +247,26 @@ describe("addAlarm", () => {
     ).toThrow(/Duplicate alarm key "errorRate"/);
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const distMetric = (metricName: string) => (dist: { distributionId: string }) =>
+      new Metric({
+        namespace: "AWS/CloudFront",
+        metricName,
+        dimensionsMap: { DistributionId: dist.distributionId, Region: "Global" },
+        statistic: "Average",
+        period: Duration.minutes(1),
+      });
+    const { result, template } = buildAndSynth((b, stack) => {
+      withOrigin(b, stack);
+      b.recommendedAlarms(false).addAlarms({
+        clientErrors: (alarm) => alarm.metric(distMetric("4xxErrorRate")).threshold(5),
+        serverErrors: (alarm) => alarm.metric(distMetric("5xxErrorRate")).threshold(1),
+      });
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["clientErrors", "serverErrors"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

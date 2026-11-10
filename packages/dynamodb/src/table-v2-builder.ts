@@ -3,7 +3,7 @@ import { type ITable, TableV2, type TablePropsV2 } from "aws-cdk-lib/aws-dynamod
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { TableAlarmConfig } from "./table-alarm-config.js";
 import { createTableAlarms } from "./table-alarms.js";
 import { TABLE_V2_DEFAULTS } from "./defaults.js";
@@ -123,11 +123,19 @@ class TableV2Builder implements Lifecycle<TableV2BuilderResult> {
   props: Partial<TableV2BuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ITable>[] = [];
 
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<ITable>) => AlarmDefinitionBuilder<ITable>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<ITable>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<ITable>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<ITable>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

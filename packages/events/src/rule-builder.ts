@@ -9,7 +9,7 @@ import {
   resolve,
   type Resolvable,
 } from "@composurecdk/core";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { RULE_DEFAULTS } from "./defaults.js";
 import type { RuleAlarmConfig } from "./rule-alarm-config.js";
 import { createRuleAlarms } from "./rule-alarms.js";
@@ -134,11 +134,19 @@ class RuleBuilder implements Lifecycle<RuleBuilderResult> {
    * receives an {@link AlarmDefinitionBuilder} typed to {@link IRule} so the
    * metric factory has access to the rule's properties.
    */
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<IRule>) => AlarmDefinitionBuilder<IRule>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<IRule>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IRule>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<IRule>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

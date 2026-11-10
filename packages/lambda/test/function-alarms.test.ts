@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Code, type Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
 import { buildFixture } from "@composurecdk/cdk-testing";
-import { alarmName } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, alarmName } from "@composurecdk/cloudwatch";
 import type { FunctionAlarmConfig } from "../src/alarm-config.js";
 import { createFunctionBuilder } from "../src/function-builder.js";
 
@@ -391,6 +391,51 @@ describe("recommended alarms", () => {
         AlarmActions: Match.absent(),
       });
     });
+  });
+});
+
+describe("addAlarms", () => {
+  function invocationAlarms(): Record<string, AlarmConfigurer<LambdaFunction>> {
+    return {
+      highInvocations: (alarm) =>
+        alarm
+          .metric((fn) => fn.metricInvocations({ period: Duration.minutes(1) }))
+          .threshold(1000)
+          .description("High invocations"),
+      noInvocations: (alarm) =>
+        alarm
+          .metric((fn) => fn.metricInvocations({ period: Duration.minutes(1) }))
+          .threshold(0)
+          .lessThanOrEqual()
+          .description("No invocations"),
+    };
+  }
+
+  it("adds every entry under its key, after earlier addAlarm calls, in order", () => {
+    const { result, template } = buildAndSynth((b) => {
+      minimalFunction(b);
+      b.recommendedAlarms(false)
+        .addAlarm("errorsAny", (alarm) =>
+          alarm.metric((fn) => fn.metricErrors()).description("Any error"),
+        )
+        .addAlarms(invocationAlarms());
+    });
+
+    expect(Object.keys(result.alarms)).toEqual(["errorsAny", "highInvocations", "noInvocations"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 3);
+    template.hasResourceProperties("AWS::CloudWatch::Alarm", {
+      AlarmDescription: "No invocations",
+      ComparisonOperator: "LessThanOrEqualToThreshold",
+    });
+  });
+
+  it("throws on a key already used by a recommended alarm, as addAlarm does", () => {
+    expect(() =>
+      buildAndSynth((b) => {
+        minimalFunction(b);
+        b.addAlarms({ errors: (alarm) => alarm.metric((fn) => fn.metricErrors()) });
+      }),
+    ).toThrow(/Duplicate alarm key "errors"/);
   });
 });
 

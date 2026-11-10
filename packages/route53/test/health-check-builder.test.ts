@@ -126,3 +126,25 @@ describe("createHealthCheckBuilder", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const route53Metric = (metricName: string) => (hc: IHealthCheck) =>
+      new Metric({
+        namespace: "AWS/Route53",
+        metricName,
+        dimensionsMap: { HealthCheckId: hc.healthCheckId },
+        statistic: "Average",
+        period: Duration.minutes(1),
+      });
+    const { result, template } = buildAndSynth((b) =>
+      b.recommendedAlarms(false).addAlarms({
+        connectionTime: (a) => a.metric(route53Metric("ConnectionTime")).threshold(2000),
+        timeToFirstByte: (a) => a.metric(route53Metric("TimeToFirstByte")).threshold(3000),
+      }),
+    );
+
+    expect(Object.keys(result.alarms)).toEqual(["connectionTime", "timeToFirstByte"]);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

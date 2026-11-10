@@ -18,7 +18,7 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createSecurityGroupBuilder } from "@composurecdk/ec2";
 import type { AgentCoreAlarmConfig, AgentCoreMetricSource } from "./alarms.js";
 import { RUNTIME_DEFAULTS } from "./runtime-defaults.js";
@@ -95,13 +95,19 @@ class RuntimeBuilder implements Lifecycle<RuntimeBuilderResult> {
   }
 
   /** Adds a custom alarm on the `DEFAULT` endpoint's metrics. */
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<AgentCoreMetricSource>,
-    ) => AlarmDefinitionBuilder<AgentCoreMetricSource>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<AgentCoreMetricSource>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<AgentCoreMetricSource>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<AgentCoreMetricSource>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

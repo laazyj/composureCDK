@@ -15,7 +15,7 @@ import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import {
   DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES,
   createBucketBuilder,
@@ -363,13 +363,19 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
   readonly #behaviorSlugs = new Map<string, string>();
   readonly #customAlarms: AlarmDefinitionBuilder<Distribution>[] = [];
 
-  addAlarm(
-    key: string,
-    configure: (
-      alarm: AlarmDefinitionBuilder<Distribution>,
-    ) => AlarmDefinitionBuilder<Distribution>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<Distribution>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Distribution>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<Distribution>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

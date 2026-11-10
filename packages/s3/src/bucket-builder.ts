@@ -4,7 +4,7 @@ import { Bucket, BucketEncryption, type BucketProps, type IBucket } from "aws-cd
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { BucketAlarmConfig } from "./alarm-config.js";
 import { createBucketAlarms } from "./bucket-alarms.js";
 import { DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES, BUCKET_DEFAULTS } from "./defaults.js";
@@ -133,11 +133,19 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
   props: Partial<BucketBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Bucket>[] = [];
 
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<Bucket>) => AlarmDefinitionBuilder<Bucket>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<Bucket>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Bucket>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<Bucket>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

@@ -438,3 +438,22 @@ describe("DistributionBuilder.recommendedAlarms semantics", () => {
     });
   });
 });
+
+describe("addAlarms", () => {
+  it("adds each entry as a custom alarm under its key", () => {
+    const errorRate = (metricName: string) => () =>
+      new Metric({ namespace: "AWS/CloudFront", metricName, statistic: "Average" });
+    const { stack, result } = buildDistribution();
+    const alarmResult = createCloudFrontAlarmBuilder()
+      .distribution(result)
+      .recommendedAlarms(false)
+      .addAlarms({
+        custom4xx: (a) => a.metric(errorRate("4xxErrorRate")).threshold(5).greaterThan(),
+        custom5xx: (a) => a.metric(errorRate("5xxErrorRate")).threshold(1).greaterThan(),
+      })
+      .build(stack, "Alarms");
+
+    expect(Object.keys(alarmResult.alarms)).toEqual(["custom4xx", "custom5xx"]);
+    Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});

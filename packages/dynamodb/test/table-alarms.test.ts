@@ -181,6 +181,21 @@ describe.each(builders)("$name table alarms", ({ create }) => {
       template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
     });
   });
+  describe("addAlarms", () => {
+    it("adds each entry as a custom alarm under its key", () => {
+      const { result, template } = build((b) => {
+        b.recommendedAlarms(false);
+        b.addAlarms({
+          userErrors: (a) => a.metric((table) => table.metricUserErrors()).threshold(5),
+          readCapacity: (a) =>
+            a.metric((table) => table.metricConsumedReadCapacityUnits()).threshold(1000),
+        });
+      });
+
+      expect(Object.keys(result.alarms)).toEqual(["userErrors", "readCapacity"]);
+      template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+    });
+  });
 });
 
 describe("resolveTableAlarmDefinitions", () => {

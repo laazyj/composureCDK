@@ -3,7 +3,7 @@ import { type IQueue, Queue, QueueEncryption, type QueueProps } from "aws-cdk-li
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { QueueBuilderExtensionProps, QueueBuilderPropsByRole } from "./queue-props.js";
 import { isDlqRole, isFifoRole, type QueueRole } from "./queue-role.js";
 import { QUEUE_DEFAULTS } from "./defaults.js";
@@ -94,11 +94,19 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
   props: Partial<InternalQueueBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IQueue>[] = [];
 
-  addAlarm(
-    key: string,
-    configure: (alarm: AlarmDefinitionBuilder<IQueue>) => AlarmDefinitionBuilder<IQueue>,
-  ): this {
+  addAlarm(key: string, configure: AlarmConfigurer<IQueue>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IQueue>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<IQueue>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
     return this;
   }
 

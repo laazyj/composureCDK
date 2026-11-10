@@ -388,29 +388,36 @@ in an `SqsDlq` for you, resolving it alongside the table `ref` via `combine`:
 )
 ```
 
-A queue is the common case, not the only one: `onFailure` accepts any
-`IEventSourceDlq` — concrete or behind a `ref()` — and passes it through
-unwrapped. An S3 failure destination, which captures the whole failed batch
-rather than just the record metadata a DLQ message carries, wires up the same
-way:
+A queue is the common case, not the only one. An S3 bucket captures the whole
+failed batch rather than just the record metadata a DLQ message carries, and
+`onFailure` takes a bucket (or a `ref()` to a sibling's) the same way:
 
 ```ts
 .addEventSource(
   "orders",
   dynamoEventSource(ref("orders", (r) => r.table), {
     retryAttempts: 3,
-    onFailure: ref("failures", (r) => new S3OnFailureDestination(r.bucket)),
+    onFailure: ref("failures", (r) => r.bucket),
   }),
 )
 ```
 
-An S3 destination on a **DynamoDB stream** (or [Kinesis](#kinesis-data-streams))
-mapping needs **aws-cdk-lib ≥ 2.184.0**, above this package's
-[floor](../../docs/adr/0008-aws-cdk-lib-version-floors.md) of 2.180.0.
-`DynamoEventSource` only opts into S3 destinations from that release;
-below it CDK rejects the pairing at synth with `S3 onFailure Destination is not
-supported for this event source`. The limit is CDK's, not this package's — a
-queue destination works at the floor.
+The bucket is wrapped in a least-privilege destination: the function is
+granted only `s3:PutObject` on the bucket's objects, `s3:ListBucket` on the
+bucket, and `kms:GenerateDataKey` on its customer-managed key if it has one —
+what AWS documents as needed to write a failed batch. CDK's own
+`S3OnFailureDestination` grants `grantReadWrite`, which also lets a
+compromised or buggy processor read every captured batch and delete the only
+durable copy of a failure.
+
+`onFailure` also accepts any `IEventSourceDlq` — concrete or behind a `ref()` —
+and passes it through unwrapped, so `new S3OnFailureDestination(bucket)` still
+opts into CDK's wider grant. That class needs **aws-cdk-lib ≥ 2.184.0** on a
+DynamoDB stream (or [Kinesis](#kinesis-data-streams)) mapping, above this
+package's [floor](../../docs/adr/0008-aws-cdk-lib-version-floors.md) of
+2.180.0: below it CDK rejects it at synth with `S3 onFailure Destination is
+not supported for this event source`. CDK's check is an `instanceof` on its own
+class, so a bare bucket is not subject to it and works at the floor.
 
 If retries or record-age are bounded but no `onFailure` destination is set, a
 suppressible synth-time warning (`STREAM_DLQ_WARNING_ID`) fires. Silence it —
@@ -498,15 +505,14 @@ default, **7 days** with the `@composurecdk/kinesis` default. Bisecting isolates
 the poison record but does not stop it being retried. Bound `retryAttempts`
 and/or `maxRecordAge` **together with** `onFailure`, so a record that never
 succeeds is moved aside and the shard keeps flowing. `onFailure` is widened
-exactly as for `dynamoEventSource` — a queue (wrapped in `SqsDlq`), any
-`IEventSourceDlq` such as `SnsDlq` or `S3OnFailureDestination`, or a `ref()` to
-either — and the [`STREAM_DLQ_WARNING_ID`](#failure-handling-dead-letter-queue)
+exactly as for `dynamoEventSource` — a queue (wrapped in `SqsDlq`), a bucket
+(wrapped in a least-privilege S3 destination), any `IEventSourceDlq` such as
+`SnsDlq`, or a `ref()` to any of them — and the [`STREAM_DLQ_WARNING_ID`](#failure-handling-dead-letter-queue)
 warning fires when retries are bounded without one. The bound is not defaulted:
 bounding without a destination would drop records silently. A queue or topic
 destination receives the batch's metadata (shard and sequence-number range),
 not the records — read them back from the stream before they age out. An S3
-destination captures the whole batch, and needs **aws-cdk-lib ≥ 2.184.0**
-(below it CDK rejects it at synth, as for DynamoDB). See
+destination captures the whole batch. See
 [on-failure destinations](https://docs.aws.amazon.com/lambda/latest/dg/kinesis-on-failure-destination.html).
 
 **Shared throughput or enhanced fan-out.** A shard's 2 MB/s of read throughput

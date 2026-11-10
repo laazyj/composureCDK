@@ -22,6 +22,7 @@ import {
 } from "aws-cdk-lib/aws-lambda-event-sources";
 import { Bucket, type IBucket } from "aws-cdk-lib/aws-s3";
 import { Queue } from "aws-cdk-lib/aws-sqs";
+import { policyJson } from "@composurecdk/cdk-testing";
 import { isRef, ref } from "@composurecdk/core";
 import { createFunctionBuilder } from "../src/function-builder.js";
 import { dynamoEventSource } from "../src/event-sources/dynamodb-event-source.js";
@@ -282,6 +283,32 @@ describe("kinesisEventSource onFailure DLQ", () => {
       MaximumRecordAgeInSeconds: 3600,
       DestinationConfig: { OnFailure: { Destination: Match.anyValue() } },
     });
+  });
+
+  it("wraps a bare bucket in a least-privilege S3 destination", () => {
+    const stack = new Stack(new App(), "S");
+    const bucket = new Bucket(stack, "FailureBucket");
+    baseBuilder()
+      .addEventSource(
+        "telemetry",
+        kinesisEventSource(new Stream(stack, "Stream"), {
+          retryAttempts: 3,
+          onFailure: ref("failures", (r: { bucket: IBucket }) => r.bucket),
+        }),
+      )
+      .build(stack, "Fn", { failures: { bucket } });
+
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties("AWS::Lambda::EventSourceMapping", {
+      DestinationConfig: {
+        OnFailure: {
+          Destination: { "Fn::GetAtt": [Match.stringLikeRegexp("FailureBucket"), "Arn"] },
+        },
+      },
+    });
+    for (const action of ["s3:GetObject", "s3:DeleteObject", "s3:Abort"]) {
+      expect(policyJson(stack)).not.toContain(action);
+    }
   });
 
   it("resolves a Ref to a non-queue destination (an S3 bucket) without wrapping it", () => {

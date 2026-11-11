@@ -144,13 +144,13 @@ Each field is independent, so any subset yields a partial wildcard — `{ method
 
 `createRestApiBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
 
-| Property           | Default | Rationale                                                                           |
-| ------------------ | ------- | ----------------------------------------------------------------------------------- |
-| `accessLogging`    | `true`  | Auto-creates a CloudWatch log group for access logging with structured JSON output. |
-| `executionLogging` | `true`  | Creates the stage's execution log group in the stack, with a retention policy.      |
-| `tracingEnabled`   | `true`  | Enables X-Ray distributed tracing on the stage.                                     |
-| `loggingLevel`     | `INFO`  | Enables CloudWatch execution logging for all methods.                               |
-| `dataTraceEnabled` | `false` | Prevents sensitive request/response bodies from appearing in logs.                  |
+| Property           | Default | Rationale                                                                                                              |
+| ------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `accessLogging`    | `true`  | Auto-creates a CloudWatch log group for access logging with structured JSON output; customise it with `{ configure }`. |
+| `executionLogging` | `true`  | Creates the stage's execution log group in the stack, with a retention policy.                                         |
+| `tracingEnabled`   | `true`  | Enables X-Ray distributed tracing on the stage.                                                                        |
+| `loggingLevel`     | `INFO`  | Enables CloudWatch execution logging for all methods.                                                                  |
+| `dataTraceEnabled` | `false` | Prevents sensitive request/response bodies from appearing in logs.                                                     |
 
 These defaults are guided by the [AWS Well-Architected Serverless Applications Lens](https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/opex-distributed-tracing.html).
 
@@ -186,7 +186,22 @@ result.api; // RestApi
 result.accessLogGroup; // LogGroup | undefined
 ```
 
-To provide your own destination instead, set `deployOptions.accessLogDestination` — the auto-created log group is skipped. To disable access logging entirely, set `.accessLogging(false)`.
+Customise the log group with `configure`, which receives its `@composurecdk/logs` builder. The stage's destination and JSON format are unchanged:
+
+```ts
+const result = createRestApiBuilder()
+  .restApiName("My Service")
+  .accessLogging({
+    configure: (lg) =>
+      lg
+        .retention(RetentionDays.THREE_MONTHS)
+        .encryptionKey(ref("logsKey", (r: KeyBuilderResult) => r.key)),
+  })
+  .addMethod("GET", integration, methodResponse)
+  .build(stack, "MyApi");
+```
+
+To provide your own destination instead, set `deployOptions.accessLogDestination` — the auto-created log group is skipped, and combining it with `configure` throws. To disable access logging entirely, set `.accessLogging(false)`.
 
 The auto-created destination renders the log group's ARN without the trailing `:*`, which is the form API Gateway stores, so drift detection reports the stage as `IN_SYNC`. A `LogGroupLogDestination` you supply yourself still depends on the `@aws-cdk/aws-apigateway:logGroupDestinationArnWithoutWildcard` feature flag for that. Stacks that already use the auto-created destination see an in-place stage update on their next deploy.
 

@@ -5,6 +5,7 @@ export {
   type IRestApiBuilder,
 } from "./rest-api-builder.js";
 export { type RestApiBuilderPropsBase } from "./builder-common.js";
+export { type AccessLoggingConfig } from "./deploy-options.js";
 export { type ExecutionLoggingConfig } from "./execution-logging.js";
 export {
   createSpecRestApiBuilder,

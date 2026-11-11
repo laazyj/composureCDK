@@ -5,6 +5,7 @@ import {
   agentInvolvement,
   attributionProblems,
   isAgentEmail,
+  mainCommitProblems,
   nxReading,
   pullRequestProblems,
   squashMessage,
@@ -226,5 +227,58 @@ describe("pullRequestProblems", () => {
     const problems = pr([commit("feat: x", { authorEmail: CLAUDE })]);
     assert.equal(problems.length, 2);
     assert.match(problems[0], /^[0-9a-f]{7} \("feat: x"\)/);
+  });
+});
+
+describe("mainCommitProblems", () => {
+  const squash = (body) => commit(`feat(s3): add a thing (#42)\n\n${body}`);
+
+  it("passes a commit no agent touched", () => {
+    assert.deepEqual(mainCommitProblems(squash("Body."), [commit("feat: x\n\nBody.")]), []);
+  });
+
+  it("passes GitHub's default squash layout, with the session stranded above", () => {
+    const landed = squash(`Why it changed.\n\n${SESSION}\n\n${CLAUDE_CO_AUTHOR}`);
+    assert.deepEqual(mainCommitProblems(landed, [agentCommit()]), []);
+  });
+
+  it("fails a body emptied at merge, as on 6afccc7", () => {
+    const problems = mainCommitProblems(commit("feat(s3): add a thing (#42)"), [agentCommit()]);
+    assert.equal(problems.length, 2);
+    assert.match(problems[0], /no `Co-authored-by/);
+    assert.match(problems[1], /dropped `Agent-Session/);
+  });
+
+  it("fails when one of the pull request's sessions was cut", () => {
+    const other = "Agent-Session: https://claude.ai/code/session_02Other";
+    const second = agentCommit(`More.\n\n${CLAUDE_CO_AUTHOR}\n${other}`);
+    const landed = squash(`Body.\n\n${CLAUDE_CO_AUTHOR}\n${SESSION}`);
+    const problems = mainCommitProblems(landed, [agentCommit(), second]);
+    assert.deepEqual(problems, [`dropped \`${other}\` from its pull request's commits`]);
+  });
+
+  it("fails a Claude-authored pull request that never named a session", () => {
+    const old = commit("feat: x\n\nBody.", { authorEmail: CLAUDE });
+    const problems = mainCommitProblems(squash(`Body.\n\n${CLAUDE_CO_AUTHOR}`), [old]);
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /names no `Agent-Session`/);
+  });
+
+  it("audits a direct push on its own message", () => {
+    assert.deepEqual(mainCommitProblems(agentCommit(), []), []);
+    assert.equal(mainCommitProblems(commit("fix: x", { authorEmail: CLAUDE }), []).length, 2);
+  });
+
+  it("requires another agent's own co-author line", () => {
+    const cursor = commit(
+      "fix: x\n\nBody.\n\nCo-authored-by: Cursor Agent <cursoragent@cursor.com>\n" +
+        "Agent-Session: Cursor 2.1.0; model some-model 2026-06",
+      { authorEmail: "cursoragent@cursor.com" },
+    );
+    const session = "Agent-Session: Cursor 2.1.0; model some-model 2026-06";
+    const problems = mainCommitProblems(squash(`Body.\n\n${session}\n\n${CLAUDE_CO_AUTHOR}`), [
+      cursor,
+    ]);
+    assert.deepEqual(problems, ["has no `Co-authored-by:` trailer for cursoragent@cursor.com"]);
   });
 });

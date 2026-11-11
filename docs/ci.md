@@ -41,6 +41,7 @@ Cutting a release
 - **`release-prepare.yml`** — manual `workflow_dispatch`, from `main` only. It requires CI to have passed the commit (the same check the release gate below applies, from [`scripts/release-gate.mjs`](../scripts/release-gate.mjs)), versions through [`scripts/release-version.mjs`](../scripts/release-version.mjs) (which skips the `nx verify` pre-version command), and runs `nx release changelog`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`; pushing the branch is also what starts the deploy gate above.
 - **`release-tag.yml`** — `workflow_run` listener on CI and Deploy Test. For a `chore(release): vX.Y.Z` commit on `main` (squash-merge required) it runs the release gate, [`scripts/release-gate.mjs`](../scripts/release-gate.mjs), and tags the commit once CI has passed that exact commit and Deploy Test has passed a commit with the same tree (see [Creating a release](#creating-a-release)). The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Creates the GitHub Release from the matching `CHANGELOG.md` section, then runs `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
+- **`commits-audit.yml`** — on every push to `main`, checks each pushed commit kept its PR's agent attribution, and opens an issue when it did not (see [Auditing main](#auditing-main)).
 - **`release-notify.yml`** — `workflow_run` listener on Release. Comments on the issues the release addressed (see [Release notifications](#release-notifications)).
 
 ## Required checks
@@ -73,6 +74,27 @@ The **Commits** job in `pr-policy.yml` checks the commit a PR will land as, agai
 It needs `npm ci`, unlike the title check, because it loads nx's commit parser and agent list instead of copying them, so it agrees with `nx release` across nx upgrades. It joins **PR policy**, so the ruleset needs no change, and re-runs on `edited` like the title check, because the title is half of what it compares.
 
 Dependabot and release PRs are held to the same rules. Neither carries agent attribution, and each is one commit. If a bumped package's release notes in a Dependabot body ever trip the nx comparison, the failure is real: that body would have changed the release.
+
+## Auditing main
+
+**Commits** runs before merge, so it cannot see the squash dialog, where whoever merges can edit or empty the body. That is how 6afccc7 (#711) landed with no attribution, though all five of its PR commits were Claude's. [`commits-audit.yml`](../.github/workflows/commits-audit.yml) closes the gap after merge: on every push to `main` it runs [`scripts/commits-audit.mjs`](../scripts/commits-audit.mjs) (`npx nx commits:audit`) for each pushed commit.
+
+It finds the commit's merged PR and that PR's commits through the API, and applies `mainCommitProblems` from [`scripts/commit-rules.mjs`](../scripts/commit-rules.mjs). If any of them shows a coding agent took part (by the same test as **Commits**), the commit on `main` must:
+
+- end with a `Co-authored-by:` trailer for every agent address involved, for example `Co-authored-by: Claude <noreply@anthropic.com>`;
+- carry every `Agent-Session:` line its PR's commits named, or at least one if an agent authored commits that named none.
+
+It reads session lines anywhere in the body, not only in the final trailer paragraph. GitHub's squash dialog re-appends co-author trailers after a blank line, which strands `Agent-Session` one paragraph up, and failing every default merge for a layout no one can fix would make the audit noise.
+
+A finding fails the run, so the commit shows red on `main`, and opens one issue per commit, assigned to whoever merged it. History on `main` is not rewritten, so the issue is the record: note the session(s) behind the change there, and close it. The issue search keys on the full SHA, so a re-run never opens a duplicate.
+
+It is a workflow of its own rather than a job in `ci.yml`. The release gate needs **CI** green on the commit being tagged, and a finding about an earlier commit must not block a release. It runs `npm ci`, like **Commits**, because it recognises agents by nx's own list.
+
+To audit older commits by hand, pass their SHAs. It only reports unless `OPEN_ISSUES=1` is set too:
+
+```sh
+GITHUB_REPOSITORY=laazyj/composureCDK SHAS="6afccc7 54035d9" npx nx commits:audit
+```
 
 ## Stacked pull requests
 

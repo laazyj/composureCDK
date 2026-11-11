@@ -73,6 +73,46 @@ describe("openIdConnectPrincipal", () => {
     });
   });
 
+  it("passes keys that already contain a colon through unprefixed", () => {
+    const template = trustPolicyOf((stack, provider) => {
+      createRoleBuilder()
+        .assumedBy(
+          openIdConnectPrincipal({
+            provider,
+            issuerHost: ISSUER_HOST,
+            stringEquals: {
+              aud: "sts.amazonaws.com",
+              "sts:RoleSessionName": `\${${ISSUER_HOST}:sub}`,
+            },
+            stringLike: {
+              [`${ISSUER_HOST}:sub`]: ["repo:acme/app:*"],
+              "aws:RequestTag/team": "platform-*",
+            },
+          }),
+        )
+        .build(stack, "Role");
+    });
+
+    template.hasResourceProperties("AWS::IAM::Role", {
+      AssumeRolePolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Condition: {
+              StringEquals: {
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                "sts:RoleSessionName": "${token.actions.githubusercontent.com:sub}",
+              },
+              StringLike: {
+                "token.actions.githubusercontent.com:sub": ["repo:acme/app:*"],
+                "aws:RequestTag/team": "platform-*",
+              },
+            },
+          }),
+        ]),
+      }),
+    });
+  });
+
   it("omits condition operators that are not supplied", () => {
     const template = trustPolicyOf((stack, provider) => {
       createRoleBuilder()

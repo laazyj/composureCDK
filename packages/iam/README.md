@@ -92,7 +92,7 @@ Thin sugar over `createRoleBuilder().assumedBy(new ServicePrincipal(...))`.
 
 Let any OpenID Connect provider — GitHub Actions, GitLab, an EKS cluster, and so on — assume a role via `sts:AssumeRoleWithWebIdentity`, without long-lived credentials and without hand-writing the trust-policy condition map.
 
-Build (or import) a provider, then scope a role's trust policy with `openIdConnectPrincipal()`. It prefixes each bare claim key with the issuer host (so you pass `aud`, not `oidc.example.com:aud`) and maps `stringEquals`/`stringLike` onto the trust-policy operators:
+Build (or import) a provider, then scope a role's trust policy with `openIdConnectPrincipal()`. It prefixes each bare claim key with the issuer host (so you pass `aud`, not `oidc.example.com:aud`) and maps `stringEquals`/`stringLike` onto the trust-policy operators. A key that already contains `:` — a global or STS key such as `sts:RoleSessionName`, or a claim key already carrying the issuer host — passes through unprefixed:
 
 ```ts
 import {
@@ -114,6 +114,16 @@ const principal = openIdConnectPrincipal({
 });
 
 createRoleBuilder().assumedBy(principal).build(stack, "DeployRole");
+```
+
+The result is a CDK `OpenIdConnectPrincipal`, so its own methods cover what the two options don't: `.withConditions(...)` for other operators, and `.withSessionTags()` to add `sts:TagSession`. For example, a multi-valued claim such as `amr` needs a set operator, and its key must be written fully qualified:
+
+```ts
+const principal = openIdConnectPrincipal({
+  provider,
+  issuerHost: "oidc.example.com",
+  stringEquals: { aud: "sts.amazonaws.com" },
+}).withConditions({ "ForAnyValue:StringLike": { "oidc.example.com:amr": "mfa" } });
 ```
 
 The builder wraps the L2 [OpenIdConnectProvider](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_iam.OpenIdConnectProvider.html), which auto-fetches the provider's root-CA thumbprint, so a URL and audience are usually all you need.

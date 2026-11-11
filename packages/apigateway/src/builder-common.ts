@@ -2,6 +2,7 @@ import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { RestApiBase } from "aws-cdk-lib/aws-apigateway";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import type { RestApiAlarmConfig } from "./alarm-config.js";
+import type { AccessLoggingConfig } from "./deploy-options.js";
 import type { ExecutionLoggingConfig } from "./execution-logging.js";
 
 /**
@@ -10,12 +11,14 @@ import type { ExecutionLoggingConfig } from "./execution-logging.js";
  */
 export interface RestApiBuilderPropsBase {
   /**
-   * Whether to automatically create a CloudWatch log group for access logging.
+   * Whether to automatically create a CloudWatch log group for access logging,
+   * and how to configure it; see {@link AccessLoggingConfig}.
    *
-   * When `true`, the builder creates a log group using
+   * When `true` (or an object), the builder creates a log group using
    * {@link createLogGroupBuilder} (with its secure defaults) and configures it
    * as the stage's access log destination with JSON-formatted output. The
    * created log group is returned in the build result as `accessLogGroup`.
+   * Pass `{ configure }` to customize the log group's sub-builder.
    *
    * When `false`, no access log group is created. You can still provide your
    * own destination via `deployOptions.accessLogDestination`.
@@ -23,7 +26,7 @@ export interface RestApiBuilderPropsBase {
    * This setting is ignored when `deployOptions.accessLogDestination` is
    * provided — the user-supplied destination takes precedence.
    */
-  accessLogging?: boolean;
+  accessLogging?: AccessLoggingConfig;
 
   /**
    * Whether the builder manages the stage's execution log group. On by

@@ -12,6 +12,7 @@ import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/clou
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { REST_API_DEFAULTS } from "./defaults.js";
 import { resolveDeployOptions } from "./deploy-options.js";
+import { resolveExecutionLogGroup } from "./execution-logging.js";
 import { ResourceBuilder } from "./resource-builder.js";
 import { createRestApiAlarms } from "./rest-api-alarms.js";
 
@@ -122,7 +123,12 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): RestApiBuilderResult {
-    const { accessLogging, recommendedAlarms: alarmConfig, ...restApiProps } = this.props;
+    const {
+      accessLogging,
+      executionLogging,
+      recommendedAlarms: alarmConfig,
+      ...restApiProps
+    } = this.props;
     const { accessLogGroup, deployOptions } = resolveDeployOptions(
       scope,
       id,
@@ -138,9 +144,18 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
     });
     this.#root.applyTo(api.root, context ?? {});
 
+    const executionLogGroup = resolveExecutionLogGroup(
+      scope,
+      id,
+      api,
+      executionLogging,
+      deployOptions,
+      context,
+    );
+
     const alarms = createRestApiAlarms(scope, id, api, alarmConfig, this.#customAlarms);
 
-    return { api, accessLogGroup, alarms };
+    return { api, accessLogGroup, executionLogGroup, alarms };
   }
 }
 

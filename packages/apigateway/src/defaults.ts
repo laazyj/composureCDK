@@ -42,6 +42,14 @@ export const REST_API_DEFAULTS = {
    */
   accessLogging: true,
 
+  /**
+   * Create the stage's execution log group in the stack, so it has a
+   * retention policy rather than the never-expiring group API Gateway
+   * creates on first write.
+   * @see https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/opex-logging.html
+   */
+  executionLogging: true,
+
   deployOptions: DEPLOY_OPTIONS_DEFAULTS,
 } satisfies Partial<RestApiBuilderProps>;
 
@@ -56,6 +64,9 @@ export const SPEC_REST_API_DEFAULTS = {
    * @see https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/opex-logging.html
    */
   accessLogging: true,
+
+  /** Manage the stage's execution log group, so it has a retention policy. */
+  executionLogging: true,
 
   deployOptions: DEPLOY_OPTIONS_DEFAULTS,
 } satisfies Partial<SpecRestApiBuilderProps>;

@@ -147,6 +147,7 @@ Each field is independent, so any subset yields a partial wildcard — `{ method
 | Property           | Default | Rationale                                                                           |
 | ------------------ | ------- | ----------------------------------------------------------------------------------- |
 | `accessLogging`    | `true`  | Auto-creates a CloudWatch log group for access logging with structured JSON output. |
+| `executionLogging` | `true`  | Creates the stage's execution log group in the stack, with a retention policy.      |
 | `tracingEnabled`   | `true`  | Enables X-Ray distributed tracing on the stage.                                     |
 | `loggingLevel`     | `INFO`  | Enables CloudWatch execution logging for all methods.                               |
 | `dataTraceEnabled` | `false` | Prevents sensitive request/response bodies from appearing in logs.                  |
@@ -188,6 +189,31 @@ result.accessLogGroup; // LogGroup | undefined
 To provide your own destination instead, set `deployOptions.accessLogDestination` — the auto-created log group is skipped. To disable access logging entirely, set `.accessLogging(false)`.
 
 The auto-created destination renders the log group's ARN without the trailing `:*`, which is the form API Gateway stores, so drift detection reports the stage as `IN_SYNC`. A `LogGroupLogDestination` you supply yourself still depends on the `@aws-cdk/aws-apigateway:logGroupDestinationArnWithoutWildcard` feature flag for that. Stacks that already use the auto-created destination see an in-place stage update on their next deploy.
+
+### Execution logging
+
+When the stage's `loggingLevel` (or any method's, via `deployOptions.methodOptions`) is anything other than `OFF`, API Gateway writes execution logs to `API-Gateway-Execution-Logs_<restApiId>/<stageName>`. Left alone, API Gateway creates that group on first write, outside the stack: it never expires, and is not encrypted, tagged or removed with the stack.
+
+So the builder creates it, through `@composurecdk/logs` with its secure defaults, and makes the stage depend on it. It is returned as `executionLogGroup`. Customise it with `configure`, which receives the log group builder pre-seeded with the group's name — leave the name alone, since API Gateway writes only to that group:
+
+```ts
+const result = createRestApiBuilder()
+  .restApiName("My Service")
+  .executionLogging({
+    configure: (lg) =>
+      lg
+        .retention(RetentionDays.THREE_MONTHS)
+        .encryptionKey(ref("logsKey", (r: KeyBuilderResult) => r.key)),
+  })
+  .addMethod("GET", integration, methodResponse)
+  .build(stack, "MyApi");
+
+result.executionLogGroup; // LogGroup | undefined
+```
+
+The name comes from the configured `deployOptions.stageName` (default `prod`), not from the deployed stage, which would make the group and the stage depend on each other. `.executionLogging(false)` leaves the group to API Gateway.
+
+An API that has already served traffic with execution logging on has a group API Gateway created, and CloudFormation cannot create one of the same name. Delete that group before deploying (its logs go with it), or set `.executionLogging(false)`.
 
 ## Recommended Alarms
 

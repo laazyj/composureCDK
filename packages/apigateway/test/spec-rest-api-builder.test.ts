@@ -301,7 +301,8 @@ describe("SpecRestApiBuilder", () => {
     it("creates an access log group by default", () => {
       const { template } = buildAndSynth((b) => withStubDefinition(b));
 
-      template.resourceCountIs("AWS::Logs::LogGroup", 1);
+      // The access log group, plus the execution log group.
+      template.resourceCountIs("AWS::Logs::LogGroup", 2);
       template.hasResourceProperties("AWS::Logs::LogGroup", {
         RetentionInDays: 731,
       });
@@ -350,14 +351,15 @@ describe("SpecRestApiBuilder", () => {
       builder.build(stack, "TestApi");
       const template = Template.fromStack(stack);
 
-      // Only the user-provided log group exists, no auto-created one
-      template.resourceCountIs("AWS::Logs::LogGroup", 1);
+      // The user-provided log group and the execution log group; no access log group.
+      template.resourceCountIs("AWS::Logs::LogGroup", 2);
     });
 
     it("creates no log group when access logging is disabled", () => {
       const { template } = buildAndSynth((b) => withStubDefinition(b.accessLogging(false)));
 
-      template.resourceCountIs("AWS::Logs::LogGroup", 0);
+      // Only the execution log group.
+      template.resourceCountIs("AWS::Logs::LogGroup", 1);
     });
 
     it("preserves user deployOptions while applying defaults for missing fields", () => {

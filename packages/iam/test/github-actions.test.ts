@@ -4,6 +4,7 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { TEST_ACCOUNT, newStack, testEnv } from "@composurecdk/cdk-testing";
 import { createRoleBuilder } from "../src/role-builder.js";
 import * as githubActions from "../src/github-actions.js";
+import { oidcClaim } from "../src/open-id-connect-principal.js";
 
 const OIDC_RESOURCE = "Custom::AWSCDKOpenIdConnectProvider";
 const ISSUER_HOST = "token.actions.githubusercontent.com";
@@ -81,6 +82,68 @@ describe("githubActions.principal", () => {
                 ],
               },
             },
+          }),
+        ]),
+      }),
+    });
+  });
+
+  it("merges extra conditions, qualified with the GitHub issuer host", () => {
+    const stack = newStack({ env: testEnv("us-east-1") });
+    const provider = githubActions.importProvider(stack, "Provider");
+    createRoleBuilder()
+      .assumedBy(
+        githubActions.principal({
+          owner: "acme",
+          repo: "app",
+          provider,
+          subjects: [githubActions.Subject.branch("main")],
+          conditions: { StringEquals: { repository_owner: "acme" } },
+        }),
+      )
+      .build(stack, "Role");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::IAM::Role", {
+      AssumeRolePolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Condition: Match.objectLike({
+              StringEquals: {
+                [`${ISSUER_HOST}:aud`]: "sts.amazonaws.com",
+                [`${ISSUER_HOST}:repository_owner`]: "acme",
+              },
+            }),
+          }),
+        ]),
+      }),
+    });
+  });
+
+  it("renders oidcClaim values with the GitHub issuer host", () => {
+    const stack = newStack({ env: testEnv("us-east-1") });
+    const provider = githubActions.importProvider(stack, "Provider");
+    createRoleBuilder()
+      .assumedBy(
+        githubActions.principal({
+          owner: "acme",
+          repo: "app",
+          provider,
+          subjects: [githubActions.Subject.branch("main")],
+          conditions: { StringEquals: { "sts:RoleSessionName": oidcClaim("actor") } },
+        }),
+      )
+      .build(stack, "Role");
+
+    Template.fromStack(stack).hasResourceProperties("AWS::IAM::Role", {
+      AssumeRolePolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Condition: Match.objectLike({
+              StringEquals: {
+                [`${ISSUER_HOST}:aud`]: "sts.amazonaws.com",
+                "sts:RoleSessionName": `\${${ISSUER_HOST}:actor}`,
+              },
+            }),
           }),
         ]),
       }),

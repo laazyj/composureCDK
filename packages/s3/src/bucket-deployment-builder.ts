@@ -36,8 +36,8 @@ export interface BucketDeploymentBuilderResult {
  * exposed as an overloaded method: call with a value to set it (returns the
  * builder for chaining), or call with no arguments to read the current value.
  *
- * The `destinationBucket` and `distribution` are set via dedicated methods
- * that accept {@link Resolvable} values for cross-component wiring.
+ * `sources`, `destinationBucket` and `distribution` accept {@link Resolvable}
+ * values for cross-component wiring.
  *
  * The builder implements {@link Lifecycle}, so it can be used directly as a
  * component in a {@link compose | composed system}.
@@ -121,12 +121,13 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
       );
     }
 
-    const { sources, ...deployProps } = this.props;
+    const { sources: sourcesProp, ...deployProps } = this.props;
+    const sources = resolve(sourcesProp, ctx);
 
     if (!sources || sources.length === 0) {
       throw new Error(
         `BucketDeploymentBuilder "${id}" requires at least one source. ` +
-          `Call .sources() with an array of ISource.`,
+          `Call .sources() with an array of ISource or a Ref to one.`,
       );
     }
 
@@ -166,8 +167,8 @@ class BucketDeploymentBuilder implements Lifecycle<BucketDeploymentBuilderResult
  * returned builder exposes {@link BucketDeploymentBuilderProps} properties as
  * fluent setters/getters, plus {@link IBucketDeploymentBuilder.destinationBucket | destinationBucket()}
  * and {@link IBucketDeploymentBuilder.distribution | distribution()} for
- * cross-component wiring with Ref support. It implements {@link Lifecycle}
- * for use with {@link compose}.
+ * cross-component wiring with Ref support; `sources` accepts a Ref too. It
+ * implements {@link Lifecycle} for use with {@link compose}.
  *
  * @returns A fluent builder for an S3 BucketDeployment.
  *

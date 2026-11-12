@@ -101,8 +101,7 @@ site that aliased it.
   `queryLogsLogGroupArn` → `QueryLoggingConfig`, `cloudfront`
   `functionAssociations` → `functions`.
 - **A prop re-declared only to change its optionality**, where the builder
-  supplies a default — the dynamodb event source's `startingPosition`, the
-  bucket deployment's `sources`.
+  supplies a default — the dynamodb event source's `startingPosition`.
 - **`any`-typed props.** `custom-resources` mirrors `AwsSdkCall.parameters`,
   which is `any` upstream; tracking it would yield `Resolvable<any>` and
   destroy the type safety the mirror exists to add.

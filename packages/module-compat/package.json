@@ -42,6 +42,7 @@
     "@composurecdk/sns": "^0.13.0",
     "@composurecdk/sqs": "^0.13.0",
     "@composurecdk/stepfunctions": "^0.13.0",
+    "@composurecdk/wafv2": "^0.13.0",
     "@composurecdk/xray": "^0.13.0"
   },
   "devDependencies": {

@@ -27,3 +27,7 @@ Cross-cutting tag key/value validation is not listed here; it is applied automat
 | `@composurecdk/ec2`            | `securityGroupName`        | `constraints.validate.securityGroupName`        | —                                   |
 | `@composurecdk/kinesis`        | `streamConsumerName`       | `constraints.validate.streamConsumerName`       | —                                   |
 | `@composurecdk/kinesis`        | `streamName`               | `constraints.validate.streamName`               | —                                   |
+| `@composurecdk/wafv2`          | `metricName`               | `constraints.validate.metricName`               | —                                   |
+| `@composurecdk/wafv2`          | `ruleLabel`                | `constraints.validate.ruleLabel`                | —                                   |
+| `@composurecdk/wafv2`          | `ruleName`                 | `constraints.validate.ruleName`                 | —                                   |
+| `@composurecdk/wafv2`          | `webAclName`               | `constraints.validate.webAclName`               | —                                   |

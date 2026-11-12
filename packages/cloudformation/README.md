@@ -176,6 +176,7 @@ The stack's own `Description`, every `CfnOutput` / `CfnParameter` description, a
 | `AWS::Neptune::DBClusterParameterGroup`, `AWS::Neptune::DBParameterGroup`                 | `description`      |
 | `AWS::EC2::SecurityGroup`                                                                 | `groupDescription` |
 | `AWS::SNS::Topic`                                                                         | `displayName`      |
+| `AWS::WAFv2::WebACL`                                                                      | `description`      |
 
 `functionCode` is the odd one out: a whole JavaScript body rather than a line of prose. It is in the list because it is usually the largest block of free text in a template, and often the only one built from external data — a redirect map read at synth carries whatever was pasted into it. The cost is a wider blast radius than another `description`: a legitimately non-ASCII string literal in a function — a `€` in a redirect target, a non-Latin `Location` header — becomes a synth failure rather than a silent bad deploy. Run `"warn"` first if that might be you.
 

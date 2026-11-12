@@ -164,6 +164,7 @@ See [docs/showcase.md](docs/showcase.md) for case studies of projects built with
 | [`@composurecdk/sns`](https://www.npmjs.com/package/@composurecdk/sns)                           | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/sns?labelColor=b85416&color=0f0d0c)              | SNS topic components with well-architected defaults                      |
 | [`@composurecdk/sqs`](https://www.npmjs.com/package/@composurecdk/sqs)                           | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/sqs?labelColor=b85416&color=0f0d0c)              | SQS queue components with well-architected defaults                      |
 | [`@composurecdk/stepfunctions`](https://www.npmjs.com/package/@composurecdk/stepfunctions)       | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/stepfunctions?labelColor=b85416&color=0f0d0c)    | Step Functions state machines with logging, tracing and secure defaults  |
+| [`@composurecdk/wafv2`](https://www.npmjs.com/package/@composurecdk/wafv2)                       | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/wafv2?labelColor=b85416&color=0f0d0c)            | AWS WAF web ACLs with rate limits, redacted logging and alarms           |
 | [`@composurecdk/xray`](https://www.npmjs.com/package/@composurecdk/xray)                         | ![npm downloads](https://img.shields.io/npm/dm/@composurecdk/xray?labelColor=b85416&color=0f0d0c)             | CloudWatch Transaction Search, for X-Ray spans in CloudWatch Logs        |
 
 ## Contributing

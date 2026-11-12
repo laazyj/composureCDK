@@ -53,7 +53,7 @@ Every publishable package ships dual ESM/CJS, built by `tshy` ([ADR-0007](docs/a
 
 ## Commits and pull requests
 
-The log on `main` is what versions and release notes are generated from, and it is the audit record of what an agent changed ([#718](https://github.com/laazyj/composureCDK/issues/718)). Pull requests are squash-merged: the PR title becomes the commit subject, and the branch's commit messages become its body. The **Commits** check enforces the rules below on every PR ([docs/ci.md](docs/ci.md#commits)).
+The log on `main` is what versions and release notes are generated from, and it is the audit record of what an agent changed ([#718](https://github.com/laazyj/composureCDK/issues/718)). Pull requests are squash-merged: the PR title becomes the commit subject, and the branch's commit messages become its body. The **Commits** check enforces the rules below on every PR ([docs/ci.md](docs/ci.md#commits)), and an audit of each commit pushed to `main` checks that the attribution survived the merge ([Auditing main](docs/ci.md#auditing-main)).
 
 - **One PR is one release-notes entry, and one commit on its branch.** Fold review changes into that commit (`git commit --amend`, then `git push --force-with-lease`), on your own branch only. Its message _is_ the squash body, so write it for the log: what changed and why. The PR description is for reviewers.
 - **Two release-notes entries means two PRs.** Stack the second on the first's branch, and merge from the bottom up. Never merge another PR into your branch, and never revert work on a branch to move it into another PR: open that PR from the right base instead.

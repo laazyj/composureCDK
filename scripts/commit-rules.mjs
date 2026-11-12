@@ -198,3 +198,53 @@ export function pullRequestProblems({ title, number, commits }) {
 
   return problems;
 }
+
+/** The `Agent-Session` lines a commit message names, anywhere in it. */
+export const sessionsOf = (message) =>
+  message
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => SESSION_TRAILER.test(line));
+
+/**
+ * Problems with a commit already on `main`, given the commits of the pull
+ * request it was squashed from (empty for a direct push). Looser than
+ * {@link attributionProblems} about layout, because GitHub's squash dialog
+ * re-appends co-author trailers after a blank line and strands
+ * `Agent-Session` in an earlier paragraph; strict about content, because an
+ * edit in that dialog is the one change no pull-request check can see.
+ */
+export function mainCommitProblems(commit, prCommits) {
+  const all = [commit, ...prCommits];
+  const involved = all.map(agentInvolvement);
+  if (!involved.some((i) => i.any)) return [];
+  const problems = [];
+
+  const agentEmails = new Set(
+    all.flatMap((c) => [
+      ...(isAgentEmail(c.authorEmail) ? [c.authorEmail.toLowerCase()] : []),
+      ...coAuthorsOf(c.message.split("\n"))
+        .map((a) => a.email.toLowerCase())
+        .filter(isAgentEmail),
+    ]),
+  );
+  const finalCoAuthors = coAuthorsOf(trailersOf(commit.message));
+  const credits = (email) => finalCoAuthors.some((a) => a.email.toLowerCase() === email);
+  const missing = [...agentEmails].filter((email) => !credits(email));
+  if (missing.length > 0) {
+    problems.push(`has no \`Co-authored-by:\` trailer for ${missing.join(", ")}`);
+  } else if (agentEmails.size === 0 && finalCoAuthors.length === 0) {
+    problems.push("has no `Co-authored-by:` trailer for the agent");
+  }
+
+  const landed = new Set(sessionsOf(commit.message));
+  const expected = new Set(prCommits.flatMap((c) => sessionsOf(c.message)));
+  const needsSession = involved.some((i) => i.authored || i.session);
+  if (needsSession && landed.size === 0 && expected.size === 0) {
+    problems.push("names no `Agent-Session`, though an agent authored commits in it");
+  }
+  for (const line of expected) {
+    if (!landed.has(line)) problems.push(`dropped \`${line}\` from its pull request's commits`);
+  }
+  return problems;
+}

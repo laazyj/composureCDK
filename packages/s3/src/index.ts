@@ -2,6 +2,7 @@ export {
   createBucketBuilder,
   type BucketBuilderProps,
   type BucketBuilderResult,
+  type BucketPolicyStatement,
   type IBucketBuilder,
   type ServerAccessLogsConfig,
 } from "./bucket-builder.js";

@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, RemovalPolicy, Stack, Tags } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
-import { Bucket, BucketEncryption, type BucketProps } from "aws-cdk-lib/aws-s3";
+import { Bucket, BucketEncryption, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
 import { buildFixture, newStack, tagsPerResource } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
@@ -42,6 +43,22 @@ function lifecycleRulesOf(bucket: { Properties: Synthesised }): Synthesised[] {
   const lifecycle = bucket.Properties.LifecycleConfiguration as
     { Rules?: Synthesised[] } | undefined;
   return lifecycle?.Rules ?? [];
+}
+
+/** An `s3:ListBucket` grant to an AWS service on `resources`. */
+function listStatement(resources: string[], service = "logging.s3.amazonaws.com") {
+  return new PolicyStatement({
+    principals: [new ServicePrincipal(service)],
+    actions: ["s3:ListBucket"],
+    resources,
+  });
+}
+
+/** The statements in a bucket's own policy, or `[]` when it has none. */
+function policyStatements(bucket: IBucket | undefined): { Action: unknown }[] {
+  const document = bucket?.policy?.document.toJSON() as
+    { Statement: { Action: unknown }[] } | undefined;
+  return document?.Statement ?? [];
 }
 
 /** Disables access logging so tests that don't need it get a single-bucket template. */
@@ -638,6 +655,107 @@ describe("BucketBuilder", () => {
         build: (b) => b.build(new Stack(new App(), "S"), "Bucket"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
+    });
+
+    it("preserves #policyStatements across .copy()", () => {
+      assertCopyPreservesState({
+        factory: () => createBucketBuilder().serverAccessLogs(false),
+        configure: (b) => {
+          b.addToResourcePolicy(listStatement(["*"], "first.amazonaws.com"));
+        },
+        mutate: (b) => {
+          b.addToResourcePolicy(listStatement(["*"], "second.amazonaws.com"));
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Bucket"),
+        inspect: (r) => policyStatements(r.bucket).length,
+      });
+    });
+  });
+
+  describe("addToResourcePolicy", () => {
+    const LIST_STATEMENT = {
+      Effect: "Allow",
+      Principal: { Service: "logging.s3.amazonaws.com" },
+      Action: "s3:ListBucket",
+    };
+
+    it("adds a concrete statement to the bucket's own policy, beside enforceSSL", () => {
+      const { template } = buildAndSynth((b) =>
+        withoutLogging(b).addToResourcePolicy(listStatement(["*"])),
+      );
+
+      template.hasResourceProperties("AWS::S3::BucketPolicy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Effect: "Deny",
+              Condition: { Bool: { "aws:SecureTransport": "false" } },
+            }),
+            Match.objectLike({ ...LIST_STATEMENT, Resource: "*" }),
+          ]),
+        },
+      });
+    });
+
+    it("passes the built bucket to a function, so the statement can name its ARN", () => {
+      const { template, result, stack } = buildAndSynth((b) =>
+        withoutLogging(b).addToResourcePolicy((bucket) => listStatement([bucket.bucketArn])),
+      );
+
+      template.hasResourceProperties("AWS::S3::BucketPolicy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              ...LIST_STATEMENT,
+              Resource: stack.resolve(result.bucket.bucketArn) as unknown,
+            }),
+          ]),
+        },
+      });
+    });
+
+    it("resolves a ref against the build context, including one a function returns", () => {
+      const sourceArn = "arn:aws:cloudtrail:us-east-1:123456789012:trail/audit";
+      const statementFor = (resources: string[]) =>
+        ref<{ arn: string }, PolicyStatement>("trail", (r) => {
+          const statement = listStatement(resources);
+          statement.addCondition("StringEquals", { "AWS:SourceArn": r.arn });
+          return statement;
+        });
+
+      const { template, result, stack } = buildAndSynth(
+        (b) =>
+          withoutLogging(b)
+            .addToResourcePolicy(statementFor(["*"]))
+            .addToResourcePolicy((bucket) => statementFor([bucket.bucketArn])),
+        { context: { trail: { arn: sourceArn } } },
+      );
+
+      const condition = { StringEquals: { "AWS:SourceArn": sourceArn } };
+      template.hasResourceProperties("AWS::S3::BucketPolicy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({ ...LIST_STATEMENT, Resource: "*", Condition: condition }),
+            Match.objectLike({
+              ...LIST_STATEMENT,
+              Resource: stack.resolve(result.bucket.bucketArn) as unknown,
+              Condition: condition,
+            }),
+          ]),
+        },
+      });
+    });
+
+    it("leaves the access logs bucket's policy alone", () => {
+      const { template, result } = buildAndSynth((b) =>
+        b.addToResourcePolicy((bucket) => listStatement([bucket.bucketArn])),
+      );
+
+      const listStatements = (bucket: IBucket | undefined) =>
+        policyStatements(bucket).filter((s) => s.Action === "s3:ListBucket");
+      expect(listStatements(result.bucket)).toHaveLength(1);
+      expect(listStatements(result.accessLogsBucket)).toHaveLength(0);
+      template.resourceCountIs("AWS::S3::BucketPolicy", 2);
     });
   });
 

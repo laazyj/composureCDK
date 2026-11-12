@@ -1,9 +1,9 @@
 name: PR policy
 
 # Checks on the pull request itself rather than its code: the `blocked` label,
-# and a Conventional Commit title. The final **PR policy** job is the one check
-# the `main` ruleset requires from here, so a new check joins by being added to
-# its `needs`. See docs/ci.md#required-checks.
+# a Conventional Commit title, and the commits it will squash into. The final
+# **PR policy** job is the one check the `main` ruleset requires from here, so a
+# new check joins by being added to its `needs`. See docs/ci.md#required-checks.
 #
 # Not part of ci.yml: these must re-run when a label or the title changes, and
 # ci.yml must not re-run every gate on a label or title edit.
@@ -50,12 +50,48 @@ jobs:
           fi
           echo "PR title OK: $TITLE"
 
+  # The squash commit this PR will land as: one commit, a body that doesn't
+  # change how nx reads the title, and agent attribution in place. See
+  # docs/ci.md#commits.
+  commits:
+    name: Commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read # list the PR's commits
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      # Dependencies because the check reads commits with nx's own parser,
+      # so it agrees with `nx release` across upgrades.
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the commits that will land
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          NX_DAEMON: false
+        run: npx nx commits:check
+
   # always() so a failed or cancelled check fails this one, rather than
   # leaving it skipped, which a required check counts as passing.
   result:
     name: PR policy
     if: always()
-    needs: [blocked, title]
+    needs: [blocked, title, commits]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

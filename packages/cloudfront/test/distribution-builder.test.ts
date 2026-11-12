@@ -211,13 +211,13 @@ describe("DistributionBuilder", () => {
         b.origin(withBucketOrigin(stack))
           .certificate(cert)
           .domainNames(["example.com"])
-          .minimumProtocolVersion(SecurityPolicyProtocol.TLS_V1_2_2025);
+          .minimumProtocolVersion(SecurityPolicyProtocol.TLS_V1_2_2019);
       });
 
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
           ViewerCertificate: Match.objectLike({
-            MinimumProtocolVersion: "TLSv1.2_2025",
+            MinimumProtocolVersion: "TLSv1.2_2019",
           }),
         }),
       });

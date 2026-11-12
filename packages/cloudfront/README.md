@@ -45,9 +45,11 @@ compose({ site: createBucketBuilder(), cdn }, { site: [], cdn: ["site"] }).build
 | `priceClass`                            | `PRICE_CLASS_100`     | North America and Europe edge locations — sufficient and cost-effective.                   |
 | `httpVersion`                           | `HTTP2_AND_3`         | Enables HTTP/2 and HTTP/3 (QUIC) for improved performance.                                 |
 | `defaultRootObject`                     | `"index.html"`        | Standard for static website hosting.                                                       |
-| `minimumProtocolVersion`                | `TLS_V1_2_2021`       | Requires TLS 1.2+ to prevent older, less secure protocol negotiation.                      |
+| `minimumProtocolVersion`                | `TLS_V1_2_2021`       | Requires TLS 1.2+. Applied only with a custom `certificate`; see below.                    |
 | `defaultBehavior.viewerProtocolPolicy`  | `REDIRECT_TO_HTTPS`   | Ensures all viewer traffic is encrypted in transit.                                        |
 | `defaultBehavior.responseHeadersPolicy` | `SECURITY_HEADERS`    | Applies managed security headers (HSTS, X-Content-Type-Options, etc.).                     |
+
+A TLS floor needs a custom domain and certificate: the default `*.cloudfront.net` certificate's security policy is fixed, so without `.certificate(...)` the `minimumProtocolVersion` default is not applied (CDK would ignore it and warn). A `minimumProtocolVersion` you set yourself is always passed through.
 
 Path behaviors added with `.behavior(pathPattern, config)` get the same `viewerProtocolPolicy` and `responseHeadersPolicy` defaults, exported as `BEHAVIOR_DEFAULTS`; override either per behavior.
 

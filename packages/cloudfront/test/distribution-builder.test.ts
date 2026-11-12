@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
@@ -10,6 +10,7 @@ import {
   type DistributionProps,
   type FunctionProps,
   PriceClass,
+  SecurityPolicyProtocol,
   ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
@@ -25,6 +26,12 @@ import {
 } from "../src/distribution-builder.js";
 
 const buildAndSynth = buildFixture(createDistributionBuilder, "TestDistribution");
+
+const CERT_ARN = "arn:aws:acm:us-east-1:123456789012:certificate/abc";
+
+function withCertificate(stack: Stack) {
+  return Certificate.fromCertificateArn(stack, "Cert", CERT_ARN);
+}
 
 function withBucketOrigin(stack: Stack) {
   const bucket = new Bucket(stack, "TestBucket");
@@ -175,11 +182,7 @@ describe("DistributionBuilder", () => {
 
     it("requires TLS 1.2 minimum protocol version by default", () => {
       const { template } = buildAndSynth((b, stack) => {
-        const cert = Certificate.fromCertificateArn(
-          stack,
-          "Cert",
-          "arn:aws:acm:us-east-1:123456789012:certificate/abc",
-        );
+        const cert = withCertificate(stack);
         b.origin(withBucketOrigin(stack)).certificate(cert).domainNames(["example.com"]);
       });
 
@@ -187,6 +190,34 @@ describe("DistributionBuilder", () => {
         DistributionConfig: Match.objectLike({
           ViewerCertificate: Match.objectLike({
             MinimumProtocolVersion: "TLSv1.2_2021",
+          }),
+        }),
+      });
+    });
+
+    it("does not set a minimum protocol version without a certificate", () => {
+      // #724: CDK ignores the setting without a certificate, and warns.
+      const { stack } = buildAndSynth((b, stack) => b.origin(withBucketOrigin(stack)));
+
+      Annotations.fromStack(stack).hasNoWarning(
+        "*",
+        Match.stringLikeRegexp("minimumProtocolVersion"),
+      );
+    });
+
+    it("lets the user's minimum protocol version override the TLS default", () => {
+      const { template } = buildAndSynth((b, stack) => {
+        const cert = withCertificate(stack);
+        b.origin(withBucketOrigin(stack))
+          .certificate(cert)
+          .domainNames(["example.com"])
+          .minimumProtocolVersion(SecurityPolicyProtocol.TLS_V1_2_2025);
+      });
+
+      template.hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({
+          ViewerCertificate: Match.objectLike({
+            MinimumProtocolVersion: "TLSv1.2_2025",
           }),
         }),
       });
@@ -492,11 +523,7 @@ describe("DistributionBuilder", () => {
     it("resolves certificate from context when using a Ref", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
-      const cert = Certificate.fromCertificateArn(
-        stack,
-        "Cert",
-        "arn:aws:acm:us-east-1:123456789012:certificate/abc",
-      );
+      const cert = withCertificate(stack);
 
       const builder = createDistributionBuilder()
         .origin(withBucketOrigin(stack))
@@ -514,7 +541,7 @@ describe("DistributionBuilder", () => {
         DistributionConfig: Match.objectLike({
           Aliases: ["example.com"],
           ViewerCertificate: Match.objectLike({
-            AcmCertificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/abc",
+            AcmCertificateArn: CERT_ARN,
           }),
         }),
       });
@@ -523,11 +550,7 @@ describe("DistributionBuilder", () => {
     it("accepts a concrete certificate without a Ref", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");
-      const cert = Certificate.fromCertificateArn(
-        stack,
-        "Cert",
-        "arn:aws:acm:us-east-1:123456789012:certificate/abc",
-      );
+      const cert = withCertificate(stack);
 
       const builder = createDistributionBuilder()
         .origin(withBucketOrigin(stack))
@@ -542,7 +565,7 @@ describe("DistributionBuilder", () => {
       template.hasResourceProperties("AWS::CloudFront::Distribution", {
         DistributionConfig: Match.objectLike({
           ViewerCertificate: Match.objectLike({
-            AcmCertificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/abc",
+            AcmCertificateArn: CERT_ARN,
           }),
         }),
       });

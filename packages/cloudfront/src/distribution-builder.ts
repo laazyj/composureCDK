@@ -22,7 +22,7 @@ import {
   type IBucketBuilder,
 } from "@composurecdk/s3";
 import type { DistributionAlarmConfig, FunctionAlarmConfig } from "./alarm-config.js";
-import { DISTRIBUTION_DEFAULTS } from "./defaults.js";
+import { effectiveDistributionDefaults } from "./defaults.js";
 import { guardOriginObjectExpiration } from "./origin-expiration-guard.js";
 import { resolveBehaviors } from "./resolve-behaviors.js";
 import { pathPatternSlug } from "./behavior-function-alarms.js";
@@ -458,7 +458,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       accessLogs: defaultAccessLogs,
       defaultBehavior: defaultBehaviorDefaults,
       ...cdkDefaults
-    } = DISTRIBUTION_DEFAULTS;
+    } = effectiveDistributionDefaults(resolvedCertificate !== undefined);
     const cfg = accessLogs ?? defaultAccessLogs;
 
     const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg, context);

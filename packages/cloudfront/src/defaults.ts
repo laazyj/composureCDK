@@ -33,16 +33,8 @@ export const BEHAVIOR_DEFAULTS: Partial<AddBehaviorOptions> = {
   responseHeadersPolicy: ResponseHeadersPolicy.SECURITY_HEADERS,
 };
 
-/**
- * Secure, AWS-recommended defaults applied to every CloudFront distribution
- * built with {@link createDistributionBuilder}. Each property can be individually
- * overridden via the builder's fluent API.
- *
- * The `defaultBehavior` defaults (viewer protocol policy, response headers
- * policy) are deep-merged with user-provided behavior options in `build()`,
- * then the resolved origin is injected.
- */
-export const DISTRIBUTION_DEFAULTS: Partial<DistributionBuilderProps> = {
+/** Defaults applied to every distribution, with or without a certificate. */
+const BASE_DEFAULTS: Partial<DistributionBuilderProps> = {
   /**
    * Auto-create a dedicated logging bucket and write CloudFront standard
    * access logs to it under the `logs/` prefix. Access logging provides an
@@ -72,15 +64,49 @@ export const DISTRIBUTION_DEFAULTS: Partial<DistributionBuilderProps> = {
    */
   defaultRootObject: "index.html",
 
+  defaultBehavior: { ...BEHAVIOR_DEFAULTS },
+};
+
+/**
+ * Defaults that only apply when the distribution has a custom `certificate`
+ * (and so a custom domain). CloudFront's default `*.cloudfront.net`
+ * certificate has a fixed security policy: CDK ignores these without one,
+ * and warns.
+ */
+const CUSTOM_CERTIFICATE_DEFAULTS: Partial<DistributionBuilderProps> = {
   /**
    * Require TLS 1.2 (2021 policy) as the minimum protocol version.
    * Prevents negotiation of older, less secure TLS versions.
    * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-in-transit.html
    */
   minimumProtocolVersion: SecurityPolicyProtocol.TLS_V1_2_2021,
-
-  defaultBehavior: { ...BEHAVIOR_DEFAULTS },
 };
+
+/**
+ * Secure, AWS-recommended defaults applied to CloudFront distributions
+ * built with {@link createDistributionBuilder}. Each property can be individually
+ * overridden via the builder's fluent API.
+ *
+ * The `defaultBehavior` defaults (viewer protocol policy, response headers
+ * policy) are deep-merged with user-provided behavior options in `build()`,
+ * then the resolved origin is injected. `minimumProtocolVersion` is applied
+ * only when a custom `certificate` is set — a TLS floor needs a custom domain
+ * and certificate.
+ */
+export const DISTRIBUTION_DEFAULTS: Partial<DistributionBuilderProps> = {
+  ...BASE_DEFAULTS,
+  ...CUSTOM_CERTIFICATE_DEFAULTS,
+};
+
+/**
+ * Returns the distribution defaults that apply given whether a custom
+ * certificate is set; see {@link CUSTOM_CERTIFICATE_DEFAULTS}.
+ */
+export function effectiveDistributionDefaults(
+  hasCertificate: boolean,
+): Partial<DistributionBuilderProps> {
+  return hasCertificate ? DISTRIBUTION_DEFAULTS : BASE_DEFAULTS;
+}
 
 /**
  * Defaults applied to every inline CloudFront Function declared on a cache

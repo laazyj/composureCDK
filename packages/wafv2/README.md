@@ -31,23 +31,26 @@ compose(
 );
 ```
 
-The result is `{ webAcl, associations }`:
+The result is `{ webAcl, associations, logGroup?, logging? }`:
 
-| Field          | Type                     | Description                                                                         |
-| -------------- | ------------------------ | ----------------------------------------------------------------------------------- |
-| `webAcl`       | `CfnWebACL`              | The web ACL. Its ARN is `webAcl.attrArn`.                                           |
-| `associations` | `CfnWebACLAssociation[]` | One per `associateWith` call, in that order. Always empty for a CLOUDFRONT web ACL. |
+| Field          | Type                                   | Description                                                                                              |
+| -------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `webAcl`       | `CfnWebACL`                            | The web ACL. Its ARN is `webAcl.attrArn`.                                                                |
+| `associations` | `CfnWebACLAssociation[]`               | One per `associateWith` call, in that order. Always empty for a CLOUDFRONT web ACL.                      |
+| `logGroup`     | `LogGroup \| undefined`                | The `aws-waf-logs-` log group WAF writes to. Absent when logging is off or goes to your own destination. |
+| `logging`      | `CfnLoggingConfiguration \| undefined` | The logging configuration. Absent when logging is off.                                                   |
 
 ## Defaults
 
-| Setting             | Default           | Rationale                                                                                                                                                                                                                                                                                                         |
-| ------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scope`             | `REGIONAL`        | API Gateway, Application Load Balancers, AppSync, Cognito, App Runner and Verified Access are regional. Set `.scope("CLOUDFRONT")` for a distribution — see [CloudFront](#cloudfront).                                                                                                                            |
-| default action      | Allow             | A web ACL in front of an application usually lets through what no rule blocks. Use `.defaultAction("block")` for an allow-list.                                                                                                                                                                                   |
-| CloudWatch metrics  | on, ACL and rules | Free, and the only way to see what the rules are doing. Not configurable.                                                                                                                                                                                                                                         |
-| metric name         | from name or path | The web ACL's `name` when set; otherwise a name derived from its construct path, so two web ACLs never share a metric name. Each rule's metric name is its own name.                                                                                                                                              |
-| `sampledRequests`   | `false`           | A sampled request keeps every header, including credentials, and [logging redaction does not apply to it](https://docs.aws.amazon.com/waf/latest/developerguide/waf-data-protection-and-logging.html). Turning it on without a `dataProtectionConfig` adds the warning `@composurecdk/wafv2:sampling-unredacted`. |
-| managed rule groups | none              | Every managed group blocks some legitimate traffic until it is tuned. None is added for you.                                                                                                                                                                                                                      |
+| Setting             | Default            | Rationale                                                                                                                                                                                                                                                                                                         |
+| ------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scope`             | `REGIONAL`         | API Gateway, Application Load Balancers, AppSync, Cognito, App Runner and Verified Access are regional. Set `.scope("CLOUDFRONT")` for a distribution — see [CloudFront](#cloudfront).                                                                                                                            |
+| default action      | Allow              | A web ACL in front of an application usually lets through what no rule blocks. Use `.defaultAction("block")` for an allow-list.                                                                                                                                                                                   |
+| CloudWatch metrics  | on, ACL and rules  | Free, and the only way to see what the rules are doing. Not configurable.                                                                                                                                                                                                                                         |
+| metric name         | from name or path  | The web ACL's `name` when set; otherwise a name derived from its construct path, so two web ACLs never share a metric name. Each rule's metric name is its own name.                                                                                                                                              |
+| `sampledRequests`   | `false`            | A sampled request keeps every header, including credentials, and [logging redaction does not apply to it](https://docs.aws.amazon.com/waf/latest/developerguide/waf-data-protection-and-logging.html). Turning it on without a `dataProtectionConfig` adds the warning `@composurecdk/wafv2:sampling-unredacted`. |
+| logging             | on, non-Allow only | WAF logs go to a created `aws-waf-logs-` log group, keeping the requests it blocks, counts or challenges and redacting `authorization` and `cookie`. See [Logging](#logging).                                                                                                                                     |
+| managed rule groups | none               | Every managed group blocks some legitimate traffic until it is tuned. None is added for you.                                                                                                                                                                                                                      |
 
 `WEB_ACL_DEFAULTS` and `WEB_ACL_VISIBILITY_DEFAULTS` export these for inspection. Everything else in `CfnWebACLProps` — `name`, `description`, `dataProtectionConfig`, `captchaConfig`, `challengeConfig`, `tokenDomains`, `associationConfig` and the rest — is set with its own builder method and passed through.
 
@@ -128,6 +131,34 @@ These are checked at synth, against the [supported status codes](https://docs.aw
 - **Headers:** at most 10, names of 1–64 characters of `[a-zA-Z0-9._$-]`, no duplicates, and not `content-type`, which WAF sets from the body.
 
 A custom response only applies to Block, so `respond()` after another action, or another action after `respond()`, throws.
+
+## Logging
+
+Logging is on by default, because the [Well-Architected security pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_detect_investigate_events_app_service_logging.html) asks for it and cdk-nag's NIST 800-53, PCI DSS and HIPAA packs fail a web ACL without it (`WAFv2LoggingEnabled`). The builder:
+
+- creates a CloudWatch log group through [`@composurecdk/logs`](../logs/README.md), so it gets that package's retention and removal defaults, named `aws-waf-logs-<web ACL name>` (or a name derived from the construct path), since WAF only logs to names with that prefix;
+- points an `AWS::WAFv2::LoggingConfiguration` at it, using the log group ARN **without** the trailing `:*` that `logGroup.logGroupArn` has, which WAF rejects;
+- keeps only the requests WAF blocks, counts, or answers with a CAPTCHA or challenge (`DEFAULT_LOGGING_FILTER`). Filtering is AWS's main lever on log [volume and cost](https://docs.aws.amazon.com/waf/latest/developerguide/logging-management.html);
+- redacts the `authorization` and `cookie` headers (`DEFAULT_LOGGING_REDACTED_HEADERS`), which carry replayable credentials and are no help when tuning a rule.
+
+```ts
+createWebAclBuilder().logging({
+  filter: "all",
+  redact: { headers: ["x-amz-security-token"], queryString: true },
+  configure: (logGroup) => logGroup.retention(RetentionDays.ONE_YEAR),
+});
+```
+
+| Option        | Effect                                                                                                                                                                                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `filter`      | `"non-allow"` (default), `"all"`, or a typed `{ defaultBehavior, filters }` whose conditions are `{ action }` or `{ label }`. The builder emits CloudFormation's PascalCase JSON, which CDK types as `any`.                                                                      |
+| `redact`      | `headers`, `queryString`, `uriPath`, `method`. **`headers` adds to `authorization` and `cookie`; it does not replace them.** At most 100 fields.                                                                                                                                 |
+| `configure`   | Customizes the created log group's builder. A name that does not start with `aws-waf-logs-` throws, since the deploy would fail.                                                                                                                                                 |
+| `destination` | Logs to an existing CloudWatch log group, S3 bucket or Firehose stream instead, by ARN or `ref`. Its name must start with `aws-waf-logs-`; an S3 bucket must use SSE-S3 or a customer managed key, and a Firehose stream must be DirectPut. Cannot be combined with `configure`. |
+
+`.logging(false)` turns logging off.
+
+WAF grants `delivery.logs.amazonaws.com` write access to the log group itself when the logging configuration is created. It does this with a policy on the log group, not an account-level one, so it does not count toward CloudWatch Logs' limit of 10 resource policies per Region. The identity that creates the configuration (CloudFormation's execution role, under a CDK bootstrap) needs `logs:PutResourcePolicy`, `logs:DescribeResourcePolicies` and `logs:CreateLogDelivery` alongside its WAF permissions. Without them, the logging configuration fails to create and the deploy rolls back; logging is never left silently off. To see the policy, run `aws logs describe-resource-policies --policy-scope RESOURCE --resource-arn <log group ARN>`. A plain `describe-resource-policies` lists only account-level policies. Redaction applies to logs only — see `sampledRequests` in [Defaults](#defaults).
 
 ## Associations
 

@@ -1,5 +1,11 @@
-import { Annotations, Lazy, Names, Token } from "aws-cdk-lib";
-import { CfnWebACL, type CfnWebACLAssociation, type CfnWebACLProps } from "aws-cdk-lib/aws-wafv2";
+import { Annotations, Lazy } from "aws-cdk-lib";
+import type { LogGroup } from "aws-cdk-lib/aws-logs";
+import {
+  type CfnLoggingConfiguration,
+  CfnWebACL,
+  type CfnWebACLAssociation,
+  type CfnWebACLProps,
+} from "aws-cdk-lib/aws-wafv2";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
@@ -12,6 +18,7 @@ import {
 } from "./defaults.js";
 import {
   sanitizeMetricName,
+  webAclBaseName,
   validateMetricName,
   validateRuleName,
   validateWebAclName,
@@ -21,6 +28,7 @@ import {
   createWebAclRuleBuilder,
   type IWebAclRuleBuilder,
 } from "./rule-builder.js";
+import { configureLogging, type WebAclLoggingConfig } from "./logging.js";
 import { checkCloudFrontRegion, type WebAclScope } from "./scope.js";
 
 /**
@@ -54,6 +62,15 @@ export interface WebAclBuilderProps extends Omit<
    * `dataProtectionConfig` warns.
    */
   sampledRequests?: boolean;
+
+  /**
+   * The web ACL's logging. On by default, to a created `aws-waf-logs-`
+   * CloudWatch log group, keeping only the requests WAF does not allow and
+   * redacting the `authorization` and `cookie` headers. `false` turns it off.
+   *
+   * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_detect_investigate_events_app_service_logging.html
+   */
+  logging?: WebAclLoggingConfig | false;
 }
 
 /** The build output of an {@link IWebAclBuilder}. */
@@ -65,6 +82,10 @@ export interface WebAclBuilderResult {
    * CLOUDFRONT web ACL, which a distribution references by `webAclId`.
    */
   associations: CfnWebACLAssociation[];
+  /** The log group WAF writes to. Absent when logging is off or goes to your own destination. */
+  logGroup?: LogGroup;
+  /** The logging configuration. Absent when logging is off. */
+  logging?: CfnLoggingConfiguration;
 }
 
 /**
@@ -150,6 +171,7 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
       scope: aclScope = WEB_ACL_DEFAULTS.scope,
       metricName: userMetricName,
       sampledRequests = WEB_ACL_DEFAULTS.sampledRequests,
+      logging: loggingConfig = WEB_ACL_DEFAULTS.logging,
       ...rest
     } = this.props;
 
@@ -199,7 +221,7 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
         // The derived name comes from the construct's path, so it is read once the construct exists.
         metricName:
           userMetricName ??
-          Lazy.string({ produce: (): string => defaultMetricName(webAcl, rest.name) }),
+          Lazy.string({ produce: (): string => sanitizeMetricName(webAclBaseName(webAcl)) }),
         sampledRequestsEnabled: sampledRequests,
       },
     });
@@ -211,7 +233,11 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
       this.#associations.map((target) => resolve(target, context)),
     );
 
-    return { webAcl, associations };
+    return {
+      webAcl,
+      associations,
+      ...configureLogging(scope, id, owner, webAcl, loggingConfig, context),
+    };
   }
 
   #buildRules(owner: string, bodies: CustomResponseBodies, sampledRequests: boolean): BuiltRule[] {
@@ -249,11 +275,6 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
 
     return rules;
   }
-}
-
-function defaultMetricName(webAcl: CfnWebACL, name: string | undefined): string {
-  if (name !== undefined && !Token.isUnresolved(name)) return name;
-  return sanitizeMetricName(Names.uniqueResourceName(webAcl, { maxLength: 128 }));
 }
 
 /**

@@ -5,13 +5,22 @@ import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
-import { type BucketDeploymentProps, Source } from "aws-cdk-lib/aws-s3-deployment";
+import { type BucketDeploymentProps, type ISource, Source } from "aws-cdk-lib/aws-s3-deployment";
 import { newStack } from "@composurecdk/cdk-testing";
 import { Ref, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createBucketDeploymentBuilder } from "../src/bucket-deployment-builder.js";
 import type { BucketDeploymentBuilderProps } from "../src/bucket-deployment-props.js";
 import { BUCKET_DEPLOYMENT_DEFAULTS } from "../src/bucket-deployment-defaults.js";
+
+const gateSources = ref("gate", (r: { sources: ISource[] }) => r.sources);
+
+function sourceKeyCount(stack: Stack): number {
+  const [deployment] = Object.values(
+    Template.fromStack(stack).findResources("Custom::CDKBucketDeployment"),
+  );
+  return (deployment.Properties as { SourceObjectKeys: unknown[] }).SourceObjectKeys.length;
+}
 
 describe("BucketDeploymentBuilder", () => {
   describe("build", () => {
@@ -97,9 +106,47 @@ describe("BucketDeploymentBuilder", () => {
           .build(stack, "Deploy"),
       ).toThrow(/requires at least one source/);
     });
+
+    it("throws when a sources Ref resolves to an empty array", () => {
+      const stack = newStack();
+      const bucket = new Bucket(stack, "Bucket");
+
+      expect(() =>
+        createBucketDeploymentBuilder()
+          .sources(gateSources)
+          .destinationBucket(bucket)
+          .build(stack, "Deploy", { gate: { sources: [] } }),
+      ).toThrow(/requires at least one source/);
+    });
   });
 
   describe("Ref resolution", () => {
+    it("resolves a Ref for sources", () => {
+      const stack = newStack();
+      const bucket = new Bucket(stack, "Bucket");
+      const sources = [Source.data("index.html", "<html></html>")];
+
+      createBucketDeploymentBuilder()
+        .sources(gateSources)
+        .destinationBucket(bucket)
+        .build(stack, "Deploy", { gate: { sources } });
+
+      expect(sourceKeyCount(stack)).toBe(1);
+    });
+
+    it("resolves a Ref that mixes static and referenced sources", () => {
+      const stack = newStack();
+      const bucket = new Bucket(stack, "Bucket");
+      const generated = [Source.data("config.json", "{}")];
+
+      createBucketDeploymentBuilder()
+        .sources(gateSources.map((sources) => [Source.asset("./test"), ...sources]))
+        .destinationBucket(bucket)
+        .build(stack, "Deploy", { gate: { sources: generated } });
+
+      expect(sourceKeyCount(stack)).toBe(2);
+    });
+
     it("resolves a Ref for destinationBucket", () => {
       const stack = newStack();
       const bucket = new Bucket(stack, "Bucket");

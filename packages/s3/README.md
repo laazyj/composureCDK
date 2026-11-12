@@ -227,7 +227,7 @@ const deploy = createBucketDeploymentBuilder()
   .build(stack, "Deploy");
 ```
 
-The `destinationBucket` and `distribution` methods accept `Ref` values for cross-component wiring. Each reads what it accepts from CDK's own `BucketDeploymentProps` rather than pinning an interface, so it accepts whatever your installed `aws-cdk-lib` accepts — `distribution` is already the broader [`cloudfront.IDistributionRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudfront.IDistributionRef.html) there.
+The `sources`, `destinationBucket` and `distribution` methods accept `Ref` values for cross-component wiring. Each reads what it accepts from CDK's own `BucketDeploymentProps` rather than pinning an interface, so it accepts whatever your installed `aws-cdk-lib` accepts — `distribution` is already the broader [`cloudfront.IDistributionRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudfront.IDistributionRef.html) there.
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
@@ -241,6 +241,14 @@ compose(
   { site: createBucketBuilder(), cdn: createDistributionBuilder(), deploy },
   { site: [], cdn: ["site"], deploy: ["site", "cdn"] },
 ).build(stack, "Website");
+```
+
+`sources` can come from another component too — for example one that generates files at build time. To deploy static and generated files together, build the array inside the ref:
+
+```ts
+const deploy = createBucketDeploymentBuilder()
+  .sources(ref("gate", (r) => [Source.asset("./site"), ...r.sources]))
+  .destinationBucket(ref("site", (r) => r.bucket));
 ```
 
 ### Secure Defaults

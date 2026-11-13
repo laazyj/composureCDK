@@ -140,6 +140,53 @@ restApiGrants.invoke(
 
 Each field is independent, so any subset yields a partial wildcard — `{ method: "GET" }` allows `GET` on any path and stage, `{ path: "/items" }` allows any method on `/items`. Paths themselves accept `*` (e.g. `{ path: "/items/*" }`), matching the `arn:…:execute-api:…:<api>/<stage>/<method>/<path>` structure.
 
+## Resource policy
+
+`.policy(document)` sets the API's resource policy on either builder. It accepts a `PolicyDocument` or a `ref`/`combine` that builds one from siblings. Here, a private API accepts calls only through an interface endpoint built in the same system:
+
+```ts
+import { EndpointType } from "aws-cdk-lib/aws-apigateway";
+import { AnyPrincipal, Effect, PolicyDocument, PolicyStatement } from "aws-cdk-lib/aws-iam";
+import {
+  createInterfaceEndpointBuilder,
+  type InterfaceEndpointBuilderResult,
+} from "@composurecdk/ec2";
+
+compose(
+  {
+    endpoint: createInterfaceEndpointBuilder() /* … */,
+    api: createRestApiBuilder()
+      .endpointTypes([EndpointType.PRIVATE])
+      .policy(
+        ref(
+          "endpoint",
+          (r: InterfaceEndpointBuilderResult) =>
+            new PolicyDocument({
+              statements: [
+                new PolicyStatement({
+                  principals: [new AnyPrincipal()],
+                  actions: ["execute-api:Invoke"],
+                  resources: ["execute-api:/*"],
+                }),
+                new PolicyStatement({
+                  effect: Effect.DENY,
+                  principals: [new AnyPrincipal()],
+                  actions: ["execute-api:Invoke"],
+                  resources: ["execute-api:/*"],
+                  conditions: { StringNotEquals: { "aws:SourceVpce": r.endpoint.vpcEndpointId } },
+                }),
+              ],
+            }),
+        ),
+      ),
+  },
+  { endpoint: [], api: ["endpoint"] },
+);
+```
+
+- **Name resources in the relative `execute-api:/stage/METHOD/path` form.** The policy is a property of the API resource itself, so `api.arnForExecuteApi()` would make the API depend on its own id, which CloudFormation rejects as a circular dependency. API Gateway expands the relative form to the API's own ARN.
+- **A component that depends on the API cannot be named here:** `compose` rejects the cycle. Grant an IAM principal access on the principal's side with [`restApiGrants`](#invoke-grants) instead.
+
 ## Secure Defaults
 
 `createRestApiBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.

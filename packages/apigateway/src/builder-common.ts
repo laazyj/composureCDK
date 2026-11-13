@@ -1,6 +1,7 @@
 import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
-import type { RestApiBase } from "aws-cdk-lib/aws-apigateway";
+import type { RestApiBase, RestApiBaseProps } from "aws-cdk-lib/aws-apigateway";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
+import type { Resolvable } from "@composurecdk/core";
 import type { RestApiAlarmConfig } from "./alarm-config.js";
 import type { AccessLoggingConfig } from "./deploy-options.js";
 import type { ExecutionLoggingConfig } from "./execution-logging.js";
@@ -10,6 +11,19 @@ import type { ExecutionLoggingConfig } from "./execution-logging.js";
  * and {@link SpecRestApiBuilderProps}.
  */
 export interface RestApiBuilderPropsBase {
+  /**
+   * The API's resource policy.
+   *
+   * Accepts a concrete `PolicyDocument` or a {@link Resolvable} — a {@link ref}
+   * or {@link combine} that builds one from sibling components, such as the
+   * interface VPC endpoint a private API admits. See the README's "Resource
+   * policy" section.
+   *
+   * The policy is part of the API resource, so a statement cannot name the
+   * API's own ARN: use the relative `execute-api:/stage/METHOD/path` form.
+   */
+  policy?: Resolvable<NonNullable<RestApiBaseProps["policy"]>>;
+
   /**
    * Whether to automatically create a CloudWatch log group for access logging,
    * and how to configure it; see {@link AccessLoggingConfig}.

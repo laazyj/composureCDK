@@ -19,7 +19,7 @@ import { createRestApiAlarms } from "./rest-api-alarms.js";
  * so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
  */
 export interface SpecRestApiBuilderProps
-  extends Omit<SpecRestApiProps, "apiDefinition">, RestApiBuilderPropsBase {
+  extends Omit<SpecRestApiProps, "apiDefinition" | "policy">, RestApiBuilderPropsBase {
   /**
    * The OpenAPI specification that defines the API.
    *
@@ -111,6 +111,7 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
       executionLogging,
       recommendedAlarms: alarmConfig,
       apiDefinition,
+      policy,
       ...specRestApiProps
     } = this.props;
 
@@ -124,6 +125,7 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
     // Resolved before anything is created, so an unresolvable ref fails
     // without leaving a half-built access log group in the scope.
     const resolvedDefinition = resolve(apiDefinition, context);
+    const resolvedPolicy = policy === undefined ? undefined : resolve(policy, context);
 
     const { accessLogGroup, deployOptions } = resolveDeployOptions(
       scope,
@@ -137,6 +139,7 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
     const api = new SpecRestApi(scope, id, {
       ...specRestApiProps,
       apiDefinition: resolvedDefinition,
+      policy: resolvedPolicy,
       deployOptions,
     });
 

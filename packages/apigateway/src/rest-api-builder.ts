@@ -6,7 +6,7 @@ import {
   type RestApiProps,
 } from "aws-cdk-lib/aws-apigateway";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, type Resolvable } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
@@ -21,7 +21,8 @@ import { createRestApiAlarms } from "./rest-api-alarms.js";
  *
  * Extends the CDK {@link RestApiProps} with additional builder-specific options.
  */
-export interface RestApiBuilderProps extends RestApiProps, RestApiBuilderPropsBase {}
+export interface RestApiBuilderProps
+  extends Omit<RestApiProps, "policy">, RestApiBuilderPropsBase {}
 
 /**
  * The build output of a {@link IRestApiBuilder}. Contains the CDK constructs
@@ -127,8 +128,12 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
       accessLogging,
       executionLogging,
       recommendedAlarms: alarmConfig,
+      policy,
       ...restApiProps
     } = this.props;
+    // Resolved before anything is created, so an unresolvable ref fails
+    // without leaving a half-built access log group in the scope.
+    const resolvedPolicy = policy === undefined ? undefined : resolve(policy, context);
     const { accessLogGroup, deployOptions } = resolveDeployOptions(
       scope,
       id,
@@ -140,6 +145,7 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
 
     const api = new RestApi(scope, id, {
       ...restApiProps,
+      policy: resolvedPolicy,
       deployOptions,
     });
     this.#root.applyTo(api.root, context ?? {});

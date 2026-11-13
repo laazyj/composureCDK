@@ -1,7 +1,8 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { type PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { type Alias, type IKey, Key, KeySpec, type KeyProps } from "aws-cdk-lib/aws-kms";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { KeyAlarmConfig } from "./alarm-config.js";
@@ -93,6 +94,7 @@ export type IKeyBuilder = ITaggedBuilder<KeyBuilderProps, KeyBuilder>;
 class KeyBuilder implements Lifecycle<KeyBuilderResult> {
   props: Partial<KeyBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IKey>[] = [];
+  readonly #policyStatements: Resolvable<PolicyStatement>[] = [];
 
   addAlarm(key: string, configure: AlarmConfigurer<IKey>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IKey>(key)));
@@ -110,15 +112,34 @@ class KeyBuilder implements Lifecycle<KeyBuilderResult> {
     return this;
   }
 
+  /**
+   * Adds a statement to the key policy once the key is built, beside CDK's
+   * default statement that delegates the key to the account's IAM policies.
+   *
+   * Setting `policy` instead replaces that default. Name the key as
+   * `resources: ["*"]` — in a key policy that means this key, and the key's
+   * own ARN would be a circular reference. A {@link Ref} resolves against the
+   * build context — see the README's "Key policy" section.
+   */
+  addToResourcePolicy(statement: Resolvable<PolicyStatement>): this {
+    this.#policyStatements.push(statement);
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: KeyBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
+    target.#policyStatements.push(...this.#policyStatements);
   }
 
-  build(scope: IConstruct, id: string): KeyBuilderResult {
+  build(scope: IConstruct, id: string, context?: Record<string, object>): KeyBuilderResult {
     const { recommendedAlarms: alarmConfig, alias, ...configured } = this.props;
 
     const key = new Key(scope, id, mergeKeyDefaults(configured));
+
+    for (const statement of this.#policyStatements) {
+      key.addToResourcePolicy(resolve(statement, context));
+    }
 
     // Created here rather than passed through as `KeyProps.alias` so the Alias
     // construct is available for the result (build results must be complete).

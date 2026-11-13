@@ -1,9 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import {
+  AccountPrincipal,
+  PolicyDocument,
+  PolicyStatement,
+  ServicePrincipal,
+} from "aws-cdk-lib/aws-iam";
 import { type IKey, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
 import { buildFixture, newStack } from "@composurecdk/cdk-testing";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import { createKeyBuilder } from "../src/key-builder.js";
@@ -238,5 +245,104 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["urgentExpiry", "soonExpiry"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+describe("addToResourcePolicy", () => {
+  const ROOT_STATEMENT = Match.objectLike({
+    Action: "kms:*",
+    Principal: { AWS: Match.anyValue() },
+    Resource: "*",
+  });
+  const SERVICE_STATEMENT = {
+    Effect: "Allow",
+    Principal: { Service: "cloudwatch.amazonaws.com" },
+    Action: ["kms:Decrypt", "kms:GenerateDataKey*"],
+    Resource: "*",
+  };
+
+  /** A key-use grant to an AWS service. */
+  function serviceStatement(service = "cloudwatch.amazonaws.com") {
+    return new PolicyStatement({
+      principals: [new ServicePrincipal(service)],
+      actions: ["kms:Decrypt", "kms:GenerateDataKey*"],
+      resources: ["*"],
+    });
+  }
+
+  /** The statements in the synthesised key policy. */
+  function keyPolicyStatements(key: IKey): unknown[] {
+    const keys = Template.fromStack(Stack.of(key)).findResources("AWS::KMS::Key");
+    return Object.values(keys).flatMap(
+      (k) =>
+        (k as { Properties: { KeyPolicy: { Statement: unknown[] } } }).Properties.KeyPolicy
+          .Statement,
+    );
+  }
+
+  it("adds the statement beside CDK's default account-root statement", () => {
+    const { template } = buildAndSynth((b) => b.addToResourcePolicy(serviceStatement()));
+
+    template.hasResourceProperties("AWS::KMS::Key", {
+      KeyPolicy: {
+        Statement: [ROOT_STATEMENT, Match.objectLike(SERVICE_STATEMENT)],
+      },
+    });
+  });
+
+  it("joins a policy set with .policy(...)", () => {
+    const own = new PolicyStatement({
+      principals: [new AccountPrincipal("111122223333")],
+      actions: ["kms:*"],
+      resources: ["*"],
+    });
+    const { template } = buildAndSynth((b) =>
+      b.policy(new PolicyDocument({ statements: [own] })).addToResourcePolicy(serviceStatement()),
+    );
+
+    template.hasResourceProperties("AWS::KMS::Key", {
+      KeyPolicy: {
+        Statement: [
+          Match.objectLike({ Principal: { AWS: Match.anyValue() }, Action: "kms:*" }),
+          Match.objectLike(SERVICE_STATEMENT),
+        ],
+      },
+    });
+  });
+
+  it("resolves a ref against the build context", () => {
+    const sourceArn = "arn:aws:sns:eu-west-1:111122223333:alerts";
+    const { template } = buildAndSynth(
+      (b) =>
+        b.addToResourcePolicy(
+          ref<{ arn: string }, PolicyStatement>("topic", (r) => {
+            const statement = serviceStatement();
+            statement.addCondition("ArnEquals", { "aws:SourceArn": r.arn });
+            return statement;
+          }),
+        ),
+      { context: { topic: { arn: sourceArn } } },
+    );
+
+    template.hasResourceProperties("AWS::KMS::Key", {
+      KeyPolicy: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            ...SERVICE_STATEMENT,
+            Condition: { ArnEquals: { "aws:SourceArn": sourceArn } },
+          }),
+        ]),
+      },
+    });
+  });
+
+  it("keeps statements across .copy()", () => {
+    assertCopyPreservesState({
+      factory: () => createKeyBuilder(),
+      configure: (b) => b.addToResourcePolicy(serviceStatement("first.amazonaws.com")),
+      mutate: (b) => b.addToResourcePolicy(serviceStatement("second.amazonaws.com")),
+      build: (b) => b.build(newStack(), "TestKey"),
+      inspect: (r) => keyPolicyStatements(r.key).length,
+    });
   });
 });

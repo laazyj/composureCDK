@@ -129,6 +129,32 @@ const handler = createFunctionBuilder().grant(
 
 A grant on the encrypted **resource** usually covers its key already: `bucketGrants.write` and `tableGrants.read` extend to the resource's `encryptionKey` when CDK knows about it. Reach for `keyGrants` for what it cannot infer — a principal decrypting ciphertext it fetched elsewhere, an envelope-encryption client calling `GenerateDataKey` directly, or a key shared with a resource the grantee holds no grant on.
 
+## Key policy
+
+`.addToResourcePolicy(statement)` adds a statement to the key policy at build time, beside CDK's default statement that delegates the key to the account's IAM policies. Reach for it when a principal needs the key and no IAM policy can say so — typically an AWS service using the key on a resource's behalf. CloudWatch alarms publishing to an SNS topic encrypted with this key are one such case:
+
+```ts
+import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+
+createKeyBuilder()
+  .description("Encrypts the alerts topic.")
+  .addToResourcePolicy(
+    new PolicyStatement({
+      effect: Effect.ALLOW,
+      principals: [new ServicePrincipal("cloudwatch.amazonaws.com")],
+      actions: ["kms:Decrypt", "kms:GenerateDataKey*"],
+      resources: ["*"],
+      conditions: { StringEquals: { "aws:SourceAccount": "111122223333" } },
+    }),
+  );
+```
+
+Use `resources: ["*"]`: in a key policy it means this key, and the key's own ARN would be a circular reference.
+
+Prefer this to `.policy(...)`. Setting `policy` replaces CDK's default statement, so the account's IAM policies can no longer grant the key — every [`keyGrants`](#grants) grant, and every grant that extends to an encrypted resource's key, stops working. When `policy` is set, the statements join that document instead.
+
+The statement may be a `ref` or `combine`, resolved against the build context, so it can name a sibling the key depends on. A component that depends on the key — anything it encrypts, and anything granted it — cannot be named: `compose` rejects the cycle. Access for an IAM principal belongs on the grantee as a `keyGrants` grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). Where neither fits, add the statement in an `afterBuild` hook, which sees every component's result.
+
 ## Recommended Alarms
 
 AWS's [recommended alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) for KMS cover one metric: `SecondsUntilKeyMaterialExpiration`. It is **opt-in** — KMS publishes the metric only for keys whose material was [imported](https://docs.aws.amazon.com/kms/latest/developerguide/importing-keys.html) with an expiration date, so on a key created by CloudFormation the alarm could never leave `INSUFFICIENT_DATA`.

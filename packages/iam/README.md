@@ -133,7 +133,7 @@ const principal = openIdConnectPrincipal({
 
 The operator is a typed union, so a typo fails to compile; overlapping operators merge, and one key given two different sets of values throws (`"x"` and `["x"]` are the same set, as IAM reads them). Prefer this to CDK's `.withConditions(...)`, which takes keys verbatim and lets a later value for the same key silently win. `.withSessionTags()` on the returned principal adds `sts:TagSession`.
 
-A value can name a token claim too — to pin the session name to the caller's subject, say. `oidcClaim()` writes the policy variable for you, qualified by the same rule as keys, so the issuer host is not hand-typed on the value side either:
+A value can name a token claim too — to pin the session name to the caller's subject, say. `oidcClaim()` writes the policy variable for you, qualified by the same rule as keys, so the issuer host is not hand-typed on the value side either. IAM substitutes policy variables only under `String*` and `Arn*` operators, so a reference under any other operator throws:
 
 ```ts
 import { oidcClaim } from "@composurecdk/iam";

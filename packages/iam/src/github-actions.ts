@@ -1,7 +1,7 @@
 import { Stack } from "aws-cdk-lib";
 import {
   type IOpenIdConnectProvider,
-  OpenIdConnectPrincipal,
+  type OpenIdConnectPrincipal,
   OpenIdConnectProvider,
 } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
@@ -9,7 +9,10 @@ import {
   createOpenIdConnectProviderBuilder,
   type IOpenIdConnectProviderBuilder,
 } from "./open-id-connect-provider-builder.js";
-import { openIdConnectPrincipal } from "./open-id-connect-principal.js";
+import {
+  openIdConnectPrincipal,
+  type OpenIdConnectPrincipalOptions,
+} from "./open-id-connect-principal.js";
 
 /**
  * GitHub Actions OIDC batteries, exposed under the `githubActions` sub-namespace
@@ -113,9 +116,9 @@ export interface PrincipalOptions {
   /**
    * The GitHub OIDC provider the role federates with — build one with
    * {@link provider} or reference the account singleton with
-   * {@link importProvider}.
+   * {@link importProvider}. Any provider `openIdConnectPrincipal` accepts works.
    */
-  readonly provider: IOpenIdConnectProvider;
+  readonly provider: OpenIdConnectPrincipalOptions["provider"];
 
   /**
    * The workflow scopes allowed to assume the role. **At least one is
@@ -128,6 +131,14 @@ export interface PrincipalOptions {
 
   /** Override the audience (`aud`); defaults to `sts.amazonaws.com`. */
   readonly audience?: string;
+
+  /**
+   * Further trust-policy conditions, keyed by operator — bare claim keys are
+   * qualified with the GitHub issuer host. See
+   * {@link OpenIdConnectPrincipalOptions.conditions}. Restating `aud` or `sub`
+   * here with a different value throws rather than loosening the guard.
+   */
+  readonly conditions?: OpenIdConnectPrincipalOptions["conditions"];
 }
 
 /**
@@ -167,6 +178,7 @@ export function principal(opts: PrincipalOptions): OpenIdConnectPrincipal {
     issuerHost: GITHUB_OIDC_ISSUER_HOST,
     stringEquals: { aud: opts.audience ?? GITHUB_OIDC_AUDIENCE },
     stringLike: { sub: opts.subjects.map((subject) => subject(ownerRepo)) },
+    conditions: opts.conditions,
   });
 }
 

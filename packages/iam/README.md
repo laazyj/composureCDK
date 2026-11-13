@@ -116,17 +116,41 @@ const principal = openIdConnectPrincipal({
 createRoleBuilder().assumedBy(principal).build(stack, "DeployRole");
 ```
 
-The result is a CDK `OpenIdConnectPrincipal`, so its own methods cover what the two options don't: `.withConditions(...)` for other operators, and `.withSessionTags()` to add `sts:TagSession`. For example, a multi-valued claim such as `amr` needs a set operator, and its key must be written fully qualified:
+`stringEquals` and `stringLike` are shorthand for the two common operators. For any other, use `conditions`, keyed by operator; its keys are qualified by the same rule. A multi-valued claim such as `amr` needs a set operator, and an exclusion needs a negated one:
 
 ```ts
 const principal = openIdConnectPrincipal({
   provider,
   issuerHost: "oidc.example.com",
   stringEquals: { aud: "sts.amazonaws.com" },
-}).withConditions({ "ForAnyValue:StringLike": { "oidc.example.com:amr": "mfa" } });
+  conditions: {
+    "ForAnyValue:StringLike": { amr: "mfa" }, // → oidc.example.com:amr
+    StringNotLike: { sub: "repo:acme/app:pull_request" }, // → oidc.example.com:sub
+    "ForAllValues:StringEquals": { "aws:TagKeys": ["team"] }, // passes through
+  },
+});
+```
+
+The operator is a typed union, so a typo fails to compile; overlapping operators merge, and one key given two different sets of values throws (`"x"` and `["x"]` are the same set, as IAM reads them). Prefer this to CDK's `.withConditions(...)`, which takes keys verbatim and lets a later value for the same key silently win. `.withSessionTags()` on the returned principal adds `sts:TagSession`.
+
+A value can name a token claim too — to pin the session name to the caller's subject, say. `oidcClaim()` writes the policy variable for you, qualified by the same rule as keys, so the issuer host is not hand-typed on the value side either:
+
+```ts
+import { oidcClaim } from "@composurecdk/iam";
+
+openIdConnectPrincipal({
+  provider,
+  issuerHost: "oidc.example.com",
+  stringEquals: { aud: "sts.amazonaws.com" },
+  conditions: {
+    StringEquals: { "sts:RoleSessionName": oidcClaim("sub") }, // → "${oidc.example.com:sub}"
+  },
+});
 ```
 
 The builder wraps the L2 [OpenIdConnectProvider](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_iam.OpenIdConnectProvider.html), which auto-fetches the provider's root-CA thumbprint, so a URL and audience are usually all you need.
+
+`provider` takes whatever CDK's own `OpenIdConnectPrincipal` takes, so on a current `aws-cdk-lib` an [`OidcProviderNative`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_iam.OidcProviderNative.html) works as well. It maps straight onto `AWS::IAM::OIDCProvider` with no custom-resource Lambda, and IAM no longer needs a thumbprint for most issuers, so prefer it when you do not need the builder.
 
 ### GitHub Actions
 
@@ -149,6 +173,6 @@ const { role } = createRoleBuilder()
   .build(stack, "GitHubActionsDeployRole");
 ```
 
-`githubActions.principal()` pins the `aud` claim with `StringEquals` and scopes `sub` with `StringLike`, and requires at least one subject — a principal with no `sub` condition would trust every repository on GitHub. Build subjects with `Subject.branch(name)`, `.tag(pattern)`, `.pullRequest()`, `.environment(name)`, or `.custom(suffix)`.
+`githubActions.principal()` pins the `aud` claim with `StringEquals` and scopes `sub` with `StringLike`, and requires at least one subject — a principal with no `sub` condition would trust every repository on GitHub. Further conditions go in `conditions`, as for `openIdConnectPrincipal()`. Build subjects with `Subject.branch(name)`, `.tag(pattern)`, `.pullRequest()`, `.environment(name)`, or `.custom(suffix)`.
 
 Only one GitHub provider is allowed per account; if it already exists, reference it instead of creating a second with `githubActions.importProvider(stack, "GithubOidcProvider")`.

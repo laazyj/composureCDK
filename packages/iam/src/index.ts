@@ -26,6 +26,9 @@ export {
 } from "./open-id-connect-provider-builder.js";
 export {
   openIdConnectPrincipal,
+  oidcClaim,
+  type ConditionOperator,
+  type OidcClaimReference,
   type OpenIdConnectPrincipalOptions,
 } from "./open-id-connect-principal.js";
 export * as githubActions from "./github-actions.js";

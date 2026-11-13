@@ -1,5 +1,6 @@
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { type PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Bucket, BucketEncryption, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
@@ -33,6 +34,15 @@ export type ServerAccessLogsConfig =
        */
       configure?: (b: IBucketBuilder) => IBucketBuilder;
     };
+
+/**
+ * A statement for {@link IBucketBuilder.addToResourcePolicy}: a
+ * {@link PolicyStatement}, a {@link Resolvable} of one, or a function of the
+ * built bucket that returns either — so the statement can name the bucket's
+ * own ARNs.
+ */
+export type BucketPolicyStatement =
+  Resolvable<PolicyStatement> | ((bucket: IBucket) => Resolvable<PolicyStatement>);
 
 /**
  * Configuration properties for the S3 bucket builder. Extends CDK
@@ -132,6 +142,7 @@ export type IBucketBuilder = ITaggedBuilder<BucketBuilderProps, BucketBuilder>;
 class BucketBuilder implements Lifecycle<BucketBuilderResult> {
   props: Partial<BucketBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Bucket>[] = [];
+  readonly #policyStatements: BucketPolicyStatement[] = [];
 
   addAlarm(key: string, configure: AlarmConfigurer<Bucket>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Bucket>(key)));
@@ -149,9 +160,22 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
     return this;
   }
 
+  /**
+   * Adds a statement to the bucket's resource policy once the bucket is built.
+   *
+   * Pass a function of the bucket to name its own ARNs. A {@link Ref} resolves
+   * against the build context; a component that depends on the bucket cannot
+   * be named that way — see the README's "Resource policy" section.
+   */
+  addToResourcePolicy(statement: BucketPolicyStatement): this {
+    this.#policyStatements.push(statement);
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: BucketBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
+    target.#policyStatements.push(...this.#policyStatements);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): BucketBuilderResult {
@@ -175,6 +199,11 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
     } as BucketProps;
 
     const bucket = new Bucket(scope, id, mergedProps);
+
+    for (const statement of this.#policyStatements) {
+      const resolvable = typeof statement === "function" ? statement(bucket) : statement;
+      bucket.addToResourcePolicy(resolve(resolvable, context));
+    }
 
     const alarms = createBucketAlarms(
       scope,

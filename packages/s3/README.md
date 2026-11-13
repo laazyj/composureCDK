@@ -105,6 +105,31 @@ createBucketBuilder().serverAccessLogs({ destination: myBucket, prefix: "x/" });
 
 The `configure` callback receives the build context, so anything `IBucketBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the bucket.
 
+### Resource policy
+
+`.addToResourcePolicy(statement)` adds a statement to the bucket's own policy at build time, beside the `enforceSSL` statement. Pass a function of the bucket to name its own ARNs:
+
+```ts
+import { AnyPrincipal, Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
+
+createBucketBuilder().addToResourcePolicy(
+  (bucket) =>
+    new PolicyStatement({
+      effect: Effect.DENY,
+      principals: [new AnyPrincipal()],
+      actions: ["s3:*"],
+      resources: [bucket.bucketArn, bucket.arnForObjects("*")],
+      conditions: { StringNotEquals: { "aws:PrincipalOrgID": "o-exampleorgid" } },
+    }),
+);
+```
+
+The statement — or the function's return value — may be a `ref` or `combine`, so it can name a sibling the bucket's policy depends on, such as a VPC endpoint for an `aws:SourceVpce` condition. Declare that sibling as a dependency of the bucket.
+
+A component that depends on the bucket cannot be named here: `compose` rejects the cycle. Declare that access where the dependency already points ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)) — a `bucketGrants` grant for an IAM principal, or `S3BucketOrigin.withOriginAccessControl(bucket, { originAccessLevels })` for a CloudFront distribution, which scopes the statement to that distribution. Where neither fits, add the statement in an `afterBuild` hook, which sees every component's result.
+
+The statements apply to this bucket only, not to the auto-created access logs bucket.
+
 ## Recommended Alarms
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#S3) automatically when [CloudWatch request metrics](https://docs.aws.amazon.com/AmazonS3/latest/userguide/configure-request-metrics-bucket.html) are configured on the bucket via `.metrics()`. One alarm per metric is created for each metrics configuration entry. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

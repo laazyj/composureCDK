@@ -18,7 +18,7 @@
 
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
-import { pullRequestProblems } from "./commit-rules.mjs";
+import { pullRequestAgentSignal, pullRequestProblems } from "./commit-rules.mjs";
 
 const { GITHUB_REPOSITORY: repo, PR_NUMBER: number, PR_TITLE: title } = process.env;
 if (!repo || !/^\d+$/.test(number ?? "") || !title) {
@@ -39,7 +39,12 @@ const commits = pages.flat().map((c) => ({
   parents: c.parents.map((p) => p.sha),
 }));
 
-const problems = pullRequestProblems({ title, number, commits });
+const pr = JSON.parse(
+  execFileSync("gh", ["api", `repos/${repo}/pulls/${number}`], { encoding: "utf8" }),
+);
+const agentSignal = pullRequestAgentSignal({ body: pr.body, headRef: pr.head?.ref });
+
+const problems = pullRequestProblems({ title, number, commits, agentSignal });
 if (problems.length === 0) {
   console.log(`Commits OK: ${commits.length} commit, squash lands as "${title} (#${number})".`);
   process.exit(0);

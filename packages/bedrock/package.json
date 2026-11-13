@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/bedrock",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Composable Amazon Bedrock model access: cross-Region inference profiles, invocation grants and alarms",
   "repository": {
     "type": "git",
@@ -40,12 +40,12 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.13.0",
-    "@composurecdk/cloudwatch": "^0.13.0",
-    "@composurecdk/core": "^0.13.0",
-    "@composurecdk/custom-resources": "^0.13.0",
-    "@composurecdk/iam": "^0.13.0",
-    "@composurecdk/logs": "^0.13.0",
+    "@composurecdk/cloudformation": "^0.14.0",
+    "@composurecdk/cloudwatch": "^0.14.0",
+    "@composurecdk/core": "^0.14.0",
+    "@composurecdk/custom-resources": "^0.14.0",
+    "@composurecdk/iam": "^0.14.0",
+    "@composurecdk/logs": "^0.14.0",
     "aws-cdk-lib": "^2.166.0",
     "constructs": "^10.0.0"
   },

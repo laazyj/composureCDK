@@ -1,3 +1,37 @@
+## 0.14.0 (2026-11-13)
+
+### 🚀 Features
+
+- ⚠️ **apigateway:** manage the stage's execution log group ([#712](https://github.com/laazyj/composureCDK/pull/712), [#707](https://github.com/laazyj/composureCDK/issues/707))
+- **apigateway:** add a configure hook to accessLogging ([#717](https://github.com/laazyj/composureCDK/pull/717), [#716](https://github.com/laazyj/composureCDK/issues/716))
+- **cloudfront:** acknowledge CDK's list-bucket warning when a default root object is set ([#737](https://github.com/laazyj/composureCDK/pull/737))
+- **cloudwatch:** add addAlarms() to every builder that has addAlarm ([#711](https://github.com/laazyj/composureCDK/pull/711))
+- **eslint-plugin:** add add-alarm-requires-add-alarms rule ([#714](https://github.com/laazyj/composureCDK/pull/714))
+- **iam:** add a general conditions option to openIdConnectPrincipal ([#721](https://github.com/laazyj/composureCDK/pull/721), [#715](https://github.com/laazyj/composureCDK/issues/715))
+- **lambda:** accept a bucket as a stream source's onFailure, with a least-privilege grant ([#710](https://github.com/laazyj/composureCDK/pull/710), [#642](https://github.com/laazyj/composureCDK/issues/642))
+- **s3:** accept a Resolvable for BucketDeploymentBuilder sources ([#727](https://github.com/laazyj/composureCDK/pull/727), [#726](https://github.com/laazyj/composureCDK/issues/726))
+- **s3:** declarative bucket resource-policy statements ([#734](https://github.com/laazyj/composureCDK/pull/734))
+
+### 🩹 Fixes
+
+- **cloudfront:** apply the TLS minimumProtocolVersion default only with a certificate ([#728](https://github.com/laazyj/composureCDK/pull/728), [#724](https://github.com/laazyj/composureCDK/issues/724))
+- **iam:** pass fully-qualified condition keys through openIdConnectPrincipal ([#709](https://github.com/laazyj/composureCDK/pull/709), [#705](https://github.com/laazyj/composureCDK/issues/705))
+
+### ⚠️ Breaking Changes
+
+- **apigateway:** manage the stage's execution log group ([#712](https://github.com/laazyj/composureCDK/pull/712), [#707](https://github.com/laazyj/composureCDK/issues/707))
+  an API that has already served traffic with execution
+  logging on (the default loggingLevel is INFO) already has a group of
+  that name, created by API Gateway, and the deploy fails because
+  CloudFormation cannot create it. Delete the existing group before
+  deploying, or set .executionLogging(false).
+  Closes #707
+  Claude-Session: https://claude.ai/code/session_01GquHJudR5PNyh6WsodLJ8D
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.13.0 (2026-11-10)
 
 ### 🚀 Features

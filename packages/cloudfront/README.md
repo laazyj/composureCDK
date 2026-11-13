@@ -164,6 +164,22 @@ L1 property overrides are invisible to the guard:
 `cfnBucket.addPropertyOverride("LifecycleConfiguration.Rules", …)` is merged
 after Aspects run, so an expiry introduced that way is not seen.
 
+### Listing an S3 origin
+
+Grant the distribution `s3:ListBucket` on its origin so that a missing key returns a 404 rather than a 403. Without it, a 403 error response such as a sign-in redirect also catches missing pages:
+
+```ts
+createDistributionBuilder().origin(
+  ref<BucketBuilderResult>("site", (r) =>
+    S3BucketOrigin.withOriginAccessControl(r.bucket, {
+      originAccessLevels: [AccessLevel.READ, AccessLevel.LIST],
+    }),
+  ),
+);
+```
+
+CDK warns about `AccessLevel.LIST` (`@aws-cdk/aws-cloudfront-origins:listBucketSecurityRisk`) whatever the distribution's settings, because without a `defaultRootObject` a request for `/` returns the bucket listing. The builder acknowledges that warning on its own distribution when `defaultRootObject` is a concrete, non-empty string, which it is by default (`index.html`). If the root object is unset, empty or an unresolved token, the warning stays. The builder decides from its props, so it does not see an L1 override of `DefaultRootObject`.
+
 ## Recommended Alarms
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CloudFront) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

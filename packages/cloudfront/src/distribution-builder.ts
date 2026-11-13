@@ -23,6 +23,7 @@ import {
 } from "@composurecdk/s3";
 import type { DistributionAlarmConfig, FunctionAlarmConfig } from "./alarm-config.js";
 import { effectiveDistributionDefaults } from "./defaults.js";
+import { acknowledgeListBucketRisk } from "./list-bucket-acknowledgement.js";
 import { guardOriginObjectExpiration } from "./origin-expiration-guard.js";
 import { resolveBehaviors } from "./resolve-behaviors.js";
 import { pathPatternSlug } from "./behavior-function-alarms.js";
@@ -492,6 +493,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       distribution.node.addDependency(accessLogsBucket);
     }
 
+    acknowledgeListBucketRisk(distribution, mergedProps.defaultRootObject);
     guardOriginObjectExpiration(distribution, id);
 
     const alarms = buildCloudFrontAlarms(

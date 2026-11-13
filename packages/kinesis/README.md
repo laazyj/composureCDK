@@ -37,7 +37,7 @@ import { STREAM_DEFAULTS } from "@composurecdk/kinesis";
 Not defaulted:
 
 - **`shardLevelMetrics`** — enhanced monitoring is billed per shard per metric, and AWS does not recommend it by default. Opt in with `.shardLevelMetrics([...])`.
-- **A resource policy** — same-account access needs none, and the stream's `grant*` methods add one for a cross-account grantee. Add statements with `result.stream.addToResourcePolicy(...)`.
+- **A resource policy** — same-account access needs none, and the stream's `grant*` methods add one for a cross-account grantee. Add statements with [`.addToResourcePolicy(...)`](#resource-policy).
 - **TLS enforcement** — Kinesis only accepts HTTPS (TLS 1.2 or later, [infrastructure security](https://docs.aws.amazon.com/streams/latest/dev/infrastructure-security.html)), and AWS documents no `aws:SecureTransport` policy for it, unlike SQS and SNS. There is nothing to enforce.
 
 ### Capacity mode
@@ -111,6 +111,35 @@ compose(
   { telemetry: [], ingest: ["telemetry"] },
 );
 ```
+
+## Resource policy
+
+`.addToResourcePolicy(statement)` adds a statement to the stream's resource policy (`AWS::Kinesis::ResourcePolicy`) at build time. Its use is access from another account, whose principals no grantee in this app can stand for — a consumer there reading the stream, say. Pass a function of the stream to name its own ARN:
+
+```ts
+import { ArnPrincipal, Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
+
+createStreamBuilder().addToResourcePolicy(
+  (stream) =>
+    new PolicyStatement({
+      effect: Effect.ALLOW,
+      principals: [new ArnPrincipal("arn:aws:iam::111122223333:role/telemetry-consumer")],
+      actions: [
+        "kinesis:DescribeStreamSummary",
+        "kinesis:GetRecords",
+        "kinesis:GetShardIterator",
+        "kinesis:ListShards",
+      ],
+      resources: [stream.streamArn],
+    }),
+);
+```
+
+A stream encrypted with a customer-managed key also needs that key's policy to allow the other account — see [`@composurecdk/kms`](../kms/README.md).
+
+The statement — or the function's return value — may be a `ref` or `combine`, so it can name a sibling the stream's policy depends on. Declare that sibling as a dependency of the stream.
+
+A component that depends on the stream cannot be named here: `compose` rejects the cycle. Access for an IAM principal in this app belongs on the grantee, as a [`streamGrants`](#grants) grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). Where neither fits, add the statement in an `afterBuild` hook, which sees every component's result.
 
 ## Constraints
 

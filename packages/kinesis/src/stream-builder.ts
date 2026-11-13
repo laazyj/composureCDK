@@ -1,4 +1,5 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { type PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { type IStream, Stream, StreamEncryption, type StreamProps } from "aws-cdk-lib/aws-kinesis";
 import { type IKey } from "aws-cdk-lib/aws-kms";
 import { type IConstruct } from "constructs";
@@ -9,6 +10,15 @@ import { STREAM_DEFAULTS } from "./defaults.js";
 import type { StreamAlarmConfig } from "./stream-alarm-config.js";
 import { createStreamAlarms } from "./stream-alarms.js";
 import { validateStreamName } from "./stream-name.js";
+
+/**
+ * A statement for {@link IStreamBuilder.addToResourcePolicy}: a
+ * {@link PolicyStatement}, a {@link Resolvable} of one, or a function of the
+ * built stream that returns either — so the statement can name the stream's
+ * own ARN.
+ */
+export type StreamPolicyStatement =
+  Resolvable<PolicyStatement> | ((stream: IStream) => Resolvable<PolicyStatement>);
 
 /**
  * Configuration properties for the Kinesis data stream builder.
@@ -107,6 +117,7 @@ export type IStreamBuilder = ITaggedBuilder<StreamBuilderProps, StreamBuilder>;
 class StreamBuilder implements Lifecycle<StreamBuilderResult> {
   props: Partial<StreamBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IStream>[] = [];
+  readonly #policyStatements: StreamPolicyStatement[] = [];
 
   addAlarm(key: string, configure: AlarmConfigurer<IStream>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IStream>(key)));
@@ -124,9 +135,23 @@ class StreamBuilder implements Lifecycle<StreamBuilderResult> {
     return this;
   }
 
+  /**
+   * Adds a statement to the stream's resource policy once the stream is
+   * built.
+   *
+   * Pass a function of the stream to name its own ARN. A {@link Ref} resolves
+   * against the build context; a component that depends on the stream cannot
+   * be named that way — see the README's "Resource policy" section.
+   */
+  addToResourcePolicy(statement: StreamPolicyStatement): this {
+    this.#policyStatements.push(statement);
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: StreamBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
+    target.#policyStatements.push(...this.#policyStatements);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): StreamBuilderResult {
@@ -142,6 +167,11 @@ class StreamBuilder implements Lifecycle<StreamBuilderResult> {
       ...encryptionKeyProps(encryptionKey, configured.encryption, context),
     };
     const stream = new Stream(scope, id, streamProps);
+
+    for (const statement of this.#policyStatements) {
+      const resolvable = typeof statement === "function" ? statement(stream) : statement;
+      stream.addToResourcePolicy(resolve(resolvable, context));
+    }
 
     const alarms = createStreamAlarms(
       scope,

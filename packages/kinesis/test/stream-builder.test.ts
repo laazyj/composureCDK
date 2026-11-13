@@ -7,6 +7,7 @@ import {
   StreamMode,
   type StreamProps,
 } from "aws-cdk-lib/aws-kinesis";
+import { ArnPrincipal, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
@@ -16,6 +17,29 @@ import { createStreamBuilder, type StreamBuilderProps } from "../src/stream-buil
 const buildAndSynth = buildFixture(createStreamBuilder, "TestStream");
 
 const incomingRecords = (stream: IStream) => stream.metricIncomingRecords();
+
+const CONSUMER_ROLE = "arn:aws:iam::111122223333:role/telemetry-consumer";
+
+/** A cross-account `kinesis:GetRecords` grant on `resources`. */
+function readStatement(resources: string[], principal = CONSUMER_ROLE) {
+  return new PolicyStatement({
+    principals: [new ArnPrincipal(principal)],
+    actions: ["kinesis:GetRecords"],
+    resources,
+  });
+}
+
+/** The statements in the resource policies of `stream`'s stack. */
+function policyStatements(stream: IStream): unknown[] {
+  const policies = Template.fromStack(Stack.of(stream)).findResources(
+    "AWS::Kinesis::ResourcePolicy",
+  );
+  return Object.values(policies).flatMap(
+    (p) =>
+      (p as { Properties: { ResourcePolicy: { Statement: unknown[] } } }).Properties.ResourcePolicy
+        .Statement,
+  );
+}
 
 describe("StreamBuilder", () => {
   describe("build", () => {
@@ -251,6 +275,97 @@ describe("StreamBuilder", () => {
         },
         build: (b) => b.build(new Stack(new App(), "S"), "Stream"),
         inspect: (r) => Object.keys(r.alarms).sort(),
+      });
+    });
+
+    it("preserves #policyStatements across .copy()", () => {
+      assertCopyPreservesState({
+        factory: () => createStreamBuilder().recommendedAlarms(false),
+        configure: (b) => {
+          b.addToResourcePolicy(readStatement(["*"], "arn:aws:iam::111122223333:role/first"));
+        },
+        mutate: (b) => {
+          b.addToResourcePolicy(readStatement(["*"], "arn:aws:iam::111122223333:role/second"));
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Stream"),
+        inspect: (r) => policyStatements(r.stream).length,
+      });
+    });
+  });
+
+  describe("addToResourcePolicy", () => {
+    const READ_STATEMENT = {
+      Effect: "Allow",
+      Principal: { AWS: CONSUMER_ROLE },
+      Action: "kinesis:GetRecords",
+    };
+
+    it("creates no resource policy by default", () => {
+      const { template } = buildAndSynth();
+
+      template.resourceCountIs("AWS::Kinesis::ResourcePolicy", 0);
+    });
+
+    it("adds a concrete statement to the stream's resource policy", () => {
+      const { template, result, stack } = buildAndSynth((b) =>
+        b.addToResourcePolicy(readStatement(["*"])),
+      );
+
+      template.resourceCountIs("AWS::Kinesis::ResourcePolicy", 1);
+      template.hasResourceProperties("AWS::Kinesis::ResourcePolicy", {
+        ResourceArn: stack.resolve(result.stream.streamArn) as unknown,
+        ResourcePolicy: {
+          Statement: [Match.objectLike({ ...READ_STATEMENT, Resource: "*" })],
+        },
+      });
+    });
+
+    it("passes the built stream to a function, so the statement can name its ARN", () => {
+      const { template, result, stack } = buildAndSynth((b) =>
+        b.addToResourcePolicy((stream) => readStatement([stream.streamArn])),
+      );
+
+      template.hasResourceProperties("AWS::Kinesis::ResourcePolicy", {
+        ResourcePolicy: {
+          Statement: [
+            Match.objectLike({
+              ...READ_STATEMENT,
+              Resource: stack.resolve(result.stream.streamArn) as unknown,
+            }),
+          ],
+        },
+      });
+    });
+
+    it("resolves a ref against the build context, including one a function returns", () => {
+      const orgId = "o-exampleorgid";
+      const statementFor = (resources: string[]) =>
+        ref<{ orgId: string }, PolicyStatement>("org", (r) => {
+          const statement = readStatement(resources);
+          statement.addCondition("StringEquals", { "aws:PrincipalOrgID": r.orgId });
+          return statement;
+        });
+
+      const { template, result, stack } = buildAndSynth(
+        (b) =>
+          b
+            .addToResourcePolicy(statementFor(["*"]))
+            .addToResourcePolicy((stream) => statementFor([stream.streamArn])),
+        { context: { org: { orgId } } },
+      );
+
+      const condition = { StringEquals: { "aws:PrincipalOrgID": orgId } };
+      template.hasResourceProperties("AWS::Kinesis::ResourcePolicy", {
+        ResourcePolicy: {
+          Statement: [
+            Match.objectLike({ ...READ_STATEMENT, Resource: "*", Condition: condition }),
+            Match.objectLike({
+              ...READ_STATEMENT,
+              Resource: stack.resolve(result.stream.streamArn) as unknown,
+              Condition: condition,
+            }),
+          ],
+        },
       });
     });
   });

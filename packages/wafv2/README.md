@@ -158,7 +158,7 @@ createWebAclBuilder().logging({
 
 `.logging(false)` turns logging off.
 
-WAF writes the log group's resource policy itself when the logging configuration is created, so the deploying principal needs `logs:PutResourcePolicy`, `logs:DescribeResourcePolicies` and `logs:CreateLogDelivery` alongside its WAF permissions. Redaction applies to logs only — see `sampledRequests` in [Defaults](#defaults).
+WAF grants `delivery.logs.amazonaws.com` write access to the log group itself when the logging configuration is created. It does this with a policy on the log group, not an account-level one, so it does not count toward CloudWatch Logs' limit of 10 resource policies per Region. The identity that creates the configuration (CloudFormation's execution role, under a CDK bootstrap) needs `logs:PutResourcePolicy`, `logs:DescribeResourcePolicies` and `logs:CreateLogDelivery` alongside its WAF permissions. Without them, the logging configuration fails to create and the deploy rolls back; logging is never left silently off. To see the policy, run `aws logs describe-resource-policies --policy-scope RESOURCE --resource-arn <log group ARN>`. A plain `describe-resource-policies` lists only account-level policies. Redaction applies to logs only — see `sampledRequests` in [Defaults](#defaults).
 
 ## Associations
 

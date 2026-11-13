@@ -114,6 +114,12 @@ jobs:
         run: |
           npx nx release changelog "$VERSION"
 
+      # nx's changelog renderer emits double spaces around breaking changes
+      # (`⚠️  `, and before the PR references), which `prettier:check` in CI
+      # rejects. Format here so the release PR is committed in CI's shape.
+      - name: Format changelog
+        run: npx nx prettier:write
+
       - name: Create release branch and commit
         env:
           BRANCH: ${{ steps.version.outputs.branch }}

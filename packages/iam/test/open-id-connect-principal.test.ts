@@ -429,4 +429,36 @@ describe("openIdConnectPrincipal", () => {
       ).not.toThrow();
     });
   });
+
+  it.each(["ForAnyValue:StringEquals", "StringNotEqualsIfExists", "ArnLike"] as const)(
+    "accepts oidcClaim under %s",
+    (operator) => {
+      trustPolicyOf((_stack, provider) => {
+        expect(() =>
+          openIdConnectPrincipal({
+            provider,
+            issuerHost: ISSUER_HOST,
+            conditions: { [operator]: { "aws:PrincipalTag/sub": oidcClaim("sub") } },
+          }),
+        ).not.toThrow();
+      });
+    },
+  );
+
+  it.each(["NumericEquals", "DateLessThan", "Bool", "ForAllValues:IpAddress", "Null"] as const)(
+    "rejects oidcClaim under %s",
+    (operator) => {
+      trustPolicyOf((_stack, provider) => {
+        expect(() =>
+          openIdConnectPrincipal({
+            provider,
+            issuerHost: ISSUER_HOST,
+            conditions: { [operator]: { "aws:SomeKey": ["1", oidcClaim("sub")] } },
+          }),
+        ).toThrow(
+          /oidcClaim\("sub"\) under .* for "aws:SomeKey": IAM substitutes policy variables/,
+        );
+      });
+    },
+  );
 });

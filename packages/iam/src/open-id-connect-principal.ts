@@ -35,6 +35,10 @@ type ConditionOperatorBase =
  *
  * A closed union rather than `string`, so a typo such as `StringLikee` fails
  * to compile instead of producing a condition IAM rejects at deploy time.
+ * It is kept by hand from the AWS reference below, which has no
+ * machine-readable form. An operator AWS adds before this union does can
+ * still be used through `.withConditions(...)` on the returned principal,
+ * which takes keys verbatim, so its claim keys must be written in full.
  *
  * @see https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition_operators.html
  */
@@ -194,9 +198,10 @@ export interface OpenIdConnectPrincipalOptions {
  * {@link githubActions} helpers which layer the GitHub constants on top. The
  * returned principal is passed to `createRoleBuilder().assumedBy(...)`.
  *
- * @throws Error if `issuerHost` is not a host and optional path, or if one
- * condition key, once qualified, is given two different sets of values under
- * the same operator.
+ * @throws Error if `issuerHost` is not a host and optional path; if an
+ * {@link oidcClaim} value sits under an operator other than `String*`/`Arn*`;
+ * or if one condition key, once qualified, is given two different sets of
+ * values under the same operator.
  *
  * @see https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html
  *
@@ -223,9 +228,18 @@ export function openIdConnectPrincipal(
 
   const conditions: Record<string, RenderedConditions> = {};
   for (const [operator, claims] of sources) {
+    // IAM substitutes policy variables only under String* and Arn* operators.
+    const takesPolicyVariables = /^(?:ForAnyValue:|ForAllValues:)?(?:String|Arn)/.test(operator);
     // An operator block is created on its first key, so an empty map adds none.
     for (const [key, raw] of Object.entries(claims ?? {})) {
       const qualified = qualify(opts.issuerHost, key);
+      const claim = [raw].flat().find(isClaimReference);
+      if (claim && !takesPolicyVariables) {
+        throw new Error(
+          `openIdConnectPrincipal: oidcClaim("${claim.claim}") under ${operator} for "${qualified}": ` +
+            "IAM substitutes policy variables only under String* and Arn* operators.",
+        );
+      }
       const value = Array.isArray(raw)
         ? raw.map((v) => render(opts.issuerHost, v))
         : render(opts.issuerHost, raw);

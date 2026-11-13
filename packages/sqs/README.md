@@ -150,6 +150,29 @@ const queue = createQueueBuilder()
   .build(stack, "MyQueue");
 ```
 
+## Resource policy
+
+`.addToResourcePolicy(statement)` adds a statement to the queue's own policy at build time, beside the `enforceSSL` statement. Pass a function of the queue to name its own ARN — here, to accept messages from a topic in another account:
+
+```ts
+import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+
+createQueueBuilder().addToResourcePolicy(
+  (queue) =>
+    new PolicyStatement({
+      effect: Effect.ALLOW,
+      principals: [new ServicePrincipal("sns.amazonaws.com")],
+      actions: ["sqs:SendMessage"],
+      resources: [queue.queueArn],
+      conditions: { ArnEquals: { "aws:SourceArn": "arn:aws:sns:eu-west-1:111122223333:orders" } },
+    }),
+);
+```
+
+The statement — or the function's return value — may be a `ref` or `combine`, so it can name a sibling the queue's policy depends on, such as a VPC endpoint for an `aws:SourceVpce` condition. Declare that sibling as a dependency of the queue.
+
+A component that depends on the queue cannot be named here: `compose` rejects the cycle. Most never need to be, because the wiring adds its own statement — an SNS subscription to the queue, an `@composurecdk/events` `sqsTarget`, or an S3 event notification. For an IAM principal, declare the access where the dependency already points, with a `queueGrants` grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). Where none fits, add the statement in an `afterBuild` hook, which sees every component's result.
+
 ## Recommended Alarms
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SQS) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.

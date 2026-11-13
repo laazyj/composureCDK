@@ -1,7 +1,8 @@
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { type PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { type IQueue, Queue, QueueEncryption, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, resolve } from "@composurecdk/core";
+import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
 import type { QueueBuilderExtensionProps, QueueBuilderPropsByRole } from "./queue-props.js";
@@ -35,6 +36,15 @@ export interface QueueBuilderResult {
    */
   alarms: Record<string, Alarm>;
 }
+
+/**
+ * A statement for {@link IQueueBuilder.addToResourcePolicy}: a
+ * {@link PolicyStatement}, a {@link Resolvable} of one, or a function of the
+ * built queue that returns either — so the statement can name the queue's own
+ * ARN.
+ */
+export type QueuePolicyStatement =
+  Resolvable<PolicyStatement> | ((queue: IQueue) => Resolvable<PolicyStatement>);
 
 /**
  * The builder's full internal prop store: the CDK {@link QueueProps},
@@ -93,6 +103,7 @@ export type IQueueBuilder<R extends QueueRole = "standard"> = ITaggedBuilder<
 class QueueBuilder implements Lifecycle<QueueBuilderResult> {
   props: Partial<InternalQueueBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IQueue>[] = [];
+  readonly #policyStatements: QueuePolicyStatement[] = [];
 
   addAlarm(key: string, configure: AlarmConfigurer<IQueue>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<IQueue>(key)));
@@ -110,9 +121,22 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
     return this;
   }
 
+  /**
+   * Adds a statement to the queue's resource policy once the queue is built.
+   *
+   * Pass a function of the queue to name its own ARN. A {@link Ref} resolves
+   * against the build context; a component that depends on the queue cannot
+   * be named that way — see the README's "Resource policy" section.
+   */
+  addToResourcePolicy(statement: QueuePolicyStatement): this {
+    this.#policyStatements.push(statement);
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: QueueBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
+    target.#policyStatements.push(...this.#policyStatements);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): QueueBuilderResult {
@@ -141,6 +165,11 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
 
     const { recommendedAlarms, ...queueProps } = mergedProps;
     const queue = new Queue(scope, id, queueProps);
+
+    for (const statement of this.#policyStatements) {
+      const resolvable = typeof statement === "function" ? statement(queue) : statement;
+      queue.addToResourcePolicy(resolve(resolvable, context));
+    }
 
     const profile = dlq
       ? dlqAlarmProfile(scope, mergedProps.retentionPeriod)

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { type IQueue, Queue, QueueEncryption, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { buildFixture, newStack } from "@composurecdk/cdk-testing";
@@ -12,6 +13,25 @@ import type { QueueBuilderProps } from "../src/queue-props.js";
 import { setUntypedProp } from "./_helpers.js";
 
 const buildAndSynth = buildFixture(createQueueBuilder, "TestQueue");
+
+/** An `sqs:SendMessage` grant to an AWS service on `resources`. */
+function sendStatement(resources: string[], service = "sns.amazonaws.com") {
+  return new PolicyStatement({
+    principals: [new ServicePrincipal(service)],
+    actions: ["sqs:SendMessage"],
+    resources,
+  });
+}
+
+/** The statements in the queue policies of `queue`'s stack. */
+function policyStatements(queue: IQueue): unknown[] {
+  const policies = Template.fromStack(Stack.of(queue)).findResources("AWS::SQS::QueuePolicy");
+  return Object.values(policies).flatMap(
+    (p) =>
+      (p as { Properties: { PolicyDocument: { Statement: unknown[] } } }).Properties.PolicyDocument
+        .Statement,
+  );
+}
 
 describe("QueueBuilder", () => {
   describe("build", () => {
@@ -233,6 +253,114 @@ describe("QueueBuilder", () => {
         build: (b) => b.build(new Stack(new App(), "S"), "Queue"),
         inspect: (r) => Object.keys(r.alarms).sort(),
       });
+    });
+
+    it("preserves #policyStatements across .copy()", () => {
+      assertCopyPreservesState({
+        factory: () => createQueueBuilder(),
+        configure: (b) => {
+          b.addToResourcePolicy(sendStatement(["*"], "first.amazonaws.com"));
+        },
+        mutate: (b) => {
+          b.addToResourcePolicy(sendStatement(["*"], "second.amazonaws.com"));
+        },
+        build: (b) => b.build(new Stack(new App(), "S"), "Queue"),
+        inspect: (r) => policyStatements(r.queue).length,
+      });
+    });
+  });
+
+  describe("addToResourcePolicy", () => {
+    const SEND_STATEMENT = {
+      Effect: "Allow",
+      Principal: { Service: "sns.amazonaws.com" },
+      Action: "sqs:SendMessage",
+    };
+
+    it("adds a concrete statement to the queue's own policy, beside enforceSSL", () => {
+      const { template } = buildAndSynth((b) => b.addToResourcePolicy(sendStatement(["*"])));
+
+      template.resourceCountIs("AWS::SQS::QueuePolicy", 1);
+      template.hasResourceProperties("AWS::SQS::QueuePolicy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Effect: "Deny",
+              Condition: { Bool: { "aws:SecureTransport": "false" } },
+            }),
+            Match.objectLike({ ...SEND_STATEMENT, Resource: "*" }),
+          ]),
+        },
+      });
+    });
+
+    it("creates the policy when enforceSSL is off", () => {
+      const { template } = buildAndSynth((b) =>
+        b.enforceSSL(false).addToResourcePolicy(sendStatement(["*"])),
+      );
+
+      template.hasResourceProperties("AWS::SQS::QueuePolicy", {
+        PolicyDocument: {
+          Statement: [Match.objectLike({ ...SEND_STATEMENT, Resource: "*" })],
+        },
+      });
+    });
+
+    it("passes the built queue to a function, so the statement can name its ARN", () => {
+      const { template, result, stack } = buildAndSynth((b) =>
+        b.addToResourcePolicy((queue) => sendStatement([queue.queueArn])),
+      );
+
+      template.hasResourceProperties("AWS::SQS::QueuePolicy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              ...SEND_STATEMENT,
+              Resource: stack.resolve(result.queue.queueArn) as unknown,
+            }),
+          ]),
+        },
+      });
+    });
+
+    it("resolves a ref against the build context, including one a function returns", () => {
+      const sourceArn = "arn:aws:sns:eu-west-1:111122223333:orders";
+      const statementFor = (resources: string[]) =>
+        ref<{ arn: string }, PolicyStatement>("topic", (r) => {
+          const statement = sendStatement(resources);
+          statement.addCondition("ArnEquals", { "aws:SourceArn": r.arn });
+          return statement;
+        });
+
+      const { template, result, stack } = buildAndSynth(
+        (b) =>
+          b
+            .addToResourcePolicy(statementFor(["*"]))
+            .addToResourcePolicy((queue) => statementFor([queue.queueArn])),
+        { context: { topic: { arn: sourceArn } } },
+      );
+
+      const condition = { ArnEquals: { "aws:SourceArn": sourceArn } };
+      template.hasResourceProperties("AWS::SQS::QueuePolicy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({ ...SEND_STATEMENT, Resource: "*", Condition: condition }),
+            Match.objectLike({
+              ...SEND_STATEMENT,
+              Resource: stack.resolve(result.queue.queueArn) as unknown,
+              Condition: condition,
+            }),
+          ]),
+        },
+      });
+    });
+
+    it("applies to a dead-letter role too", () => {
+      const result = createQueueBuilder("dlq")
+        .addToResourcePolicy((queue) => sendStatement([queue.queueArn]))
+        .build(new Stack(new App(), "S"), "Dlq");
+
+      expect(policyStatements(result.queue)).toHaveLength(2);
     });
   });
 

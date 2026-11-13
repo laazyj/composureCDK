@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { App, Stack } from "aws-cdk-lib";
+import { App, Lazy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { OpenIdConnectProvider } from "aws-cdk-lib/aws-iam";
@@ -378,6 +378,55 @@ describe("openIdConnectPrincipal", () => {
           }),
         ]),
       }),
+    });
+  });
+
+  it.each([
+    "https://oidc.example.com",
+    "oidc.example.com/",
+    "/oidc.example.com",
+    "oidc.example.com ",
+    "oidc.example.com//id/x",
+    "",
+  ])("rejects the issuerHost %j", (issuerHost) => {
+    trustPolicyOf((_stack, provider) => {
+      expect(() => openIdConnectPrincipal({ provider, issuerHost })).toThrow(
+        /openIdConnectPrincipal issuerHost ".*" is invalid/,
+      );
+    });
+  });
+
+  it("keeps an issuer path in the key prefix", () => {
+    const issuerHost = "oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE";
+    const template = trustPolicyOf((stack, provider) => {
+      createRoleBuilder()
+        .assumedBy(
+          openIdConnectPrincipal({
+            provider,
+            issuerHost,
+            stringEquals: { aud: "sts.amazonaws.com" },
+          }),
+        )
+        .build(stack, "Role");
+    });
+
+    template.hasResourceProperties("AWS::IAM::Role", {
+      AssumeRolePolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Condition: { StringEquals: { [`${issuerHost}:aud`]: "sts.amazonaws.com" } },
+          }),
+        ]),
+      }),
+    });
+  });
+
+  it("does not check an issuerHost that is an unresolved token", () => {
+    trustPolicyOf((_stack, provider) => {
+      const issuerHost = Lazy.string({ produce: () => "oidc.example.com" });
+      expect(() =>
+        openIdConnectPrincipal({ provider, issuerHost, stringEquals: { aud: "x" } }),
+      ).not.toThrow();
     });
   });
 });

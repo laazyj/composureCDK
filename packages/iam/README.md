@@ -92,7 +92,7 @@ Thin sugar over `createRoleBuilder().assumedBy(new ServicePrincipal(...))`.
 
 Let any OpenID Connect provider — GitHub Actions, GitLab, an EKS cluster, and so on — assume a role via `sts:AssumeRoleWithWebIdentity`, without long-lived credentials and without hand-writing the trust-policy condition map.
 
-Build (or import) a provider, then scope a role's trust policy with `openIdConnectPrincipal()`. It prefixes each bare claim key with the issuer host (so you pass `aud`, not `oidc.example.com:aud`) and maps `stringEquals`/`stringLike` onto the trust-policy operators. A key that already contains `:` — a global or STS key such as `sts:RoleSessionName`, or a claim key already carrying the issuer host — passes through unprefixed:
+Build (or import) a provider, then scope a role's trust policy with `openIdConnectPrincipal()`. It prefixes each bare claim key with the issuer host (so you pass `aud`, not `oidc.example.com:aud`) and maps `stringEquals`/`stringLike` onto the trust-policy operators. `issuerHost` is the issuer URL without `https://`, keeping any path (as an EKS issuer has); passing the URL itself throws. A key that already contains `:` — a global or STS key such as `sts:RoleSessionName`, or a claim key already carrying the issuer host — passes through unprefixed:
 
 ```ts
 import {

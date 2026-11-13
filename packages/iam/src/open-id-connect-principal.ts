@@ -1,3 +1,4 @@
+import { type StringConstraint, validateString } from "@composurecdk/cloudformation";
 import { OpenIdConnectPrincipal } from "aws-cdk-lib/aws-iam";
 
 type ConditionOperatorBase =
@@ -95,6 +96,21 @@ type ClaimConditions = Record<string, ConditionValue | ConditionValue[]>;
 /** The rendered form: what IAM receives. */
 type RenderedConditions = Record<string, string | string[]>;
 
+/**
+ * `issuerHost` is a host and optional path — the issuer URL without its
+ * scheme. The first segment excludes `:`, which rejects a URL passed whole;
+ * segments exclude `/`, which rejects a leading, trailing or doubled `/` and
+ * keeps the pattern linear. See ADR-0010.
+ */
+const ISSUER_HOST: StringConstraint = {
+  name: "openIdConnectPrincipal issuerHost",
+  pattern: /^[^\s/:]+(?:\/[^\s/]+)*$/,
+  allowed:
+    'the issuer URL without its scheme, keeping any path — e.g. "oidc.example.com" for "https://oidc.example.com"',
+  source:
+    "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html#condition-keys-wif",
+};
+
 /** Qualifies a bare claim with the issuer host; a name containing `:` passes through. */
 function qualify(issuerHost: string, name: string): string {
   return name.includes(":") ? name : `${issuerHost}:${name}`;
@@ -142,8 +158,9 @@ export interface OpenIdConnectPrincipalOptions {
 
   /**
    * The provider's issuer host, used to prefix every condition key — the
-   * host portion of the issuer URL, without scheme
-   * (e.g. `"token.actions.githubusercontent.com"`).
+   * issuer URL without its scheme (e.g. `"token.actions.githubusercontent.com"`).
+   * Keep any path the issuer has: IAM keys an EKS cluster's claims as
+   * `oidc.eks.<region>.amazonaws.com/id/<id>:sub`.
    */
   readonly issuerHost: string;
 
@@ -177,8 +194,9 @@ export interface OpenIdConnectPrincipalOptions {
  * {@link githubActions} helpers which layer the GitHub constants on top. The
  * returned principal is passed to `createRoleBuilder().assumedBy(...)`.
  *
- * @throws Error if one condition key, once qualified, is given two different
- * sets of values under the same operator.
+ * @throws Error if `issuerHost` is not a host and optional path, or if one
+ * condition key, once qualified, is given two different sets of values under
+ * the same operator.
  *
  * @see https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html
  *
@@ -196,6 +214,7 @@ export interface OpenIdConnectPrincipalOptions {
 export function openIdConnectPrincipal(
   opts: OpenIdConnectPrincipalOptions,
 ): OpenIdConnectPrincipal {
+  validateString(opts.issuerHost, ISSUER_HOST);
   const sources: [string, ClaimConditions | undefined][] = [
     ["StringEquals", opts.stringEquals],
     ["StringLike", opts.stringLike],

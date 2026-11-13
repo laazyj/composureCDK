@@ -215,6 +215,8 @@ Bumps are derived from [Conventional Commits](https://www.conventionalcommits.or
 
 Scopes are optional and do not affect the bump.
 
+The workspace changelog is rendered by [`scripts/changelog-renderer.cjs`](../scripts/changelog-renderer.cjs), a subclass of nx's default renderer. One of its changes: a breaking-change note in the **Breaking Changes** section ends before the first paragraph made only of trailers and issue references. nx's own renderer stops at a `Co-authored-by:` line, which GitHub's squash moves to the very end of the body, so the `Closes #N` and `Agent-Session:` lines between used to be published in the notes. Preview the result with `npx nx release:dryrun`.
+
 ### Creating a release
 
 1. **Preview locally.**

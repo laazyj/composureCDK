@@ -24,7 +24,7 @@
 
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
-import { mainCommitProblems } from "./commit-rules.mjs";
+import { mainCommitProblems, pullRequestAgentSignal } from "./commit-rules.mjs";
 
 const { GITHUB_REPOSITORY: repo, GITHUB_EVENT_PATH: eventPath, SHAS } = process.env;
 if (!repo) {
@@ -60,7 +60,8 @@ for (const sha of shas) {
     (p) => p.merge_commit_sha === commit.sha,
   );
   const prCommits = pr ? apiPages(`repos/${repo}/pulls/${pr.number}/commits`).map(toCommit) : [];
-  const problems = mainCommitProblems(commit, prCommits);
+  const agentSignal = pr ? pullRequestAgentSignal({ body: pr.body, headRef: pr.head?.ref }) : null;
+  const problems = mainCommitProblems(commit, prCommits, agentSignal);
   const short = commit.sha.slice(0, 7);
   const subject = commit.message.split("\n", 1)[0];
   if (problems.length === 0) {

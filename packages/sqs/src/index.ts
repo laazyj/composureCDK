@@ -2,6 +2,7 @@ export {
   createQueueBuilder,
   type IQueueBuilder,
   type QueueBuilderResult,
+  type QueuePolicyStatement,
 } from "./queue-builder.js";
 export { queueGrants } from "./grants.js";
 export { type QueueRole } from "./queue-role.js";

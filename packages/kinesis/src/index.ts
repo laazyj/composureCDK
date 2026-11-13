@@ -5,6 +5,7 @@ export {
   createStreamBuilder,
   type StreamBuilderProps,
   type StreamBuilderResult,
+  type StreamPolicyStatement,
   type IStreamBuilder,
 } from "./stream-builder.js";
 export { streamGrants } from "./grants.js";

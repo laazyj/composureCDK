@@ -29,9 +29,9 @@ export type DependencySource = IConstruct | Ref<object>;
  * whose parameters are hardcoded strings, a function invoked for its effect
  * rather than its return value — where the edge has to be declared outright.
  *
- * It backs `dependsOn` in `@composurecdk/custom-resources` and `after` in
- * `@composurecdk/lambda`'s `.invokeOnDeploy()`, so a consumer implementing
- * their own `Lifecycle` can spell ordering the same way both do.
+ * It backs `deployAfter`, `dependsOn` in `@composurecdk/custom-resources`
+ * and `after` in `@composurecdk/lambda`'s `.invokeOnDeploy()`. In a composed
+ * system, prefer `deployAfter` to calling this from a hand-written `Lifecycle`.
  */
 export function addDependencies(
   target: IConstruct,

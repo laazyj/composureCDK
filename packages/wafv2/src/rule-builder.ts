@@ -5,6 +5,7 @@ import type {
   CustomResponseBody,
   CustomResponseBodies,
 } from "./custom-response.js";
+import type { WebAclRuleAlarmConfig } from "./alarm-config.js";
 import { WEB_ACL_VISIBILITY_DEFAULTS } from "./defaults.js";
 import { validateMetricName, validateRuleLabel } from "./names.js";
 
@@ -39,6 +40,14 @@ export interface WebAclRuleBuilderProps {
 
   /** Challenge immunity for this rule, overriding the web ACL's. */
   challengeConfig?: CfnWebACL.RuleProperty["challengeConfig"];
+
+  /**
+   * This rule's recommended alarms: a `BlockedRequests` alarm, on by default
+   * for a rule you wrote that blocks and opt-in for a rule-group rule, and a
+   * `DaysToExpiry` alarm for a pinned managed rule group version. `false`
+   * disables both.
+   */
+  alarms?: WebAclRuleAlarmConfig | false;
 }
 
 /** What the web ACL builder knows when it turns a rule into CloudFormation. */
@@ -62,6 +71,12 @@ export interface BuiltRule {
   readonly metricName: string;
   readonly sampled: boolean;
   readonly rateBased: boolean;
+  /** Whether the rule evaluates a rule group, so takes `overrideAction`. */
+  readonly ruleGroup: boolean;
+  /** Whether matching requests are blocked: by the rule, or by a rule group's own rules. */
+  readonly blocks: boolean;
+  /** The rule's recommended alarm configuration. */
+  readonly alarms: WebAclRuleAlarmConfig | false | undefined;
 }
 
 const RULE_GROUP_STATEMENTS = ["managedRuleGroupStatement", "ruleGroupReferenceStatement"] as const;
@@ -191,12 +206,14 @@ class WebAclRuleBuilder {
     validateMetricName(metricName);
     const sampled = this.props.sampledRequests ?? ctx.sampledRequests;
     const rateBased = statement.rateBasedStatement !== undefined;
+    const ruleGroup = isRuleGroupStatement(statement);
 
+    const { blocks, ...action } = this.#actionProperty(ctx, who, ruleGroup, rateBased);
     const property = {
       name: ctx.name,
       priority: this.props.priority ?? ctx.defaultPriority,
       statement,
-      ...this.#actionProperty(ctx, who, statement, rateBased),
+      ...action,
       visibilityConfig: {
         ...WEB_ACL_VISIBILITY_DEFAULTS,
         metricName,
@@ -206,23 +223,34 @@ class WebAclRuleBuilder {
       ...(this.props.captchaConfig && { captchaConfig: this.props.captchaConfig }),
       ...(this.props.challengeConfig && { challengeConfig: this.props.challengeConfig }),
     };
-    return { property, metricName, sampled, rateBased };
+    return {
+      property,
+      metricName,
+      sampled,
+      rateBased,
+      ruleGroup,
+      blocks,
+      alarms: this.props.alarms,
+    };
   }
 
   #actionProperty(
     ctx: RuleBuildContext,
     who: string,
-    statement: CfnWebACL.StatementProperty,
+    ruleGroup: boolean,
     rateBased: boolean,
-  ): Pick<CfnWebACL.RuleProperty, "action" | "overrideAction"> {
-    if (isRuleGroupStatement(statement)) {
+  ): Pick<CfnWebACL.RuleProperty, "action" | "overrideAction"> & { blocks: boolean } {
+    if (ruleGroup) {
       if (this.#action !== undefined && this.#action !== "count") {
         throw new Error(
           `${ctx.owner} ${who} evaluates a rule group, whose rules keep their own actions. ` +
             `Use .count() to count them all instead, or leave the action unset.`,
         );
       }
-      return { overrideAction: this.#action === "count" ? { count: {} } : { none: {} } };
+      // The group's own rules block unless the whole group is counted.
+      return this.#action === "count"
+        ? { overrideAction: { count: {} }, blocks: false }
+        : { overrideAction: { none: {} }, blocks: true };
     }
 
     const action = this.#action ?? "block";
@@ -231,8 +259,8 @@ class WebAclRuleBuilder {
         `${ctx.owner} ${who} is rate-based, and a rate-based rule cannot Allow. Use block, count, captcha or challenge.`,
       );
     }
-    if (action !== "block") return { action: { [action]: {} } };
-    return { action: { block: ctx.bodies.block(who, ctx.name, this.#response) } };
+    if (action !== "block") return { action: { [action]: {} }, blocks: false };
+    return { action: { block: ctx.bodies.block(who, ctx.name, this.#response) }, blocks: true };
   }
 }
 

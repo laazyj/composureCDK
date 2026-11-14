@@ -31,7 +31,7 @@ compose(
 );
 ```
 
-The result is `{ webAcl, associations, logGroup?, logging? }`:
+The result is `{ webAcl, associations, logGroup?, logging?, metrics, alarms }`:
 
 | Field          | Type                                   | Description                                                                                              |
 | -------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -39,6 +39,8 @@ The result is `{ webAcl, associations, logGroup?, logging? }`:
 | `associations` | `CfnWebACLAssociation[]`               | One per `associateWith` call, in that order. Always empty for a CLOUDFRONT web ACL.                      |
 | `logGroup`     | `LogGroup \| undefined`                | The `aws-waf-logs-` log group WAF writes to. Absent when logging is off or goes to your own destination. |
 | `logging`      | `CfnLoggingConfiguration \| undefined` | The logging configuration. Absent when logging is off.                                                   |
+| `metrics`      | `WebAclMetrics`                        | Metrics for the web ACL, its default action and each rule — see [Metrics](#metrics).                     |
+| `alarms`       | `Record<string, Alarm>`                | Recommended and custom alarms, keyed by alarm key — see [Alarms](#alarms).                               |
 
 ## Defaults
 
@@ -159,6 +161,53 @@ createWebAclBuilder().logging({
 `.logging(false)` turns logging off.
 
 WAF grants `delivery.logs.amazonaws.com` write access to the log group itself when the logging configuration is created. It does this with a policy on the log group, not an account-level one, so it does not count toward CloudWatch Logs' limit of 10 resource policies per Region. The identity that creates the configuration (CloudFormation's execution role, under a CDK bootstrap) needs `logs:PutResourcePolicy`, `logs:DescribeResourcePolicies` and `logs:CreateLogDelivery` alongside its WAF permissions. Without them, the logging configuration fails to create and the deploy rolls back; logging is never left silently off. To see the policy, run `aws logs describe-resource-policies --policy-scope RESOURCE --resource-arn <log group ARN>`. A plain `describe-resource-policies` lists only account-level policies. Redaction applies to logs only — see `sampledRequests` in [Defaults](#defaults).
+
+## Metrics
+
+`result.metrics` builds the [`AWS/WAFV2` metrics](https://docs.aws.amazon.com/waf/latest/developerguide/waf-metrics.html) from the names the builder gave the web ACL and its rules, so there is nothing to thread through by hand:
+
+```ts
+const { metrics } = createWebAclBuilder().addRule("PerIpRate", …).build(stack, "Waf");
+
+metrics.blockedRequests(); // every rule: Rule=ALL
+metrics.rule("PerIpRate").blockedRequests(); // one rule, by the name given to addRule
+metrics.defaultAction.allowedRequests(); // requests no rule terminated
+metrics.daysToExpiry({ vendorName: "AWS", name: "AWSManagedRulesCommonRuleSet", version: "Version_1.12" });
+```
+
+Each request metric — `allowedRequests`, `blockedRequests`, `countedRequests`, `captchaRequests`, `challengeRequests` — is a Sum over 5 minutes unless you pass `MetricOptions`.
+
+The dimensions follow what WAF actually publishes, which differs from its documentation in two places (checked against a deployed web ACL):
+
+- **`WebACL` is the web ACL's _name_**, not its `VisibilityConfig` metric name. An unnamed web ACL's dimension reads the generated name from its `Ref`.
+- **The default action is published as `Rule=<the web ACL's metric name>`**, not `Rule=Default_Action`.
+- `Rule` is the rule's metric name, and `Region` is present for a regional web ACL only.
+
+## Alarms
+
+The recommended alarms are per rule. AWS publishes [no recommended alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) for WAF, so the defaults below (`WEB_ACL_RULE_ALARM_DEFAULTS`) are this library's starting points. Every alarm treats missing data as not breaching, because WAF publishes a datapoint only when its count is non-zero. No alarm actions are configured — apply them from the result or with [`alarmActionsPolicy`](../cloudwatch/README.md).
+
+| Alarm key               | Created for                                | Metric                         | Default threshold | Why                                                                                                                                                                                                          |
+| ----------------------- | ------------------------------------------ | ------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<rule>BlockedRequests` | a rule you wrote whose action is Block     | `BlockedRequests` (Sum, 5 min) | > 0               | A block by your own rule is a signal: a throttled client, a request without its credentials. Raise it on a rule that blocks routinely.                                                                       |
+| `<rule>BlockedRequests` | a rule-group rule — **opt-in**             | `BlockedRequests` (Sum, 5 min) | > 0               | Managed rules block internet background noise all day; on by default, it would page constantly.                                                                                                              |
+| `<rule>DaysToExpiry`    | a managed rule group pinned to a `version` | `DaysToExpiry` (Min, 1 hour)   | < 30              | [Once a pinned version expires](https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning-expiration.html), WAF rejects every update to the web ACL that does not move it on. |
+
+`<rule>` is the rule's name in camelCase: `PerIpRate` and `per-ip-rate` both become `perIpRate`, so two rules whose names differ only that way cannot both have alarms; the build throws, naming them. No alarm is created for a rule that counts, allows, or answers with a CAPTCHA or challenge.
+
+Tune or disable a rule's alarms with `.alarms()`, all of them with `.recommendedAlarms(false)`, and add your own with `addAlarm`, whose metric factory receives `WebAclMetrics`:
+
+```ts
+createWebAclBuilder()
+  .addRule("PerIpRate", (rule) => rule.statement(…).alarms({ blockedRequests: { threshold: 50 } }))
+  .addRule("CommonRuleSet", (rule) => rule.statement(…).alarms({ blockedRequests: { threshold: 1000 } }))
+  .addRule("Probe", (rule) => rule.statement(…).count().alarms(false))
+  .addAlarm("probeCounted", (alarm) =>
+    alarm.metric((m) => m.rule("Probe").countedRequests()).threshold(100),
+  );
+```
+
+A CLOUDFRONT web ACL's metrics are published in `us-east-1`, where the web ACL must be, so its alarms need nothing special.
 
 ## Associations
 

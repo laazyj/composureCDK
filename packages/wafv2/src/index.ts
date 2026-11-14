@@ -24,6 +24,13 @@ export {
   SUPPORTED_CUSTOM_RESPONSE_STATUS_CODES,
 } from "./custom-response.js";
 export { type WebAclScope } from "./scope.js";
+export {
+  type ManagedRuleGroupVersion,
+  type WebAclMetrics,
+  type WebAclRequestMetrics,
+} from "./metrics.js";
+export { type WebAclAlarmConfig, type WebAclRuleAlarmConfig } from "./alarm-config.js";
+export { WEB_ACL_RULE_ALARM_DEFAULTS } from "./alarm-defaults.js";
 export { type WebAclLoggingConfig, type WebAclLogRedaction } from "./logging.js";
 export {
   type WebAclLogAction,

@@ -8,6 +8,12 @@ import { type Lifecycle } from "./lifecycle.js";
  * the `Ref` brand (ADR-0007): the ESM and CommonJS copies of `@composurecdk/core`
  * can both load in one process, and a brand minted by either copy must be
  * recognised by either.
+ *
+ * A combinator that wraps a component and builds it under the id it was given
+ * must forward this brand, or it silently drops the pin and rotates logical
+ * ids. Re-wrap with {@link at} to do so, as `deployAfter()` does. It must not
+ * forward {@link SCOPED_BUILD}: `scoped()` would then build the system directly
+ * and skip what the wrapper adds.
  */
 export const BUILD_ID = Symbol.for("composurecdk.buildId");
 

@@ -134,6 +134,50 @@ A construct-level dependency already covers that construct's own children, so na
 
 It backs `dependsOn` in [`@composurecdk/custom-resources`](../custom-resources/README.md) and `after` in [`@composurecdk/lambda`](../lambda/README.md)'s `.invokeOnDeploy()`, so both spell ordering the same way.
 
+### Ordering a component: `deployAfter`
+
+In a composed system you don't need to call `addDependencies` yourself. Wrap the component in `deployAfter(component, { target, after })` instead, and the edge is declared beside the component it orders. `target` selects the construct that waits:
+
+```ts
+import { compose, deployAfter, ref } from "@composurecdk/core";
+import { createCertificateBuilder } from "@composurecdk/acm";
+import {
+  createCrossAccountZoneDelegationBuilder,
+  createHostedZoneBuilder,
+  type CrossAccountZoneDelegationBuilderResult,
+  type HostedZoneBuilderResult,
+} from "@composurecdk/route53";
+
+const zoneOf = (r: HostedZoneBuilderResult) => r.hostedZone;
+
+compose(
+  {
+    zone: createHostedZoneBuilder().zoneName("app.example.com"),
+    delegation: createCrossAccountZoneDelegationBuilder()
+      .delegatedZone(ref("zone", zoneOf))
+      .parentHostedZoneName("example.com")
+      .delegationRole("arn:aws:iam::111122223333:role/delegation"),
+    // ACM can only validate once the parent zone delegates to `zone`, but
+    // nothing in the certificate's template references the NS record.
+    certificate: deployAfter(
+      createCertificateBuilder().domainName("app.example.com").validationZone(ref("zone", zoneOf)),
+      {
+        target: (r) => r.certificate,
+        after: [ref("delegation", (r: CrossAccountZoneDelegationBuilderResult) => r.record)],
+      },
+    ),
+  },
+  { zone: [], delegation: ["zone"], certificate: ["zone", "delegation"] },
+);
+```
+
+- **Name one construct in `after`.** A whole-component `ref("delegation")` also reaches the constructs that component was passed, such as its delegation role.
+- **Declare the sibling as a dependency.** Refs in `after` resolve against the build context. Under a nested system, a ref the inner record doesn't declare resolves to a parent component of the same name instead.
+- **Mind stacks.** Under `withStacks`, the target must be in the source's stack or in one that deploys after it. Otherwise synth fails with a cyclic-reference error.
+- **One target per wrapper.** To order two constructs of one component, nest two `deployAfter`s.
+
+See [ADR-0021](../../docs/adr/0021-deploy-order-is-a-composition-concern.md) for why this is a combinator and not a builder method.
+
 ## Examples
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`

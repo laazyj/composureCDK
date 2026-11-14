@@ -76,7 +76,7 @@ Cycle detection happens at composition time, not build time. This means structur
 
 ### Pinning a component's construct id with `at`
 
-By default a component's construct id is derived from its key as `` `${parentId}/${key}` ``. Nesting an already-deployed system under a new key therefore lengthens every construct path and rotates every CloudFormation logical id — a destructive replacement. `at(id, component)` decouples the construct id from the wiring key: `compose` builds the tagged component under `id` verbatim, so a nested system preserves the logical ids it had standalone.
+By default a component's construct id is derived from its key as `` `${parentId}/${key}` ``. Nesting an already-deployed system under a new key therefore lengthens every construct path and rotates every CloudFormation logical id — a destructive replacement. `at(id, component)` decouples the construct id from the wiring key: `compose` builds the tagged component under `id` verbatim, so a nested system preserves the logical ids it had standalone. When you wrap a component in your own `Lifecycle`, keep `at()` outermost: `compose()` reads the pin only on the outermost object, so a wrapper that hides it drops the pin silently, rotating logical ids ([#853](https://github.com/laazyj/composureCDK/issues/853)). Core's combinators, like `dependsOn`, already keep it.
 
 ```typescript
 compose(
@@ -92,6 +92,10 @@ The id rides on a `Symbol.for` brand that only `compose` reads; the wiring key (
 ### Encapsulating a system with `scoped`
 
 The derived `` `${parentId}/${key}` `` is not real nesting: `constructs` rewrites the `/` to `--`, so a nested system's components land beside the parent's as siblings. `scoped(system)` creates `new Construct(scope, id)` and builds the system into it with each component at its key, so `App--failures--bucket` becomes `App--failures/bucket`. A composite builder uses it to keep what it creates under one node, which `Tags.of()` and Aspects can then target alone: its `build` returns `scoped(compose(...)).build(scope, id, context)`. Unwrapped systems derive ids as before. See [ADR-0020](adr/0020-scoped-system-construct.md).
+
+### Deploy-time dependencies with `dependsOn`
+
+The dependency record orders builds, not deploys. When nothing in a component's template references what it must deploy after, `dependsOn(component, { target, sources })` declares the dependency. See [ADR-0022](adr/0022-deploy-dependencies-at-composition.md).
 
 ### Dependency declarations are exhaustive
 

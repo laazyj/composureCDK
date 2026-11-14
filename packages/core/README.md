@@ -110,11 +110,64 @@ ref<FunctionBuilderResult>("handler")
 ref<FunctionBuilderResult>("handler", (r) => new LambdaIntegration(r.function));
 ```
 
-## Ordering: `addDependencies`
+## Deploy-time dependencies
 
-`compose()` decides the order components _build_; CloudFormation decides the order resources _deploy_, and it only orders B after A when B's template references A. Where no such reference exists — an SDK call whose parameters are hardcoded strings, a Lambda invoked during deployment — the edge has to be declared.
+`compose()` decides the order components _build_; CloudFormation decides the order resources _deploy_, and it only orders B after A when B's template references A. Where no such reference exists — an SDK call whose parameters are hardcoded strings, a Lambda invoked during deployment, a certificate validated in a zone another resource delegates — the dependency has to be declared. Composing a system, use `dependsOn`; writing a builder, use `addDependencies`.
 
-`addDependencies(target, sources, context)` is that seam. Each source is a concrete construct, a `ref` to one construct inside a sibling's result, or a `ref` to the whole sibling:
+### In a composed system: `dependsOn`
+
+Wrap the component in `dependsOn(component, { target, sources })` to declare the dependency beside it. `target` picks the construct in the component's result that depends on `sources`:
+
+```ts
+import { compose, dependsOn, ref } from "@composurecdk/core";
+import { createCertificateBuilder } from "@composurecdk/acm";
+import {
+  createCrossAccountZoneDelegationBuilder,
+  createHostedZoneBuilder,
+  type CrossAccountZoneDelegationBuilderResult,
+  type HostedZoneBuilderResult,
+} from "@composurecdk/route53";
+
+const zoneOf = (r: HostedZoneBuilderResult) => r.hostedZone;
+
+compose(
+  {
+    zone: createHostedZoneBuilder().zoneName("app.example.com"),
+    delegation: createCrossAccountZoneDelegationBuilder()
+      .delegatedZone(ref("zone", zoneOf))
+      .parentHostedZoneName("example.com")
+      .delegationRole("arn:aws:iam::111122223333:role/delegation"),
+    // ACM can only validate once the parent zone delegates to `zone`, but
+    // nothing in the certificate's template references the NS record.
+    certificate: dependsOn(
+      createCertificateBuilder().domainName("app.example.com").validationZone(ref("zone", zoneOf)),
+      {
+        target: (r) => r.certificate,
+        sources: [ref("delegation", (r: CrossAccountZoneDelegationBuilderResult) => r.record)],
+      },
+    ),
+  },
+  { zone: [], delegation: ["zone"], certificate: ["zone", "delegation"] },
+);
+```
+
+- **Prefer a builder's own option when it has one.** [`@composurecdk/custom-resources`](../custom-resources/README.md)' `.dependsOn()` and [`@composurecdk/lambda`](../lambda/README.md)'s `.invokeOnDeploy({ after })` pick the target, and `.invokeOnDeploy()` also waits for the function's execution role.
+- **Name one construct in `sources`.** A whole-component ref would also reach the delegation builder's role ([what `sources` accepts](#what-sources-accepts)).
+- **Declare the sibling in the dependency record.** Refs in `sources` resolve against the build context. Under a nested system, a ref the inner record doesn't declare resolves to a parent component of the same name instead.
+- **Mind stacks.** Under `withStacks`, the target must be in the source's stack or in one that deploys after it. Otherwise synth fails with a cyclic-reference error.
+- **One target per wrapper.** To order two constructs of one component, nest two `dependsOn`s.
+
+See [ADR-0022](../../docs/adr/0022-deploy-dependencies-at-composition.md) for why this is a combinator and not a builder method.
+
+### What `sources` accepts
+
+`dependsOn`, `addDependencies` and the builder options above all take the same `DependencySource`s: a construct you already hold, a `ref` to one construct in a sibling's result, or a `ref` to the whole sibling.
+
+A construct-level dependency already covers that construct's own children, so naming one is enough whenever what you need sits under it — ordering against a `RestApi` also orders against its deployment and stage. Naming the component instead also reaches its _peers_: an API's access log group, a queue's dead-letter queue, and any construct the component was passed.
+
+### Inside a builder: `addDependencies`
+
+In your builder's `build()`, call `addDependencies(target, sources, context)` with the context you were given. `dependsOn` and the builder options above are built on it:
 
 ```ts
 import { addDependencies, ref } from "@composurecdk/core";
@@ -129,10 +182,6 @@ addDependencies(
   context,
 );
 ```
-
-A construct-level dependency already covers that construct's own children, so naming one is enough whenever what you need sits under it — ordering against a `RestApi` also orders against its deployment and stage. Naming the component instead also reaches its _peers_: an API's access log group, a queue's dead-letter queue.
-
-It backs `dependsOn` in [`@composurecdk/custom-resources`](../custom-resources/README.md) and `after` in [`@composurecdk/lambda`](../lambda/README.md)'s `.invokeOnDeploy()`, so both spell ordering the same way.
 
 ## Construct IDs
 

@@ -8,6 +8,11 @@ import { type Lifecycle } from "./lifecycle.js";
  * the `Ref` brand (ADR-0007): the ESM and CommonJS copies of `@composurecdk/core`
  * can both load in one process, and a brand minted by either copy must be
  * recognised by either.
+ *
+ * `compose()` reads this brand only on a component's outermost object. A core
+ * combinator that wraps a component must re-wrap with {@link at}, as
+ * `dependsOn()` does, and must not forward {@link SCOPED_BUILD}: `scoped()`
+ * would then build the system directly and skip what the wrapper adds.
  */
 export const BUILD_ID = Symbol.for("composurecdk.buildId");
 
@@ -35,6 +40,12 @@ export const SCOPED_BUILD = Symbol.for("composurecdk.scopedBuild");
  *
  * The pinned id shares the sibling namespace of the scope it is built into, so
  * it must not collide with another component's id; `compose` throws if it does.
+ *
+ * `compose` reads the pin only on a component's outermost object. When you wrap
+ * a component in your own {@link Lifecycle}, put `at()` outside the wrapper, not
+ * inside it: a wrapper that hides the pin drops it silently, rotating the
+ * component's logical ids (laazyj/composureCDK#853). Core's combinators, such
+ * as `dependsOn()`, keep the pin in either order.
  *
  * @param id - The construct id the component should build under.
  * @param inner - The component to tag.

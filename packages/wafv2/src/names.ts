@@ -4,7 +4,8 @@ import {
   stringConstraint,
   validateString,
 } from "@composurecdk/cloudformation";
-import { Token } from "aws-cdk-lib";
+import { Names, Token } from "aws-cdk-lib";
+import type { CfnWebACL } from "aws-cdk-lib/aws-wafv2";
 
 /**
  * The name rule WAF applies to web ACLs and to the rules in them: 1–128
@@ -80,6 +81,19 @@ export function validateMetricName(raw: string): void {
       `${METRIC_NAME.name} "${raw}" is reserved by AWS WAF. Reserved: ${RESERVED_METRIC_NAMES.join(", ")}. See ${METRIC_NAME.source}.`,
     );
   }
+}
+
+/**
+ * The web ACL's name when it is a literal, and otherwise a name derived from
+ * its construct path, unique in the app. The base of its default metric and
+ * log group names.
+ *
+ * @internal
+ */
+export function webAclBaseName(webAcl: CfnWebACL): string {
+  const { name } = webAcl;
+  if (name !== undefined && !Token.isUnresolved(name)) return name;
+  return Names.uniqueResourceName(webAcl, { maxLength: 128 });
 }
 
 /**

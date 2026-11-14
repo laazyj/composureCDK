@@ -67,3 +67,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0018: Re-declared builder props take their type from the CDK prop](0018-re-declared-props-track-cdk-prop-types.md)
 - [ADR-0019: Lint rules as public contract — preset tiers and rule semver](0019-lint-rules-as-public-contract.md)
 - [ADR-0020: `scoped()` — build a composed system under a construct of its own](0020-scoped-system-construct.md)
+- [ADR-0021: Deploy order is a composition concern — the `deployAfter()` combinator](0021-deploy-order-is-a-composition-concern.md)

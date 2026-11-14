@@ -1,4 +1,5 @@
 import { Annotations, Lazy } from "aws-cdk-lib";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import {
   type CfnLoggingConfiguration,
@@ -9,6 +10,13 @@ import {
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  createAlarms,
+} from "@composurecdk/cloudwatch";
+import type { WebAclAlarmConfig } from "./alarm-config.js";
+import { resolveWebAclAlarmDefinitions } from "./alarms.js";
 import { associate, type WebAclAssociationTarget } from "./association.js";
 import { type CustomResponse, CustomResponseBodies } from "./custom-response.js";
 import {
@@ -29,6 +37,7 @@ import {
   type IWebAclRuleBuilder,
 } from "./rule-builder.js";
 import { configureLogging, type WebAclLoggingConfig } from "./logging.js";
+import { type WebAclMetrics, webAclMetrics } from "./metrics.js";
 import { checkCloudFrontRegion, type WebAclScope } from "./scope.js";
 
 /**
@@ -71,6 +80,16 @@ export interface WebAclBuilderProps extends Omit<
    * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_detect_investigate_events_app_service_logging.html
    */
   logging?: WebAclLoggingConfig | false;
+
+  /**
+   * The master switch for the recommended alarms, which are configured per
+   * rule with the rule builder's `.alarms()`. `false` creates none; alarms
+   * added with `addAlarm()` are unaffected.
+   *
+   * No alarm actions are configured; apply them from the result or with
+   * `alarmActionsPolicy`.
+   */
+  recommendedAlarms?: WebAclAlarmConfig | false;
 }
 
 /** The build output of an {@link IWebAclBuilder}. */
@@ -86,6 +105,13 @@ export interface WebAclBuilderResult {
   logGroup?: LogGroup;
   /** The logging configuration. Absent when logging is off. */
   logging?: CfnLoggingConfiguration;
+  /**
+   * The web ACL's metrics, for the ACL, the default action and each rule,
+   * with dimensions that match what WAF publishes.
+   */
+  metrics: WebAclMetrics;
+  /** The CloudWatch alarms created, recommended and custom, keyed by alarm key. */
+  alarms: Record<string, Alarm>;
 }
 
 /**
@@ -113,6 +139,7 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
   readonly #rules: RuleEntry[] = [];
   readonly #associations: Resolvable<WebAclAssociationTarget>[] = [];
   #defaultAction: DefaultAction = { action: "allow" };
+  readonly #customAlarms: AlarmDefinitionBuilder<WebAclMetrics>[] = [];
 
   /**
    * What happens to a request no rule decides on. `allow` is the default;
@@ -158,11 +185,33 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
     return this;
   }
 
+  /**
+   * Adds a custom alarm. The metric factory receives the web ACL's
+   * {@link WebAclMetrics}, so a rule's metrics come by its name:
+   * `(m) => m.rule("PerIpRate").countedRequests()`.
+   */
+  addAlarm(key: string, configure: AlarmConfigurer<WebAclMetrics>): this {
+    this.#customAlarms.push(configure(new AlarmDefinitionBuilder<WebAclMetrics>(key)));
+    return this;
+  }
+
+  /**
+   * Adds a set of custom alarms in one call: each entry exactly as if by
+   * `addAlarm(key, configure)`, in the record's iteration order.
+   */
+  addAlarms(alarms: Record<string, AlarmConfigurer<WebAclMetrics>>): this {
+    for (const [key, configure] of Object.entries(alarms)) {
+      this.addAlarm(key, configure);
+    }
+    return this;
+  }
+
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: WebAclBuilder): void {
     target.#rules.push(...this.#rules);
     target.#associations.push(...this.#associations);
     target.#defaultAction = this.#defaultAction;
+    target.#customAlarms.push(...this.#customAlarms);
   }
 
   build(scope: IConstruct, id: string, context: Record<string, object> = {}): WebAclBuilderResult {
@@ -172,6 +221,7 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
       metricName: userMetricName,
       sampledRequests = WEB_ACL_DEFAULTS.sampledRequests,
       logging: loggingConfig = WEB_ACL_DEFAULTS.logging,
+      recommendedAlarms,
       ...rest
     } = this.props;
 
@@ -210,6 +260,10 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
       );
     }
 
+    // The derived name comes from the construct's path, so it is read once the construct exists.
+    const metricName =
+      userMetricName ??
+      Lazy.string({ produce: (): string => sanitizeMetricName(webAclBaseName(webAcl)) });
     const webAcl: CfnWebACL = new CfnWebACL(scope, id, {
       ...rest,
       scope: aclScope,
@@ -218,10 +272,7 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
       customResponseBodies: bodies.toProperty(),
       visibilityConfig: {
         ...WEB_ACL_VISIBILITY_DEFAULTS,
-        // The derived name comes from the construct's path, so it is read once the construct exists.
-        metricName:
-          userMetricName ??
-          Lazy.string({ produce: (): string => sanitizeMetricName(webAclBaseName(webAcl)) }),
+        metricName,
         sampledRequestsEnabled: sampledRequests,
       },
     });
@@ -233,10 +284,22 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
       this.#associations.map((target) => resolve(target, context)),
     );
 
+    const metrics = webAclMetrics(
+      webAcl,
+      metricName,
+      new Map(rules.map((r) => [r.property.name, r.metricName])),
+    );
+    const alarms = createAlarms(scope, id, [
+      ...resolveWebAclAlarmDefinitions(owner, metrics, rules, recommendedAlarms),
+      ...this.#customAlarms.map((b) => b.resolve(metrics)),
+    ]);
+
     return {
       webAcl,
       associations,
       ...configureLogging(scope, id, owner, webAcl, loggingConfig, context),
+      metrics,
+      alarms,
     };
   }
 

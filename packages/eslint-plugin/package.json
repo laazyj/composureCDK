@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/eslint-plugin",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Internal ESLint plugin encoding ComposureCDK architectural invariants (tagged builders, lifecycle context, builder copy state).",
   "repository": {
     "type": "git",

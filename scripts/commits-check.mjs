@@ -18,7 +18,7 @@
 
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
-import { pullRequestAgentSignal, pullRequestProblems } from "./commit-rules.mjs";
+import { pullRequestAgentSignal, pullRequestProblems, toCommit } from "./commit-rules.mjs";
 
 const { GITHUB_REPOSITORY: repo, PR_NUMBER: number, PR_TITLE: title } = process.env;
 if (!repo || !/^\d+$/.test(number ?? "") || !title) {
@@ -32,12 +32,7 @@ const pages = JSON.parse(
     maxBuffer: 64 * 1024 * 1024,
   }),
 );
-const commits = pages.flat().map((c) => ({
-  sha: c.sha,
-  message: c.commit.message,
-  authorEmail: c.commit.author?.email ?? "",
-  parents: c.parents.map((p) => p.sha),
-}));
+const commits = pages.flat().map(toCommit);
 
 const pr = JSON.parse(
   execFileSync("gh", ["api", `repos/${repo}/pulls/${number}`], { encoding: "utf8" }),

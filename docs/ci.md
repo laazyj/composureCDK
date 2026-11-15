@@ -41,6 +41,7 @@ Cutting a release
 - **`release-prepare.yml`** — manual `workflow_dispatch`, from `main` only. It requires CI to have passed the commit (the same check the release gate below applies, from [`scripts/release-gate.mjs`](../scripts/release-gate.mjs)), versions through [`scripts/release-version.mjs`](../scripts/release-version.mjs) (which skips the `nx verify` pre-version command), runs `nx release changelog` and formats it with `nx prettier:write`, pushes branch `release/vX.Y.Z`, opens a PR titled `chore(release): vX.Y.Z`. The PR is the integration point that lets release coexist with branch protection on `main`; pushing the branch is also what starts the deploy gate above.
 - **`release-tag.yml`** — `workflow_run` listener on CI and Deploy Test. For a `chore(release): vX.Y.Z` commit on `main` (squash-merge required) it runs the release gate, [`scripts/release-gate.mjs`](../scripts/release-gate.mjs), and tags the commit once CI has passed that exact commit and Deploy Test has passed a commit with the same tree (see [Creating a release](#creating-a-release)). The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Creates the GitHub Release from the matching `CHANGELOG.md` section, then runs `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
+- **`squash-merge.yml`** — on a `/squash` comment, squash-merges the pull request with the message `main` should keep (see [Merging](#merging)).
 - **`commits-audit.yml`** — on every push to `main`, checks each pushed commit kept its PR's agent attribution, and opens an issue when it did not (see [Auditing main](#auditing-main)).
 - **`release-notify.yml`** — `workflow_run` listener on Release. Comments on the issues the release addressed (see [Release notifications](#release-notifications)).
 
@@ -76,9 +77,32 @@ It needs `npm ci`, unlike the title check, because it loads nx's commit parser a
 
 Dependabot and release PRs are held to the same rules. Neither carries agent attribution, and each is one commit. If a bumped package's release notes in a Dependabot body ever trip the nx comparison, the failure is real: that body would have changed the release.
 
+## Merging
+
+Merge a pull request by commenting `/squash` on it, from the web or the mobile app. [`squash-merge.yml`](../.github/workflows/squash-merge.yml) runs [`scripts/squash-merge.mjs`](../scripts/squash-merge.mjs) (`npx nx squash:merge`), which merges with the message **Commits** checked: the PR title and ` (#N)` as the subject, and the branch's one commit message, word for word, as the body.
+
+The merge buttons build that message in the client, and each client changes it. The web dialog moves `Co-authored-by` lines to the end of the body, stranding `Agent-Session` a paragraph above, and whoever merges can edit or empty it there. The mobile app sends an empty body. #711, #760 and #761 landed with no body that way, which dropped their attribution and their `Closes`/`Refs` footers from the release notes. No setting forbids the buttons, so `/squash` is the convention rather than a rule.
+
+The script refuses, with a comment on the pull request saying why, unless:
+
+- the commenter has write or admin access;
+- the pull request is open, not a draft, and targets the default branch, so a stacked pull request waits until the one below it has merged and it is retargeted;
+- every check the base branch's ruleset requires has passed on the head commit (read from the ruleset, so a newly required check counts without a change here). This is checked again rather than left to the ruleset because the token's owner may be able to bypass it;
+- its commits pass the **Commits** rules.
+
+The merge is pinned to the head SHA it judged, so a push after the checks makes GitHub reject it. Re-run a refused merge by commenting `/squash` again.
+
+It merges with a PAT stored as `SQUASH_MERGE_TOKEN`, because a merge made with `GITHUB_TOKEN` starts no workflows, and the release gate needs CI to run on the commit it lands. Create a fine-grained PAT scoped to this repository with **Contents**, **Pull requests** and **Workflows** read and write. A pull request that changes a workflow cannot be merged without **Workflows**. The PAT is held only in the merge step's environment, and the job restores no dependency cache, as in `release.yml` (see [Auditing the workflows](#auditing-the-workflows)). Its owner is recorded as the merger, and the commits audit assigns its issues to them.
+
+To see what `/squash` would do without merging, run it with `DRY_RUN=1`:
+
+```sh
+GITHUB_REPOSITORY=laazyj/composureCDK PR_NUMBER=760 COMMENTER=laazyj DRY_RUN=1 npx nx squash:merge
+```
+
 ## Auditing main
 
-**Commits** runs before merge, so it cannot see the squash dialog, where whoever merges can edit or empty the body. That is how 6afccc7 (#711) landed with no attribution, though all five of its PR commits were Claude's. [`commits-audit.yml`](../.github/workflows/commits-audit.yml) closes the gap after merge: on every push to `main` it runs [`scripts/commits-audit.mjs`](../scripts/commits-audit.mjs) (`npx nx commits:audit`) for each pushed commit.
+**Commits** runs before merge, so it cannot see a merge made with the buttons rather than `/squash` (see [Merging](#merging)), where the body can be edited or emptied. That is how 6afccc7 (#711) landed with no attribution, though all five of its PR commits were Claude's. [`commits-audit.yml`](../.github/workflows/commits-audit.yml) closes the gap after merge: on every push to `main` it runs [`scripts/commits-audit.mjs`](../scripts/commits-audit.mjs) (`npx nx commits:audit`) for each pushed commit.
 
 It finds the commit's merged PR and that PR's commits through the API, and applies `mainCommitProblems` from [`scripts/commit-rules.mjs`](../scripts/commit-rules.mjs). If any of them, or the pull request itself, shows a coding agent took part (by the same tests as **Commits**), the commit on `main` must:
 

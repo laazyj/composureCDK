@@ -1,11 +1,11 @@
 /**
  * The rules a commit on `main` must meet, shared by `commits:check` (on a pull
- * request, before merge) and `commits:audit` (on `main`, after). Pure apart from
- * loading nx's commit parser, so `commit-rules.test.mjs` can drive it with
- * plain objects. See docs/ci.md#commits and AGENTS.md#commits-and-pull-requests.
- *
- * A commit is `{ sha, message, authorEmail, parents }`, where `message` is the
- * full message (subject, blank line, body) and `parents` the parent SHAs.
+ * request, before merge), `squash:merge` (at merge) and `commits:audit` (on
+ * `main`, after). Pure apart from loading nx's commit parser, so `commit-
+ * rules.test.mjs` can drive it with plain objects. See docs/ci.md#commits and
+ * AGENTS.md#commits-and-pull-requests.  A commit is `{ sha, message,
+ * authorEmail, parents }`, where `message` is the full message (subject, blank
+ * line, body) and `parents` the parent SHAs.
  */
 
 import { createRequire } from "node:module";
@@ -29,6 +29,14 @@ const LEGACY_SESSION_LINE = /^claude-session:/im;
 const CO_AUTHOR_LINE = /^co-authored-by:\s*(?<name>.*?)\s*<(?<email>[^>]+)>\s*$/i;
 const TRAILER_LINE = /^[A-Za-z0-9][A-Za-z0-9-]*: \S/;
 const AUTOSQUASH_SUBJECT = /^(fixup|squash|amend)! /;
+
+/** A commit as the REST API returns it, in the shape these rules take. */
+export const toCommit = (c) => ({
+  sha: c.sha,
+  message: c.commit.message,
+  authorEmail: c.commit.author?.email ?? "",
+  parents: c.parents.map((p) => p.sha),
+});
 
 /** The subject line of a commit message. */
 export const subjectOf = (message) => message.split("\n", 1)[0];
@@ -274,4 +282,54 @@ export function mainCommitProblems(commit, prCommits, agentSignal = null) {
     if (!landed.has(line)) problems.push(`dropped \`${line}\` from its pull request's commits`);
   }
   return problems;
+}
+
+// Conclusions a ruleset accepts from a required check.
+const PASSING = new Set(["success", "neutral", "skipped"]);
+
+/**
+ * Why `/squash` must not merge a pull request, or `[]`: the commenter cannot
+ * merge, the pull request is not ready, a check the ruleset requires has not
+ * passed on its head, or its commits would not land cleanly
+ * ({@link pullRequestProblems}). `permission` is the commenter's repository
+ * permission (`admin`, `write`, `read` or `none`), `requiredChecks` the check
+ * names the base branch's ruleset requires, and `checkRuns` the head commit's
+ * check runs as `{ name, status, conclusion, started_at }`.
+ */
+export function squashMergeRefusals({
+  pr,
+  login,
+  permission,
+  requiredChecks,
+  checkRuns,
+  commits,
+  agentSignal = null,
+}) {
+  const refusals = [];
+  if (permission !== "admin" && permission !== "write") {
+    refusals.push(`\`${login}\` has ${permission} access, and only someone who can merge may ask.`);
+  }
+  if (pr.state !== "open") refusals.push("The pull request is not open.");
+  if (pr.draft) refusals.push("The pull request is a draft.");
+  if (pr.base.ref !== pr.base.repo.default_branch) {
+    refusals.push(
+      `The pull request targets \`${pr.base.ref}\`, not \`${pr.base.repo.default_branch}\`. ` +
+        "Merge the pull request below it first, then retarget this one.",
+    );
+  }
+  for (const name of requiredChecks) {
+    const latest = checkRuns
+      .filter((run) => run.name === name)
+      .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? ""))[0];
+    if (!latest) refusals.push(`The required check **${name}** has not run on the head commit.`);
+    else if (latest.status !== "completed") {
+      refusals.push(`The required check **${name}** is still running.`);
+    } else if (!PASSING.has(latest.conclusion)) {
+      refusals.push(`The required check **${name}** finished as \`${latest.conclusion}\`.`);
+    }
+  }
+  refusals.push(
+    ...pullRequestProblems({ title: pr.title, number: pr.number, commits, agentSignal }),
+  );
+  return refusals;
 }

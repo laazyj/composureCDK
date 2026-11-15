@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * `commits:audit` — check that every commit pushed to `main` kept the agent
- * attribution of the pull request it came from. The pull-request check
- * (`commits:check`) cannot see the squash dialog, where the body is edited or
- * emptied at merge; this sees what landed. See docs/ci.md#auditing-main.
+ * `commits:audit` — check that every commit pushed to `main` landed with the
+ * message its pull request was checked with, and kept its agent attribution.
+ * The pull-request check (`commits:check`) cannot see a merge made with the
+ * buttons, where the body is edited or emptied; this sees what landed. See
+ * docs/ci.md#auditing-main.
  *
  * For each commit it finds the merged pull request and that PR's commits, and
- * applies `mainCommitProblems` from commit-rules.mjs. A commit with problems
+ * applies `squashBodyProblems` and `mainCommitProblems` from commit-rules.mjs.
+ * A direct push has no pull request, so only its attribution is checked. A
+ * commit with problems
  * gets an issue assigned to whoever merged it (one per commit, never
  * duplicated), and the run fails, so the commit shows red on `main`.
  *
@@ -24,7 +27,12 @@
 
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
-import { mainCommitProblems, pullRequestAgentSignal, toCommit } from "./commit-rules.mjs";
+import {
+  mainCommitProblems,
+  pullRequestAgentSignal,
+  squashBodyProblems,
+  toCommit,
+} from "./commit-rules.mjs";
 
 const { GITHUB_REPOSITORY: repo, GITHUB_EVENT_PATH: eventPath, SHAS } = process.env;
 if (!repo) {
@@ -55,7 +63,8 @@ for (const sha of shas) {
   );
   const prCommits = pr ? apiPages(`repos/${repo}/pulls/${pr.number}/commits`).map(toCommit) : [];
   const agentSignal = pr ? pullRequestAgentSignal({ body: pr.body, headRef: pr.head?.ref }) : null;
-  const problems = mainCommitProblems(commit, prCommits, agentSignal);
+  const bodyProblems = pr ? squashBodyProblems(commit, pr, prCommits) : [];
+  const problems = [...bodyProblems, ...mainCommitProblems(commit, prCommits, agentSignal)];
   const short = commit.sha.slice(0, 7);
   const subject = commit.message.split("\n", 1)[0];
   if (problems.length === 0) {
@@ -63,13 +72,13 @@ for (const sha of shas) {
     continue;
   }
   for (const problem of problems) console.log(`::error::${short} ${problem}.`);
-  findings.push({ commit, short, subject, problems, pr });
+  findings.push({ commit, short, subject, problems, pr, edited: bodyProblems.length > 0 });
 }
 
 if (findings.length === 0) process.exit(0);
 
 const marker = (sha) => `<!-- commits-audit:${sha} -->`;
-for (const { commit, short, subject, problems, pr } of findings) {
+for (const { commit, short, subject, problems, pr, edited } of findings) {
   const lines = [
     `### ${short} ${subject}`,
     "",
@@ -103,11 +112,13 @@ for (const { commit, short, subject, problems, pr } of findings) {
   const merger = pr ? api(`repos/${repo}/pulls/${pr.number}`).merged_by?.login : undefined;
   const body = [
     marker(commit.sha),
-    `Commit ${commit.sha} landed on \`main\` without the agent attribution its pull request carried.`,
+    edited
+      ? `Commit ${commit.sha} landed on \`main\` with a different message from the one its pull request was checked with.`
+      : `Commit ${commit.sha} landed on \`main\` without the agent attribution its pull request carried.`,
     "",
     ...lines.slice(2),
     "",
-    "History on `main` is not rewritten, so this issue is the record: note here which agent session(s) produced the change, then close it. See [docs/ci.md](https://github.com/laazyj/composureCDK/blob/main/docs/ci.md#auditing-main).",
+    "History on `main` is not rewritten, so this issue is the record: note here what the commit lost (the agent session(s) behind the change, the issues it closes or refers to), close any issue a dropped `Closes` footer would have closed, then close this one. Merge with a `/squash` comment to avoid it. See [docs/ci.md](https://github.com/laazyj/composureCDK/blob/main/docs/ci.md#auditing-main).",
   ].join("\n");
   const args = [
     "issue",
@@ -115,7 +126,9 @@ for (const { commit, short, subject, problems, pr } of findings) {
     "--repo",
     repo,
     "--title",
-    `Missing agent attribution on ${short}`,
+    edited
+      ? `Commit message of ${short} differs from its pull request`
+      : `Missing agent attribution on ${short}`,
     "--body",
     body,
   ];

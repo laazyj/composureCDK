@@ -42,7 +42,7 @@ Cutting a release
 - **`release-tag.yml`** — `workflow_run` listener on CI and Deploy Test. For a `chore(release): vX.Y.Z` commit on `main` (squash-merge required) it runs the release gate, [`scripts/release-gate.mjs`](../scripts/release-gate.mjs), and tags the commit once CI has passed that exact commit and Deploy Test has passed a commit with the same tree (see [Creating a release](#creating-a-release)). The tag is pushed authenticated with `RELEASE_PR_TOKEN` (a PAT) so it triggers `release.yml`'s `push: tags` workflow — pushes authenticated with the default `GITHUB_TOKEN` do not fire downstream triggers.
 - **`release.yml`** — triggered by `v*.*.*` tag pushes (from release-tag.yml or a manual `git push origin vX.Y.Z`). Creates the GitHub Release from the matching `CHANGELOG.md` section, then runs `npx nx release publish` to npm with provenance, authenticated via [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) (OIDC) in the `npm` environment. Trust is configured against this workflow file (`release.yml`), so both the automated chain and the manual escape hatch resolve to the same OIDC `job_workflow_ref` claim.
 - **`squash-merge.yml`** — on a `/squash` comment, squash-merges the pull request with the message `main` should keep (see [Merging](#merging)).
-- **`commits-audit.yml`** — on every push to `main`, checks each pushed commit kept its PR's agent attribution, and opens an issue when it did not (see [Auditing main](#auditing-main)).
+- **`commits-audit.yml`** — on every push to `main`, checks each pushed commit landed with its PR's commit message and kept its agent attribution, and opens an issue when it did not (see [Auditing main](#auditing-main)).
 - **`release-notify.yml`** — `workflow_run` listener on Release. Comments on the issues the release addressed (see [Release notifications](#release-notifications)).
 
 ## Required checks
@@ -102,16 +102,31 @@ GITHUB_REPOSITORY=laazyj/composureCDK PR_NUMBER=760 COMMENTER=laazyj DRY_RUN=1 n
 
 ## Auditing main
 
-**Commits** runs before merge, so it cannot see a merge made with the buttons rather than `/squash` (see [Merging](#merging)), where the body can be edited or emptied. That is how 6afccc7 (#711) landed with no attribution, though all five of its PR commits were Claude's. [`commits-audit.yml`](../.github/workflows/commits-audit.yml) closes the gap after merge: on every push to `main` it runs [`scripts/commits-audit.mjs`](../scripts/commits-audit.mjs) (`npx nx commits:audit`) for each pushed commit.
+**Commits** runs before merge, so it cannot see a merge made with the buttons rather than `/squash` (see [Merging](#merging)), where the body can be edited or emptied. That is how 6afccc7 (#711) landed with no attribution, though all five of its PR commits were Claude's, and how #760 lost its `Closes #735`. [`commits-audit.yml`](../.github/workflows/commits-audit.yml) closes the gap after merge: on every push to `main` it runs [`scripts/commits-audit.mjs`](../scripts/commits-audit.mjs) (`npx nx commits:audit`) for each pushed commit.
 
-It finds the commit's merged PR and that PR's commits through the API, and applies `mainCommitProblems` from [`scripts/commit-rules.mjs`](../scripts/commit-rules.mjs). If any of them, or the pull request itself, shows a coding agent took part (by the same tests as **Commits**), the commit on `main` must:
+It finds the commit's merged PR and that PR's commits through the API, and applies two rules from [`scripts/commit-rules.mjs`](../scripts/commit-rules.mjs).
+
+**The body** (`squashBodyProblems`), for every merged pull request, whether or not an agent took part. The commit's body must be the one `/squash` would have written: `squashMessage` of the PR's commits, so the branch's one commit body word for word, or GitHub's bulleted list for several. A difference is reported, and so is each `Closes`, `Fixes`, `Resolves` or `Refs` footer it dropped, because that is the link the release notes lose. It allows only what the web dialog does without anyone touching it, so a default button merge is not a finding:
+
+- trailing whitespace and runs of blank lines;
+- `Co-authored-by:` lines anywhere in the body (the dialog moves them all to the end), and extra ones for the PR's commit authors (the dialog adds them). A co-author line the PR's commits carried must still be there, and one nobody's commit credits is reported as added.
+
+The title plays no part, so a title edited after merge does not matter; the subject on `main`, less its ` (#N)`, is taken as the title it merged with.
+
+- **Release pull requests** (`chore(release): vX.Y.Z`) need no exception. Their commit has no body, and the dialog's `Co-authored-by: github-actions[bot]` is a commit author's line, as on 90bf811.
+- **Dependabot pull requests** are checked like any other. A button merge keeps Dependabot's body and adds `Co-authored-by: dependabot[bot]`, which passes; an emptied one is reported, though it costs the release notes nothing, because the rule cannot tell a body that mattered from one that did not.
+- **A direct push** has no pull request to compare against, so it gets only the attribution rule below, applied to its own message. The ruleset is what stops direct pushes; this does not.
+
+**Agent attribution** (`mainCommitProblems`). If any of the commits, or the pull request itself, shows a coding agent took part (by the same tests as **Commits**), the commit on `main` must:
 
 - end with a `Co-authored-by:` trailer for every agent address involved, for example `Co-authored-by: Claude <noreply@anthropic.com>`;
 - carry every `Agent-Session:` line its PR's commits named, or at least one if an agent authored commits that named none.
 
-It reads session lines anywhere in the body, not only in the final trailer paragraph. GitHub's squash dialog re-appends co-author trailers after a blank line, which strands `Agent-Session` one paragraph up, and failing every default merge for a layout no one can fix would make the audit noise.
+It reads session lines anywhere in the body, not only in the final trailer paragraph, because the web dialog strands `Agent-Session` one paragraph above the co-author lines it moves, and failing every default merge for that layout would make the audit noise.
 
-A finding fails the run, so the commit shows red on `main`, and opens one issue per commit, assigned to whoever merged it. History on `main` is not rewritten, so the issue is the record: note the session(s) behind the change there, and close it. The issue search keys on the full SHA, so a re-run never opens a duplicate.
+The two rules sit alongside each other rather than the body rule replacing the attribution rule's layout allowances. The body rule says _that_ a message was edited; the attribution rule says _which_ attribution the edit lost, which is what the issue needs to record, and it is the only rule a direct push gets. An agent's dropped co-author line is left to the attribution rule, so it is reported once. With that one exception, a commit that passes the body rule kept everything its pull request's commits said, so the attribution rule's layout allowances never let an edit through unreported: they only stop it reporting the web dialog's own layout twice.
+
+A finding fails the run, so the commit shows red on `main`, and opens one issue per commit, assigned to whoever merged it. History on `main` is not rewritten, so the issue is the record: note there what the commit lost (the session(s) behind the change, the issues it closes or refers to), close by hand any issue a dropped `Closes` footer would have closed, then close the issue. The issue search keys on the full SHA, so a re-run never opens a duplicate.
 
 It is a workflow of its own rather than a job in `ci.yml`. The release gate needs **CI** green on the commit being tagged, and a finding about an earlier commit must not block a release. It runs `npm ci`, like **Commits**, because it recognises agents by nx's own list.
 

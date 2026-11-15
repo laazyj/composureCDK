@@ -6,9 +6,11 @@ import {
   attributionProblems,
   isAgentEmail,
   mainCommitProblems,
+  mergedTitle,
   nxReading,
   pullRequestAgentSignal,
   pullRequestProblems,
+  squashBodyProblems,
   squashMergeRefusals,
   squashMessage,
   trailersOf,
@@ -282,6 +284,107 @@ describe("mainCommitProblems", () => {
       cursor,
     ]);
     assert.deepEqual(problems, ["has no `Co-authored-by:` trailer for cursoragent@cursor.com"]);
+  });
+});
+
+describe("squashBodyProblems", () => {
+  const PR = { number: 42, title: "fix(s3): x" };
+  const BODY = "Why it changed.\n\nCloses #12";
+  const personal = commit(`fix(s3): x\n\n${BODY}`);
+  const landed = (body, subject = "fix(s3): x (#42)") =>
+    commit(body === "" ? subject : `${subject}\n\n${body}`);
+
+  it("passes the body `/squash` writes, give or take trailing whitespace", () => {
+    assert.deepEqual(squashBodyProblems(landed(BODY), PR, [personal]), []);
+    assert.deepEqual(squashBodyProblems(landed(`${BODY}  \n\n`), PR, [personal]), []);
+  });
+
+  it("fails a person's pull request emptied at merge, as on #761, naming the lost footer", () => {
+    assert.deepEqual(squashBodyProblems(landed(""), PR, [personal]), [
+      "landed with an empty body, where its pull request's commit message has one",
+      "dropped `Closes #12`, so the release notes no longer link the issue",
+    ]);
+  });
+
+  it("fails a body edited in the merge dialog", () => {
+    const problems = squashBodyProblems(landed("Why it changed.\n\nRefs #12"), PR, [personal]);
+    assert.deepEqual(problems, [
+      "landed with a body that differs from its pull request's commit message",
+      "dropped `Closes #12`, so the release notes no longer link the issue",
+    ]);
+  });
+
+  it("passes the web dialog's layout: co-authors moved to the end, session stranded", () => {
+    const moved = `${BODY}\n\n${SESSION}\n\n${CLAUDE_CO_AUTHOR}`;
+    assert.deepEqual(squashBodyProblems(landed(moved), PR, [agentCommit(BODY)]), []);
+  });
+
+  it("leaves a dropped agent co-author to mainCommitProblems, so it is reported once", () => {
+    const source = agentCommit(BODY);
+    const cut = landed(`${BODY}\n\n${SESSION}`);
+    assert.deepEqual(squashBodyProblems(cut, PR, [source]), []);
+    assert.deepEqual(mainCommitProblems(cut, [source]), [
+      "has no `Co-authored-by:` trailer for noreply@anthropic.com",
+    ]);
+  });
+
+  it("fails a person's co-author dropped, or one added that no commit credits", () => {
+    const pair = "Co-authored-by: Pat <pat@example.com>";
+    const source = commit(`fix(s3): x\n\n${BODY}\n\n${pair}`);
+    assert.deepEqual(squashBodyProblems(landed(BODY), PR, [source]), [
+      `dropped \`${pair}\` from its pull request's commits`,
+    ]);
+    const stranger = "Co-authored-by: Sam <sam@example.com>";
+    assert.deepEqual(squashBodyProblems(landed(`${BODY}\n\n${stranger}`), PR, [personal]), [
+      `added \`${stranger}\`, which no commit in its pull request credits`,
+    ]);
+  });
+
+  it("passes a release pull request merged with the buttons, as 90bf811 landed", () => {
+    const bot = "41898282+github-actions[bot]@users.noreply.github.com";
+    const release = commit("chore(release): v0.13.0", { authorEmail: bot });
+    const merged = landed(
+      `Co-authored-by: github-actions[bot] <${bot}>`,
+      "chore(release): v0.13.0 (#704)",
+    );
+    assert.deepEqual(squashBodyProblems(merged, { number: 704, title: "x" }, [release]), []);
+  });
+
+  it("checks a Dependabot pull request like any other", () => {
+    const bot = "49699333+dependabot[bot]@users.noreply.github.com";
+    const body =
+      "Bumps x from 1 to 2.\n\n---\nupdated-dependencies: ...\n\nSigned-off-by: dependabot[bot] <support@github.com>";
+    const bump = commit(`build(deps): bump x\n\n${body}`, { authorEmail: bot });
+    const pr = { number: 7, title: "build(deps): bump x" };
+    const merged = (b) => landed(b, "build(deps): bump x (#7)");
+    const viaButtons = merged(`${body}\n\nCo-authored-by: dependabot[bot] <${bot}>`);
+    assert.deepEqual(squashBodyProblems(viaButtons, pr, [bump]), []);
+    assert.equal(squashBodyProblems(merged(""), pr, [bump]).length, 1);
+  });
+
+  it("compares several commits as GitHub's bulleted list", () => {
+    const commits = [commit("fix: a\n\nOne."), commit("fix: b\n\nTwo.")];
+    const bulleted = landed("* fix: a\n\nOne.\n\n* fix: b\n\nTwo.");
+    assert.deepEqual(squashBodyProblems(bulleted, PR, commits), []);
+    assert.equal(squashBodyProblems(landed("One."), PR, commits).length, 1);
+  });
+
+  it("skips a direct push, which has nothing to compare against", () => {
+    assert.deepEqual(squashBodyProblems(commit("fix: x"), PR, []), []);
+  });
+});
+
+describe("mergedTitle", () => {
+  it("reads the title from the landed subject, so a later edit does not count", () => {
+    const merged = commit("fix(s3): the title at merge (#42)\n\nBody.");
+    assert.equal(
+      mergedTitle(merged, { number: 42, title: "fix(s3): renamed since" }),
+      "fix(s3): the title at merge",
+    );
+  });
+
+  it("falls back to the pull request's title when the subject has no number", () => {
+    assert.equal(mergedTitle(commit("fix: edited"), { number: 42, title: "fix: x" }), "fix: x");
   });
 });
 

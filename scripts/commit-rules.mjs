@@ -244,6 +244,10 @@ export const sessionsOf = (message) =>
  * `Agent-Session` in an earlier paragraph; strict about content, because an
  * edit in that dialog is the one change no pull-request check can see.
  * `agentSignal` is {@link pullRequestAgentSignal} for that pull request.
+ *
+ * Runs alongside {@link squashBodyProblems}, which reports any edit to a
+ * merged pull request's body. This one says which attribution an edit lost,
+ * and is the only check on a direct push, which has no body to compare.
  */
 export function mainCommitProblems(commit, prCommits, agentSignal = null) {
   const all = [commit, ...prCommits];
@@ -280,6 +284,86 @@ export function mainCommitProblems(commit, prCommits, agentSignal = null) {
   }
   for (const line of expected) {
     if (!landed.has(line)) problems.push(`dropped \`${line}\` from its pull request's commits`);
+  }
+  return problems;
+}
+
+// A footer that links an issue in the release notes: `Closes #12`, `Refs: o/r#3`.
+const ISSUE_REFERENCE =
+  /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?)\b:?\s+(?:[\w.-]+\/[\w.-]+)?#\d+/i;
+
+/**
+ * A body's text and its co-authors, compared apart: the web merge dialog
+ * moves every `Co-authored-by` line to the end and adds one for each commit
+ * author, so where those lines sit says nothing about what was edited.
+ * Trailing whitespace and runs of blank lines are not differences either.
+ */
+function bodyParts(body) {
+  const lines = body.replace(/\r\n?/g, "\n").split("\n");
+  const coAuthors = coAuthorsOf(lines);
+  const text = lines
+    .filter((line) => !CO_AUTHOR_LINE.test(line.trim()))
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { text, coAuthors };
+}
+
+/**
+ * The title a pull request had when it merged: the landed subject without its
+ * ` (#N)`, so a title edited afterwards does not count against the commit.
+ * Falls back to the pull request's title if the subject has no such suffix.
+ */
+export function mergedTitle(commit, pr) {
+  const subject = subjectOf(commit.message);
+  const suffix = ` (#${pr.number})`;
+  return subject.endsWith(suffix) ? subject.slice(0, -suffix.length) : pr.title;
+}
+
+/**
+ * Problems with the body of a commit on `main`, given the pull request it was
+ * squashed from (`{ number, title }`) and that PR's commits: whatever differs
+ * from the body `/squash` would have written ({@link squashMessage}), whether
+ * or not an agent took part. Allows exactly what the web merge dialog does on
+ * its own: `Co-authored-by` lines moved to the end, and added for the PR's
+ * commit authors. A co-author an agent's address names is left to
+ * {@link mainCommitProblems}, so a dropped attribution is reported once.
+ */
+export function squashBodyProblems(commit, pr, prCommits) {
+  if (prCommits.length === 0) return [];
+  const expected = bodyParts(squashMessage(mergedTitle(commit, pr), pr.number, prCommits).body);
+  const landed = bodyParts(bodyOf(commit.message));
+  const problems = [];
+
+  if (landed.text !== expected.text) {
+    problems.push(
+      landed.text === ""
+        ? `landed with an empty body, where its pull request's commit message has one`
+        : "landed with a body that differs from its pull request's commit message",
+    );
+    const kept = new Set(landed.text.split("\n").map((line) => line.trim()));
+    for (const line of expected.text.split("\n").map((l) => l.trim())) {
+      if (ISSUE_REFERENCE.test(line) && !kept.has(line)) {
+        problems.push(`dropped \`${line}\`, so the release notes no longer link the issue`);
+      }
+    }
+  }
+
+  const emails = (list) => new Set(list.map((a) => a.email.toLowerCase()));
+  const landedEmails = emails(landed.coAuthors);
+  const expectedEmails = emails(expected.coAuthors);
+  const authors = new Set(prCommits.map((c) => c.authorEmail.toLowerCase()));
+  for (const a of expected.coAuthors) {
+    if (!landedEmails.has(a.email.toLowerCase()) && !isAgentEmail(a.email)) {
+      problems.push(`dropped \`${a.line}\` from its pull request's commits`);
+    }
+  }
+  for (const a of landed.coAuthors) {
+    const email = a.email.toLowerCase();
+    if (!expectedEmails.has(email) && !authors.has(email)) {
+      problems.push(`added \`${a.line}\`, which no commit in its pull request credits`);
+    }
   }
   return problems;
 }

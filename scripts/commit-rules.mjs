@@ -405,8 +405,13 @@ export function squashMergeRefusals({
     const latest = checkRuns
       .filter((run) => run.name === name)
       .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? ""))[0];
-    if (!latest) refusals.push(`The required check **${name}** has not run on the head commit.`);
-    else if (latest.status !== "completed") {
+    // A summary job's check run appears only once the jobs it needs have
+    // finished, so no run usually means its workflow is still going.
+    if (!latest) {
+      refusals.push(
+        `The required check **${name}** has not finished on the head commit. It may still be running.`,
+      );
+    } else if (latest.status !== "completed") {
       refusals.push(`The required check **${name}** is still running.`);
     } else if (!PASSING.has(latest.conclusion)) {
       refusals.push(`The required check **${name}** finished as \`${latest.conclusion}\`.`);

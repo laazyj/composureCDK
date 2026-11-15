@@ -65,6 +65,10 @@
       "floor": "2.160.0",
       "gatedBy": "aws-stepfunctions.StateMachineProps.encryptionConfiguration and CustomerManagedEncryptionConfiguration (introduced 2.160.0), which StateMachineBuilderProps re-declares as Resolvable<NonNullable<StateMachineProps[\"encryptionConfiguration\"]>>. Note stateMachineGrants.redriveExecution names states:RedriveExecution via IStateMachine.grantExecution instead of delegating to grantRedriveExecution, which is newer than this floor (introduced 2.200.0); do not 'simplify' it to the native method without raising the floor. Note also that StateMachineBuilderProps re-declares logs as Partial<NonNullable<StateMachineProps[\"logs\"]>>, and the builder leaves logs unset when logging is OFF: LogOptions.destination is required at this floor, and CDK here dereferences an absent destination and throws on { level: OFF }. Do not 'simplify' either back to the CDK prop without raising the floor."
     },
+    "wafv2": {
+      "floor": "2.93.0",
+      "gatedBy": "Not bisected below 2.93.0, the floor it inherits from @composurecdk/cloudwatch — so this entry is an upper bound on wafv2's own floor, not a measurement. The builder only sets long-standing CfnWebACL/CfnWebACLAssociation props (rules, ruleLabels, customResponseBodies, visibilityConfig, defaultAction, scope); newer ones such as challengeConfig and associationConfig pass straight through from the consumer's own CfnWebACLProps. Note WebAclAssociationTarget reads its type from CfnWebACLAssociationProps[\"resourceArn\"], which is string-only until CDK began widening it to reference interfaces (IWebACLRef by 2.230.0; ILoadBalancerRef and IGraphQLApiRef later); do not name those interfaces directly without raising the floor."
+    },
     "xray": {
       "floor": "2.183.0",
       "gatedBy": "aws-xray.CfnTransactionSearchConfig (introduced 2.183.0)"

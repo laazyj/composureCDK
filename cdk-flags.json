@@ -35,6 +35,7 @@
     "sns": ["aws-sns", "aws-sns-subscriptions"],
     "sqs": ["aws-sqs"],
     "stepfunctions": ["aws-stepfunctions"],
+    "wafv2": ["aws-wafv2"],
     "xray": ["aws-xray"]
   },
   "statusReasons": {

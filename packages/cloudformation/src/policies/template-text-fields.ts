@@ -41,4 +41,5 @@ export const TEMPLATE_TEXT_FIELDS: TemplateTextFields = {
   "AWS::Neptune::DBClusterParameterGroup": ["description"],
   "AWS::Neptune::DBParameterGroup": ["description"],
   "AWS::SNS::Topic": ["displayName"],
+  "AWS::WAFv2::WebACL": ["description"],
 };

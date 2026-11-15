@@ -24,6 +24,7 @@
     "logs": ["aws-logs"],
     "module-compat": [],
     "neptune": ["aws-neptune"],
+    "organizations": ["aws-organizations"],
     "route53": [
       "aws-route53",
       "aws-route53-targets",

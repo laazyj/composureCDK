@@ -1,3 +1,47 @@
+## 0.14.0 (2026-11-15)
+
+### 🚀 Features
+
+- ⚠️ **apigateway:** manage the stage's execution log group ([#712](https://github.com/laazyj/composureCDK/pull/712), [#707](https://github.com/laazyj/composureCDK/issues/707))
+- **apigateway:** add a configure hook to accessLogging ([#717](https://github.com/laazyj/composureCDK/pull/717), [#716](https://github.com/laazyj/composureCDK/issues/716))
+- **apigateway:** accept a Resolvable for the REST API resource policy ([#760](https://github.com/laazyj/composureCDK/pull/760))
+- **cloudfront:** acknowledge CDK's list-bucket warning when a default root object is set ([#737](https://github.com/laazyj/composureCDK/pull/737))
+- **cloudwatch:** add addAlarms() to every builder that has addAlarm ([#711](https://github.com/laazyj/composureCDK/pull/711))
+- **dynamodb:** accept a Resolvable for the table resource policy ([#764](https://github.com/laazyj/composureCDK/pull/764))
+- **eslint-plugin:** add add-alarm-requires-add-alarms rule ([#714](https://github.com/laazyj/composureCDK/pull/714))
+- **iam:** add a general conditions option to openIdConnectPrincipal ([#721](https://github.com/laazyj/composureCDK/pull/721), [#715](https://github.com/laazyj/composureCDK/issues/715))
+- **kinesis:** declarative stream resource-policy statements ([#749](https://github.com/laazyj/composureCDK/pull/749))
+- **kms:** declarative key-policy statements ([#748](https://github.com/laazyj/composureCDK/pull/748))
+- **lambda:** accept a bucket as a stream source's onFailure, with a least-privilege grant ([#710](https://github.com/laazyj/composureCDK/pull/710), [#642](https://github.com/laazyj/composureCDK/issues/642))
+- **s3:** accept a Resolvable for BucketDeploymentBuilder sources ([#727](https://github.com/laazyj/composureCDK/pull/727), [#726](https://github.com/laazyj/composureCDK/issues/726))
+- **s3:** declarative bucket resource-policy statements ([#734](https://github.com/laazyj/composureCDK/pull/734))
+- **sns:** declarative topic resource-policy statements ([#768](https://github.com/laazyj/composureCDK/pull/768))
+- **sqs:** declarative queue resource-policy statements ([#747](https://github.com/laazyj/composureCDK/pull/747))
+- **stepfunctions:** add account-level quota alarms ([#770](https://github.com/laazyj/composureCDK/pull/770), [#601](https://github.com/laazyj/composureCDK/issues/601))
+- **wafv2:** add @composurecdk/wafv2 with createWebAclBuilder ([#730](https://github.com/laazyj/composureCDK/pull/730))
+- **wafv2:** log web ACL traffic by default, redacted ([#731](https://github.com/laazyj/composureCDK/pull/731))
+- **wafv2:** add web ACL metrics and alarms ([#750](https://github.com/laazyj/composureCDK/pull/750))
+
+### 🩹 Fixes
+
+- **cloudfront:** apply the TLS minimumProtocolVersion default only with a certificate ([#728](https://github.com/laazyj/composureCDK/pull/728), [#724](https://github.com/laazyj/composureCDK/issues/724))
+- **iam:** pass fully-qualified condition keys through openIdConnectPrincipal ([#709](https://github.com/laazyj/composureCDK/pull/709), [#705](https://github.com/laazyj/composureCDK/issues/705))
+- **iam:** reject an openIdConnectPrincipal issuerHost that is a URL ([#741](https://github.com/laazyj/composureCDK/pull/741), [#738](https://github.com/laazyj/composureCDK/issues/738))
+- **iam:** reject oidcClaim under operators that do not substitute policy variables ([#742](https://github.com/laazyj/composureCDK/pull/742), [#739](https://github.com/laazyj/composureCDK/issues/739))
+
+### ⚠️ Breaking Changes
+
+- **apigateway:** manage the stage's execution log group ([#712](https://github.com/laazyj/composureCDK/pull/712), [#707](https://github.com/laazyj/composureCDK/issues/707))
+  an API that has already served traffic with execution
+  logging on (the default loggingLevel is INFO) already has a group of
+  that name, created by API Gateway, and the deploy fails because
+  CloudFormation cannot create it. Delete the existing group before
+  deploying, or set .executionLogging(false).
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.13.0 (2026-11-10)
 
 ### 🚀 Features

@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/kinesis",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Composable Kinesis Data Streams builder with well-architected defaults",
   "repository": {
     "type": "git",
@@ -40,9 +40,9 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.13.0",
-    "@composurecdk/cloudwatch": "^0.13.0",
-    "@composurecdk/core": "^0.13.0",
+    "@composurecdk/cloudformation": "^0.14.0",
+    "@composurecdk/cloudwatch": "^0.14.0",
+    "@composurecdk/core": "^0.14.0",
     "aws-cdk-lib": "^2.180.0",
     "constructs": "^10.0.0"
   },

@@ -524,10 +524,10 @@ describe("squashMergeRefusals", () => {
     ]);
   });
 
-  it("refuses when a required check never ran", () => {
+  it("refuses when a required check has no run yet", () => {
     assert.deepEqual(squashMergeRefusals(ready({ checkRuns: [] })), [
-      "The required check **CI** has not run on the head commit.",
-      "The required check **PR policy** has not run on the head commit.",
+      "The required check **CI** has not finished on the head commit. It may still be running.",
+      "The required check **PR policy** has not finished on the head commit. It may still be running.",
     ]);
   });
 

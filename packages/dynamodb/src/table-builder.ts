@@ -13,7 +13,7 @@ import { TABLE_DEFAULTS } from "./defaults.js";
  *
  * Extends the CDK {@link TableProps} with additional builder-specific options.
  */
-export interface TableBuilderProps extends Omit<TableProps, "encryptionKey"> {
+export interface TableBuilderProps extends Omit<TableProps, "encryptionKey" | "resourcePolicy"> {
   /**
    * The customer-managed KMS key used to encrypt the table at rest.
    *
@@ -30,6 +30,19 @@ export interface TableBuilderProps extends Omit<TableProps, "encryptionKey"> {
    * (ADR-0018) — see the table in `@composurecdk/kms`'s README.
    */
   encryptionKey?: Resolvable<NonNullable<TableProps["encryptionKey"]>>;
+
+  /**
+   * The table's resource policy.
+   *
+   * Accepts a concrete `PolicyDocument` or a {@link Resolvable} — a {@link ref}
+   * or {@link combine} that builds one from sibling components, such as the
+   * interface VPC endpoint in an `aws:SourceVpce` condition. See the README's
+   * "Resource policy" section.
+   *
+   * The policy is part of the table resource, so a statement cannot name the
+   * table's own ARN: use `resources: ["*"]`, which means this table.
+   */
+  resourcePolicy?: Resolvable<NonNullable<TableProps["resourcePolicy"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -134,11 +147,17 @@ class TableBuilder implements Lifecycle<TableBuilderResult> {
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): TableBuilderResult {
-    const { recommendedAlarms: alarmConfig, encryptionKey, ...tableProps } = this.props;
+    const {
+      recommendedAlarms: alarmConfig,
+      encryptionKey,
+      resourcePolicy,
+      ...tableProps
+    } = this.props;
 
     const mergedProps = mergeTableDefaults({
       ...tableProps,
       ...(encryptionKey !== undefined ? { encryptionKey: resolve(encryptionKey, context) } : {}),
+      ...(resourcePolicy !== undefined ? { resourcePolicy: resolve(resourcePolicy, context) } : {}),
     });
 
     const table = new Table(scope, id, mergedProps);

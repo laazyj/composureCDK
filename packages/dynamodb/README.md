@@ -119,6 +119,49 @@ createFunctionBuilder()
 
 Each capability grants the table's customer-managed key, when it has one, in the grantee's identity policy, so a grant stands alone. A key built by [`@composurecdk/kms`](../kms/README.md) keeps CDK's default key policy, which delegates to IAM, so that is enough within the account. Two limits: on a `TableV2` with replicas only the primary Region's key is granted, not a replica's; and a key in another account needs its key policy to allow the grantee.
 
+## Resource policy
+
+`.resourcePolicy(document)` sets the table's resource policy on either builder. It accepts a `PolicyDocument` or a `ref`/`combine` that builds one from siblings. Here, a table rejects any request that does not arrive through an interface endpoint built in the same system:
+
+```ts
+import { AnyPrincipal, Effect, PolicyDocument, PolicyStatement } from "aws-cdk-lib/aws-iam";
+import {
+  createInterfaceEndpointBuilder,
+  type InterfaceEndpointBuilderResult,
+} from "@composurecdk/ec2";
+
+compose(
+  {
+    endpoint: createInterfaceEndpointBuilder() /* … */,
+    orders: createTableV2Builder()
+      .partitionKey({ name: "pk", type: AttributeType.STRING })
+      .resourcePolicy(
+        ref(
+          "endpoint",
+          (r: InterfaceEndpointBuilderResult) =>
+            new PolicyDocument({
+              statements: [
+                new PolicyStatement({
+                  effect: Effect.DENY,
+                  principals: [new AnyPrincipal()],
+                  actions: ["dynamodb:*"],
+                  resources: ["*"],
+                  conditions: { StringNotEquals: { "aws:SourceVpce": r.endpoint.vpcEndpointId } },
+                }),
+              ],
+            }),
+        ),
+      ),
+  },
+  { endpoint: [], orders: ["endpoint"] },
+);
+```
+
+- **Use `resources: ["*"]`; it means this table.** The policy is a property of the table resource itself, so naming `table.tableArn` would make the table depend on its own ARN, which CloudFormation rejects as a circular dependency.
+- **Use it for what an in-app grant cannot express:** access from another account, and guardrails such as the endpoint condition above. Grant an IAM principal in the app access on the principal's side with [`tableGrants`](#grants) instead ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)).
+- **A component that depends on the table cannot be named here:** `compose` rejects the cycle.
+- **On a `TableV2` with replicas, it covers the primary Region only** under the recommended `@aws-cdk/aws-dynamodb:resourcePolicyPerReplica` flag. Give each replica its own policy with `replicas[].resourcePolicy`, or a guardrail like the one above leaves the replicas open.
+
 ## DynamoDB Streams
 
 Enable a stream with `.dynamoStream(StreamViewType…)` (TableV2) or `.stream(StreamViewType…)` (classic). The build result surfaces the stream ARN so a downstream component can wire a consumer:

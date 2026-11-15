@@ -13,7 +13,7 @@ import { TABLE_V2_DEFAULTS } from "./defaults.js";
  *
  * Extends the CDK {@link TablePropsV2} with additional builder-specific options.
  */
-export interface TableV2BuilderProps extends Omit<TablePropsV2, "encryption"> {
+export interface TableV2BuilderProps extends Omit<TablePropsV2, "encryption" | "resourcePolicy"> {
   /**
    * Server-side encryption for the table and its replicas.
    *
@@ -36,6 +36,19 @@ export interface TableV2BuilderProps extends Omit<TablePropsV2, "encryption"> {
    * @default TableEncryptionV2.awsManagedKey()
    */
   encryption?: Resolvable<NonNullable<TablePropsV2["encryption"]>>;
+
+  /**
+   * The table's resource policy.
+   *
+   * Accepts a concrete `PolicyDocument` or a {@link Resolvable} — a {@link ref}
+   * or {@link combine} that builds one from sibling components, such as the
+   * interface VPC endpoint in an `aws:SourceVpce` condition. See the README's
+   * "Resource policy" section.
+   *
+   * The policy is part of the table resource, so a statement cannot name the
+   * table's own ARN: use `resources: ["*"]`, which means this table.
+   */
+  resourcePolicy?: Resolvable<NonNullable<TablePropsV2["resourcePolicy"]>>;
 
   /**
    * Configuration for AWS-recommended CloudWatch alarms.
@@ -145,7 +158,12 @@ class TableV2Builder implements Lifecycle<TableV2BuilderResult> {
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): TableV2BuilderResult {
-    const { recommendedAlarms: alarmConfig, encryption, ...tableProps } = this.props;
+    const {
+      recommendedAlarms: alarmConfig,
+      encryption,
+      resourcePolicy,
+      ...tableProps
+    } = this.props;
 
     // TableV2's billing and encryption defaults are single helper objects with
     // no flat sibling props, so a same-key spread is sufficient — unlike the
@@ -155,6 +173,7 @@ class TableV2Builder implements Lifecycle<TableV2BuilderResult> {
       ...TABLE_V2_DEFAULTS,
       ...tableProps,
       ...(encryption !== undefined ? { encryption: resolve(encryption, context) } : {}),
+      ...(resourcePolicy !== undefined ? { resourcePolicy: resolve(resourcePolicy, context) } : {}),
     } as TablePropsV2;
 
     const table = new TableV2(scope, id, mergedProps);

@@ -34,7 +34,7 @@
   "devDependencies": {
     "@composurecdk/cdk-testing": "*",
     "@types/node": "^26.6.6",
-    "aws-cdk": "^2.1147.0",
+    "aws-cdk": "^2.1148.0",
     "typescript": "^6.0.3",
     "vitest": "^5.0.0"
   },

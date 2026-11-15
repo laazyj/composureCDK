@@ -24,10 +24,19 @@ export {
   SUPPORTED_CUSTOM_RESPONSE_STATUS_CODES,
 } from "./custom-response.js";
 export { type WebAclScope } from "./scope.js";
+export { type WebAclLoggingConfig, type WebAclLogRedaction } from "./logging.js";
 export {
+  type WebAclLogAction,
+  type WebAclLogCondition,
+  type WebAclLoggingFilter,
+} from "./logging-filter.js";
+export {
+  DEFAULT_LOGGING_FILTER,
+  DEFAULT_LOGGING_REDACTED_HEADERS,
   DEFAULT_RULE_PRIORITY_STEP,
   WEB_ACL_DEFAULTS,
   WEB_ACL_VISIBILITY_DEFAULTS,
+  WAF_LOG_GROUP_NAME_PREFIX,
 } from "./defaults.js";
 
 /**

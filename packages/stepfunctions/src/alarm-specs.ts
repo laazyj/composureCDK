@@ -20,8 +20,14 @@ import { createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
 export const INAPPLICABLE_ALARM_CONFIG_WARNING_ID =
   "@composurecdk/stepfunctions:inapplicable-alarm-config";
 
-const METRIC_PERIOD = Duration.minutes(1);
+/** The period every recommended alarm in this package uses. */
+export const METRIC_PERIOD = Duration.minutes(1);
 const METRIC_PERIOD_LABEL = `${String(METRIC_PERIOD.toMinutes())} minute`;
+
+/** The threshold sentence that ends a recommended alarm's description. */
+export function describeThreshold(threshold: number): string {
+  return `Threshold: > ${String(threshold)} in ${METRIC_PERIOD_LABEL}.`;
+}
 
 /** One recommended alarm on a resource of type `T`. */
 export interface AlarmSpec<T extends IConstruct> {
@@ -90,7 +96,7 @@ export function createSpecAlarms<T extends IConstruct, K extends string>(
         evaluationPeriods: cfg.evaluationPeriods,
         datapointsToAlarm: cfg.datapointsToAlarm,
         treatMissingData: cfg.treatMissingData,
-        description: `${spec.describe} Threshold: > ${String(cfg.threshold)} in ${METRIC_PERIOD_LABEL}.`,
+        description: `${spec.describe} ${describeThreshold(cfg.threshold)}`,
       });
     }
   }

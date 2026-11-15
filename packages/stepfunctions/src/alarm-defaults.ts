@@ -3,8 +3,8 @@ import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
 
 /**
  * Alarm on the first occurrence in a minute; an idle resource stays OK. AWS
- * publishes no Step Functions thresholds, so every recommended alarm in this
- * package uses this library default.
+ * publishes no thresholds for per-resource Step Functions metrics, so every
+ * recommended alarm on a state machine or activity uses this library default.
  */
 export const ANY_OCCURRENCE: AlarmConfigDefaults = {
   threshold: 0,

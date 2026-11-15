@@ -362,6 +362,29 @@ describe("squashBodyProblems", () => {
     assert.equal(squashBodyProblems(merged(""), pr, [bump]).length, 1);
   });
 
+  it("passes a grouped Dependabot bump that kept its commit subject, as 5baf18c (#752) landed", () => {
+    const bot = "49699333+dependabot[bot]@users.noreply.github.com";
+    const message =
+      "build(deps-dev): bump aws-cdk\n\nBumps the aws-cdk group with 1 update.\n\n\n" +
+      "Updates `aws-cdk` from 2.1147.0 to 2.1148.0\n\n---\nupdated-dependencies: ...\n\n" +
+      "Signed-off-by: dependabot[bot] <support@github.com>";
+    const bump = commit(message, { authorEmail: bot });
+    const title = "build(deps-dev): bump aws-cdk from 2.1147.0 to 2.1148.0 in the aws-cdk group";
+    const merged = landed(
+      `${message}\nCo-authored-by: dependabot[bot] <${bot}>`,
+      `${title} (#752)`,
+    );
+    assert.deepEqual(squashBodyProblems(merged, { number: 752, title }, [bump]), []);
+  });
+
+  it("still fails a body that keeps the subject but changes the rest", () => {
+    const edited = landed(`fix(s3): x\n\nWhy it changed.`);
+    assert.deepEqual(squashBodyProblems(edited, PR, [personal]), [
+      "landed with a body that differs from its pull request's commit message",
+      "dropped `Closes #12`, so the release notes no longer link the issue",
+    ]);
+  });
+
   it("compares several commits as GitHub's bulleted list", () => {
     const commits = [commit("fix: a\n\nOne."), commit("fix: b\n\nTwo.")];
     const bulleted = landed("* fix: a\n\nOne.\n\n* fix: b\n\nTwo.");

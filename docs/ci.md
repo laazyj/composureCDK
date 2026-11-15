@@ -109,12 +109,13 @@ It finds the commit's merged PR and that PR's commits through the API, and appli
 **The body** (`squashBodyProblems`), for every merged pull request, whether or not an agent took part. The commit's body must be the one `/squash` would have written: `squashMessage` of the PR's commits, so the branch's one commit body word for word, or GitHub's bulleted list for several. A difference is reported, and so is each `Closes`, `Fixes`, `Resolves` or `Refs` footer it dropped, because that is the link the release notes lose. It allows only what the web dialog does without anyone touching it, so a default button merge is not a finding:
 
 - trailing whitespace and runs of blank lines;
-- `Co-authored-by:` lines anywhere in the body (the dialog moves them all to the end), and extra ones for the PR's commit authors (the dialog adds them). A co-author line the PR's commits carried must still be there, and one nobody's commit credits is reported as added.
+- `Co-authored-by:` lines anywhere in the body (the dialog moves them all to the end), and extra ones for the PR's commit authors (the dialog adds them). A co-author line the PR's commits carried must still be there, and one nobody's commit credits is reported as added;
+- for a PR with one commit, that commit's subject as the body's first line. The dialog keeps it when the commit's subject is not the PR title, as on 5baf18c (#752), a grouped Dependabot bump.
 
 The title plays no part, so a title edited after merge does not matter; the subject on `main`, less its ` (#N)`, is taken as the title it merged with.
 
 - **Release pull requests** (`chore(release): vX.Y.Z`) need no exception. Their commit has no body, and the dialog's `Co-authored-by: github-actions[bot]` is a commit author's line, as on 90bf811.
-- **Dependabot pull requests** are checked like any other. A button merge keeps Dependabot's body and adds `Co-authored-by: dependabot[bot]`, which passes; an emptied one is reported, though it costs the release notes nothing, because the rule cannot tell a body that mattered from one that did not.
+- **Dependabot pull requests** are checked like any other. A button merge keeps Dependabot's body (with its commit subject on top, for a grouped update whose title differs) and adds `Co-authored-by: dependabot[bot]`, which passes; an emptied one is reported, though it costs the release notes nothing, because the rule cannot tell a body that mattered from one that did not.
 - **A direct push** has no pull request to compare against, so it gets only the attribution rule below, applied to its own message. The ruleset is what stops direct pushes; this does not.
 
 **Agent attribution** (`mainCommitProblems`). If any of the commits, or the pull request itself, shows a coding agent took part (by the same tests as **Commits**), the commit on `main` must:

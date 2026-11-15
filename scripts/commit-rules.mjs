@@ -327,7 +327,7 @@ export function mergedTitle(commit, pr) {
  * from the body `/squash` would have written ({@link squashMessage}), whether
  * or not an agent took part. Allows exactly what the web merge dialog does on
  * its own: `Co-authored-by` lines moved to the end, and added for the PR's
- * commit authors. A co-author an agent's address names is left to
+ * commit authors, and a lone commit's subject kept as the body's first line. A co-author an agent's address names is left to
  * {@link mainCommitProblems}, so a dropped attribution is reported once.
  */
 export function squashBodyProblems(commit, pr, prCommits) {
@@ -335,8 +335,12 @@ export function squashBodyProblems(commit, pr, prCommits) {
   const expected = bodyParts(squashMessage(mergedTitle(commit, pr), pr.number, prCommits).body);
   const landed = bodyParts(bodyOf(commit.message));
   const problems = [];
+  // The dialog's default for one commit whose subject is not the PR title
+  // keeps that subject as the body's first line, as 5baf18c (#752) landed.
+  const withSubject =
+    prCommits.length === 1 && landed.text === bodyParts(prCommits[0].message).text;
 
-  if (landed.text !== expected.text) {
+  if (landed.text !== expected.text && !withSubject) {
     problems.push(
       landed.text === ""
         ? `landed with an empty body, where its pull request's commit message has one`

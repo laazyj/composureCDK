@@ -4,6 +4,7 @@ export {
   type TopicBuilderResult,
   type ITopicBuilder,
   type AllowServicePublishOptions,
+  type TopicPolicyStatement,
 } from "./topic-builder.js";
 export { topicGrants } from "./grants.js";
 export { TOPIC_DEFAULTS } from "./defaults.js";

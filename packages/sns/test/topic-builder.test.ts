@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { AccountPrincipal, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
 import { type ITopic, type TopicProps } from "aws-cdk-lib/aws-sns";
@@ -17,6 +18,15 @@ import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createTopicBuilder, type TopicBuilderProps } from "../src/topic-builder.js";
 
 const buildAndSynth = buildFixture(createTopicBuilder, "TestTopic");
+
+/** An `sns:Publish` grant to another account on `resources`. */
+function publishStatement(resources: string[], account = "111122223333") {
+  return new PolicyStatement({
+    principals: [new AccountPrincipal(account)],
+    actions: ["sns:Publish"],
+    resources,
+  });
+}
 
 describe("TopicBuilder", () => {
   describe("build", () => {
@@ -279,8 +289,71 @@ describe("TopicBuilder", () => {
     });
   });
 
+  describe("addToResourcePolicy", () => {
+    const PUBLISH_STATEMENT = {
+      Effect: "Allow",
+      Principal: { AWS: { "Fn::Join": ["", Match.arrayWith([":iam::111122223333:root"])] } },
+      Action: "sns:Publish",
+    };
+
+    it("adds a concrete statement to the topic's own policy alongside enforceSSL", () => {
+      const { template } = buildAndSynth((b) => b.addToResourcePolicy(publishStatement(["*"])));
+
+      template.resourceCountIs("AWS::SNS::TopicPolicy", 1);
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [
+            Match.objectLike({ Sid: "AllowPublishThroughSSLOnly" }),
+            Match.objectLike({ ...PUBLISH_STATEMENT, Resource: "*" }),
+          ],
+        }),
+      });
+    });
+
+    it("creates the policy when enforceSSL is off", () => {
+      const { result, template } = buildAndSynth((b) =>
+        b.enforceSSL(false).addToResourcePolicy(publishStatement(["*"])),
+      );
+
+      expect(result.policy).toBeDefined();
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [Match.objectLike({ ...PUBLISH_STATEMENT, Resource: "*" })],
+        }),
+      });
+    });
+
+    it("resolves a ref against the build context, including one a function returns", () => {
+      const fromPartner = (resources: string[]) =>
+        ref<{ account: string }, PolicyStatement>("partner", (r) =>
+          publishStatement(resources, r.account),
+        );
+
+      const { template, result, stack } = buildAndSynth(
+        (b) =>
+          b
+            .enforceSSL(false)
+            .addToResourcePolicy(fromPartner(["*"]))
+            .addToResourcePolicy((topic) => fromPartner([topic.topicArn])),
+        { context: { partner: { account: "111122223333" } } },
+      );
+
+      template.hasResourceProperties("AWS::SNS::TopicPolicy", {
+        PolicyDocument: Match.objectLike({
+          Statement: [
+            Match.objectLike({ ...PUBLISH_STATEMENT, Resource: "*" }),
+            Match.objectLike({
+              ...PUBLISH_STATEMENT,
+              Resource: stack.resolve(result.topic.topicArn) as unknown,
+            }),
+          ],
+        }),
+      });
+    });
+  });
+
   describe("[COPY_STATE]", () => {
-    it("preserves #customAlarms, #subscriptions and #servicePublishers across .copy()", () => {
+    it("preserves #customAlarms, #subscriptions and #policyStatements across .copy()", () => {
       const failedMetric = (topic: ITopic): Metric =>
         new Metric({
           namespace: "AWS/SNS",
@@ -298,6 +371,7 @@ describe("TopicBuilder", () => {
           );
           b.addSubscription("first", new EmailSubscription("first@example.com"));
           b.allowServicePublish("budgets.amazonaws.com");
+          b.addToResourcePolicy(publishStatement(["*"]));
         },
         mutate: (b) => {
           b.addAlarm("secondCustom", (a) =>
@@ -305,6 +379,7 @@ describe("TopicBuilder", () => {
           );
           b.addSubscription("second", new EmailSubscription("second@example.com"));
           b.allowServicePublish("events.amazonaws.com");
+          b.addToResourcePolicy((topic) => publishStatement([topic.topicArn], "444455556666"));
         },
         build: (b) => b.build(new Stack(new App(), "S"), "Topic"),
         inspect: (r) => ({

@@ -55,7 +55,7 @@ const topic = createTopicBuilder().topicName("my-topic").enforceSSL(false).build
 
 ## Topic Access Policy
 
-A topic has one access policy. CDK creates it as an `AWS::SNS::TopicPolicy` the first time a statement is added — by the `enforceSSL` default, by `allowServicePublish`, or by `topic.addToResourcePolicy(...)` — and every later statement joins that same policy. The build result returns it as `result.policy`, which CDK keeps private on `Topic`; it is `undefined` when the topic had no statements at build time.
+A topic has one access policy. CDK creates it as an `AWS::SNS::TopicPolicy` the first time a statement is added — by the `enforceSSL` default, by `allowServicePublish`, or by `addToResourcePolicy` — and every later statement joins that same policy. The build result returns it as `result.policy`, which CDK keeps private on `Topic`; it is `undefined` when the topic had no statements at build time.
 
 Use `allowServicePublish` to let an AWS service publish to the topic. The statement joins the topic's own policy, next to the `enforceSSL` statement:
 
@@ -69,7 +69,25 @@ createTopicBuilder()
 
 `conditions` is optional; use one where the service supports it, to guard against the [confused deputy problem](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html). Integrations that wire themselves — EventBridge targets, S3 notifications, and [`@composurecdk/budgets`](../budgets/README.md) SNS subscribers — already add their statement to the topic's policy, so they need no `allowServicePublish`.
 
-Do not create another `TopicPolicy` for a topic built here: each policy resource replaces the topic's policy outright, so one of them is lost. [`topicPolicyConflictPolicy`](#topic-policy-conflict-policy) catches this at synth.
+For any other statement, use `addToResourcePolicy`. Pass a function of the topic to name its ARN, which an SNS statement needs as its `Resource`:
+
+```ts
+import { AccountPrincipal, PolicyStatement } from "aws-cdk-lib/aws-iam";
+
+createTopicBuilder().addToResourcePolicy(
+  (topic) =>
+    new PolicyStatement({
+      principals: [new AccountPrincipal("111122223333")],
+      actions: ["sns:Publish"],
+      resources: [topic.topicArn],
+    }),
+);
+```
+
+- **Use it for what an in-app grant cannot express:** access from another account, and guardrails such as an organisation (`aws:PrincipalOrgID`) or VPC endpoint (`aws:SourceVpce`) condition. Grant an IAM principal in the app access on the principal's side with `topicGrants` instead ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)).
+- **The statement, or the function's return value, may be a `ref` or `combine`**, so it can name a sibling the policy depends on, such as a VPC endpoint. A component that depends on the topic cannot be named that way: `compose` rejects the cycle.
+
+Do not create another `TopicPolicy` for a topic built here: each policy resource replaces the topic's policy outright, so one of them is lost. Add to the topic's own policy with `addToResourcePolicy` instead. [`topicPolicyConflictPolicy`](#topic-policy-conflict-policy) catches this at synth.
 
 ## Recommended Alarms
 
@@ -322,7 +340,7 @@ import { topicPolicyConflictPolicy } from "@composurecdk/sns";
 topicPolicyConflictPolicy(app); // or { onViolation: "warn" } to annotate instead
 ```
 
-The usual cause is a `new TopicPolicy(...)` for a topic built in CDK, alongside the policy CDK creates for the topic itself (for example, for the `enforceSSL` default). Add to the topic's own policy with `topic.addToResourcePolicy(...)` instead.
+The usual cause is a `new TopicPolicy(...)` for a topic built in CDK, alongside the policy CDK creates for the topic itself (for example, for the `enforceSSL` default). Add to the topic's own policy with the builder's `addToResourcePolicy`, or `topic.addToResourcePolicy(...)` for a topic built elsewhere, instead.
 
 The check matches topics by the resolved `Topics`/`TopicArn` value: a literal ARN matches across stacks, and a `Ref` matches within its stack.
 

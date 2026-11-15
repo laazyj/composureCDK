@@ -86,7 +86,7 @@ export function topicPolicyConflictPolicy(
         const message =
           `${node.node.path}: another topic policy (${prior.node.path}) already targets ` +
           `SNS topic ${key}, and whichever CloudFormation applies last replaces the other. ` +
-          `Add statements with topic.addToResourcePolicy(...) instead.`;
+          `Add statements to the topic's own policy with addToResourcePolicy instead.`;
         if (onViolation === "throw") throw new Error(message);
         Annotations.of(node).addWarningV2(TOPIC_POLICY_CONFLICT_WARNING_ID, message);
       }

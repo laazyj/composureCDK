@@ -134,6 +134,15 @@ export interface TopicBuilderResult {
  */
 export type ITopicBuilder = ITaggedBuilder<TopicBuilderProps, TopicBuilder>;
 
+/**
+ * A statement for {@link ITopicBuilder.addToResourcePolicy}: a
+ * {@link PolicyStatement}, a {@link Resolvable} of one, or a function of the
+ * built topic that returns either — so the statement can name the topic's own
+ * ARN.
+ */
+export type TopicPolicyStatement =
+  Resolvable<PolicyStatement> | ((topic: ITopic) => Resolvable<PolicyStatement>);
+
 /** Options for {@link ITopicBuilder.allowServicePublish}. */
 export interface AllowServicePublishOptions {
   /**
@@ -142,11 +151,6 @@ export interface AllowServicePublishOptions {
    * {@link https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html | confused deputy problem}.
    */
   conditions?: PolicyStatementProps["conditions"];
-}
-
-interface ServicePublisher {
-  service: string;
-  options: AllowServicePublishOptions;
 }
 
 interface SubscriptionEntry {
@@ -158,7 +162,7 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
   props: Partial<TopicBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ITopic>[] = [];
   readonly #subscriptions: SubscriptionEntry[] = [];
-  readonly #servicePublishers: ServicePublisher[] = [];
+  readonly #policyStatements: TopicPolicyStatement[] = [];
 
   addAlarm(key: string, configure: AlarmConfigurer<ITopic>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<ITopic>(key)));
@@ -209,7 +213,28 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
    * at build time — see the README's "Topic Access Policy" section.
    */
   allowServicePublish(service: string, options: AllowServicePublishOptions = {}): this {
-    this.#servicePublishers.push({ service, options });
+    return this.addToResourcePolicy(
+      (topic) =>
+        new PolicyStatement({
+          effect: Effect.ALLOW,
+          principals: [new ServicePrincipal(service)],
+          actions: ["sns:Publish"],
+          resources: [topic.topicArn],
+          conditions: options.conditions,
+        }),
+    );
+  }
+
+  /**
+   * Adds a statement to the topic's access policy once the topic is built.
+   * For an AWS service publishing, {@link allowServicePublish} is shorter.
+   *
+   * Pass a function of the topic to name its own ARN. A {@link Ref} resolves
+   * against the build context; a component that depends on the topic cannot
+   * be named that way — see the README's "Topic Access Policy" section.
+   */
+  addToResourcePolicy(statement: TopicPolicyStatement): this {
+    this.#policyStatements.push(statement);
     return this;
   }
 
@@ -217,7 +242,7 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
   [COPY_STATE](target: TopicBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
     target.#subscriptions.push(...this.#subscriptions);
-    target.#servicePublishers.push(...this.#servicePublishers);
+    target.#policyStatements.push(...this.#policyStatements);
   }
 
   build(scope: IConstruct, id: string, context?: Record<string, object>): TopicBuilderResult {
@@ -231,16 +256,9 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
 
     const topic = new Topic(scope, id, mergedProps);
 
-    for (const { service, options } of this.#servicePublishers) {
-      topic.addToResourcePolicy(
-        new PolicyStatement({
-          effect: Effect.ALLOW,
-          principals: [new ServicePrincipal(service)],
-          actions: ["sns:Publish"],
-          resources: [topic.topicArn],
-          conditions: options.conditions,
-        }),
-      );
+    for (const statement of this.#policyStatements) {
+      const resolvable = typeof statement === "function" ? statement(topic) : statement;
+      topic.addToResourcePolicy(resolve(resolvable, context));
     }
 
     const subscriptions: Record<string, Subscription> = {};

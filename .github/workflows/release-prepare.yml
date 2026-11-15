@@ -114,6 +114,12 @@ jobs:
         run: |
           npx nx release changelog "$VERSION"
 
+      # nx writes double spaces in breaking-change lines, which prettier:check
+      # rejects on the release branch. The base commit passed CI, so only the
+      # generated changelog changes.
+      - name: Format changelog
+        run: npx nx prettier:write
+
       - name: Create release branch and commit
         env:
           BRANCH: ${{ steps.version.outputs.branch }}

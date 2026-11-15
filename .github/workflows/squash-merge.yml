@@ -1,0 +1,61 @@
+name: Squash merge
+
+# Squash-merges a pull request when someone who can merge comments `/squash`,
+# with the message main should keep. See docs/ci.md#merging.
+
+on:
+  # zizmor flags every issue_comment trigger. The job runs only for a `/squash`
+  # comment on a pull request by its owner, a member or a collaborator, and the
+  # script checks the commenter can merge. It checks out the default branch,
+  # never PR code, with persist-credentials: false.
+  issue_comment: # zizmor: ignore[dangerous-triggers]
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: squash-merge-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    name: Squash merge
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/squash') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      checks: read # the head commit's required checks
+      pull-requests: write # read the PR and its commits, and say why it did not merge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      # No dependency cache: this job holds a PAT that can merge to main, and a
+      # cache written by another ref would run with it (as in release.yml).
+      # Dependencies because the rules read commits with nx's own parser.
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      # --ignore-scripts: no install script needs to run beside the PAT.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_TOKEN: ${{ secrets.SQUASH_MERGE_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+          NX_DAEMON: false
+        run: npx nx squash:merge

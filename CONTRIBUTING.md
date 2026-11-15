@@ -167,6 +167,10 @@ PR title, and its body is the commit messages on your branch. So:
 - **Mind what the body says.** The release tooling reads all of it.
   `BREAKING CHANGE:` makes the release breaking, so pair it with `!` in the
   title. `This reverts commit <sha>.` marks the entry as a revert.
+- **Maintainers merge by commenting `/squash`.** It lands the commit with
+  exactly the message the checks saw. The merge buttons let that message be
+  edited or emptied, and the mobile app empties it; see
+  [Merging](docs/ci.md#merging).
 - **Say when an AI assistant helped.** We record which changes an agent wrote,
   so a commit that an assistant wrote or co-wrote ends with a
   `Co-authored-by:` trailer naming it and an `Agent-Session:` trailer saying

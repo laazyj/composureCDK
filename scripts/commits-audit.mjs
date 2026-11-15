@@ -24,7 +24,7 @@
 
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
-import { mainCommitProblems, pullRequestAgentSignal } from "./commit-rules.mjs";
+import { mainCommitProblems, pullRequestAgentSignal, toCommit } from "./commit-rules.mjs";
 
 const { GITHUB_REPOSITORY: repo, GITHUB_EVENT_PATH: eventPath, SHAS } = process.env;
 if (!repo) {
@@ -46,12 +46,6 @@ for (const sha of shas) {
 const gh = (...args) => execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const api = (path) => JSON.parse(gh("api", path));
 const apiPages = (path) => JSON.parse(gh("api", "--paginate", "--slurp", path)).flat();
-const toCommit = (c) => ({
-  sha: c.sha,
-  message: c.commit.message,
-  authorEmail: c.commit.author?.email ?? "",
-  parents: c.parents.map((p) => p.sha),
-});
 
 const findings = [];
 for (const sha of shas) {

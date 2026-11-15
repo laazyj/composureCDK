@@ -9,6 +9,7 @@ import {
   nxReading,
   pullRequestAgentSignal,
   pullRequestProblems,
+  squashMergeRefusals,
   squashMessage,
   trailersOf,
 } from "./commit-rules.mjs";
@@ -360,5 +361,75 @@ describe("agent-signalled pull requests", () => {
       "has no `Co-authored-by:` trailer for the agent",
       `names no \`Agent-Session\`, though its pull request ${signal}`,
     ]);
+  });
+});
+
+describe("squashMergeRefusals", () => {
+  const run = (name, conclusion = "success", { status = "completed", at = "07:00" } = {}) => ({
+    name,
+    status,
+    conclusion,
+    started_at: `2026-11-15T${at}:00Z`,
+  });
+  const ready = (overrides = {}) => ({
+    pr: {
+      number: 42,
+      title: "feat(s3): add a thing",
+      state: "open",
+      draft: false,
+      base: { ref: "main", repo: { default_branch: "main" } },
+    },
+    login: "maintainer",
+    permission: "admin",
+    requiredChecks: ["CI", "PR policy"],
+    checkRuns: [run("CI"), run("PR policy")],
+    commits: [agentCommit()],
+    ...overrides,
+  });
+
+  it("merges a ready pull request", () => {
+    assert.deepEqual(squashMergeRefusals(ready()), []);
+  });
+
+  it("refuses a commenter who cannot merge", () => {
+    const [refusal] = squashMergeRefusals(ready({ permission: "read" }));
+    assert.match(refusal, /`maintainer` has read access/);
+  });
+
+  it("refuses a draft, a closed pull request and a stacked one", () => {
+    const pr = {
+      ...ready().pr,
+      state: "closed",
+      draft: true,
+      base: { ref: "claude/below", repo: { default_branch: "main" } },
+    };
+    const refusals = squashMergeRefusals(ready({ pr }));
+    assert.equal(refusals.length, 3);
+    assert.match(refusals[2], /targets `claude\/below`, not `main`/);
+  });
+
+  it("judges each required check by its latest run", () => {
+    const checkRuns = [
+      run("CI"),
+      run("CI", "failure", { at: "08:00" }),
+      run("PR policy", null, { status: "in_progress", at: "08:00" }),
+      run("Unrequired", "failure", { at: "08:00" }),
+    ];
+    assert.deepEqual(squashMergeRefusals(ready({ checkRuns })), [
+      "The required check **CI** finished as `failure`.",
+      "The required check **PR policy** is still running.",
+    ]);
+  });
+
+  it("refuses when a required check never ran", () => {
+    assert.deepEqual(squashMergeRefusals(ready({ checkRuns: [] })), [
+      "The required check **CI** has not run on the head commit.",
+      "The required check **PR policy** has not run on the head commit.",
+    ]);
+  });
+
+  it("refuses commits that would not land cleanly", () => {
+    const refusals = squashMergeRefusals(ready({ commits: [agentCommit(), agentCommit()] }));
+    assert.match(refusals[0], /The branch has 2 commits/);
   });
 });

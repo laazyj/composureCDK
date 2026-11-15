@@ -144,9 +144,12 @@ jobs:
           BRANCH: ${{ steps.version.outputs.branch }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if gh pr view "$BRANCH" --json number --jq .number >/dev/null 2>&1; then
+          # Only an open PR counts: `gh pr view <branch>` also finds a closed one,
+          # which would leave the re-pushed branch with no PR at all.
+          existing=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
+          if [ -n "$existing" ]; then
             echo "PR already open for $BRANCH — branch was force-updated."
-            gh pr view "$BRANCH" --json url --jq .url
+            echo "$existing"
             exit 0
           fi
 

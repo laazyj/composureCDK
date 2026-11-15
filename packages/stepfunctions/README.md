@@ -162,6 +162,41 @@ createStateMachineBuilder()
 
 `.recommendedAlarms(false)` (or `{ enabled: false }`) disables every recommended alarm; custom alarms added with `addAlarm` are still created.
 
+### Account-level alarms
+
+Some [Step Functions quotas](https://docs.aws.amazon.com/step-functions/latest/dg/service-quotas.html) apply to the account in each Region. When one is reached, every workflow in it is affected. Their metrics have no dimensions, so no state machine builder can own them. `createAccountAlarmBuilder` creates their alarms. **Build one per account and Region**: a second one creates duplicate alarms.
+
+```ts
+import { createAccountAlarmBuilder } from "@composurecdk/stepfunctions";
+
+compose(
+  {
+    stepFunctionsAccount: createAccountAlarmBuilder().recommendedAlarms({
+      openExecutions: { thresholdPercent: 0.2 },
+      startExecutionThrottled: {}, // opt-in
+    }),
+  },
+  { stepFunctionsAccount: [] },
+);
+// result: { alarms: Record<string, Alarm> }
+```
+
+| Alarm                      | Metric (1 min)                                           | Default threshold          | Created by default |
+| -------------------------- | -------------------------------------------------------- | -------------------------- | ------------------ |
+| `openExecutions`           | `OpenExecutionCount / OpenExecutionLimit` (Maximum)      | > 0.1 (`thresholdPercent`) | Yes                |
+| `openMapRuns`              | `ApproximateOpenMapRunCount` (Maximum)                   | > 900                      | Yes                |
+| `mapRunBacklog`            | `ApproximateMapRunBacklogSize` (Maximum)                 | none: supply one           | No                 |
+| `startExecutionThrottled`  | `ThrottledEvents`, `APIName=StartExecution` (Sum)        | > 0                        | No                 |
+| `stateTransitionThrottled` | `ThrottledEvents`, `ServiceMetric=StateTransition` (Sum) | > 0                        | No                 |
+
+- **The thresholds of the two default alarms are [AWS's](https://docs.aws.amazon.com/step-functions/latest/dg/procedure-cw-metrics.html).** These are the only Step Functions metrics with AWS-recommended thresholds. The other three have none, so they are opt-in.
+- **`openExecutions` follows a raised quota without changes.** AWS recommends alarming at 100K open executions against the 1M default quota. The alarm divides the count by `OpenExecutionLimit`, which Step Functions publishes beside it, so the same 10% still applies when the quota is raised. Only Standard executions count toward the quota. Below about 10,000 open executions the count can read zero.
+- **`openMapRuns` uses a fixed threshold** because its quota of 1,000 is hard.
+- **`stateTransitionThrottled` is the account-wide view** of each Standard state machine's `executionThrottled` alarm.
+- **Missing data is not breaching.** Step Functions delivers these metrics on a best-effort basis, so a gap is not a fault.
+
+No alarm actions are configured. The defaults are exported as `ACCOUNT_ALARM_DEFAULTS`. Alarms are tuned and disabled as above, and `addAlarm` receives the account's dimensionless `AWS/States` metrics: `(a) => a.metric((m) => m.metric("ExecutionsFailed", { statistic: "Sum" })).threshold(10)`.
+
 ## Execution role
 
 CDK creates the execution role unless one is supplied with `.role(...)`, which accepts a `Resolvable`. Either way it is returned as `result.role`. The log-delivery and X-Ray actions CDK adds are on `*`, because those APIs [do not support resource-level permissions](https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html), so a hand-built role would gain nothing over CDK's.

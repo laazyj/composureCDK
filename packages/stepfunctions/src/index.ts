@@ -37,3 +37,12 @@ export {
   type StateMachineAliasAlarmConfig,
   type StateMachineAliasResult,
 } from "./state-machine-alias.js";
+export {
+  type AccountAlarmBuilderProps,
+  type AccountAlarmBuilderResult,
+  type AccountMetrics,
+  createAccountAlarmBuilder,
+  type IAccountAlarmBuilder,
+} from "./account-alarm-builder.js";
+export { type AccountAlarmConfig, type OpenExecutionsAlarmConfig } from "./account-alarm-config.js";
+export { ACCOUNT_ALARM_DEFAULTS } from "./account-alarm-defaults.js";

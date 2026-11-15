@@ -62,3 +62,29 @@ compose(
   { logKey: [], audit: ["logKey"] },
 );
 ```
+
+### Resource policies
+
+The builder has no resource-policy method, on purpose. A CloudWatch Logs resource policy (`AWS::Logs::ResourcePolicy`) belongs to the account and Region, not to a log group: the log groups it covers are the ARNs its statements name. AWS allows [10 per account per Region](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html), shared with every stack and service in it. CDK's `logGroup.addToResourcePolicy(...)` creates a new one for each log group it is called on, so a method here would spend that quota one log group at a time, and the failure would surface in whichever deployment found it used up.
+
+You rarely need one yourself. Access from another account goes through a subscription filter and a Logs destination, which has its own policy, and a principal in the app needs an IAM grant. What a log-group policy is for is letting an AWS service write to the group, and the integrations that do so add their own:
+
+- **EventBridge targets** — `cloudWatchLogGroupTarget` from [`@composurecdk/events`](../events/README.md#target-helpers), through CDK's `CloudWatchLogGroup`.
+- **Route 53 query logging** — [`@composurecdk/route53`](../route53/README.md#query-logging) creates one shared policy per stack for every zone's log group.
+
+Where a service still needs one, create a single shared `ResourcePolicy` whose statements name the log groups it covers, rather than one per group. Once there are more than a few, give them a common name prefix and name `log-group:<prefix>*` instead, so a new group needs no policy change and the document stays within its size limit:
+
+```ts
+import { PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { ResourcePolicy } from "aws-cdk-lib/aws-logs";
+
+new ResourcePolicy(stack, "ServiceLogsPolicy", {
+  policyStatements: [
+    new PolicyStatement({
+      principals: [new ServicePrincipal("delivery.logs.amazonaws.com")],
+      actions: ["logs:CreateLogStream", "logs:PutLogEvents"],
+      resources: [auditLogs.logGroupArn, accessLogs.logGroupArn],
+    }),
+  ],
+});
+```

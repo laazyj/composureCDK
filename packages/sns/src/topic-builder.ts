@@ -7,6 +7,7 @@ import {
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
 import {
+  type CfnSubscription,
   CfnTopicPolicy,
   type ITopic,
   type ITopicSubscription,
@@ -268,21 +269,26 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
       subscriptions[entry.key] = bindSubscription(scope, subscriptionId, topic, resolvedSub);
     }
 
-    // Subscriptions are bound first so the redrive alarms can see their DLQs.
-    const hasDeadLetterQueue = Object.values(subscriptions).some(
-      (s) => s.deadLetterQueue !== undefined,
-    );
-    const alarms = createTopicAlarms(
-      scope,
-      id,
-      topic,
-      alarmConfig,
-      this.#customAlarms,
-      hasDeadLetterQueue,
-    );
+    // Subscriptions are bound first so the conditional alarms can see their
+    // DLQs and filter policies.
+    const bound = Object.values(subscriptions);
+    const alarms = createTopicAlarms(scope, id, topic, alarmConfig, this.#customAlarms, {
+      hasDeadLetterQueue: bound.some((s) => s.deadLetterQueue !== undefined),
+      hasFilterPolicy: bound.some(hasFilterPolicy),
+    });
 
     return { topic, alarms, subscriptions, policy: findTopicPolicy(topic) };
   }
+}
+
+/**
+ * Whether `subscription` has a filter policy, on message attributes or on the
+ * body. `Subscription` keeps both private, but each sets the L1's
+ * `filterPolicy` (the body form adds `filterPolicyScope`). A `Subscription`'s
+ * default child is always its `CfnSubscription`.
+ */
+function hasFilterPolicy(subscription: Subscription): boolean {
+  return (subscription.node.defaultChild as CfnSubscription).filterPolicy !== undefined;
 }
 
 /**

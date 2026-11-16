@@ -63,7 +63,8 @@ export function createEc2App(app = exampleApp()) {
 
   const { alerts } = compose(
     {
-      alerts: createTopicBuilder().displayName("EC2 Alerts"),
+      // Alarms off: they would notify this topic (sns README, "Alert topics").
+      alerts: createTopicBuilder().displayName("EC2 Alerts").recommendedAlarms(false),
 
       network: createVpcBuilder().maxAzs(2).natGateways(0),
 

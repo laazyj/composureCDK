@@ -43,7 +43,8 @@ export function createAgentVolumeApp(app = exampleApp()) {
 
   const { alerts } = compose(
     {
-      alerts: createTopicBuilder().displayName("Agent Volume Alerts"),
+      // Alarms off: they would notify this topic (sns README, "Alert topics").
+      alerts: createTopicBuilder().displayName("Agent Volume Alerts").recommendedAlarms(false),
 
       network: createVpcBuilder().maxAzs(2).natGateways(0),
 

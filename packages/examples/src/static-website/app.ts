@@ -53,7 +53,8 @@ export function createStaticWebsiteApp(app = exampleApp()) {
 
   const { alerts } = compose(
     {
-      alerts: createTopicBuilder().displayName("Static Website Alerts"),
+      // Alarms off: they would notify this topic (sns README, "Alert topics").
+      alerts: createTopicBuilder().displayName("Static Website Alerts").recommendedAlarms(false),
 
       site: createBucketBuilder()
         .versioned(false)

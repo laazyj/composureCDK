@@ -93,12 +93,14 @@ Do not create another `TopicPolicy` for a topic built here: each policy resource
 
 The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS) by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions.
 
-| Alarm                                               | Metric                                                          | Default threshold | Created when                   |
-| --------------------------------------------------- | --------------------------------------------------------------- | ----------------- | ------------------------------ |
-| `numberOfNotificationsFailed`                       | NumberOfNotificationsFailed (Sum, 1 min)                        | > 0               | Always                         |
-| `numberOfNotificationsFilteredOutInvalidAttributes` | NumberOfNotificationsFilteredOut-InvalidAttributes (Sum, 1 min) | > 0               | Always                         |
-| `numberOfNotificationsRedrivenToDlq`                | NumberOfNotificationsRedrivenToDlq (Sum, 1 min)                 | > 0               | A subscription has a DLQ[^dlq] |
-| `numberOfNotificationsFailedToRedriveToDlq`         | NumberOfNotificationsFailedToRedriveToDlq (Sum, 1 min)          | > 0               | A subscription has a DLQ[^dlq] |
+| Alarm                                               | Metric                                                          | Default threshold | Created when                                |
+| --------------------------------------------------- | --------------------------------------------------------------- | ----------------- | ------------------------------------------- |
+| `numberOfNotificationsFailed`                       | NumberOfNotificationsFailed (Sum, 1 min)                        | > 0               | Always                                      |
+| `numberOfNotificationsFilteredOutInvalidAttributes` | NumberOfNotificationsFilteredOut-InvalidAttributes (Sum, 1 min) | > 0               | A subscription has a filter policy[^filter] |
+| `numberOfNotificationsRedrivenToDlq`                | NumberOfNotificationsRedrivenToDlq (Sum, 1 min)                 | > 0               | A subscription has a DLQ[^dlq]              |
+| `numberOfNotificationsFailedToRedriveToDlq`         | NumberOfNotificationsFailedToRedriveToDlq (Sum, 1 min)          | > 0               | A subscription has a DLQ[^dlq]              |
+
+[^filter]: The metric only emits data when a subscription on the topic has a filter policy, so the builder creates the alarm only when a subscription added via `addSubscription()` has a `filterPolicy` or `filterPolicyWithMessageBody`. As with the redrive alarms, a subscription made with `createSubscriptionBuilder` is not seen: pass an explicit config (`{}` for the defaults) to create the alarm regardless.
 
 [^dlq]: The redrive metrics only emit data when a subscription on the topic has a dead-letter queue attached and SNS attempts redrive, so the builder creates these two alarms only when a subscription added via `addSubscription()` has one. A DLQ on a subscription made with `createSubscriptionBuilder` is not seen, so a topic whose DLQ subscriptions are all built that way gets neither alarm unless you ask: pass an explicit config (`{}` for the defaults) to create either alarm regardless. Attach a DLQ on the `ITopicSubscription` itself (e.g. `new LambdaSubscription(fn, { deadLetterQueue: dlq })`) — see [SNS DLQ docs](https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html).
 
@@ -174,6 +176,22 @@ const alertTopic = new Topic(stack, "AlertTopic");
 for (const alarm of Object.values(result.alarms)) {
   alarm.addAlarmAction(new SnsAction(alertTopic));
 }
+```
+
+### Alert topics
+
+`numberOfNotificationsFailed` and the two redrive alarms report that SNS is failing to deliver the topic's messages. Don't send one to the topic it watches: its notification goes down the same failing path, so only subscriptions that are still delivering receive it, and on a single-subscriber topic none do. This is easy to do by accident with an alert topic, because a stack-wide [`alarmActionsPolicy`](../cloudwatch/README.md) also reaches the topic's own alarms.
+
+The builder warns at synth time (`TOPIC_ALARM_SELF_NOTIFICATION_WARNING_ID`) when an alarm on one of those metrics, recommended or added with `addAlarm`, lists its own topic in its actions. Fix it in one of two ways:
+
+- **Route the topic's alarms somewhere else**, such as a second topic with a different channel. With a stack-wide policy, add a rule that matches the alert topic's alarms with `replaceDefaults: true` and that topic's action. CloudWatch alarm actions must target a topic in the same region as the alarm.
+- **Turn the alarms off on the alert topic** with `recommendedAlarms(false)` when there is nowhere else to send them. An alert topic whose subscriber is a person's inbox gains nothing from alarms it cannot deliver.
+
+```ts
+const alerts = createTopicBuilder()
+  .displayName("Site alerts")
+  .addSubscription("email", new EmailSubscription("ops@example.com"))
+  .recommendedAlarms(false);
 ```
 
 ## Adding Subscriptions to a Topic

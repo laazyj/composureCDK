@@ -30,7 +30,8 @@ export function createDualFunctionApp(app = exampleApp()) {
 
   const { alerts } = compose(
     {
-      alerts: createTopicBuilder().displayName("Dual Function Alerts"),
+      // Alarms off: they would notify this topic (sns README, "Alert topics").
+      alerts: createTopicBuilder().displayName("Dual Function Alerts").recommendedAlarms(false),
 
       api: createFunctionBuilder()
         .runtime(Runtime.NODEJS_22_X)

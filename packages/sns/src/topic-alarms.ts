@@ -6,28 +6,45 @@ import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import { AlarmDefinitionBuilder, createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
 import type { TopicAlarmConfig } from "./topic-alarm-config.js";
 import { TOPIC_ALARM_DEFAULTS } from "./topic-alarm-defaults.js";
+import { guardAlarmSelfNotification } from "./topic-alarm-self-notification-guard.js";
 
 const METRIC_PERIOD = Duration.minutes(1);
 const METRIC_PERIOD_LABEL = `${String(METRIC_PERIOD.toMinutes())} minute`;
 
 /**
+ * What the subscriptions the builder bound have, which decides whether the
+ * alarms whose metrics need it are created by default.
+ */
+export interface TopicSubscriptionFeatures {
+  /**
+   * A subscription has a dead-letter queue — see
+   * {@link TopicAlarmConfig.numberOfNotificationsRedrivenToDlq}.
+   */
+  hasDeadLetterQueue: boolean;
+  /**
+   * A subscription has a filter policy — see
+   * {@link TopicAlarmConfig.numberOfNotificationsFilteredOutInvalidAttributes}.
+   */
+  hasFilterPolicy: boolean;
+}
+
+/**
  * Resolves the recommended alarm configuration into fully-resolved
  * {@link AlarmDefinition}s for an SNS topic.
- *
- * @param hasDeadLetterQueue - Whether a subscription the builder bound has a
- *   dead-letter queue, which decides whether the two redrive alarms are created
- *   by default — see {@link TopicAlarmConfig.numberOfNotificationsRedrivenToDlq}.
  */
 export function resolveTopicAlarmDefinitions(
   topic: ITopic,
   config: TopicAlarmConfig | undefined,
-  hasDeadLetterQueue: boolean,
+  features: TopicSubscriptionFeatures,
 ): AlarmDefinition[] {
   if (config?.enabled === false) return [];
 
   const definitions: AlarmDefinition[] = [];
-  // An omitted redrive alarm resolves to defaults (`{}`) only when there is a DLQ to watch.
-  const dlqDefault = hasDeadLetterQueue ? {} : false;
+  // An omitted conditional alarm resolves to defaults (`{}`) only when its metric can emit.
+  const dlqDefault = features.hasDeadLetterQueue ? {} : false;
+  const filteredOut =
+    config?.numberOfNotificationsFilteredOutInvalidAttributes ??
+    (features.hasFilterPolicy ? {} : false);
   const redrivenToDlq = config?.numberOfNotificationsRedrivenToDlq ?? dlqDefault;
   const failedToRedriveToDlq = config?.numberOfNotificationsFailedToRedriveToDlq ?? dlqDefault;
 
@@ -49,9 +66,9 @@ export function resolveTopicAlarmDefinitions(
     });
   }
 
-  if (config?.numberOfNotificationsFilteredOutInvalidAttributes !== false) {
+  if (filteredOut !== false) {
     const cfg = resolveAlarmConfig(
-      config?.numberOfNotificationsFilteredOutInvalidAttributes,
+      filteredOut,
       TOPIC_ALARM_DEFAULTS.numberOfNotificationsFilteredOutInvalidAttributes,
     );
     definitions.push({
@@ -124,7 +141,7 @@ export function resolveTopicAlarmDefinitions(
  * @param config - User-provided alarm configuration, or `false` to disable the
  *   recommended alarms.
  * @param customAlarms - Custom alarm builders added via `addAlarm()`.
- * @param hasDeadLetterQueue - See {@link resolveTopicAlarmDefinitions}.
+ * @param features - See {@link TopicSubscriptionFeatures}.
  * @returns A record mapping alarm keys to their created Alarm constructs.
  *
  * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS
@@ -135,13 +152,14 @@ export function createTopicAlarms(
   topic: ITopic,
   config: TopicAlarmConfig | false | undefined,
   customAlarms: AlarmDefinitionBuilder<ITopic>[],
-  hasDeadLetterQueue: boolean,
+  features: TopicSubscriptionFeatures,
 ): Record<string, Alarm> {
-  const recommended =
-    config === false || config?.enabled === false
-      ? []
-      : resolveTopicAlarmDefinitions(topic, config, hasDeadLetterQueue);
+  const recommended = config === false ? [] : resolveTopicAlarmDefinitions(topic, config, features);
   const custom = customAlarms.map((b) => b.resolve(topic));
 
-  return createAlarms(scope, id, [...recommended, ...custom]);
+  const alarms = createAlarms(scope, id, [...recommended, ...custom]);
+  for (const [key, alarm] of Object.entries(alarms)) {
+    guardAlarmSelfNotification(alarm, topic, id, key);
+  }
+  return alarms;
 }

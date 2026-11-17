@@ -3,7 +3,8 @@ import type { AlarmConfig } from "@composurecdk/cloudwatch";
 /**
  * Controls which recommended alarms are created for an SNS topic.
  * All applicable alarms are enabled by default with AWS-recommended thresholds;
- * the two redrive alarms are applicable only when a subscription has a
+ * the filtered-out alarm is applicable only when a subscription has a filter
+ * policy, and the two redrive alarms only when a subscription has a
  * dead-letter queue.
  * Set individual alarms to `false` to disable them, or provide an
  * {@link AlarmConfig} to tune thresholds.
@@ -31,6 +32,13 @@ export interface TopicAlarmConfig {
   /**
    * Alarm when messages are rejected due to invalid subscription filter
    * policy attributes.
+   *
+   * The metric only emits data when a subscription has a filter policy, so
+   * the alarm is created by default only when a subscription added via
+   * `addSubscription()` has a `filterPolicy` or `filterPolicyWithMessageBody`.
+   * Provide an {@link AlarmConfig} (`{}` for the defaults) to create it
+   * regardless — e.g. for a filter policy on a subscription made with
+   * `createSubscriptionBuilder`, which the topic can't see.
    *
    * Metric: `AWS/SNS NumberOfNotificationsFilteredOut-InvalidAttributes`,
    * statistic Sum, period 1 minute.

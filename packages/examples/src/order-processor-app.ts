@@ -112,12 +112,13 @@ export function createOrderProcessorApp(app = exampleApp()) {
 
   const { alerts } = compose(
     {
-      alerts: createTopicBuilder().displayName("Order Processor Alerts"),
+      // Alarms off: they would notify this topic (sns README, "Alert topics").
+      alerts: createTopicBuilder().displayName("Order Processor Alerts").recommendedAlarms(false),
 
       // Intake topic. Its recommended alarms include the two redrive
       // metrics (NumberOfNotificationsRedrivenToDlq, ...FailedToRedrive),
       // which the builder creates because the orders subscription below
-      // has a DLQ — the alerts topic above has none, so it gets neither.
+      // has a DLQ. It has no filter policy, so no filtered-out alarm.
       orderEvents: createTopicBuilder()
         .displayName("Order Events")
         // Fan-out to the work queue. `SqsSubscription` carries the

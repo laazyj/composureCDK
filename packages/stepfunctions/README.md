@@ -68,6 +68,8 @@ Where tasks call more than one sibling, use [`combine`](../core/README.md):
 
 Task states written in CDK add the IAM their service call needs to the execution role, scoped to the resource — `LambdaInvoke` grants `lambda:InvokeFunction` on that function, `DynamoPutItem` grants `dynamodb:PutItem` on that table.
 
+A DynamoDB task's expression reaches DynamoDB only when the state runs, so a [reserved word](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html) left unaliased (`SET status = :s`) passes synth and fails the execution. [`@composure-labs/dynamodb-guard`](https://github.com/composure-labs/dynamodb-guard), from [Composure Labs](../../README.md#composure-labs), checks every DynamoDB task at synth instead. It skips values known only at run time, and can't read a definition loaded with `DefinitionBody.fromFile`. The [fulfilment workflow example](../examples/src/fulfilment-workflow-app.ts) uses it.
+
 ### Amazon States Language documents
 
 For a workflow kept as ASL, set `definitionBody` instead. `definitionSubstitutions` fills its `${...}` placeholders, and each value is independently `Resolvable`:

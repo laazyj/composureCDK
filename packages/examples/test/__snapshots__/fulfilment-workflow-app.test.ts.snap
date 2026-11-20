@@ -347,19 +347,19 @@ exports[`fulfilment-workflow-app > matches the expected synthesised template 1`]
               {
                 "Ref": "AWS::Partition",
               },
-              ":states:::dynamodb:putItem","Parameters":{"Item":{"orderId":{"S.$":"$.orderId"},"status":{"S":"ACCEPTED"}},"TableName":"",
+              ":states:::dynamodb:updateItem","Parameters":{"Key":{"orderId":{"S.$":"$.orderId"}},"TableName":"",
               {
                 "Ref": "FulfilmentWorkfloworders66A10CC3",
               },
-              ""}},"Accepted":{"Type":"Succeed"},"RecordRejected":{"Next":"Rejected","Type":"Task","ResultPath":null,"Resource":"arn:",
+              "","ExpressionAttributeNames":{"#status":"status"},"ExpressionAttributeValues":{":status":{"S":"ACCEPTED"}},"UpdateExpression":"SET #status = :status"}},"Accepted":{"Type":"Succeed"},"RecordRejected":{"Next":"Rejected","Type":"Task","ResultPath":null,"Resource":"arn:",
               {
                 "Ref": "AWS::Partition",
               },
-              ":states:::dynamodb:putItem","Parameters":{"Item":{"orderId":{"S.$":"$.orderId"},"status":{"S":"REJECTED"}},"TableName":"",
+              ":states:::dynamodb:updateItem","Parameters":{"Key":{"orderId":{"S.$":"$.orderId"}},"TableName":"",
               {
                 "Ref": "FulfilmentWorkfloworders66A10CC3",
               },
-              ""}},"Rejected":{"Type":"Succeed"}},"TimeoutSeconds":300}",
+              "","ExpressionAttributeNames":{"#status":"status"},"ExpressionAttributeValues":{":status":{"S":"REJECTED"}},"UpdateExpression":"SET #status = :status"}},"Rejected":{"Type":"Succeed"}},"TimeoutSeconds":300}",
             ],
           ],
         },
@@ -489,7 +489,7 @@ exports[`fulfilment-workflow-app > matches the expected synthesised template 1`]
               ],
             },
             {
-              "Action": "dynamodb:PutItem",
+              "Action": "dynamodb:UpdateItem",
               "Effect": "Allow",
               "Resource": {
                 "Fn::Join": [

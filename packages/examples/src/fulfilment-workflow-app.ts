@@ -9,10 +9,11 @@ import {
 } from "aws-cdk-lib/aws-stepfunctions";
 import {
   DynamoAttributeValue,
-  DynamoPutItem,
+  DynamoUpdateItem,
   LambdaInvoke,
 } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import type { Construct } from "constructs";
+import { dynamodbExpressionPolicy } from "@composure-labs/dynamodb-guard/cdk";
 import { combine, compose, ref } from "@composurecdk/core";
 import { createTableV2Builder, type TableV2BuilderResult } from "@composurecdk/dynamodb";
 import { createRuleBuilder, sfnStateMachineTarget } from "@composurecdk/events";
@@ -36,14 +37,18 @@ const ORDER_EVENT_SOURCE = "composurecdk.examples.orders";
  */
 const STOCK_LIMIT = 10;
 
-/** Records an order's outcome straight to DynamoDB — a direct SDK integration, no Lambda. */
+/**
+ * Records an order's outcome straight to DynamoDB — a direct SDK integration, no
+ * Lambda. The workflow owns only the order's `status`, so it sets that attribute
+ * with an update rather than replacing the whole item with a put.
+ */
 function recordStatus(scope: Construct, id: string, orders: ITableV2, status: string) {
-  return new DynamoPutItem(scope, id, {
+  return new DynamoUpdateItem(scope, id, {
     table: orders,
-    item: {
-      orderId: DynamoAttributeValue.fromString(JsonPath.stringAt("$.orderId")),
-      status: DynamoAttributeValue.fromString(status),
-    },
+    key: { orderId: DynamoAttributeValue.fromString(JsonPath.stringAt("$.orderId")) },
+    updateExpression: "SET #status = :status",
+    expressionAttributeNames: { "#status": "status" },
+    expressionAttributeValues: { ":status": DynamoAttributeValue.fromString(status) },
     resultPath: JsonPath.DISCARD,
   });
 }
@@ -62,9 +67,13 @@ function recordStatus(scope: Construct, id: string, orders: ITableV2, status: st
  * `createKeyBuilder()`. CDK scopes the execution role's key grant to the state
  * machine's ARN, which needs a name; the builder always sets one, where
  * unnamed plain CDK would deny every execution the key.
+
  */
 export function createFulfilmentWorkflowApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-FulfilmentWorkflowStack");
+  // Fails synth on an expression DynamoDB would reject, such as `status` unaliased:
+  // https://github.com/composure-labs/dynamodb-guard
+  dynamodbExpressionPolicy(stack);
 
   compose(
     {

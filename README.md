@@ -134,7 +134,7 @@ See [docs/showcase.md](docs/showcase.md) for case studies of projects built with
 
 ## Composure Labs
 
-[Composure Labs](https://github.com/composure-labs) builds the tooling around ComposureCDK. Its packages are first-party, published under [`@composure-labs`](https://www.npmjs.com/org/composure-labs), and released on their own schedule rather than in lockstep with the `@composurecdk/*` packages below. [See what it builds](https://github.com/composure-labs).
+[Composure Labs](https://github.com/composure-labs) builds the tooling around ComposureCDK. Its packages are first-party, published under [`@composure-labs`](https://www.npmjs.com/org/composure-labs), and released on their own schedule rather than in lockstep with the `@composurecdk/*` packages below. [See what it builds](https://github.com/composure-labs). Packages that work alongside ComposureCDK are listed under [Ecosystem](docs/showcase.md#ecosystem) in the showcase.
 
 ## Packages
 

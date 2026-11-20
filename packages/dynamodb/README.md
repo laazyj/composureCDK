@@ -282,3 +282,7 @@ const system = compose(
   { orders: [], processor: ["orders"] },
 );
 ```
+
+## Checking expressions before deploy
+
+DynamoDB rejects an expression that names a [reserved word](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html) such as `status` without an alias, but only when the call runs: `cdk synth` and a mocked client both accept it. [`@composure-labs/dynamodb-guard`](https://github.com/composure-labs/dynamodb-guard), from [Composure Labs](../../README.md#composure-labs), catches that and DynamoDB's other expression mistakes before deploy: in unit tests, by checking the requests your mocked clients recorded, at synth for Step Functions tasks, and in lint. It can't check a code path no test runs. The [fulfilment workflow example](../examples/src/fulfilment-workflow-app.ts) checks its tasks at synth.

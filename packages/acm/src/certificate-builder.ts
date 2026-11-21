@@ -4,13 +4,17 @@ import {
   type CertificateProps,
   type ICertificate,
 } from "aws-cdk-lib/aws-certificatemanager";
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IHostedZone } from "aws-cdk-lib/aws-route53";
 import { type IConstruct } from "constructs";
 import { combine, COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { CertificateAlarmConfig } from "./alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { CertificateAlarmConfig, CertificateAlarmKey } from "./alarm-config.js";
 import { createCertificateAlarms } from "./certificate-alarms.js";
 import { CERTIFICATE_DEFAULTS } from "./defaults.js";
 
@@ -78,14 +82,16 @@ export interface CertificateBuilderResult {
    *
    * Includes both AWS-recommended alarms and any custom alarms added
    * via {@link ICertificateBuilder.addAlarm}. Access individual alarms
-   * by key (e.g., `result.alarms.daysToExpiry`).
+   * by key (e.g., `result.alarms.daysToExpiry`). A recommended alarm is
+   * `Alarm | undefined`: it may be disabled. Any other key is a compile
+   * error; read a custom alarm through {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#CertificateManager
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<CertificateAlarmKey>;
 }
 
 /**
@@ -122,7 +128,7 @@ export interface CertificateBuilderResult {
  */
 export type ICertificateBuilder = ITaggedBuilder<CertificateBuilderProps, CertificateBuilder>;
 
-class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
+class CertificateBuilder implements Lifecycle<WithCustomAlarms<CertificateBuilderResult, string>> {
   props: Partial<CertificateBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ICertificate>[] = [];
 
@@ -153,7 +159,11 @@ class CertificateBuilder implements Lifecycle<CertificateBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): CertificateBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<CertificateBuilderResult, string> {
     const {
       validationZone,
       validationZones,

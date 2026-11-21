@@ -1,11 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { Duration } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
-import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Certificate, type ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { createCertificateBuilder } from "../src/certificate-builder.js";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
+import {
+  createCertificateBuilder,
+  type CertificateBuilderResult,
+} from "../src/certificate-builder.js";
 import { resolveCertificateAlarmDefinitions } from "../src/certificate-alarms.js";
 
 const buildAndSynth = buildFixture(createCertificateBuilder, "TestCertificate", {
@@ -237,5 +242,54 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["expiringSoon", "expiringNow"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth();
+    const typed: CertificateBuilderResult = result;
+    const expiry = typed.alarms.daysToExpiry;
+
+    assertAssignable<Alarm | undefined, typeof expiry>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof expiry>();
+    expect(expiry).toBeDefined();
+    // @ts-expect-error -- "daysToExpiri" is not an ACM alarm key
+    expect(typed.alarms.daysToExpiri).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const zone = new PublicHostedZone(stack, "Zone", { zoneName: "example.com" });
+    const system = compose(
+      {
+        cert: createCertificateBuilder()
+          .domainName("example.com")
+          .validationZone(zone)
+          .addAlarm("urgentExpiry", (alarm) =>
+            alarm
+              .metric((cert) => cert.metricDaysToExpiry())
+              .threshold(7)
+              .lessThanOrEqual(),
+          ),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("cert", (r: WithCustomAlarms<CertificateBuilderResult, "urgentExpiry">) => {
+              // @ts-expect-error -- "urgentExpiri" was not declared as a custom key
+              expect(r.alarms.urgentExpiri).toBeUndefined();
+              return r.alarms.urgentExpiry;
+            }).resolve(context),
+          }),
+        },
+      },
+      { cert: [], consumer: ["cert"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.cert.alarms.urgentExpiry);
   });
 });

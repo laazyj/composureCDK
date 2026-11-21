@@ -91,7 +91,7 @@ export {
   type HealthCheckAlarmBuilderResult,
   type IHealthCheckAlarmBuilder,
 } from "./health-check-alarm-builder.js";
-export type { HealthCheckAlarmConfig } from "./health-check-alarm-config.js";
+export type { HealthCheckAlarmConfig, HealthCheckAlarmKey } from "./health-check-alarm-config.js";
 export { HEALTH_CHECK_ALARM_DEFAULTS } from "./health-check-alarm-defaults.js";
 export {
   cloudfrontAliasTarget,

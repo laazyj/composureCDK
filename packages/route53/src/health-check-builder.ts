@@ -1,10 +1,14 @@
 import { HealthCheck, type HealthCheckProps, type IHealthCheck } from "aws-cdk-lib/aws-route53";
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { HealthCheckAlarmConfig } from "./health-check-alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { HealthCheckAlarmConfig, HealthCheckAlarmKey } from "./health-check-alarm-config.js";
 import { buildHealthCheckAlarms } from "./health-check-alarm-builder.js";
 import { HEALTH_CHECK_DEFAULTS } from "./defaults.js";
 
@@ -51,14 +55,16 @@ export interface HealthCheckBuilderResult {
    *
    * Includes both AWS-recommended alarms and any custom alarms added via
    * {@link IHealthCheckBuilder.addAlarm}. Access individual alarms by key
-   * (e.g. `result.alarms.healthCheckStatus`).
+   * (e.g. `result.alarms.healthCheckStatus`). A recommended alarm is
+   * `Alarm | undefined`: it may be disabled. Any other key is a compile
+   * error; read a custom alarm through {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Route53
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<HealthCheckAlarmKey>;
 }
 
 /**
@@ -82,7 +88,7 @@ export interface HealthCheckBuilderResult {
  */
 export type IHealthCheckBuilder = ITaggedBuilder<HealthCheckBuilderProps, HealthCheckBuilder>;
 
-class HealthCheckBuilder implements Lifecycle<HealthCheckBuilderResult> {
+class HealthCheckBuilder implements Lifecycle<WithCustomAlarms<HealthCheckBuilderResult, string>> {
   props: Partial<HealthCheckBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IHealthCheck>[] = [];
 
@@ -107,7 +113,7 @@ class HealthCheckBuilder implements Lifecycle<HealthCheckBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string): HealthCheckBuilderResult {
+  build(scope: IConstruct, id: string): WithCustomAlarms<HealthCheckBuilderResult, string> {
     const { recommendedAlarms, ...rest } = this.props;
 
     if (!rest.type) {

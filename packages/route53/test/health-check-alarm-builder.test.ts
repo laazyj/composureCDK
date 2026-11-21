@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
-import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
-import { newStack, testEnv } from "@composurecdk/cdk-testing";
+import { assertAssignable, newStack, testEnv } from "@composurecdk/cdk-testing";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import type { AlarmDefinitionBuilder, WithCustomAlarms } from "@composurecdk/cloudwatch";
 import { createHealthCheckBuilder } from "../src/health-check-builder.js";
 import {
   createHealthCheckAlarmBuilder,
@@ -272,5 +272,43 @@ describe("addAlarms", () => {
 
     expect(Object.keys(alarmResult.alarms)).toEqual(["connectionTime", "slowConnection"]);
     Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("uses the health check's key scheme and rejects a misspelled key", () => {
+    const { stack, result } = buildHealthCheck();
+    const typed: HealthCheckAlarmBuilderResult = createHealthCheckAlarmBuilder()
+      .healthCheck(result)
+      .build(stack, "Alarms");
+    const status = typed.alarms.healthCheckStatus;
+
+    assertAssignable<Alarm | undefined, typeof status>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof status>();
+    expect(status).toBeDefined();
+    // @ts-expect-error -- "healthCheckStatu" is not a health-check alarm key
+    expect(typed.alarms.healthCheckStatu).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { stack, result } = buildHealthCheck();
+    const alarmResult = createHealthCheckAlarmBuilder()
+      .healthCheck(result)
+      .addAlarm("connectionTime", connectionTimeAlarm)
+      .build(stack, "Alarms");
+    const alarm = ref(
+      "apiAlarms",
+      (r: WithCustomAlarms<HealthCheckAlarmBuilderResult, "connectionTime">) => {
+        // @ts-expect-error -- "connectTime" was not declared as a custom key
+        expect(r.alarms.connectTime).toBeUndefined();
+        return r.alarms.connectionTime;
+      },
+    ).resolve({ apiAlarms: alarmResult });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(alarmResult.alarms.connectionTime);
   });
 });

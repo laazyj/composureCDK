@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { Duration } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
-import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { HealthCheckType, type IHealthCheck } from "aws-cdk-lib/aws-route53";
-import { buildFixture, testEnv } from "@composurecdk/cdk-testing";
-import { createHealthCheckBuilder } from "../src/health-check-builder.js";
+import { assertAssignable, buildFixture, testEnv } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { ref } from "@composurecdk/core";
+import {
+  createHealthCheckBuilder,
+  type HealthCheckBuilderResult,
+} from "../src/health-check-builder.js";
 import { resolveHealthCheckAlarmDefinitions } from "../src/health-check-alarms.js";
 
 const buildAndSynth = buildFixture(
@@ -188,5 +193,49 @@ describe("recommended alarms", () => {
         TreatMissingData: "breaching",
       });
     });
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types a recommended key as possibly absent and rejects a misspelled key", () => {
+    const { result } = buildAndSynth();
+    const typed: HealthCheckBuilderResult = result;
+    const status = typed.alarms.healthCheckStatus;
+
+    assertAssignable<Alarm | undefined, typeof status>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof status>();
+    expect(status).toBeDefined();
+    // @ts-expect-error -- "healthCheckStatu" is not a health-check alarm key
+    expect(typed.alarms.healthCheckStatu).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { result } = buildAndSynth((b) => {
+      b.addAlarm("connectionTime", (alarm) =>
+        alarm
+          .metric(
+            (hc: IHealthCheck) =>
+              new Metric({
+                namespace: "AWS/Route53",
+                metricName: "ConnectionTime",
+                dimensionsMap: { HealthCheckId: hc.healthCheckId },
+                statistic: "Average",
+              }),
+          )
+          .threshold(2000)
+          .greaterThan(),
+      );
+    });
+    const alarm = ref("api", (r: WithCustomAlarms<HealthCheckBuilderResult, "connectionTime">) => {
+      // @ts-expect-error -- "connectTime" was not declared as a custom key
+      expect(r.alarms.connectTime).toBeUndefined();
+      return r.alarms.connectionTime;
+    }).resolve({ api: result });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(result.alarms.connectionTime);
   });
 });

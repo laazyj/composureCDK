@@ -8,9 +8,11 @@ import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import {
   type AlarmConfigurer,
   AlarmDefinitionBuilder,
+  type AlarmsOf,
   createAlarms,
+  type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
-import type { HealthCheckAlarmConfig } from "./health-check-alarm-config.js";
+import type { HealthCheckAlarmConfig, HealthCheckAlarmKey } from "./health-check-alarm-config.js";
 import { resolveHealthCheckAlarmDefinitions } from "./health-check-alarms.js";
 import type { HealthCheckBuilderResult } from "./health-check-builder.js";
 
@@ -49,8 +51,12 @@ export interface HealthCheckAlarmBuilderResult {
   /**
    * The CloudWatch alarms created by this builder, keyed by alarm name.
    * Uses the same key scheme as {@link HealthCheckBuilderResult.alarms}.
+   *
+   * A recommended alarm is `Alarm | undefined`: it may be disabled. Any
+   * other key is a compile error; read a custom alarm through
+   * {@link WithCustomAlarms}.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<HealthCheckAlarmKey>;
 }
 
 /**
@@ -121,7 +127,9 @@ export function buildHealthCheckAlarms(
   return createAlarms(scope, id, allAlarmDefs);
 }
 
-class HealthCheckAlarmBuilder implements Lifecycle<HealthCheckAlarmBuilderResult> {
+class HealthCheckAlarmBuilder implements Lifecycle<
+  WithCustomAlarms<HealthCheckAlarmBuilderResult, string>
+> {
   props: Partial<HealthCheckAlarmBuilderProps> = {};
   #healthCheck?: Resolvable<HealthCheckBuilderResult>;
   readonly #customAlarms: AlarmDefinitionBuilder<IHealthCheck>[] = [];
@@ -176,7 +184,7 @@ class HealthCheckAlarmBuilder implements Lifecycle<HealthCheckAlarmBuilderResult
     scope: IConstruct,
     id: string,
     context?: Record<string, object>,
-  ): HealthCheckAlarmBuilderResult {
+  ): WithCustomAlarms<HealthCheckAlarmBuilderResult, string> {
     if (!this.#healthCheck) {
       throw new Error(
         `HealthCheckAlarmBuilder "${id}" requires a health check. ` +

@@ -345,6 +345,21 @@ createHealthCheckBuilder()
   );
 ```
 
+#### Reading alarms by key
+
+`HealthCheckBuilderResult` and `HealthCheckAlarmBuilderResult` type `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("apiAlarms", (r: HealthCheckAlarmBuilderResult) => r.alarms.healthCheckStatus); // Alarm | undefined
+ref(
+  "apiAlarms",
+  (r: WithCustomAlarms<HealthCheckAlarmBuilderResult, "connectionTime">) => r.alarms.connectionTime,
+); // Alarm
+ref("apiAlarms", (r: HealthCheckAlarmBuilderResult) => r.alarms.healthCheckStatu); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of a builder's own `build()` accepts any key, as `WithCustomAlarms<…, string>`. The recommended keys are exported as `HealthCheckAlarmKey`.
+
 #### Applying alarm actions
 
 No alarm actions are configured by default. Wire SNS or other actions via `alarmActionsPolicy` (or an `afterBuild` hook) — for cross-region deployments, the policy applied to the `us-east-1` monitoring stack covers both recommended and custom alarms.

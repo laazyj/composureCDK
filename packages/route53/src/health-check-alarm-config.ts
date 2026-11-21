@@ -38,3 +38,11 @@ export interface HealthCheckAlarmConfig {
    */
   healthCheckStatus?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms a health-check builder can create — every
+ * {@link HealthCheckAlarmConfig} entry except the `enabled` master switch.
+ * Shared by `HealthCheckBuilderResult` and `HealthCheckAlarmBuilderResult`,
+ * which create their alarms through the same function.
+ */
+export type HealthCheckAlarmKey = Exclude<keyof HealthCheckAlarmConfig, "enabled">;

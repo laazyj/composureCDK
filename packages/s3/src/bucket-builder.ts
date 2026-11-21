@@ -1,12 +1,16 @@
 import { RemovalPolicy } from "aws-cdk-lib";
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Bucket, BucketEncryption, type BucketProps, type IBucket } from "aws-cdk-lib/aws-s3";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { BucketAlarmConfig } from "./alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { BucketAlarmConfig, BucketAlarmKey } from "./alarm-config.js";
 import { createBucketAlarms } from "./bucket-alarms.js";
 import { DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES, BUCKET_DEFAULTS } from "./defaults.js";
 
@@ -77,8 +81,8 @@ export interface BucketBuilderProps extends Omit<
    *
    * S3 request metric alarms (5xxErrors, 4xxErrors) require
    * [CloudWatch request metrics](https://docs.aws.amazon.com/AmazonS3/latest/userguide/configure-request-metrics-bucket.html)
-   * to be enabled on the bucket. Set {@link BucketAlarmConfig.requestMetricsFilterId}
-   * to the ID of the request metrics configuration to create these alarms.
+   * to be enabled on the bucket. They are created for each entry in
+   * {@link BucketProps.metrics}, keyed by its ID (e.g. `serverErrors:EntireBucket`).
    *
    * No alarm actions are configured by default since notification
    * methods are user-specific. Access alarms from the build result
@@ -107,15 +111,18 @@ export interface BucketBuilderResult {
    * CloudWatch alarms created for the bucket, keyed by alarm name.
    *
    * Includes both AWS-recommended alarms and any custom alarms added
-   * via {@link IBucketBuilder.addAlarm}. Access individual alarms
-   * by key (e.g., `result.alarms.serverErrors`).
+   * via {@link IBucketBuilder.addAlarm}. A recommended alarm is keyed by
+   * its request metrics configuration ID (e.g.,
+   * `result.alarms["serverErrors:EntireBucket"]`) and is `Alarm | undefined`:
+   * it may be disabled, or have no such metrics configuration. Any other key
+   * is a compile error; read a custom alarm through {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#S3
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<BucketAlarmKey>;
 }
 
 /**
@@ -139,7 +146,7 @@ export interface BucketBuilderResult {
  */
 export type IBucketBuilder = ITaggedBuilder<BucketBuilderProps, BucketBuilder>;
 
-class BucketBuilder implements Lifecycle<BucketBuilderResult> {
+class BucketBuilder implements Lifecycle<WithCustomAlarms<BucketBuilderResult, string>> {
   props: Partial<BucketBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Bucket>[] = [];
   readonly #policyStatements: BucketPolicyStatement[] = [];
@@ -178,7 +185,11 @@ class BucketBuilder implements Lifecycle<BucketBuilderResult> {
     target.#policyStatements.push(...this.#policyStatements);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): BucketBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<BucketBuilderResult, string> {
     const {
       serverAccessLogs,
       recommendedAlarms: alarmConfig,

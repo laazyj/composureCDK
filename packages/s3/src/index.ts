@@ -12,7 +12,7 @@ export {
   DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES,
   DEFAULT_BUCKET_LIFECYCLE_RULES,
 } from "./defaults.js";
-export { type BucketAlarmConfig } from "./alarm-config.js";
+export { type BucketAlarmConfig, type BucketAlarmKey } from "./alarm-config.js";
 export { BUCKET_ALARM_DEFAULTS } from "./alarm-defaults.js";
 export {
   createBucketDeploymentBuilder,

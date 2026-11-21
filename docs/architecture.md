@@ -479,7 +479,7 @@ A dependency on another package is part of the public API too, because every con
 
 ### Test helpers
 
-Test helpers are shared through two packages: `@composurecdk/core/testing`, which is public API, and `@composurecdk/cdk-testing`, which is private to this repository. [`cdk-testing`'s README](../packages/cdk-testing/README.md#why-this-package-exists) says which helper goes where.
+Test helpers are shared through two packages: [`@composurecdk/core/testing`](../packages/core/docs/testing.md), which is public API, and `@composurecdk/cdk-testing`, which is private to this repository. [`cdk-testing`'s README](../packages/cdk-testing/README.md#why-this-package-exists) says which helper goes where.
 
 ## How the pieces fit together
 

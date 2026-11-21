@@ -4,7 +4,7 @@ Internal, CDK-aware test helpers shared across the `@composurecdk/*` suites. Pri
 
 ## Why this package exists
 
-`@composurecdk/core/testing` is the existing home for shared test helpers, and is the wrong home for these, on two counts.
+[`@composurecdk/core/testing`](../core/docs/testing.md) is the existing home for shared test helpers, and is the wrong home for these, on two counts.
 
 It is public API. `core/testing` is a published subpath: a consumer writing their own builder gets `assertCopyPreservesState` to prove their `[COPY_STATE]` hook, so its helpers are agnostic and carry a semver surface. The helpers here are coupled to this repo's own suites and are not a contract to offer anyone. Hence `"private": true`, as for `examples` and `module-compat`: no dual ESM/CJS publishing, no `peerDependencies` entry in `@composurecdk/module-compat`, no `check:exports` gate.
 

@@ -134,6 +134,10 @@ A construct-level dependency already covers that construct's own children, so na
 
 It backs `dependsOn` in [`@composurecdk/custom-resources`](../custom-resources/README.md) and `after` in [`@composurecdk/lambda`](../lambda/README.md)'s `.invokeOnDeploy()`, so both spell ordering the same way.
 
+## Testing
+
+`@composurecdk/core/testing` holds `assertCopyPreservesState`, a test helper for builder authors that checks a builder's `[COPY_STATE]` hook. See [docs/testing.md](docs/testing.md).
+
 ## Examples
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`

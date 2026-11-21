@@ -21,6 +21,8 @@ const toRule = (builder: ReturnType<typeof createWebAclRuleBuilder>) => {
     defaultPriority: 0,
     sampledRequests: false,
     bodies,
+    context: {},
+    warn: () => undefined,
   });
   return { rule: rule.property, bodies: bodies.toProperty() };
 };
@@ -34,6 +36,20 @@ describe("WebAclRuleBuilder", () => {
       },
       mutate: (b) => {
         b.labels("more");
+      },
+      build: toRule,
+      inspect: (result) => result,
+    });
+  });
+
+  it("copies a rate limit's aggregation and scope-down", () => {
+    assertCopyPreservesState({
+      factory: createWebAclRuleBuilder,
+      configure: (b) => {
+        b.rateLimit(100).aggregateOnHeader("x-api-key").scopeDown(PATH);
+      },
+      mutate: (b) => {
+        b.aggregateOnIp();
       },
       build: toRule,
       inspect: (result) => result,

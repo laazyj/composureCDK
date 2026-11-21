@@ -34,3 +34,9 @@ export interface VolumeAlarmConfig {
    */
   burstBalance?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms the volume builder creates — every
+ * {@link VolumeAlarmConfig} entry except the `enabled` master switch.
+ */
+export type VolumeAlarmKey = Exclude<keyof VolumeAlarmConfig, "enabled">;

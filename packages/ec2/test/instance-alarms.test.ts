@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { Duration } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
-import { Stats, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Stats, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { InstanceClass, InstanceSize, InstanceType, type Instance } from "aws-cdk-lib/aws-ec2";
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { ref } from "@composurecdk/core";
 import { buildInstance as buildAndSynth } from "./_helpers.js";
-import { createInstanceBuilder } from "../src/instance-builder.js";
+import { createInstanceBuilder, type InstanceBuilderResult } from "../src/instance-builder.js";
 
 const ALWAYS_ON_ALARM_KEYS = [
   "cpuUtilization",
@@ -328,5 +331,60 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["networkIn", "networkOut"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth(() => undefined);
+    const typed: InstanceBuilderResult = result;
+    const status = typed.alarms.statusCheckFailed;
+
+    assertAssignable<Alarm | undefined, typeof status>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof status>();
+    expect(status).toBeDefined();
+    // @ts-expect-error -- "statusCheckFailure" is not an EC2 instance alarm key
+    expect(typed.alarms.statusCheckFailure).toBeUndefined();
+  });
+
+  it("types per-attachment alarm keys by suffix", () => {
+    const { result } = buildAndSynth(() => undefined);
+    const typed: InstanceBuilderResult = result;
+
+    assertAssignable<Alarm | undefined, (typeof typed.alarms)["AgentData.volumeStalledIo"]>();
+    // @ts-expect-error -- the suffix is ".volumeStalledIo", not ".volumeStalledIO"
+    expect(typed.alarms["AgentData.volumeStalledIO"]).toBeUndefined();
+    // @ts-expect-error -- a per-attachment key needs its attachment-key prefix
+    expect(typed.alarms.volumeStalledIo).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { result } = buildAndSynth((b) => {
+      b.addAlarm("networkIn", (alarm) =>
+        alarm
+          .metric(
+            (instance) =>
+              new Metric({
+                namespace: "AWS/EC2",
+                metricName: "NetworkIn",
+                dimensionsMap: { InstanceId: instance.instanceId },
+                statistic: Stats.AVERAGE,
+                period: Duration.minutes(1),
+              }),
+          )
+          .threshold(1_000_000_000),
+      );
+    });
+    const alarm = ref("server", (r: WithCustomAlarms<InstanceBuilderResult, "networkIn">) => {
+      // @ts-expect-error -- "networkOut" was not declared as a custom key
+      expect(r.alarms.networkOut).toBeUndefined();
+      return r.alarms.networkIn;
+    }).resolve({ server: result });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(result.alarms.networkIn);
   });
 });

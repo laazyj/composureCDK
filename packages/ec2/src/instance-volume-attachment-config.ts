@@ -33,3 +33,12 @@ export interface VolumeAttachmentAlarmConfig {
    */
   volumeStalledIo?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the per-attachment recommended alarms that
+ * `attachVolume(key, …)` adds to the instance result's `alarms`: each
+ * {@link VolumeAttachmentAlarmConfig} entry except `enabled`, prefixed by
+ * the attachment key and a dot, e.g. `AgentData.volumeStalledIo`.
+ */
+export type VolumeAttachmentAlarmKey =
+  `${string}.${Exclude<keyof VolumeAttachmentAlarmConfig, "enabled">}`;

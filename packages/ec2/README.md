@@ -190,6 +190,19 @@ The result exposes the attachment under `result.agent.volumeAttachments.AgentDat
 })
 ```
 
+### Reading alarms by key
+
+`InstanceBuilderResult`, `VolumeBuilderResult` and `InterfaceEndpointBuilderResult` type `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled or depend on configuration (`cpuCreditBalance` needs a burstable instance type, `burstBalance` a burstable volume type). The instance's per-attachment alarms are typed by suffix, so any `<attachment key>.volumeStalledIo` is accepted and `<attachment key>.volumeStalledIO` is not. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("agent", (r: InstanceBuilderResult) => r.alarms.statusCheckFailed); // Alarm | undefined
+ref("agent", (r: InstanceBuilderResult) => r.alarms["AgentData.volumeStalledIo"]); // Alarm | undefined
+ref("agent", (r: WithCustomAlarms<InstanceBuilderResult, "networkIn">) => r.alarms.networkIn); // Alarm
+ref("agent", (r: InstanceBuilderResult) => r.alarms.statusCheckFailure); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of each builder's own `build()` accepts any key, as `WithCustomAlarms<Result, string>`. The recommended keys are exported as `InstanceAlarmKey`, `VolumeAttachmentAlarmKey`, `VolumeAlarmKey` and `InterfaceEndpointAlarmKey`.
+
 ## VPC Builder
 
 ```ts

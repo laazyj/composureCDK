@@ -64,3 +64,11 @@ export interface InstanceAlarmConfig {
    */
   cpuCreditBalance?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms the instance builder creates for the
+ * instance itself — every {@link InstanceAlarmConfig} entry except the
+ * `enabled` master switch. The instance result's `alarms` also holds the
+ * per-attachment alarms, keyed by `VolumeAttachmentAlarmKey`.
+ */
+export type InstanceAlarmKey = Exclude<keyof InstanceAlarmConfig, "enabled">;

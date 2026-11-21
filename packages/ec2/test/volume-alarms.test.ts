@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Duration, Size } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
-import { Metric, Stats, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric, Stats, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { EbsDeviceVolumeType, type Volume } from "aws-cdk-lib/aws-ec2";
-import { buildFixture } from "@composurecdk/cdk-testing";
-import { createVolumeBuilder } from "../src/volume-builder.js";
+import { assertAssignable, buildFixture } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { ref } from "@composurecdk/core";
+import { createVolumeBuilder, type VolumeBuilderResult } from "../src/volume-builder.js";
 
 const buildAndSynth = buildFixture(
   () =>
@@ -243,5 +245,49 @@ describe("volume addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["volumeQueueLength", "volumeIdleTime"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("volume alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildBurstable(() => undefined);
+    const typed: VolumeBuilderResult = result;
+    const burst = typed.alarms.burstBalance;
+
+    assertAssignable<Alarm | undefined, typeof burst>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof burst>();
+    expect(burst).toBeDefined();
+    // @ts-expect-error -- "burstBalence" is not an EBS volume alarm key
+    expect(typed.alarms.burstBalence).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { result } = buildBurstable((b) =>
+      b.addAlarm("volumeQueueLength", (alarm) =>
+        alarm
+          .metric(
+            (volume) =>
+              new Metric({
+                namespace: "AWS/EBS",
+                metricName: "VolumeQueueLength",
+                dimensionsMap: { VolumeId: volume.volumeId },
+                statistic: Stats.AVERAGE,
+                period: Duration.minutes(5),
+              }),
+          )
+          .threshold(10),
+      ),
+    );
+    const alarm = ref("data", (r: WithCustomAlarms<VolumeBuilderResult, "volumeQueueLength">) => {
+      // @ts-expect-error -- "volumeIdleTime" was not declared as a custom key
+      expect(r.alarms.volumeIdleTime).toBeUndefined();
+      return r.alarms.volumeQueueLength;
+    }).resolve({ data: result });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(result.alarms.volumeQueueLength);
   });
 });

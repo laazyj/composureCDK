@@ -59,3 +59,11 @@ export interface TableAlarmConfig {
    */
   writeThrottleEvents?: AlarmConfig | false;
 }
+
+/**
+ * The key of a recommended alarm a table builder creates: every
+ * {@link TableAlarmConfig} entry except the `enabled` master switch. Both
+ * `TableBuilderResult` and `TableV2BuilderResult` type their `alarms` by it,
+ * since both create their alarms through the same function.
+ */
+export type TableAlarmKey = Exclude<keyof TableAlarmConfig, "enabled">;

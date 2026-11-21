@@ -6,6 +6,13 @@ Read [docs/architecture.md](docs/architecture.md) first — it's the primary gui
 
 **ADRs are for architecturally significant decisions only** — ones that change the library's shape or bind work across packages. An implementation choice localised to one feature, or to a set of features inside a single package, does not get an ADR: document it in the package README and the PR body. Applying an existing pattern to a new service is not a new decision. Read [when to write an ADR](docs/adr/README.md#when-to-write-an-adr) before adding one; the default answer is no.
 
+## Public APIs
+
+Each package is published to npm on its own; its exports and dependencies are what its consumers get. Reuse code freely within a package; across packages, judge a change by its effect on consumers:
+
+- **Export only what a consumer will call.** An export only another package uses is a public promise with no consumer behind it. Until shared code meets the bar in cloudwatch's [Adding an export](packages/cloudwatch/README.md#adding-an-export), copy it between packages instead.
+- **A new dependency needs a reason of its own.** Every consumer installs it, so removing duplication is not enough.
+
 ## After making changes
 
 Run the gates after each task, before presenting work for review:
@@ -36,12 +43,11 @@ Rules:
 
 ## Publishing & module format
 
-Every publishable package ships dual ESM/CJS, built by `tshy` ([ADR-0007](docs/adr/0007-dual-esm-cjs-publishing.md)). Each rule below has an ESLint rule behind it, so you will be told — but knowing why saves a fight with the linter:
+Every publishable package ships dual ESM/CJS, built by `tshy` ([ADR-0007](docs/adr/0007-dual-esm-cjs-publishing.md)). Where a rule names an ESLint rule, you will be told — but knowing why saves a fight with the linter:
 
 - **No `import.meta` or top-level `await` in `src/`** — neither emits to CommonJS (`composurecdk/no-cjs-incompatible-syntax`).
 - **Cross-realm identity checks use a `Symbol.for(...)` brand, never `instanceof`** (`composurecdk/no-realm-bound-instanceof`) — the ESM and CJS copies of a package can both load in one process, for a relative import as much as a bare specifier. Brand a CDK L2 you cannot modify by reading its L1 instead (`CfnResource.isCfnResource` + `cfnResourceType`, [ADR-0011](docs/adr/0011-cross-component-relationship-guards.md)).
 - **A prop re-declared only to widen it to `Resolvable` reads its inner type from CDK's own prop** (`composurecdk/redeclared-prop-must-track-cdk-type`) — `Resolvable<NonNullable<TopicProps["masterKey"]>>`, never `Resolvable<IKey>` — so it tracks the consumer's installed `aws-cdk-lib` ([ADR-0018](docs/adr/0018-re-declared-props-track-cdk-prop-types.md)). Keep the indexed access inline: a named alias puts an unnameable type into the emitted builder type and reintroduces [ADR-0001](docs/adr/0001-builder-type-emission.md)'s TS2883.
-- **Code that packages share is not, by itself, a reason to export it from `@composurecdk/cloudwatch`.** Read the cloudwatch README's [Adding an export](packages/cloudwatch/README.md#adding-an-export) first: until code meets that bar, copying it between packages is preferred.
 - **A new package** must be added to `@composurecdk/module-compat`'s `peerDependencies`, and to `cdk-flags.json`'s `modules` map.
 
 ## CDK feature flags

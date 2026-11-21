@@ -1,4 +1,3 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IRule, type IRuleTarget, Rule, type RuleProps } from "aws-cdk-lib/aws-events";
 import { type IConstruct } from "constructs";
 import {
@@ -9,9 +8,14 @@ import {
   resolve,
   type Resolvable,
 } from "@composurecdk/core";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import { RULE_DEFAULTS } from "./defaults.js";
-import type { RuleAlarmConfig } from "./rule-alarm-config.js";
+import type { RuleAlarmConfig, RuleAlarmKey } from "./rule-alarm-config.js";
 import { createRuleAlarms } from "./rule-alarms.js";
 
 /**
@@ -73,10 +77,16 @@ export interface RuleBuilderResult {
    * CloudWatch alarms created for the rule, keyed by alarm key.
    *
    * Includes both AWS-recommended alarms and any custom alarms added via
-   * {@link IRuleBuilder.addAlarm}. No alarm actions are configured —
-   * apply them via the result or an {@link alarmActionsPolicy}.
+   * {@link IRuleBuilder.addAlarm}. Access individual alarms by key (e.g.,
+   * `result.alarms.failedInvocations`). A recommended alarm is
+   * `Alarm | undefined`: it may be disabled, or, for the two DLQ alarms, off
+   * because no target has a dead-letter queue. Any other key is a compile
+   * error; read a custom alarm through {@link WithCustomAlarms}.
+   *
+   * No alarm actions are configured — apply them via the result or an
+   * {@link alarmActionsPolicy}.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<RuleAlarmKey>;
 
   /**
    * Resolved {@link IRuleTarget}s registered via
@@ -124,7 +134,7 @@ interface TargetEntry {
   target: Resolvable<NonNullable<RuleProps["targets"]>[number]>;
 }
 
-class RuleBuilder implements Lifecycle<RuleBuilderResult> {
+class RuleBuilder implements Lifecycle<WithCustomAlarms<RuleBuilderResult, string>> {
   props: Partial<RuleBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IRule>[] = [];
   readonly #targets: TargetEntry[] = [];
@@ -172,7 +182,11 @@ class RuleBuilder implements Lifecycle<RuleBuilderResult> {
     return this;
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): RuleBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<RuleBuilderResult, string> {
     const ctx = context ?? {};
     const { eventBus, eventPattern, recommendedAlarms: alarmConfig, ...rest } = this.props;
 

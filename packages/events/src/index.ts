@@ -5,7 +5,7 @@ export {
   type RuleBuilderResult,
 } from "./rule-builder.js";
 export { RULE_DEFAULTS } from "./defaults.js";
-export { type RuleAlarmConfig } from "./rule-alarm-config.js";
+export { type RuleAlarmConfig, type RuleAlarmKey } from "./rule-alarm-config.js";
 export { RULE_ALARM_DEFAULTS } from "./rule-alarm-defaults.js";
 export { lambdaTarget } from "./targets/lambda-target.js";
 export { SQS_TARGET_KEY_WARNING_ID, sqsTarget } from "./targets/sqs-target.js";

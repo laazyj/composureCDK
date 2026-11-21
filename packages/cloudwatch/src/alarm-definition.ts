@@ -25,7 +25,7 @@ export type AlarmMetric = Metric | MathExpression;
  * - `alarmName`: when omitted, {@link createAlarms} derives a default via
  *   `defaultAlarmName(scope, id, key)`.
  * - `constructId`: when omitted, {@link createAlarms} derives the construct id
- *   as `` `${id}${Capitalize(key)}Alarm` ``.
+ *   as `` `${id}${Capitalize(key)}Alarm` ``, with `key` sanitised.
  */
 export interface AlarmDefinition {
   key: string;

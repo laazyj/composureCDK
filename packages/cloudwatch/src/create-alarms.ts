@@ -1,4 +1,5 @@
 import { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { sanitizeConstructId } from "@composurecdk/core";
 import type { IConstruct } from "constructs";
 import type { AlarmDefinition } from "./alarm-definition.js";
 import { defaultAlarmName } from "./default-alarm-name.js";
@@ -15,7 +16,8 @@ function capitalize(s: string): string {
  * otherwise it is derived from the scope, `id`, and `def.key` via
  * {@link defaultAlarmName}.
  *
- * Each alarm's construct id is `${id}${Capitalize(key)}Alarm`, unless the
+ * Each alarm's construct id is `${id}${Capitalize(key)}Alarm`, with `key`
+ * sanitised by `sanitizeConstructId`, unless the
  * definition supplies an explicit `constructId`, which is used verbatim (e.g.
  * to preserve an existing logical ID when grandfathering).
  *
@@ -42,7 +44,7 @@ export function createAlarms(
     if (def.constructId === "") {
       throw new Error(`Alarm "${def.key}": constructId, when set, must be non-empty.`);
     }
-    const constructId = def.constructId ?? `${id}${capitalize(def.key)}Alarm`;
+    const constructId = def.constructId ?? `${id}${capitalize(sanitizeConstructId(def.key))}Alarm`;
     alarms[def.key] = def.metric.createAlarm(scope, constructId, {
       alarmName: def.alarmName ?? defaultAlarmName(scope, id, def.key),
       threshold: def.threshold,

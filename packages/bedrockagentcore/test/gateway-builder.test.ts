@@ -137,6 +137,22 @@ describe("createGatewayBuilder", () => {
       template.resourceCountIs("AWS::BedrockAgentCore::GatewayTarget", 1);
     });
 
+    it("passes the factory its key sanitised as a construct id", () => {
+      let seen: string | undefined;
+      buildAndSynth((b) =>
+        b.addTarget("search/v2", (gateway, id) => {
+          seen = id;
+          return gateway.addMcpServerTarget(id, {
+            gatewayTargetName: "search",
+            endpoint: "https://mcp.example.com",
+            credentialProviderConfigurations: [GatewayCredentialProvider.fromIamRole()],
+          });
+        }),
+      );
+
+      expect(seen).toBe("search-v2");
+    });
+
     it("rejects a duplicate key", () => {
       const factory = () => ({}) as GatewayTarget;
       expect(() => createGatewayBuilder().addTarget("a", factory).addTarget("a", factory)).toThrow(

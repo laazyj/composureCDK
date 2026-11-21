@@ -16,7 +16,13 @@ import {
   type TopicProps,
 } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import {
+  COPY_STATE,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+  sanitizeConstructId,
+} from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import {
   type AlarmConfigurer,
@@ -276,7 +282,8 @@ class TopicBuilder implements Lifecycle<WithCustomAlarms<TopicBuilderResult, str
     const subscriptions: Record<string, Subscription> = {};
     for (const entry of this.#subscriptions) {
       const resolvedSub = resolve(entry.subscription, context ?? {});
-      const subscriptionId = `${id}${entry.key[0].toUpperCase()}${entry.key.slice(1)}Subscription`;
+      const key = sanitizeConstructId(entry.key);
+      const subscriptionId = `${id}${key[0].toUpperCase()}${key.slice(1)}Subscription`;
       subscriptions[entry.key] = bindSubscription(scope, subscriptionId, topic, resolvedSub);
     }
 

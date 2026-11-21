@@ -82,6 +82,20 @@ describe("createAlarms", () => {
     expect(logicalIds.some((id) => id.startsWith("MyFuncErrorsAlarm"))).toBe(true);
   });
 
+  it("sanitises the key in a derived construct ID", () => {
+    const stack = new Stack(new App(), "TestStack");
+    const result = createAlarms(stack, "MyFunc", [makeDefinition({ key: "errors/5xx" })]);
+
+    expect(result["errors/5xx"].node.id).toBe("MyFuncErrors-5xxAlarm");
+  });
+
+  it("throws when a key carries a leaked token", () => {
+    const stack = new Stack(new App(), "TestStack");
+    expect(() =>
+      createAlarms(stack, "MyFunc", [makeDefinition({ key: "${Token[TOKEN.1]}" })]),
+    ).toThrow(/unresolved CDK token/);
+  });
+
   it("uses an explicit constructId verbatim, leaving alarmName to derive its default", () => {
     const stack = new Stack(new App(), "MyServiceStack");
     const definitions = [makeDefinition({ key: "errors", constructId: "LegacyErrorsAlarm" })];

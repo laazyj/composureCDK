@@ -136,7 +136,9 @@ It backs `dependsOn` in [`@composurecdk/custom-resources`](../custom-resources/R
 
 ## Construct IDs
 
-Use these when a builder derives a construct ID from something the user supplied, such as a map key or a record name. `constructId` replaces `/` and control characters with `-`, and throws on `{ } [ ]`, because they mean an unresolved CDK token has leaked into the ID, which would give a logical ID that changes between synths. Given several parts, it sanitises each and joins them with `-`. To sanitise one fragment inside a larger ID, use `sanitizeConstructId`. Sanitise only the part you derive, never the `id` your builder was given: under `compose` it can contain `/` on purpose ([ADR-0012](../../docs/adr/0012-explicit-build-id-decoupled-from-compose-key.md)).
+Use these when a builder derives a construct ID from something the user supplied, such as a map key or a record name. The user wrote a key, not a construct ID, so the builder sanitises the ID it derives rather than constraining the key: the sanitise-derived-values rule of [ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md).
+
+`constructId` replaces `/` and control characters with `-`, and throws on `{ } [ ]`, because they mean an unresolved CDK token has leaked into the ID, which would give a logical ID that changes between synths. Given several parts, it sanitises each and joins them with `-`. To sanitise one fragment inside a larger ID, use `sanitizeConstructId`. Sanitise only the part you derive, never the `id` your builder was given: under `compose` it can contain `/` on purpose ([ADR-0012](../../docs/adr/0012-explicit-build-id-decoupled-from-compose-key.md)).
 
 ```ts
 import { constructId } from "@composurecdk/core";

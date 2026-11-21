@@ -102,7 +102,7 @@ Memory has no recommended alarms: AgentCore publishes memory metrics per API ope
 
 Pass a customer managed key with `.kmsKey(...)` to meet BedrockAgentCore.4.
 
-`addLambdaTarget(key, options)` takes the function as a `ref(...)`, and its tools are named `<key>___<tool>` for agents. Add any other target with `addTarget(key, (gateway, key) => gateway.addMcpServerTarget(key, { gatewayTargetName: key, ... }))`. CDK grants the service role what each target needs.
+`addLambdaTarget(key, options)` takes the function as a `ref(...)`, and its tools are named `<key>___<tool>` for agents. Add any other target with `addTarget(key, (gateway, id) => gateway.addMcpServerTarget(id, { gatewayTargetName: key, ... }))`; `id` is `key` sanitised as a construct ID. CDK grants the service role what each target needs.
 
 ```ts
 createGatewayBuilder()

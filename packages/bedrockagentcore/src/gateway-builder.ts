@@ -8,7 +8,13 @@ import {
 } from "aws-cdk-lib/aws-bedrockagentcore";
 import { type IRole, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
-import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
+import {
+  COPY_STATE,
+  type Lifecycle,
+  resolve,
+  type Resolvable,
+  sanitizeConstructId,
+} from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import {
   type AlarmConfigurer,
@@ -74,10 +80,10 @@ export interface GatewayBuilderResult {
  */
 export type IGatewayBuilder = ITaggedBuilder<GatewayBuilderProps, GatewayBuilder>;
 
-/** Adds a target to the gateway, using `key` as its construct id. */
+/** Adds a target to the gateway, using `id` (its key, sanitised) as the construct id. */
 export type GatewayTargetFactory = (
   gateway: Gateway,
-  key: string,
+  id: string,
   context: Record<string, object>,
 ) => GatewayTarget;
 
@@ -102,7 +108,7 @@ class GatewayBuilder implements Lifecycle<WithCustomAlarms<GatewayBuilderResult,
 
   /**
    * Adds any other target, e.g.
-   * `(gateway, key) => gateway.addMcpServerTarget(key, { gatewayTargetName: key, … })`.
+   * `(gateway, id) => gateway.addMcpServerTarget(id, { gatewayTargetName: "orders", … })`.
    */
   addTarget(key: string, factory: GatewayTargetFactory): this {
     if (this.#targets.has(key)) {
@@ -157,7 +163,10 @@ class GatewayBuilder implements Lifecycle<WithCustomAlarms<GatewayBuilderResult,
       ...(kmsKey && { kmsKey }),
     });
     const targets = Object.fromEntries(
-      [...this.#targets].map(([key, factory]) => [key, factory(gateway, key, context)]),
+      [...this.#targets].map(([key, factory]) => [
+        key,
+        factory(gateway, sanitizeConstructId(key), context),
+      ]),
     );
     const alarms = buildAgentCoreAlarms(
       scope,

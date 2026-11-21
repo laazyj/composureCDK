@@ -39,15 +39,15 @@ compose({ site: createBucketBuilder(), cdn }, { site: [], cdn: ["site"] }).build
 
 `createDistributionBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
 
-| Property                                | Default               | Rationale                                                                                  |
-| --------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------ |
-| `accessLogs`                            | `{ prefix: "logs/" }` | Auto-creates an S3 logging bucket for the access log audit trail under the `logs/` prefix. |
-| `priceClass`                            | `PRICE_CLASS_100`     | North America and Europe edge locations — sufficient and cost-effective.                   |
-| `httpVersion`                           | `HTTP2_AND_3`         | Enables HTTP/2 and HTTP/3 (QUIC) for improved performance.                                 |
-| `defaultRootObject`                     | `"index.html"`        | Standard for static website hosting.                                                       |
-| `minimumProtocolVersion`                | `TLS_V1_2_2021`       | Requires TLS 1.2+. Applied only with a custom `certificate`; see below.                    |
-| `defaultBehavior.viewerProtocolPolicy`  | `REDIRECT_TO_HTTPS`   | Ensures all viewer traffic is encrypted in transit.                                        |
-| `defaultBehavior.responseHeadersPolicy` | `SECURITY_HEADERS`    | Applies managed security headers (HSTS, X-Content-Type-Options, etc.).                     |
+| Property                                | Default               | Rationale                                                                                                                                                                                                   |
+| --------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accessLogs`                            | `{ prefix: "logs/" }` | Auto-creates an S3 logging bucket for the access log audit trail under the `logs/` prefix. Uses legacy logging, which needs ACLs; see [Standard logging (v2)](#standard-logging-v2) for an ACL-free bucket. |
+| `priceClass`                            | `PRICE_CLASS_100`     | North America and Europe edge locations — sufficient and cost-effective.                                                                                                                                    |
+| `httpVersion`                           | `HTTP2_AND_3`         | Enables HTTP/2 and HTTP/3 (QUIC) for improved performance.                                                                                                                                                  |
+| `defaultRootObject`                     | `"index.html"`        | Standard for static website hosting.                                                                                                                                                                        |
+| `minimumProtocolVersion`                | `TLS_V1_2_2021`       | Requires TLS 1.2+. Applied only with a custom `certificate`; see below.                                                                                                                                     |
+| `defaultBehavior.viewerProtocolPolicy`  | `REDIRECT_TO_HTTPS`   | Ensures all viewer traffic is encrypted in transit.                                                                                                                                                         |
+| `defaultBehavior.responseHeadersPolicy` | `SECURITY_HEADERS`    | Applies managed security headers (HSTS, X-Content-Type-Options, etc.).                                                                                                                                      |
 
 A TLS floor needs a custom domain and certificate: the default `*.cloudfront.net` certificate's security policy is fixed, so without `.certificate(...)` the `minimumProtocolVersion` default is not applied (CDK would ignore it and warn). A `minimumProtocolVersion` you set yourself is always passed through.
 
@@ -76,7 +76,7 @@ const cdn = createDistributionBuilder()
 
 ### Access logging
 
-CloudFront standard access logging is configured through a single `.accessLogs(config)` setting. By default, the builder creates a dedicated logging bucket (using `@composurecdk/s3` with its secure defaults, plus `BUCKET_OWNER_PREFERRED` object ownership which CloudFront standard logging requires) and writes logs under `logs/`. The created bucket is returned in the build result:
+CloudFront access logging is configured through a single `.accessLogs(config)` setting. By default, the builder uses CloudFront's **legacy** standard logging: it creates a dedicated logging bucket (using `@composurecdk/s3` with its secure defaults, plus `BUCKET_OWNER_PREFERRED` object ownership) and writes logs under `logs/`. The created bucket is returned in the build result:
 
 ```ts
 const result = createDistributionBuilder().origin(myOrigin).build(stack, "CDN");
@@ -85,7 +85,10 @@ result.distribution; // Distribution
 result.accessLogsBucket; // Bucket | undefined
 ```
 
-`.accessLogs(config)` accepts either `false` to disable access logging, or an object describing how to handle logs:
+> [!IMPORTANT]
+> Legacy logging writes through bucket ACLs, so its bucket must have ACLs enabled. Where a guardrail requires `BucketOwnerEnforced` on every bucket, use [standard logging (v2)](#standard-logging-v2) instead.
+
+`.accessLogs(config)` accepts `false` to disable access logging, `{ v2: {...} }` for [standard logging (v2)](#standard-logging-v2), or an object describing how to handle legacy logs:
 
 ```ts
 import { Duration } from "aws-cdk-lib";
@@ -122,6 +125,114 @@ The `configure` callback receives the build context, so anything `IBucketBuilder
 The config object replaces the default wholesale rather than merging with it. For example, `.accessLogs({ includeCookies: true })` does **not** preserve the default `prefix: "logs/"` — restate any default you want to keep.
 
 The auto-created logging bucket uses `DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES` from `@composurecdk/s3`: incomplete multipart uploads are aborted after 7 days and access log objects expire after 2 years (matching the default `LogGroup` retention so the audit window is consistent across log destinations). CloudFront never deletes its own logs, so this lifecycle is the only thing that bounds the bucket's growth.
+
+### Standard logging (v2)
+
+`.accessLogs({ v2: {...} })` uses CloudFront's [standard logging (v2)](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/standard-logging.html), which delivers through CloudWatch Logs vended-log delivery (`AWS::Logs::DeliverySource`, `AWS::Logs::DeliveryDestination` and `AWS::Logs::Delivery`). Its S3 destination is granted through the bucket policy, so the bucket keeps ACLs disabled.
+
+The delivery is built in the distribution's stack by a delivery builder (`ICloudFrontLogDeliveryBuilder`), and `configure` customizes it. Its options are listed below; `includeCookies` sits beside `configure` because it is a setting on the distribution.
+
+```ts
+// Auto-create an ACL-free bucket (the default destination)
+createDistributionBuilder().origin(myOrigin).accessLogs({ v2: {} });
+
+// Customize the bucket, the key prefix and the delivery
+createDistributionBuilder()
+  .origin(myOrigin)
+  .accessLogs({
+    v2: {
+      configure: (d) =>
+        d
+          .destination({
+            s3: {
+              prefix: "cdn",
+              configure: (sub) =>
+                sub.lifecycleRules([{ id: "ShortLogs", expiration: Duration.days(180) }]),
+            },
+          })
+          .outputFormat("parquet"),
+      includeCookies: true,
+    },
+  });
+
+// Bring your own bucket (any region) or a log group (us-east-1)
+createDistributionBuilder()
+  .origin(myOrigin)
+  .accessLogs({ v2: { configure: (d) => d.destination({ s3: { bucket: myBucket } }) } });
+
+// Deliver to a delivery destination you manage: Firehose, cross-account, …
+createDistributionBuilder()
+  .origin(myOrigin)
+  .accessLogs({
+    v2: { configure: (d) => d.destination({ deliveryDestinationArn: myDestinationArn }) },
+  });
+```
+
+In a composed system, the destination can be a sibling component, passed by `ref`. Declare it as a dependency of the distribution:
+
+```ts
+compose(
+  {
+    // Server access logging off: a log bucket needs no log bucket of its own.
+    logs: createBucketBuilder().serverAccessLogs(false),
+    cdn: createDistributionBuilder()
+      .origin(myOrigin)
+      .accessLogs({
+        v2: {
+          configure: (d) =>
+            d.destination({ s3: { bucket: ref("logs", (r: BucketBuilderResult) => r.bucket) } }),
+        },
+      }),
+  },
+  { logs: [], cdn: ["logs"] },
+);
+```
+
+A log group from `@composurecdk/logs` plugs in the same way, as `d.destination({ logGroup: ref("logs", (r: LogGroupBuilderResult) => r.logGroup) })`.
+
+The build result's `logDelivery` holds the delivery source, destination and delivery, and `accessLogsBucket` holds the bucket when the builder created one.
+
+The builder's options are only those it needs to know about. The delivery's other settings — the record fields, field delimiter and S3 partitioning suffix — change nothing the builder creates, so set them on the `CfnDelivery` in `logDelivery.delivery`, which is typed by the aws-cdk-lib you have installed:
+
+```ts
+const { logDelivery } = createDistributionBuilder()
+  .origin(myOrigin)
+  .accessLogs({ v2: {} })
+  .build(stack, "CDN");
+logDelivery?.delivery.addPropertyOverride("S3SuffixPath", "{DistributionId}/{yyyy}/{MM}/{dd}");
+// On aws-cdk-lib 2.167.0 or later, the typed setters work too:
+// logDelivery.delivery.recordFields = ["date", "time", "c-ip"];
+```
+
+| Option                          | Default        | Notes                                                                                                                                                                     |
+| ------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.destination()`                | `{ s3: {} }`   | `{ s3 }`, `{ logGroup }` or `{ deliveryDestinationArn }`.                                                                                                                 |
+| `.outputFormat()`               | `"w3c"` for S3 | `json`, `plain`, `w3c`, `raw` or `parquet` (S3 only; CloudWatch charges for the conversion), or any format AWS adds later. Changing it replaces the delivery destination. |
+| `.s3EnableHiveCompatiblePath()` | `false`        | S3 only. Hive-compatible object paths. An option because, without a prefix, it changes the path the bucket policy grants.                                                 |
+| `includeCookies`                | `false`        | On `{ v2 }`, not the builder. Rendered on the distribution: cookie logging is a distribution-wide setting.                                                                |
+
+#### The auto-created bucket
+
+The bucket is built by `@composurecdk/s3` with `BUCKET_OWNER_ENFORCED` object ownership set explicitly, versioning off, `RemovalPolicy.RETAIN`, server access logging off, and the same `DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES` as the legacy bucket. `s3.configure` customizes it, as `configure` does for legacy logging. It is created at `<id>LogDelivery/Bucket`, beside the delivery resources, not at the legacy `<id>AccessLogs`: a legacy bucket can't be switched to `BucketOwnerEnforced` in place, because CloudFront adds its log-delivery grant to the bucket ACL outside CloudFormation. Moving an existing distribution from legacy to v2 therefore creates a new bucket; the legacy one is retained with its logs.
+
+Without `s3.prefix`, CloudFront writes under `AWSLogs/<account-id>/CloudFront/`. A prefix **replaces** that path rather than preceding it.
+
+#### Permissions
+
+- **S3.** The builder adds a statement to the bucket's policy allowing `delivery.logs.amazonaws.com` to `s3:PutObject` under the log path, conditioned on `s3:x-amz-acl: bucket-owner-full-control`, `aws:SourceAccount` and the delivery source's ARN. It is written into the template on purpose: left out, CloudWatch Logs appends it to the bucket policy itself, and the next deploy of the CDK-managed policy removes it again. If the bucket is encrypted with a customer-managed KMS key, the key policy gets a matching statement; SSE-KMS with an AWS-managed key is not supported by vended-log delivery. For an imported bucket or key, you own those policies.
+- **CloudWatch Logs.** A log group defined in your app gets a resource policy statement allowing `logs:CreateLogStream` and `logs:PutLogEvents`. Log group resource policies count against a limit of 10 per account and region.
+- **`deliveryDestinationArn`.** You own the destination's permissions and its output format, so `outputFormat` is rejected. A Firehose stream must be in `us-east-1` and tagged `LogDeliveryEnabled: true`.
+
+#### Region
+
+CloudWatch Logs accepts a CloudFront delivery source only in `us-east-1`, and the builder creates it next to the distribution, so **the distribution's stack must be deployed in `us-east-1`**. `build()` throws when the stack's region is a known other region. For an env-agnostic stack it checks `CDK_DEFAULT_REGION`, and warns (`@composurecdk/cloudfront:log-delivery-region`) when that is unset. A log group outside `us-east-1` raises the same warning, since CloudFront documents cross-region delivery for S3 only. An S3 bucket may be in any region.
+
+#### Constraints
+
+- A distribution can have only **one** delivery source. The source's name is derived from its construct path so it is never replaced; moving the distribution's construct to another path means removing logging in one deploy and adding it in the next.
+- The delivery depends on its destination's constructs (the bucket or log group, with their policies). On stack deletion it is removed first, so a bucket with `autoDeleteObjects` is emptied only once CloudFront has stopped delivering to it.
+- S3 bucket names must match `[\w-]`: a bucket name with dots is rejected.
+- Legacy and v2 logging can run side by side on one distribution, but not through one builder: `accessLogs` takes one or the other.
 
 ### Origin object-expiration guard
 

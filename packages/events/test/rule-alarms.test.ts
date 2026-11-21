@@ -5,11 +5,13 @@ import { Rule, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { Code, Function as LambdaFn, Runtime } from "aws-cdk-lib/aws-lambda";
 import { Queue } from "aws-cdk-lib/aws-sqs";
-import { Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { newStack } from "@composurecdk/cdk-testing";
+import { type Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
 import type { RuleAlarmConfig } from "../src/rule-alarm-config.js";
 import { resolveRuleAlarmDefinitions } from "../src/rule-alarms.js";
-import { createRuleBuilder } from "../src/rule-builder.js";
+import { createRuleBuilder, type RuleBuilderResult } from "../src/rule-builder.js";
 
 function makeFn(stack: Stack): LambdaFn {
   return new LambdaFn(stack, "Handler", {
@@ -279,16 +281,17 @@ describe("RuleBuilder recommended alarms", () => {
   });
 });
 
+const eventsMetric = (metricName: string) => (rule: { ruleName: string }) =>
+  new Metric({
+    namespace: "AWS/Events",
+    metricName,
+    dimensionsMap: { RuleName: rule.ruleName },
+    statistic: "Sum",
+    period: Duration.minutes(1),
+  });
+
 describe("addAlarms", () => {
   it("adds each entry as a custom alarm under its key", () => {
-    const eventsMetric = (metricName: string) => (rule: { ruleName: string }) =>
-      new Metric({
-        namespace: "AWS/Events",
-        metricName,
-        dimensionsMap: { RuleName: rule.ruleName },
-        statistic: "Sum",
-        period: Duration.minutes(1),
-      });
     const stack = newStack();
     const fn = makeFn(stack);
 
@@ -305,5 +308,52 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["retryAttempts", "invocations"]);
     Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  const scheduledRule = (stack: Stack) =>
+    createRuleBuilder()
+      .schedule(Schedule.rate(Duration.minutes(15)))
+      .addTarget("h", new LambdaFunction(makeFn(stack)));
+
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const stack = newStack();
+    const typed: RuleBuilderResult = scheduledRule(stack).build(stack, "TestRule");
+    const failed = typed.alarms.failedInvocations;
+
+    assertAssignable<Alarm | undefined, typeof failed>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof failed>();
+    expect(failed).toBeDefined();
+    // @ts-expect-error -- "failedInvocation" is not an EventBridge rule alarm key
+    expect(typed.alarms.failedInvocation).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const system = compose(
+      {
+        rule: scheduledRule(stack).addAlarm("retryAttempts", (alarm) =>
+          alarm.metric(eventsMetric("RetryInvocationAttempts")).threshold(10),
+        ),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("rule", (r: WithCustomAlarms<RuleBuilderResult, "retryAttempts">) => {
+              // @ts-expect-error -- "retryAttempt" was not declared as a custom key
+              expect(r.alarms.retryAttempt).toBeUndefined();
+              return r.alarms.retryAttempts;
+            }).resolve(context),
+          }),
+        },
+      },
+      { rule: [], consumer: ["rule"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.rule.alarms.retryAttempts);
   });
 });

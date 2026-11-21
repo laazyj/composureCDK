@@ -142,9 +142,24 @@ createRuleBuilder()
   );
 ```
 
+### Reading alarms by key
+
+`RuleBuilderResult` types `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled, and the two DLQ alarms are off unless a target has a dead-letter queue. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("schedule", (r: RuleBuilderResult) => r.alarms.failedInvocations); // Alarm | undefined
+ref(
+  "schedule",
+  (r: WithCustomAlarms<RuleBuilderResult, "retryAttempts">) => r.alarms.retryAttempts,
+); // Alarm
+ref("schedule", (r: RuleBuilderResult) => r.alarms.failedInvocation); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of the builder's own `build()` accepts any key, as `WithCustomAlarms<RuleBuilderResult, string>`. The recommended keys are exported as `RuleAlarmKey`.
+
 ### Applying alarm actions
 
-Alarms are returned in the build result as `Record<string, Alarm>`:
+Alarms are returned in the build result's `alarms`, keyed by alarm:
 
 ```ts
 const result = rule.build(stack, "MyRule");

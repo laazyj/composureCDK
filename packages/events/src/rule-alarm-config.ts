@@ -66,3 +66,10 @@ export interface RuleAlarmConfig {
    */
   invocationsFailedToBeSentToDlq?: AlarmConfig | false;
 }
+
+/**
+ * The key of each recommended alarm an EventBridge rule builder creates:
+ * every {@link RuleAlarmConfig} entry except the `enabled` master switch.
+ * Each alarm is created under the key of the config entry that controls it.
+ */
+export type RuleAlarmKey = Exclude<keyof RuleAlarmConfig, "enabled">;

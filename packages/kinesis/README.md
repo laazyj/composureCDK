@@ -12,11 +12,11 @@ const telemetry = createStreamBuilder().streamName("telemetry").build(stack, "Te
 
 The result is `{ stream, alarms, key? }`:
 
-| Field    | Type                    | Description                                                                                                                                                         |
-| -------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stream` | `Stream`                | The data stream.                                                                                                                                                    |
-| `alarms` | `Record<string, Alarm>` | Alarms created for the stream, keyed by name — see [Alarms](#alarms).                                                                                               |
-| `key`    | `IKey \| undefined`     | The customer-managed encryption key: the one you supplied, or the one CDK creates for `encryption: StreamEncryption.KMS` without a key. Absent for the managed key. |
+| Field    | Type                       | Description                                                                                                                                                         |
+| -------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stream` | `Stream`                   | The data stream.                                                                                                                                                    |
+| `alarms` | `AlarmsOf<StreamAlarmKey>` | Alarms created for the stream, keyed by name — see [Reading alarms by key](#reading-alarms-by-key).                                                                 |
+| `key`    | `IKey \| undefined`        | The customer-managed encryption key: the one you supplied, or the one CDK creates for `encryption: StreamEncryption.KMS` without a key. Absent for the managed key. |
 
 ## Secure Defaults
 
@@ -153,7 +153,7 @@ constraints.validate.streamName("telemetry"); // throws on an invalid name
 
 ## Alarms
 
-The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Kinesis) by default. Alarms are returned in the build result as `Record<string, Alarm>`, keyed as below. No alarm actions are configured — apply them from the result or with [`alarmActionsPolicy`](../cloudwatch/README.md).
+The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Kinesis) by default. Alarms are returned in the build result's `alarms`, keyed as below. No alarm actions are configured — apply them from the result or with [`alarmActionsPolicy`](../cloudwatch/README.md).
 
 Each alarm's metric, statistic, period, datapoints and comparison follow the AWS page exactly. AWS gives no numeric threshold for any Kinesis alarm — every one is "depends on your situation" — so the thresholds below are this library's starting points, chosen against AWS's threshold justification for each (for example, iterator age past 50% of retention is where AWS says data loss becomes a risk, and throttling should alarm when sustained but not at zero, since throttled requests are retried). Tune them to your workload via `recommendedAlarms`.
 
@@ -214,6 +214,21 @@ const telemetry = createStreamBuilder()
   );
 ```
 
+### Reading alarms by key
+
+`StreamBuilderResult` types `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled, be off by default, or be skipped when the iterator-age threshold cannot be derived. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("telemetry", (r: StreamBuilderResult) => r.alarms.getRecordsIteratorAgeMilliseconds); // Alarm | undefined
+ref(
+  "telemetry",
+  (r: WithCustomAlarms<StreamBuilderResult, "noIncomingRecords">) => r.alarms.noIncomingRecords,
+); // Alarm
+ref("telemetry", (r: StreamBuilderResult) => r.alarms.getRecordsIteratorAgeMiliseconds); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of the builder's own `build()` accepts any key, as `WithCustomAlarms<StreamBuilderResult, string>`. The recommended keys are exported as `StreamAlarmKey`. `StreamConsumerBuilderResult` is typed the same way, with its recommended keys exported as `StreamConsumerAlarmKey`.
+
 ## Enhanced fan-out consumers
 
 `createStreamConsumerBuilder()` registers an [enhanced fan-out](https://docs.aws.amazon.com/streams/latest/dev/enhanced-consumers.html) (EFO) consumer with a stream. It wraps the CDK [StreamConsumer](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kinesis.StreamConsumer.html) construct, and is its own component rather than an option on the stream builder, so the consumer has its own place in the `compose` graph, its own alarm and its own grant.
@@ -251,10 +266,10 @@ const system = compose(
 
 The result is `{ consumer, alarms }`:
 
-| Field      | Type                    | Description                                                 |
-| ---------- | ----------------------- | ----------------------------------------------------------- |
-| `consumer` | `StreamConsumer`        | The registered consumer.                                    |
-| `alarms`   | `Record<string, Alarm>` | Alarms created for the consumer, keyed by name (see below). |
+| Field      | Type                               | Description                                                 |
+| ---------- | ---------------------------------- | ----------------------------------------------------------- |
+| `consumer` | `StreamConsumer`                   | The registered consumer.                                    |
+| `alarms`   | `AlarmsOf<StreamConsumerAlarmKey>` | Alarms created for the consumer, keyed by name (see below). |
 
 Builder tags reach the consumer itself from aws-cdk-lib 2.205.0, the release in which `AWS::Kinesis::StreamConsumer` gained `Tags` in CDK. On earlier releases they reach only its alarms.
 

@@ -1,13 +1,17 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { type IStream, Stream, StreamEncryption, type StreamProps } from "aws-cdk-lib/aws-kinesis";
 import { type IKey } from "aws-cdk-lib/aws-kms";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import { STREAM_DEFAULTS } from "./defaults.js";
-import type { StreamAlarmConfig } from "./stream-alarm-config.js";
+import type { StreamAlarmConfig, StreamAlarmKey } from "./stream-alarm-config.js";
 import { createStreamAlarms } from "./stream-alarms.js";
 import { validateStreamName } from "./stream-name.js";
 
@@ -75,12 +79,15 @@ export interface StreamBuilderResult {
    * Includes both AWS-recommended alarms and any custom alarms added via
    * {@link IStreamBuilder.addAlarm}. Access individual alarms by key (e.g.,
    * `result.alarms.getRecordsIteratorAgeMilliseconds`); see
-   * {@link StreamAlarmConfig} for the recommended keys.
+   * {@link StreamAlarmConfig} for the recommended keys. A recommended alarm
+   * is `Alarm | undefined`: it may be disabled, off by default, or skipped
+   * when its threshold cannot be derived. Any other key is a compile error;
+   * read a custom alarm through {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<StreamAlarmKey>;
 
   /**
    * The stream's customer-managed encryption key: the one supplied through
@@ -114,7 +121,7 @@ export interface StreamBuilderResult {
  */
 export type IStreamBuilder = ITaggedBuilder<StreamBuilderProps, StreamBuilder>;
 
-class StreamBuilder implements Lifecycle<StreamBuilderResult> {
+class StreamBuilder implements Lifecycle<WithCustomAlarms<StreamBuilderResult, string>> {
   props: Partial<StreamBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IStream>[] = [];
   readonly #policyStatements: StreamPolicyStatement[] = [];
@@ -154,7 +161,11 @@ class StreamBuilder implements Lifecycle<StreamBuilderResult> {
     target.#policyStatements.push(...this.#policyStatements);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): StreamBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<StreamBuilderResult, string> {
     const { recommendedAlarms, encryptionKey, ...configured } = this.props;
 
     // Fail at synth, at the authoring call site, instead of at deploy time.

@@ -38,3 +38,9 @@ export interface StreamConsumerAlarmConfig {
    */
   subscribeToShardEventMillisBehindLatest?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended Kinesis stream consumer alarms — every
+ * {@link StreamConsumerAlarmConfig} entry except the `enabled` master switch.
+ */
+export type StreamConsumerAlarmKey = Exclude<keyof StreamConsumerAlarmConfig, "enabled">;

@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match } from "aws-cdk-lib/assertions";
-import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Stream } from "aws-cdk-lib/aws-kinesis";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { createStreamBuilder } from "../src/stream-builder.js";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
+import { createStreamBuilder, type StreamBuilderResult } from "../src/stream-builder.js";
 import { resolveStreamAlarmDefinitions } from "../src/stream-alarms.js";
 import { STREAM_ALARM_DEFAULTS } from "../src/stream-alarm-defaults.js";
 
@@ -322,6 +324,54 @@ describe("custom alarms survive disabled recommended alarms", () => {
 
     expect(result.alarms.noIncomingRecords).toBeDefined();
     expect(Object.keys(result.alarms)).toHaveLength(6);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth();
+    const typed: StreamBuilderResult = result;
+    const iteratorAge = typed.alarms.getRecordsIteratorAgeMilliseconds;
+
+    assertAssignable<Alarm | undefined, typeof iteratorAge>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof iteratorAge>();
+    expect(iteratorAge).toBeDefined();
+    // @ts-expect-error -- "getRecordsIteratorAgeMiliseconds" is not a Kinesis stream alarm key
+    expect(typed.alarms.getRecordsIteratorAgeMiliseconds).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const system = compose(
+      {
+        stream: createStreamBuilder().addAlarm("noIncomingRecords", (alarm) =>
+          alarm
+            .metric((stream) => stream.metricIncomingRecords())
+            .threshold(1)
+            .lessThan(),
+        ),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref(
+              "stream",
+              (r: WithCustomAlarms<StreamBuilderResult, "noIncomingRecords">) => {
+                // @ts-expect-error -- "noIncomingRecord" was not declared as a custom key
+                expect(r.alarms.noIncomingRecord).toBeUndefined();
+                return r.alarms.noIncomingRecords;
+              },
+            ).resolve(context),
+          }),
+        },
+      },
+      { stream: [], consumer: ["stream"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.stream.alarms.noIncomingRecords);
   });
 });
 

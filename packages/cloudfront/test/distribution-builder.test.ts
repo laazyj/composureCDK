@@ -572,6 +572,40 @@ describe("DistributionBuilder", () => {
     });
   });
 
+  describe("web ACL", () => {
+    const WEB_ACL_ARN = "arn:aws:wafv2:us-east-1:123456789012:global/webacl/edge/abc";
+
+    it("resolves webAclId from context when using a Ref", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+
+      createDistributionBuilder()
+        .origin(withBucketOrigin(stack))
+        .webAclId(ref<{ arn: string }>("waf").map((r) => r.arn))
+        .accessLogs(false)
+        .build(stack, "TestDistribution", { waf: { arn: WEB_ACL_ARN } });
+
+      Template.fromStack(stack).hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({ WebACLId: WEB_ACL_ARN }),
+      });
+    });
+
+    it("accepts a concrete web ACL ARN", () => {
+      const app = new App();
+      const stack = new Stack(app, "TestStack");
+
+      createDistributionBuilder()
+        .origin(withBucketOrigin(stack))
+        .webAclId(WEB_ACL_ARN)
+        .accessLogs(false)
+        .build(stack, "TestDistribution");
+
+      Template.fromStack(stack).hasResourceProperties("AWS::CloudFront::Distribution", {
+        DistributionConfig: Match.objectLike({ WebACLId: WEB_ACL_ARN }),
+      });
+    });
+  });
+
   describe("access logging", () => {
     it("creates distribution dependency on access logs bucket for proper deletion order", () => {
       const app = new App();

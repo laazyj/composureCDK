@@ -1,5 +1,4 @@
 import {
-  type Alarm,
   ComparisonOperator,
   MathExpression,
   Metric,
@@ -15,10 +14,16 @@ import {
   type AlarmDefinition,
   AlarmDefinitionBuilder,
   type AlarmMetric,
+  type AlarmsOf,
   createAlarms,
   resolveAlarmConfig,
+  type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
-import type { AccountAlarmConfig, OpenExecutionsAlarmConfig } from "./account-alarm-config.js";
+import type {
+  AccountAlarmConfig,
+  AccountAlarmKey,
+  OpenExecutionsAlarmConfig,
+} from "./account-alarm-config.js";
 import { ACCOUNT_ALARM_DEFAULTS } from "./account-alarm-defaults.js";
 import { describeThreshold, METRIC_PERIOD } from "./alarm-specs.js";
 
@@ -51,8 +56,12 @@ export interface AccountAlarmBuilderProps {
 
 /** The build output of an {@link IAccountAlarmBuilder}. */
 export interface AccountAlarmBuilderResult {
-  /** The CloudWatch alarms created, keyed by alarm key. */
-  alarms: Record<string, Alarm>;
+  /**
+   * The CloudWatch alarms created, keyed by alarm key: the recommended alarms
+   * that are on, and any added via `addAlarm()`. To read a custom alarm by
+   * key, name it with {@link WithCustomAlarms}.
+   */
+  alarms: AlarmsOf<AccountAlarmKey>;
 }
 
 /**
@@ -61,8 +70,6 @@ export interface AccountAlarmBuilderResult {
  * @see {@link createAccountAlarmBuilder}
  */
 export type IAccountAlarmBuilder = ITaggedBuilder<AccountAlarmBuilderProps, AccountAlarmBuilder>;
-
-type AlarmKey = Exclude<keyof AccountAlarmConfig, "enabled">;
 
 interface AccountAlarmSpec {
   metric: AlarmMetric;
@@ -83,13 +90,15 @@ const { thresholdPercent: openExecutionsThreshold, ...openExecutionsDefaults } =
   ACCOUNT_ALARM_DEFAULTS.openExecutions;
 
 /** {@link ACCOUNT_ALARM_DEFAULTS} by alarm key, with `openExecutions`' fraction as its threshold. */
-const DEFAULTS: Record<AlarmKey, Omit<AlarmConfigDefaults, "threshold"> & { threshold?: number }> =
-  {
-    ...ACCOUNT_ALARM_DEFAULTS,
-    openExecutions: { ...openExecutionsDefaults, threshold: openExecutionsThreshold },
-  };
+const DEFAULTS: Record<
+  AccountAlarmKey,
+  Omit<AlarmConfigDefaults, "threshold"> & { threshold?: number }
+> = {
+  ...ACCOUNT_ALARM_DEFAULTS,
+  openExecutions: { ...openExecutionsDefaults, threshold: openExecutionsThreshold },
+};
 
-const SPECS: Record<AlarmKey, AccountAlarmSpec> = {
+const SPECS: Record<AccountAlarmKey, AccountAlarmSpec> = {
   openExecutions: {
     metric: new MathExpression({
       expression: "count / limit",
@@ -147,11 +156,11 @@ function openExecutionsConfig(
 
 function recommendedAlarms(config: AccountAlarmConfig | false | undefined): AlarmDefinition[] {
   if (config === false || config?.enabled === false) return [];
-  const configs: Partial<Record<AlarmKey, AlarmConfig | false>> = {
+  const configs: Partial<Record<AccountAlarmKey, AlarmConfig | false>> = {
     ...config,
     openExecutions: openExecutionsConfig(config?.openExecutions),
   };
-  return (Object.keys(SPECS) as AlarmKey[]).flatMap((key) => {
+  return (Object.keys(SPECS) as AccountAlarmKey[]).flatMap((key) => {
     const spec = SPECS[key];
     const userConfig = configs[key];
     if (userConfig === false || (userConfig === undefined && !spec.enabledByDefault)) return [];
@@ -179,7 +188,9 @@ function recommendedAlarms(config: AccountAlarmConfig | false | undefined): Alar
   });
 }
 
-class AccountAlarmBuilder implements Lifecycle<AccountAlarmBuilderResult> {
+class AccountAlarmBuilder implements Lifecycle<
+  WithCustomAlarms<AccountAlarmBuilderResult, string>
+> {
   props: AccountAlarmBuilderProps = {};
   readonly #customAlarms: AlarmDefinitionBuilder<AccountMetrics>[] = [];
 
@@ -209,7 +220,7 @@ class AccountAlarmBuilder implements Lifecycle<AccountAlarmBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string): AccountAlarmBuilderResult {
+  build(scope: IConstruct, id: string): WithCustomAlarms<AccountAlarmBuilderResult, string> {
     return {
       alarms: createAlarms(scope, id, [
         ...recommendedAlarms(this.props.recommendedAlarms),

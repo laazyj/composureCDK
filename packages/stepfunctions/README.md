@@ -164,6 +164,18 @@ createStateMachineBuilder()
 
 `.recommendedAlarms(false)` (or `{ enabled: false }`) disables every recommended alarm; custom alarms added with `addAlarm` are still created.
 
+### Reading alarms by key
+
+`StateMachineBuilderResult`, `ActivityBuilderResult`, `AccountAlarmBuilderResult` and each alias's `StateMachineAliasResult` type `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled, opt-in, or not apply (`executionThrottled` on an Express state machine). To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("workflow", (r: StateMachineBuilderResult) => r.alarms.executionsFailed); // Alarm | undefined
+ref("workflow", (r: WithCustomAlarms<StateMachineBuilderResult, "aborted">) => r.alarms.aborted); // Alarm
+ref("workflow", (r: StateMachineBuilderResult) => r.alarms.executionFailed); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of a builder's own `build()` accepts any key, as `WithCustomAlarms<…, string>`. An alias's rollback alarms take no custom keys. The recommended keys are exported as `StateMachineAlarmKey`, `ActivityAlarmKey`, `AccountAlarmKey` and `StateMachineAliasAlarmKey`.
+
 ### Account-level alarms
 
 Some [Step Functions quotas](https://docs.aws.amazon.com/step-functions/latest/dg/service-quotas.html) apply to the account in each Region. When one is reached, every workflow in it is affected. Their metrics have no dimensions, so no state machine builder can own them. `createAccountAlarmBuilder` creates their alarms. **Build one per account and Region**: a second one creates duplicate alarms.
@@ -180,7 +192,7 @@ compose(
   },
   { stepFunctionsAccount: [] },
 );
-// result: { alarms: Record<string, Alarm> }
+// result: { alarms: AlarmsOf<AccountAlarmKey> }
 ```
 
 | Alarm                      | Metric (1 min)                                           | Default threshold          | Created by default |

@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import { Duration, type Stack } from "aws-cdk-lib";
 import { Annotations, Match } from "aws-cdk-lib/assertions";
 import { Pass, StateMachineType } from "aws-cdk-lib/aws-stepfunctions";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { Construct } from "constructs";
-import { buildFixture } from "@composurecdk/cdk-testing";
+import { assertAssignable, buildFixture } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { INAPPLICABLE_ALARM_CONFIG_WARNING_ID } from "../src/index.js";
-import { createStateMachineBuilder } from "../src/state-machine-builder.js";
+import {
+  createStateMachineBuilder,
+  type StateMachineBuilderResult,
+} from "../src/state-machine-builder.js";
 
 const buildAndSynth = buildFixture(
   () =>
@@ -160,5 +166,36 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["aborted", "throttled"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth();
+    const typed: StateMachineBuilderResult = result;
+    const failed = typed.alarms.executionsFailed;
+
+    assertAssignable<Alarm | undefined, typeof failed>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof failed>();
+    expect(failed).toBeDefined();
+    // @ts-expect-error -- "executionFailed" is not a state machine alarm key
+    expect(typed.alarms.executionFailed).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { result } = buildAndSynth((b) =>
+      b.addAlarm("aborted", (a) => a.metric((sm) => sm.metricAborted()).threshold(0)),
+    );
+    const alarm = ref("workflow", (r: WithCustomAlarms<StateMachineBuilderResult, "aborted">) => {
+      // @ts-expect-error -- "abort" was not declared as a custom key
+      expect(r.alarms.abort).toBeUndefined();
+      return r.alarms.aborted;
+    }).resolve({ workflow: result });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(result.alarms.aborted);
   });
 });

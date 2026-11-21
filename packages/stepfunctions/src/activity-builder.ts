@@ -1,10 +1,14 @@
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Activity, type ActivityProps } from "aws-cdk-lib/aws-stepfunctions";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { ActivityAlarmConfig } from "./activity-alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { ActivityAlarmConfig, ActivityAlarmKey } from "./activity-alarm-config.js";
 import { ACTIVITY_ALARMS } from "./activity-alarms.js";
 import { createSpecAlarms } from "./alarm-specs.js";
 
@@ -33,10 +37,12 @@ export interface ActivityBuilderResult {
   activity: Activity;
 
   /**
-   * CloudWatch alarms created for the activity, keyed by alarm name — the
-   * recommended alarms and any added via {@link IActivityBuilder.addAlarm}.
+   * CloudWatch alarms created for the activity, keyed by alarm key — the
+   * recommended alarms that are on, and any added via
+   * {@link IActivityBuilder.addAlarm}. To read a custom alarm by key, name it
+   * with {@link WithCustomAlarms}.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<ActivityAlarmKey>;
 }
 
 /**
@@ -47,7 +53,7 @@ export interface ActivityBuilderResult {
  */
 export type IActivityBuilder = ITaggedBuilder<ActivityBuilderProps, ActivityBuilder>;
 
-class ActivityBuilder implements Lifecycle<ActivityBuilderResult> {
+class ActivityBuilder implements Lifecycle<WithCustomAlarms<ActivityBuilderResult, string>> {
   props: Partial<ActivityBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Activity>[] = [];
 
@@ -76,7 +82,7 @@ class ActivityBuilder implements Lifecycle<ActivityBuilderResult> {
     scope: IConstruct,
     id: string,
     context: Record<string, object> = {},
-  ): ActivityBuilderResult {
+  ): WithCustomAlarms<ActivityBuilderResult, string> {
     const { encryptionConfiguration, recommendedAlarms, ...activityProps } = this.props;
 
     const activity = new Activity(scope, id, {

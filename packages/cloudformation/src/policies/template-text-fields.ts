@@ -40,6 +40,7 @@ export const TEMPLATE_TEXT_FIELDS: TemplateTextFields = {
   "AWS::Lambda::Function": ["description"],
   "AWS::Neptune::DBClusterParameterGroup": ["description"],
   "AWS::Neptune::DBParameterGroup": ["description"],
+  "AWS::Organizations::Policy": ["description"],
   "AWS::SNS::Topic": ["displayName"],
   "AWS::WAFv2::WebACL": ["description"],
 };

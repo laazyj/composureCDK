@@ -357,9 +357,24 @@ const api = createRestApiBuilder()
   );
 ```
 
+### Reading alarms by key
+
+`RestApiBuilderResult` and `SpecRestApiBuilderResult` type `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. Both builders create the same recommended alarms, so the two results share one key union. A recommended alarm is `Alarm | undefined`, because it can be disabled. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("api", (r: RestApiBuilderResult) => r.alarms.serverError); // Alarm | undefined
+ref(
+  "api",
+  (r: WithCustomAlarms<RestApiBuilderResult, "integrationLatency">) => r.alarms.integrationLatency,
+); // Alarm
+ref("api", (r: RestApiBuilderResult) => r.alarms.serverErrors); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of a builder's own `build()` accepts any key, as `WithCustomAlarms<…, string>`. The recommended keys are exported as `RestApiAlarmKey`.
+
 ### Applying alarm actions
 
-Alarms are returned in the build result as `Record<string, Alarm>`:
+Alarms are returned in the build result's `alarms`, keyed by alarm:
 
 ```ts
 const result = api.build(stack, "MyApi");

@@ -8,10 +8,15 @@ import {
   RestApi,
   type RestApiBase,
 } from "aws-cdk-lib/aws-apigateway";
-import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { createRestApiBuilder } from "../src/rest-api-builder.js";
-import { createSpecRestApiBuilder } from "../src/spec-rest-api-builder.js";
+import { type Alarm, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
+import { createRestApiBuilder, type RestApiBuilderResult } from "../src/rest-api-builder.js";
+import {
+  createSpecRestApiBuilder,
+  type SpecRestApiBuilderResult,
+} from "../src/spec-rest-api-builder.js";
 import { resolveRestApiAlarmDefinitions } from "../src/rest-api-alarms.js";
 
 const buildAndSynth = buildFixture(createRestApiBuilder, "TestApi");
@@ -404,5 +409,65 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["integrationLatency", "cacheMisses"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth(withStubMethod);
+    const typed: RestApiBuilderResult = result;
+    const latency = typed.alarms.latency;
+
+    assertAssignable<Alarm | undefined, typeof latency>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof latency>();
+    expect(latency).toBeDefined();
+    // @ts-expect-error -- "serverErrors" is not an API Gateway alarm key
+    expect(typed.alarms.serverErrors).toBeUndefined();
+  });
+
+  it("types the spec-driven result's alarms with the same keys", () => {
+    assertAssignable<Alarm | undefined, SpecRestApiBuilderResult["alarms"]["clientError"]>();
+    // @ts-expect-error -- "clientErrors" is not an API Gateway alarm key
+    assertAssignable<undefined, SpecRestApiBuilderResult["alarms"]["clientErrors"]>();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const api = createRestApiBuilder();
+    withStubMethod(api);
+    api.addAlarm("integrationLatency", (alarm) =>
+      alarm
+        .metric(
+          (restApi) =>
+            new Metric({
+              namespace: "AWS/ApiGateway",
+              metricName: "IntegrationLatency",
+              dimensionsMap: { ApiName: restApi.restApiName },
+            }),
+        )
+        .threshold(2000),
+    );
+    const system = compose(
+      {
+        api,
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("api", (r: WithCustomAlarms<RestApiBuilderResult, "integrationLatency">) => {
+              // @ts-expect-error -- "integrationLatancy" was not declared as a custom key
+              expect(r.alarms.integrationLatancy).toBeUndefined();
+              return r.alarms.integrationLatency;
+            }).resolve(context),
+          }),
+        },
+      },
+      { api: [], consumer: ["api"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.api.alarms.integrationLatency);
   });
 });

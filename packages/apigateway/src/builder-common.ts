@@ -1,8 +1,8 @@
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { RestApiBase, RestApiBaseProps } from "aws-cdk-lib/aws-apigateway";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
+import type { AlarmsOf } from "@composurecdk/cloudwatch";
 import type { Resolvable } from "@composurecdk/core";
-import type { RestApiAlarmConfig } from "./alarm-config.js";
+import type { RestApiAlarmConfig, RestApiAlarmKey } from "./alarm-config.js";
 import type { AccessLoggingConfig } from "./deploy-options.js";
 import type { ExecutionLoggingConfig } from "./execution-logging.js";
 
@@ -93,12 +93,15 @@ export interface RestApiBuilderResultBase<T extends RestApiBase> {
    *
    * Includes both AWS-recommended alarms and any custom alarms added
    * via `addAlarm()`. Access individual alarms by key
-   * (e.g., `result.alarms.serverError`).
+   * (e.g., `result.alarms.serverError`). A recommended alarm is
+   * `Alarm | undefined`: it may be disabled. Any other key is a compile
+   * error; read a custom alarm through `WithCustomAlarms`, from
+   * `@composurecdk/cloudwatch`.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#ApiGateway
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<RestApiAlarmKey>;
 }

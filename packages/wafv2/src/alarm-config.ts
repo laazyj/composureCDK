@@ -61,3 +61,15 @@ export interface WebAclRuleAlarmConfig {
    */
   daysToExpiry?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms a web ACL builder can create, as they
+ * appear in {@link WebAclBuilderResult.alarms}.
+ *
+ * These are not the {@link WebAclRuleAlarmConfig} keys. Each alarm is keyed
+ * by its rule's name in camelCase, suffixed with the config key
+ * (`perIpRateBlockedRequests`, `commonRuleSetDaysToExpiry`), so the keys are
+ * template-literal patterns: any prefix is accepted, a misspelled suffix is
+ * not.
+ */
+export type WebAclAlarmKey = `${string}BlockedRequests` | `${string}DaysToExpiry`;

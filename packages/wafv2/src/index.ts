@@ -29,7 +29,11 @@ export {
   type WebAclMetrics,
   type WebAclRequestMetrics,
 } from "./metrics.js";
-export { type WebAclAlarmConfig, type WebAclRuleAlarmConfig } from "./alarm-config.js";
+export {
+  type WebAclAlarmConfig,
+  type WebAclAlarmKey,
+  type WebAclRuleAlarmConfig,
+} from "./alarm-config.js";
 export { WEB_ACL_RULE_ALARM_DEFAULTS } from "./alarm-defaults.js";
 export { type WebAclLoggingConfig, type WebAclLogRedaction } from "./logging.js";
 export {

@@ -1,5 +1,4 @@
 import { Annotations, Lazy } from "aws-cdk-lib";
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import {
   type CfnLoggingConfiguration,
@@ -13,9 +12,11 @@ import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation
 import {
   type AlarmConfigurer,
   AlarmDefinitionBuilder,
+  type AlarmsOf,
   createAlarms,
+  type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
-import type { WebAclAlarmConfig } from "./alarm-config.js";
+import type { WebAclAlarmConfig, WebAclAlarmKey } from "./alarm-config.js";
 import { resolveWebAclAlarmDefinitions } from "./alarms.js";
 import { associate, type WebAclAssociationTarget } from "./association.js";
 import { type CustomResponse, CustomResponseBodies } from "./custom-response.js";
@@ -110,8 +111,14 @@ export interface WebAclBuilderResult {
    * with dimensions that match what WAF publishes.
    */
   metrics: WebAclMetrics;
-  /** The CloudWatch alarms created, recommended and custom, keyed by alarm key. */
-  alarms: Record<string, Alarm>;
+  /**
+   * The CloudWatch alarms created, recommended and custom, keyed by alarm
+   * key. A recommended alarm is `<rule>BlockedRequests` or
+   * `<rule>DaysToExpiry`, typed `Alarm | undefined`: it may be disabled, or
+   * not apply to the rule. Any other key is a compile error; read a custom
+   * alarm through {@link WithCustomAlarms}.
+   */
+  alarms: AlarmsOf<WebAclAlarmKey>;
 }
 
 /**
@@ -134,7 +141,7 @@ interface DefaultAction {
 const SAMPLING_ANNOTATION = "@composurecdk/wafv2:sampling-unredacted";
 const MAX_RATE_BASED_RULES = 10;
 
-class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
+class WebAclBuilder implements Lifecycle<WithCustomAlarms<WebAclBuilderResult, string>> {
   props: Partial<WebAclBuilderProps> = {};
   readonly #rules: RuleEntry[] = [];
   readonly #associations: Resolvable<WebAclAssociationTarget>[] = [];
@@ -214,7 +221,11 @@ class WebAclBuilder implements Lifecycle<WebAclBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string, context: Record<string, object> = {}): WebAclBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context: Record<string, object> = {},
+  ): WithCustomAlarms<WebAclBuilderResult, string> {
     const owner = `WebAclBuilder "${id}"`;
     const {
       scope: aclScope = WEB_ACL_DEFAULTS.scope,

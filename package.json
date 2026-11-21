@@ -53,7 +53,7 @@
     "@nx/eslint-plugin": "24.0.5",
     "@nx/js": "24.0.5",
     "@vitest/coverage-v8": "^5.1.0",
-    "eslint": "^10.14.0",
+    "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
@@ -61,6 +61,6 @@
     "prettier": "^3.9.10",
     "publint": "^0.3.25",
     "tshy": "^4.1.4",
-    "typescript-eslint": "^8.72.1"
+    "typescript-eslint": "^8.72.2"
   }
 }

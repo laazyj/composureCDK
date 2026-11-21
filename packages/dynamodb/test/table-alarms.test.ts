@@ -1,10 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { type Lifecycle } from "@composurecdk/core";
+import { compose, type Lifecycle, ref } from "@composurecdk/core";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { AttributeType, Table } from "aws-cdk-lib/aws-dynamodb";
-import { createTableBuilder, type ITableBuilder } from "../src/table-builder.js";
-import { createTableV2Builder, type ITableV2Builder } from "../src/table-v2-builder.js";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { AttributeType, type ITable, Table } from "aws-cdk-lib/aws-dynamodb";
+import { assertAssignable, newStack } from "@composurecdk/cdk-testing";
+import type { AlarmConfigurer, WithCustomAlarms } from "@composurecdk/cloudwatch";
+import {
+  createTableBuilder,
+  type ITableBuilder,
+  type TableBuilderResult,
+} from "../src/table-builder.js";
+import {
+  createTableV2Builder,
+  type ITableV2Builder,
+  type TableV2BuilderResult,
+} from "../src/table-v2-builder.js";
 import { resolveTableAlarmDefinitions } from "../src/table-alarms.js";
 
 const PK = { name: "pk", type: AttributeType.STRING };
@@ -195,6 +206,71 @@ describe.each(builders)("$name table alarms", ({ create }) => {
       expect(Object.keys(result.alarms)).toEqual(["userErrors", "readCapacity"]);
       template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
     });
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error. Each
+// result type is named on its own, since the point is what it accepts.
+describe("alarm keys (type-level)", () => {
+  it("types TableBuilderResult's recommended alarms as optional and rejects a misspelled key", () => {
+    const typed: TableBuilderResult = createTableBuilder()
+      .partitionKey(PK)
+      .build(newStack(), "Table");
+    const errors = typed.alarms.systemErrors;
+
+    assertAssignable<Alarm | undefined, typeof errors>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof errors>();
+    expect(errors).toBeDefined();
+    // @ts-expect-error -- "systemErorrs" is not a DynamoDB table alarm key
+    expect(typed.alarms.systemErorrs).toBeUndefined();
+  });
+
+  it("types TableV2BuilderResult's recommended alarms as optional and rejects a misspelled key", () => {
+    const typed: TableV2BuilderResult = createTableV2Builder()
+      .partitionKey(PK)
+      .build(newStack(), "Table");
+    const throttles = typed.alarms.readThrottleEvents;
+
+    assertAssignable<Alarm | undefined, typeof throttles>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof throttles>();
+    expect(throttles).toBeDefined();
+    // @ts-expect-error -- "readThrottleEvent" is not a DynamoDB table alarm key
+    expect(typed.alarms.readThrottleEvent).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const userErrors: AlarmConfigurer<ITable> = (a) =>
+      a.metric((table) => table.metricUserErrors()).threshold(5);
+    const system = compose(
+      {
+        table: createTableBuilder().partitionKey(PK).addAlarm("userErrors", userErrors),
+        tableV2: createTableV2Builder().partitionKey(PK).addAlarm("userErrors", userErrors),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("table", (r: WithCustomAlarms<TableBuilderResult, "userErrors">) => {
+              // @ts-expect-error -- "userErorrs" was not declared as a custom key
+              expect(r.alarms.userErorrs).toBeUndefined();
+              return r.alarms.userErrors;
+            }).resolve(context),
+            alarmV2: ref("tableV2", (r: WithCustomAlarms<TableV2BuilderResult, "userErrors">) => {
+              // @ts-expect-error -- "userErorrs" was not declared as a custom key
+              expect(r.alarms.userErorrs).toBeUndefined();
+              return r.alarms.userErrors;
+            }).resolve(context),
+          }),
+        },
+      },
+      { table: [], tableV2: [], consumer: ["table", "tableV2"] },
+    );
+
+    const built = system.build(newStack(), "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    assertAssignable<Alarm, typeof built.consumer.alarmV2>();
+    expect(built.consumer.alarm).toBe(built.table.alarms.userErrors);
+    expect(built.consumer.alarmV2).toBe(built.tableV2.alarms.userErrors);
   });
 });
 

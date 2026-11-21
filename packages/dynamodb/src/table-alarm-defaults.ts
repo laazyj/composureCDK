@@ -1,11 +1,9 @@
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
+import type { TableAlarmKey } from "./table-alarm-config.js";
 
-interface TableAlarmDefaults {
+interface TableAlarmDefaults extends Record<TableAlarmKey, AlarmConfigDefaults> {
   enabled: true;
-  systemErrors: AlarmConfigDefaults;
-  readThrottleEvents: AlarmConfigDefaults;
-  writeThrottleEvents: AlarmConfigDefaults;
 }
 
 /**

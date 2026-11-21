@@ -1,10 +1,14 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type ITable, TableV2, type TablePropsV2 } from "aws-cdk-lib/aws-dynamodb";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { TableAlarmConfig } from "./table-alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { TableAlarmConfig, TableAlarmKey } from "./table-alarm-config.js";
 import { createTableAlarms } from "./table-alarms.js";
 import { TABLE_V2_DEFAULTS } from "./defaults.js";
 
@@ -85,9 +89,12 @@ export interface TableV2BuilderResult {
   /**
    * CloudWatch alarms created for the table, keyed by alarm name — both the
    * AWS-recommended alarms and any added via {@link ITableV2Builder.addAlarm}.
-   * No alarm actions are configured.
+   * Access individual alarms by key (e.g. `result.alarms.systemErrors`). A
+   * recommended alarm is `Alarm | undefined`, because it may be disabled. Any
+   * other key is a compile error; read a custom alarm through
+   * {@link WithCustomAlarms}. No alarm actions are configured.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<TableAlarmKey>;
 }
 
 /**
@@ -132,7 +139,7 @@ export interface TableV2BuilderResult {
  */
 export type ITableV2Builder = ITaggedBuilder<TableV2BuilderProps, TableV2Builder>;
 
-class TableV2Builder implements Lifecycle<TableV2BuilderResult> {
+class TableV2Builder implements Lifecycle<WithCustomAlarms<TableV2BuilderResult, string>> {
   props: Partial<TableV2BuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ITable>[] = [];
 
@@ -157,7 +164,11 @@ class TableV2Builder implements Lifecycle<TableV2BuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): TableV2BuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<TableV2BuilderResult, string> {
     const {
       recommendedAlarms: alarmConfig,
       encryption,

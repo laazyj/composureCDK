@@ -76,6 +76,18 @@ createStatementBuilder()
   .allowWildcardResources(true);
 ```
 
+### Accepting statements in your own builder
+
+If your builder accepts statements the way this package's builders do, as `(PolicyStatement | StatementBuilder)[]`, use `isStatementBuilder` to tell them apart and build only the builders:
+
+```ts
+import { isStatementBuilder } from "@composurecdk/iam";
+
+const resolved = statements.map((s) => (isStatementBuilder(s) ? s.build() : s));
+```
+
+Don't use `instanceof StatementBuilder`: with the ESM and CommonJS copies of this package both loaded, it misses a builder from the other copy, which then skips `build()` and the wildcard guard ([why](../eslint-plugin/docs/rules/no-realm-bound-instanceof.md)).
+
 ## Service Role Helper
 
 ```ts

@@ -134,6 +134,19 @@ A construct-level dependency already covers that construct's own children, so na
 
 It backs `dependsOn` in [`@composurecdk/custom-resources`](../custom-resources/README.md) and `after` in [`@composurecdk/lambda`](../lambda/README.md)'s `.invokeOnDeploy()`, so both spell ordering the same way.
 
+## Construct IDs
+
+Use these when a builder derives a construct ID from something the user supplied, such as a map key or a record name. `constructId` replaces `/` and control characters with `-`, and throws on `{ } [ ]`, because they mean an unresolved CDK token has leaked into the ID, which would give a logical ID that changes between synths. Given several parts, it sanitises each and joins them with `-`. To sanitise one fragment inside a larger ID, use `sanitizeConstructId`. Sanitise only the part you derive, never the `id` your builder was given: under `compose` it can contain `/` on purpose ([ADR-0012](../../docs/adr/0012-explicit-build-id-decoupled-from-compose-key.md)).
+
+```ts
+import { constructId } from "@composurecdk/core";
+
+ruleSet.addRule(constructId(entry.key), options);
+constructId("records", "a/b"); // "records-a-b"
+```
+
+A construct ID is part of the resource's logical ID. Adopting these in a builder that already passed such strings through unsanitised changes the logical ID of any resource whose input contained `/` or a control character, and CloudFormation replaces that resource.
+
 ## Testing
 
 `@composurecdk/core/testing` holds `assertCopyPreservesState`, a test helper for builder authors that checks a builder's `[COPY_STATE]` hook. See [docs/testing.md](docs/testing.md).

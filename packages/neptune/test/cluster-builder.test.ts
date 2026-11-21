@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { SecurityGroup, SubnetType, type Vpc } from "aws-cdk-lib/aws-ec2";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Key } from "aws-cdk-lib/aws-kms";
 import {
   ClusterParameterGroup,
@@ -10,10 +11,15 @@ import {
   InstanceType,
   ParameterGroupFamily,
 } from "@aws-cdk/aws-neptune-alpha";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { type ClusterBuilderProps, createClusterBuilder } from "../src/cluster-builder.js";
+import {
+  type ClusterBuilderProps,
+  type ClusterBuilderResult,
+  createClusterBuilder,
+} from "../src/cluster-builder.js";
 import { clusterParameterGroupFamily } from "../src/cluster-parameter-group-defaults.js";
 import { isolatedVpc } from "./_helpers.js";
 
@@ -259,6 +265,52 @@ describe("ClusterBuilder", () => {
 
       expect(Object.keys(result.alarms)).toEqual(["gremlinErrors"]);
       template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+  });
+
+  // The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+  // target, run before `test`) fails if any of them stops being an error.
+  describe("alarm keys (type-level)", () => {
+    it("types recommended alarms as optional and rejects a misspelled key", () => {
+      const { result } = buildAndSynth();
+      const typed: ClusterBuilderResult = result;
+      const cpu = typed.alarms.cpuUtilization;
+
+      assertAssignable<Alarm | undefined, typeof cpu>();
+      // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+      assertAssignable<Alarm, typeof cpu>();
+      expect(cpu).toBeDefined();
+      // @ts-expect-error -- "cpuUtilisation" is not a Neptune cluster alarm key
+      expect(typed.alarms.cpuUtilisation).toBeUndefined();
+    });
+
+    it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+      const stack = newStack();
+      const system = compose(
+        {
+          graph: createClusterBuilder()
+            .vpc(isolatedVpc(stack))
+            .vpcSubnets({ subnetType: SubnetType.PRIVATE_ISOLATED })
+            .instanceType(InstanceType.R6G_LARGE)
+            .addAlarm("gremlinErrors", (a) =>
+              a.metric((cluster) => cluster.metric("NumGremlinErrorsPerSec")).threshold(0),
+            ),
+          consumer: {
+            build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+              alarm: ref("graph", (r: WithCustomAlarms<ClusterBuilderResult, "gremlinErrors">) => {
+                // @ts-expect-error -- "gremlinErorrs" was not declared as a custom key
+                expect(r.alarms.gremlinErorrs).toBeUndefined();
+                return r.alarms.gremlinErrors;
+              }).resolve(context),
+            }),
+          },
+        },
+        { graph: [], consumer: ["graph"] },
+      );
+
+      const built = system.build(stack, "System");
+      assertAssignable<Alarm, typeof built.consumer.alarm>();
+      expect(built.consumer.alarm).toBe(built.graph.alarms.gremlinErrors);
     });
   });
 

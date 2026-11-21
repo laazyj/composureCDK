@@ -80,3 +80,10 @@ export interface NeptuneClusterAlarmConfig {
    */
   serverlessDatabaseCapacity?: AlarmConfig | false;
 }
+
+/**
+ * The keys of the recommended alarms the cluster builder can create: every
+ * {@link NeptuneClusterAlarmConfig} entry except the `enabled` master switch.
+ * Each alarm is stored on the result's `alarms` under its config key.
+ */
+export type NeptuneClusterAlarmKey = Exclude<keyof NeptuneClusterAlarmConfig, "enabled">;

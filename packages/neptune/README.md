@@ -54,7 +54,7 @@ interface ClusterBuilderResult {
   cluster: DatabaseCluster;
   subnetGroup: ISubnetGroup;
   clusterParameterGroup: IClusterParameterGroup;
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<NeptuneClusterAlarmKey>; // see "Reading alarms by key"
 }
 ```
 
@@ -176,3 +176,18 @@ createClusterBuilder()
 // disable all recommended alarms
 createClusterBuilder().recommendedAlarms(false);
 ```
+
+### Reading alarms by key
+
+`ClusterBuilderResult` types `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled, and `serverlessDatabaseCapacity` is only created for a serverless cluster. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("graph", (r: ClusterBuilderResult) => r.alarms.cpuUtilization); // Alarm | undefined
+ref(
+  "graph",
+  (r: WithCustomAlarms<ClusterBuilderResult, "gremlinErrors">) => r.alarms.gremlinErrors,
+); // Alarm
+ref("graph", (r: ClusterBuilderResult) => r.alarms.cpuUtilisation); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of the builder's own `build()` accepts any key, as `WithCustomAlarms<ClusterBuilderResult, string>`. The recommended keys are exported as `NeptuneClusterAlarmKey`.

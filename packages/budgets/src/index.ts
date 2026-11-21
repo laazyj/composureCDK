@@ -15,7 +15,11 @@ export {
   type BudgetAlarmBuilderResult,
 } from "./budget-alarm-builder.js";
 export { BUDGET_DEFAULTS, DEFAULT_BUDGET_CURRENCIES } from "./defaults.js";
-export { type BudgetAlarmConfig, type EstimatedChargesAlarmConfig } from "./alarm-config.js";
+export {
+  type BudgetAlarmConfig,
+  type BudgetAlarmKey,
+  type EstimatedChargesAlarmConfig,
+} from "./alarm-config.js";
 export { createBudgetsTopicPolicies } from "./topic-policy.js";
 export { email, type Email } from "./email.js";
 export {

@@ -157,6 +157,21 @@ createBudgetBuilder()
   );
 ```
 
+### Reading alarms by key
+
+`BudgetBuilderResult` and `BudgetAlarmBuilderResult` type `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. The recommended alarm is `Alarm | undefined`, because it is off unless configured. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("accountAlarms", (r: BudgetAlarmBuilderResult) => r.alarms.estimatedCharges); // Alarm | undefined
+ref(
+  "account",
+  (r: WithCustomAlarms<BudgetBuilderResult, "ec2EstimatedCharges">) => r.alarms.ec2EstimatedCharges,
+); // Alarm
+ref("accountAlarms", (r: BudgetAlarmBuilderResult) => r.alarms.estimatedCharge); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of each builder's own `build()` accepts any key, as `WithCustomAlarms<…, string>`. Both builders create the same recommended alarms, exported as `BudgetAlarmKey`.
+
 ### Applying alarm actions
 
 No alarm actions are configured by default. Wire SNS or other actions via [`alarmActionsPolicy`](../cloudwatch/README.md#alarm-actions-policy) (or an `afterBuild` hook) — for cross-region deployments, the policy applied to the `us-east-1` monitoring stack covers both recommended and custom alarms.
@@ -201,6 +216,6 @@ If your custom `addAlarm` definitions reference the budget construct, set `cross
 interface BudgetBuilderResult {
   budget: CfnBudget;
   topicPolicies: Record<string, TopicPolicy>;
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<BudgetAlarmKey>; // "estimatedCharges"; custom keys via WithCustomAlarms
 }
 ```

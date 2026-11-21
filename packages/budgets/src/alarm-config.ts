@@ -62,3 +62,12 @@ export interface BudgetAlarmConfig {
    */
   estimatedCharges?: EstimatedChargesAlarmConfig | false;
 }
+
+/**
+ * The key of each recommended alarm that {@link createBudgetBuilder} and
+ * {@link createBudgetAlarmBuilder} can create: every
+ * {@link BudgetAlarmConfig} entry except the `enabled` master switch. Both
+ * builders create their alarms through the same function, so their results
+ * share this key.
+ */
+export type BudgetAlarmKey = Exclude<keyof BudgetAlarmConfig, "enabled">;

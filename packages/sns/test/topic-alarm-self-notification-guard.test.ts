@@ -32,7 +32,7 @@ describe("alarm self-notification guard", () => {
   it("warns when the action is added to the alarm directly", () => {
     const stack = newStack();
     const { topic, alarms } = createTopicBuilder().build(stack, "Alerts");
-    alarms.numberOfNotificationsFailed.addAlarmAction(new SnsAction(topic));
+    alarms.numberOfNotificationsFailed?.addAlarmAction(new SnsAction(topic));
 
     expect(warnings(stack)).toHaveLength(1);
   });

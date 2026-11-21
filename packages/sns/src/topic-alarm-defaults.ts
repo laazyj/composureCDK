@@ -1,13 +1,8 @@
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import type { AlarmConfigDefaults } from "@composurecdk/cloudwatch";
+import type { TopicAlarmKey } from "./topic-alarm-config.js";
 
-interface TopicAlarmDefaults {
-  enabled: true;
-  numberOfNotificationsFailed: AlarmConfigDefaults;
-  numberOfNotificationsFilteredOutInvalidAttributes: AlarmConfigDefaults;
-  numberOfNotificationsRedrivenToDlq: AlarmConfigDefaults;
-  numberOfNotificationsFailedToRedriveToDlq: AlarmConfigDefaults;
-}
+type TopicAlarmDefaults = { enabled: true } & Record<TopicAlarmKey, AlarmConfigDefaults>;
 
 /**
  * AWS-recommended default alarm configuration for SNS topics.

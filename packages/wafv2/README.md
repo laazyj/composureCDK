@@ -40,7 +40,7 @@ The result is `{ webAcl, associations, logGroup?, logging?, metrics, alarms }`:
 | `logGroup`     | `LogGroup \| undefined`                | The `aws-waf-logs-` log group WAF writes to. Absent when logging is off or goes to your own destination. |
 | `logging`      | `CfnLoggingConfiguration \| undefined` | The logging configuration. Absent when logging is off.                                                   |
 | `metrics`      | `WebAclMetrics`                        | Metrics for the web ACL, its default action and each rule — see [Metrics](#metrics).                     |
-| `alarms`       | `Record<string, Alarm>`                | Recommended and custom alarms, keyed by alarm key — see [Alarms](#alarms).                               |
+| `alarms`       | `AlarmsOf<WebAclAlarmKey>`             | Recommended and custom alarms, keyed by alarm key — see [Alarms](#alarms).                               |
 
 ## Defaults
 
@@ -208,6 +208,18 @@ createWebAclBuilder()
 ```
 
 A CLOUDFRONT web ACL's metrics are published in `us-east-1`, where the web ACL must be, so its alarms need nothing special.
+
+### Reading alarms by key
+
+`WebAclBuilderResult` types `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. The recommended keys are typed by suffix, so any `<rule>BlockedRequests` or `<rule>DaysToExpiry` is accepted and `<rule>BlockedRequest` is not. A recommended alarm is `Alarm | undefined`, because it can be disabled or not apply to the rule. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("waf", (r: WebAclBuilderResult) => r.alarms.perIpRateBlockedRequests); // Alarm | undefined
+ref("waf", (r: WithCustomAlarms<WebAclBuilderResult, "probeCounted">) => r.alarms.probeCounted); // Alarm
+ref("waf", (r: WebAclBuilderResult) => r.alarms.probeCounted); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of the builder's own `build()` accepts any key, as `WithCustomAlarms<WebAclBuilderResult, string>`. The recommended keys are exported as `WebAclAlarmKey`.
 
 ## Associations
 

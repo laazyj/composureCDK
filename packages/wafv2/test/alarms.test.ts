@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { Lazy } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { CfnWebACL } from "aws-cdk-lib/aws-wafv2";
-import { buildFixture } from "@composurecdk/cdk-testing";
+import { assertAssignable, buildFixture } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { ruleAlarmKey } from "../src/alarms.js";
 import type { IWebAclRuleBuilder } from "../src/rule-builder.js";
-import { createWebAclBuilder } from "../src/web-acl-builder.js";
+import { createWebAclBuilder, type WebAclBuilderResult } from "../src/web-acl-builder.js";
 
 const buildAndSynth = buildFixture(createWebAclBuilder, "Waf");
 
@@ -298,5 +301,42 @@ describe("WebAclBuilder custom alarms", () => {
       build: (b) => buildFixture(() => b, "Waf")().result,
       inspect: (result) => Object.keys(result.alarms),
     });
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms by suffix, as optional, and rejects a misspelled key", () => {
+    const { result } = buildAndSynth((b) =>
+      b
+        .addRule("PerIpRate", pathRule)
+        .addRule("Common", (r) => r.statement(managed("Version_1.12"))),
+    );
+    const typed: WebAclBuilderResult = result;
+    const blocked = typed.alarms.perIpRateBlockedRequests;
+
+    assertAssignable<Alarm | undefined, typeof blocked>();
+    assertAssignable<Alarm | undefined, typeof typed.alarms.commonDaysToExpiry>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof blocked>();
+    expect(blocked).toBeDefined();
+    expect(typed.alarms.commonDaysToExpiry).toBeDefined();
+    // @ts-expect-error -- the suffix is "BlockedRequests", not "BlockedRequest"
+    expect(typed.alarms.perIpRateBlockedRequest).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { result } = buildAndSynth((b) =>
+      b.addAlarm("allBlocked", (a) => a.metric((m) => m.blockedRequests()).threshold(1000)),
+    );
+    const alarm = ref("waf", (r: WithCustomAlarms<WebAclBuilderResult, "allBlocked">) => {
+      // @ts-expect-error -- "allBlock" was not declared as a custom key
+      expect(r.alarms.allBlock).toBeUndefined();
+      return r.alarms.allBlocked;
+    }).resolve({ waf: result });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(result.alarms.allBlocked);
   });
 });

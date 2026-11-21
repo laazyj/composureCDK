@@ -34,7 +34,7 @@ class BucketBuilderImpl {
 
 ## Existence, not correctness
 
-The rule checks only that the hook is **present**. A hook copying three of five fields passes. The companion test helper [`assertCopyPreservesState`](../../../core/docs/testing.md#assertcopypreservesstate) from `@composurecdk/core/testing` closes that gap on the test side — the two are meant to be used together.
+The rule checks only that the hook is **present**. A hook copying three of five fields passes. The companion test helper [`assertCopyPreservesState`](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/testing.md#assertcopypreservesstate) from `@composurecdk/core/testing` closes that gap on the test side — the two are meant to be used together.
 
 ## Per-field opt-out
 

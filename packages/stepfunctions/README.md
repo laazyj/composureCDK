@@ -1,6 +1,6 @@
 # @composurecdk/stepfunctions
 
-AWS Step Functions builders for [ComposureCDK](../../README.md).
+AWS Step Functions builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for state machines with secure, AWS-recommended defaults. It wraps the CDK [StateMachine](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_stepfunctions.StateMachine.html) construct — refer to the CDK documentation for the full set of configurable properties. The states themselves (`Pass`, `Choice`, `Map`, and the service integrations in `aws-cdk-lib/aws-stepfunctions-tasks`) are CDK's own; the builder does not wrap them.
 
@@ -48,7 +48,7 @@ compose(
 );
 ```
 
-Where tasks call more than one sibling, use [`combine`](../core/README.md):
+Where tasks call more than one sibling, use [`combine`](https://github.com/laazyj/composureCDK/blob/main/packages/core/README.md):
 
 ```ts
 .definition(
@@ -68,7 +68,7 @@ Where tasks call more than one sibling, use [`combine`](../core/README.md):
 
 Task states written in CDK add the IAM their service call needs to the execution role, scoped to the resource — `LambdaInvoke` grants `lambda:InvokeFunction` on that function, `DynamoPutItem` grants `dynamodb:PutItem` on that table.
 
-A DynamoDB task's expression reaches DynamoDB only when the state runs, so a [reserved word](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html) left unaliased (`SET status = :s`) passes synth and fails the execution. [`@composure-labs/dynamodb-guard`](https://github.com/composure-labs/dynamodb-guard), from [Composure Labs](../../README.md#composure-labs), checks every DynamoDB task at synth instead. It skips values known only at run time, and can't read a definition loaded with `DefinitionBody.fromFile`. The [fulfilment workflow example](../examples/src/fulfilment-workflow-app.ts) uses it.
+A DynamoDB task's expression reaches DynamoDB only when the state runs, so a [reserved word](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html) left unaliased (`SET status = :s`) passes synth and fails the execution. [`@composure-labs/dynamodb-guard`](https://github.com/composure-labs/dynamodb-guard), from [Composure Labs](https://github.com/laazyj/composureCDK/blob/main/README.md#composure-labs), checks every DynamoDB task at synth instead. It skips values known only at run time, and can't read a definition loaded with `DefinitionBody.fromFile`. The [fulfilment workflow example](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/fulfilment-workflow-app.ts) uses it.
 
 ### Amazon States Language documents
 
@@ -98,7 +98,7 @@ An ASL document carries no IAM — CDK cannot see which resources its tasks call
 | `logs.level`                | `ERROR` (Standard), `ALL` (Express)         | A Standard workflow keeps its full history in Step Functions, so its logs need only the failures. An [Express workflow has no history](https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html) beyond what it logs.                                                                                                                                     |
 | `logs.includeExecutionData` | `false`                                     | Each state's input and output is the workload's own data and may be sensitive ([Serverless Lens](https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/data-protection.html)). Opt in where the logs are protected accordingly.                                                                                                          |
 
-The log group is built with [`@composurecdk/logs`](../logs/README.md), so it inherits that package's defaults — two-year retention, retained when the stack is deleted — and is returned as `result.logGroup`. Supply your own with `.logs({ destination })`, or set `.logs({ level: LogLevel.OFF })`; neither creates one. A partial `.logs({...})` merges over the defaults for the state machine's type.
+The log group is built with [`@composurecdk/logs`](https://github.com/laazyj/composureCDK/blob/main/packages/logs/README.md), so it inherits that package's defaults — two-year retention, retained when the stack is deleted — and is returned as `result.logGroup`. Supply your own with `.logs({ destination })`, or set `.logs({ level: LogLevel.OFF })`; neither creates one. A partial `.logs({...})` merges over the defaults for the state machine's type.
 
 The defaults are exported as `STATE_MACHINE_DEFAULTS` and `STATE_MACHINE_LOG_DEFAULTS`.
 
@@ -110,7 +110,7 @@ Set `TimeoutSeconds` (and `HeartbeatSeconds`, for callbacks) on individual task 
 
 ### Encryption at rest
 
-Step Functions encrypts the definition and execution history with an AWS-owned key. To use your own, pass a `CustomerManagedEncryptionConfiguration`, typically mapped from a [`@composurecdk/kms`](../kms/README.md) key:
+Step Functions encrypts the definition and execution history with an AWS-owned key. To use your own, pass a `CustomerManagedEncryptionConfiguration`, typically mapped from a [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) key:
 
 ```ts
 compose(
@@ -215,7 +215,7 @@ No alarm actions are configured. The defaults are exported as `ACCOUNT_ALARM_DEF
 
 CDK creates the execution role unless one is supplied with `.role(...)`, which accepts a `Resolvable`. Either way it is returned as `result.role`. The log-delivery and X-Ray actions CDK adds are on `*`, because those APIs [do not support resource-level permissions](https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html), so a hand-built role would gain nothing over CDK's.
 
-The state machine is a **grantee**: `.grant(...)` adds a sibling's capability to its role, for a resource its tasks call that CDK cannot see — one named in an ASL document, or reached through a generic `CallAwsService` task. See [ADR-0013](../../docs/adr/0013-consumer-side-grants.md).
+The state machine is a **grantee**: `.grant(...)` adds a sibling's capability to its role, for a resource its tasks call that CDK cannot see — one named in an ASL document, or reached through a generic `CallAwsService` task. See [ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md).
 
 ## Grants
 
@@ -325,5 +325,5 @@ The builder does not hand back the alias as an `IStateMachine`: given one throug
 
 The CDK integrations accept the built state machine through a `ref`, with no change to this package:
 
-- **EventBridge** — `sfnStateMachineTarget(ref(...))` from [`@composurecdk/events`](../events/README.md).
-- **API Gateway** — `StepFunctionsIntegration.startExecution(...)` inside `addMethod(...)` on [`@composurecdk/apigateway`](../apigateway/README.md). CDK requires an **Express** state machine here, because the integration calls `StartSyncExecution`.
+- **EventBridge** — `sfnStateMachineTarget(ref(...))` from [`@composurecdk/events`](https://github.com/laazyj/composureCDK/blob/main/packages/events/README.md).
+- **API Gateway** — `StepFunctionsIntegration.startExecution(...)` inside `addMethod(...)` on [`@composurecdk/apigateway`](https://github.com/laazyj/composureCDK/blob/main/packages/apigateway/README.md). CDK requires an **Express** state machine here, because the integration calls `StartSyncExecution`.

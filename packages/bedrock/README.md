@@ -1,6 +1,6 @@
 # @composurecdk/bedrock
 
-Amazon Bedrock model access for [ComposureCDK](../../README.md): references to foundation models and cross-Region inference profiles, the IAM grants to invoke them, and CloudWatch alarms on their metrics.
+Amazon Bedrock model access for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md): references to foundation models and cross-Region inference profiles, the IAM grants to invoke them, and CloudWatch alarms on their metrics.
 
 It builds on the stable [`aws-cdk-lib/aws-bedrock`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrock-readme.html) module. Amazon Bedrock AgentCore is a separate service and is not covered here.
 

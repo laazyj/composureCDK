@@ -1,6 +1,6 @@
 # @composurecdk/events
 
-EventBridge rule builder for [ComposureCDK](../../README.md).
+EventBridge rule builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for EventBridge rules with secure, AWS-recommended defaults. It wraps the CDK [Rule](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_events.Rule.html) construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -187,7 +187,7 @@ const result = createRuleBuilder()
 result.targets.stopper; // IRuleTarget
 ```
 
-For cross-component wiring inside a [`compose`](../core/README.md) system, pass a `ref` and use the matching target helper from this package (see [Target Helpers](#target-helpers) below):
+For cross-component wiring inside a [`compose`](https://github.com/laazyj/composureCDK/blob/main/packages/core/README.md) system, pass a `ref` and use the matching target helper from this package (see [Target Helpers](#target-helpers) below):
 
 ```ts
 import { compose, ref } from "@composurecdk/core";

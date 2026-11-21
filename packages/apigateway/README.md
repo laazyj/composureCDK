@@ -1,6 +1,6 @@
 # @composurecdk/apigateway
 
-API Gateway builders for [ComposureCDK](../../README.md).
+API Gateway builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for API Gateway REST APIs with secure, AWS-recommended defaults. It wraps the CDK [RestApi](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.RestApi.html) construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -26,7 +26,7 @@ Every [RestApiProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws
 
 `addMethod` accepts any CDK [Integration](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_apigateway.Integration.html) — `LambdaIntegration`, `MockIntegration`, `HttpIntegration`, or `AwsIntegration` to call an AWS service directly with no Lambda in the request path. To wire an integration to a sibling builder (e.g. a DynamoDB table's name and an IAM role for API Gateway to assume), assemble it with `ref`/`combine` so the integration resolves once its dependencies are built:
 
-- [**CrudApiStack**](../examples/src/crud-api-app.ts) — a complete CRUD REST API wired straight to DynamoDB via `AwsIntegration` and VTL mapping templates (`Scan`/`PutItem`/`GetItem`/`DeleteItem`), with the credentials role assembled from sibling builders using `combine` and granted via consumer-side `tableGrants`. Start here for the `AwsIntegration` → DynamoDB pattern.
+- [**CrudApiStack**](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/crud-api-app.ts) — a complete CRUD REST API wired straight to DynamoDB via `AwsIntegration` and VTL mapping templates (`Scan`/`PutItem`/`GetItem`/`DeleteItem`), with the credentials role assembled from sibling builders using `combine` and granted via consumer-side `tableGrants`. Start here for the `AwsIntegration` → DynamoDB pattern.
 
 ## Spec REST API Builder
 
@@ -72,11 +72,11 @@ compose(
 );
 ```
 
-The specification stays declarative, the API stays inside `compose`, and [OpenApiPetstoreStack](../examples/src/openapi-petstore-app.ts) is the same thing as a deployable stack.
+The specification stays declarative, the API stays inside `compose`, and [OpenApiPetstoreStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/openapi-petstore-app.ts) is the same thing as a deployable stack.
 
 No placeholder syntax is imposed — keys are replaced literally, so `${Function.Arn}`, `{{functionArn}}` and `__FUNCTION_ARN__` all work, and all of them are matched in a single pass so declaration order cannot matter. A key that appears nowhere in the document throws, since it is nearly always a typo. Note the reverse is undetectable without a syntax to scan for: a placeholder **in the document** that you never map is substituted by nothing and deploys verbatim.
 
-`inlineSpecDefinition` is `combine` + `substituteSpec` + `ApiDefinition.fromInline` in one call. Both halves are exported, so anything it does not cover composes from the parts — an asset- or bucket-backed definition, a substitution that is not a string replacement, or a document completed some other way, each passed to the same `apiDefinition` ([ADR-0015](../../docs/adr/0015-combine-multi-ref-combinator.md)):
+`inlineSpecDefinition` is `combine` + `substituteSpec` + `ApiDefinition.fromInline` in one call. Both halves are exported, so anything it does not cover composes from the parts — an asset- or bucket-backed definition, a substitution that is not a string replacement, or a document completed some other way, each passed to the same `apiDefinition` ([ADR-0015](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0015-combine-multi-ref-combinator.md)):
 
 ```ts
 // The same thing, written out
@@ -91,12 +91,12 @@ No placeholder syntax is imposed — keys are replaced literally, so `${Function
 
 Two things to know either way:
 
-- **Reach for the account, region or partition via `Aws.*`.** A transform receives the build context, not a construct scope, so `Stack.of(scope)` is not available to it — see [Resolvable](../../docs/architecture.md#resolvable). `Aws.PARTITION` and `Aws.REGION` need no scope and resolve correctly inside the API body.
+- **Reach for the account, region or partition via `Aws.*`.** A transform receives the build context, not a construct scope, so `Stack.of(scope)` is not available to it — see [Resolvable](https://github.com/laazyj/composureCDK/blob/main/docs/architecture.md#resolvable). `Aws.PARTITION` and `Aws.REGION` need no scope and resolve correctly inside the API body.
 - **An inline body is embedded in the CloudFormation template.** A large generated specification counts against the template size limit; load it from S3 with `ApiDefinition.fromBucket` if it grows (at the cost of the in-process substitution shown here).
 
 ## Invoke grants
 
-To let a principal call an IAM-authorized API (`authorizationType: AuthorizationType.IAM`), `restApiGrants` provides a consumer-side grant helper — the mirror of DynamoDB's `tableGrants`. Declare it on the **grantee** (the caller), pointing at the API via a `ref`, exactly as you would any other grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)):
+To let a principal call an IAM-authorized API (`authorizationType: AuthorizationType.IAM`), `restApiGrants` provides a consumer-side grant helper — the mirror of DynamoDB's `tableGrants`. Declare it on the **grantee** (the caller), pointing at the API via a `ref`, exactly as you would any other grant ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)):
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
@@ -120,7 +120,7 @@ compose(
 
 `restApiGrants.invoke(api)` adds `execute-api:Invoke` on the API's `arnForExecuteApi()` (all methods, paths, and stages). `IRestApi` is implemented by both `RestApi` and `SpecRestApi`, so the same helper serves either builder's result.
 
-Unlike most resources, `IRestApi` exposes no native `grant*` method to delegate to — the grant is assembled from the single `execute-api:Invoke` action plus the construct's own ARN builder ([ADR-0013 addendum](../../docs/adr/0013-consumer-side-grants.md#addendum-2026-07-24-resources-with-no-native-grant-method)).
+Unlike most resources, `IRestApi` exposes no native `grant*` method to delegate to — the grant is assembled from the single `execute-api:Invoke` action plus the construct's own ARN builder ([ADR-0013 addendum](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md#addendum-2026-07-24-resources-with-no-native-grant-method)).
 
 ### Scoping the grant
 
@@ -387,7 +387,7 @@ for (const alarm of Object.values(result.alarms)) {
 
 ## Examples
 
-- [CrudApiStack](../examples/src/crud-api-app.ts) — CRUD REST API backed directly by DynamoDB via `AwsIntegration`, with no Lambda in the request path
-- [MockApiStack](../examples/src/mock-api-app.ts) — CRUD REST API with mock integrations and recommended alarms with custom thresholds
-- [MultiStackApp](../examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`, wired with `ref`
-- [OpenApiPetstoreStack](../examples/src/openapi-petstore-app.ts) — spec-driven REST API whose Lambda integration is resolved into the OpenAPI document at build time
+- [CrudApiStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/crud-api-app.ts) — CRUD REST API backed directly by DynamoDB via `AwsIntegration`, with no Lambda in the request path
+- [MockApiStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/mock-api-app.ts) — CRUD REST API with mock integrations and recommended alarms with custom thresholds
+- [MultiStackApp](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`, wired with `ref`
+- [OpenApiPetstoreStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/openapi-petstore-app.ts) — spec-driven REST API whose Lambda integration is resolved into the OpenAPI document at build time

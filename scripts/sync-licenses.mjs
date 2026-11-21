@@ -7,14 +7,7 @@
  * look up the tree, so a package listing `LICENSE` without holding the file
  * publishes without it — silently. Every package here did exactly that.
  *
- * The set of published packages is taken from `publishConfig.access`, not from
- * `files` and not from `private`. Keying on `files` would make the declaration
- * its own authority: a new package that simply forgot to list `LICENSE` would
- * pass. `private` is the wrong axis too — `@composurecdk/eslint-plugin` is
- * private today but publishes later, while `@composurecdk/cdk-testing` is
- * private for good. Omitting `publishConfig.access` is the one mistake that
- * already fails loudly, at `npm publish`, so deriving from it makes the silent
- * failures checkable.
+ * The set of published packages comes from `published-packages.mjs`.
  *
  * Checks, for each published package: `LICENSE` is listed in `files`, the file
  * is present and identical to the root one, and every other `files` entry
@@ -30,26 +23,13 @@
  *   node scripts/sync-licenses.mjs --check
  */
 
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { published } from "./published-packages.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(ROOT, "LICENSE");
-const PACKAGES = join(ROOT, "packages");
-
-/** Every package npm will publish, with its parsed manifest. */
-function published() {
-  return readdirSync(PACKAGES)
-    .sort()
-    .map((name) => join(PACKAGES, name))
-    .filter((dir) => existsSync(join(dir, "package.json")))
-    .map((dir) => ({
-      dir,
-      manifest: JSON.parse(readFileSync(join(dir, "package.json"), "utf8")),
-    }))
-    .filter(({ manifest }) => manifest.publishConfig?.access === "public");
-}
 
 /** Problems that this script cannot fix by copying — a human has to edit the manifest. */
 function manifestProblems({ dir, manifest }) {

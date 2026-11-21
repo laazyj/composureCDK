@@ -1,6 +1,6 @@
 # @composurecdk/route53
 
-Route 53 hosted zone and record builders for [ComposureCDK](../../README.md).
+Route 53 hosted zone and record builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for Route 53 public hosted zones, for the record types most commonly needed when fronting an AWS workload (A/AAAA alias, CNAME, TXT, MX, SRV, CAA, NS, DS, HTTPS, SVCB), and for both halves of a cross-account subdomain delegation. It wraps the CDK [aws-route53](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_route53-readme.html) constructs — refer to the CDK documentation for the full set of configurable properties.
 
@@ -72,7 +72,7 @@ Enabling query logging adds two long-lived resources per stack: the log group (c
 
 ## Delegation grants
 
-Handing a subdomain to another account means letting that account write the subdomain's `NS` records into the parent zone. The account's role is the consumer and the zone is the resource, so the grant is declared on the **role**, pointing at the zone via a `ref` — the same consumer-side shape as every other grant in the library ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)):
+Handing a subdomain to another account means letting that account write the subdomain's `NS` records into the parent zone. The account's role is the consumer and the zone is the resource, so the grant is declared on the **role**, pointing at the zone via a `ref` — the same consumer-side shape as every other grant in the library ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)):
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
@@ -159,7 +159,7 @@ The child half is already least privilege: CDK grants the custom-resource provid
 
 The delegation record is backed by a Lambda custom resource, and aws-cdk-lib creates that Lambda as a raw `AWS::Lambda::Function` with no `LoggingConfig`. Left alone, the Lambda service creates `/aws/lambda/<generated-name>` on first invocation with **indefinite** retention — a log group no template describes and no `@composurecdk/logs` default reaches.
 
-**The builder brings it under the same defaults as every other log group in the library.** It declares `/aws/lambda/<stackName>-cross-account-zone-delegation` (in a nested stack, `<stackName>` is `Parent/Dns`: see [`stackNameSegments`](../cloudformation/README.md#stacknamesegments)) with `RetentionDays.TWO_YEARS` / `RemovalPolicy.RETAIN` and points the provider's `LoggingConfig` at it. The provider is a stack-level singleton, so the log group is one too: every delegation record in the stack shares it, and each build result returns the same handle as `result.providerLogGroup`.
+**The builder brings it under the same defaults as every other log group in the library.** It declares `/aws/lambda/<stackName>-cross-account-zone-delegation` (in a nested stack, `<stackName>` is `Parent/Dns`: see [`stackNameSegments`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudformation/README.md#stacknamesegments)) with `RetentionDays.TWO_YEARS` / `RemovalPolicy.RETAIN` and points the provider's `LoggingConfig` at it. The provider is a stack-level singleton, so the log group is one too: every delegation record in the stack shares it, and each build result returns the same handle as `result.providerLogGroup`.
 
 ```ts
 type DelegationProviderLoggingConfig =
@@ -294,7 +294,7 @@ Exported as `HEALTH_CHECK_DEFAULTS` for visibility and testing.
 
 ### Recommended Alarms
 
-The builder creates the [AWS-recommended](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Route53) `HealthCheckStatus` alarm by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions, or use [`alarmActionsPolicy`](../cloudwatch/README.md#alarm-actions-policy) for stack-wide wiring.
+The builder creates the [AWS-recommended](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Route53) `HealthCheckStatus` alarm by default. No alarm actions are configured — access alarms from the build result to add SNS topics or other actions, or use [`alarmActionsPolicy`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/README.md#alarm-actions-policy) for stack-wide wiring.
 
 | Alarm               | Metric                                | Default threshold |
 | ------------------- | ------------------------------------- | ----------------- |
@@ -395,7 +395,7 @@ compose(
   .build(app, "App");
 ```
 
-Set `crossRegionReferences: true` on both stacks so CDK can export the `HealthCheckId` from the app stack and import it in the alarm stack. The same pattern is documented for CloudFront alarms ([#58](https://github.com/laazyj/composureCDK/pull/58)) and codified in [ADR-0004](../../docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md).
+Set `crossRegionReferences: true` on both stacks so CDK can export the `HealthCheckId` from the app stack and import it in the alarm stack. The same pattern is documented for CloudFront alarms ([#58](https://github.com/laazyj/composureCDK/pull/58)) and codified in [ADR-0004](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md).
 
 ## Zone DSL
 
@@ -515,7 +515,7 @@ The DSL supports value-mode HTTPS/SVCB records (fixed advertised parameters). Fo
 
 ### Worked example
 
-A production-like zone with every record type is demonstrated in [`packages/examples/src/dns-zone-app.ts`](../examples/src/dns-zone-app.ts).
+A production-like zone with every record type is demonstrated in [`packages/examples/src/dns-zone-app.ts`](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/dns-zone-app.ts).
 
 ## Composing with ACM and CloudFront
 

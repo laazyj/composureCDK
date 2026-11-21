@@ -1,6 +1,6 @@
 # @composurecdk/ses
 
-Compose-native builders for [AWS SES](https://docs.aws.amazon.com/ses/latest/dg/Welcome.html), part of [ComposureCDK](../../README.md).
+Compose-native builders for [AWS SES](https://docs.aws.amazon.com/ses/latest/dg/Welcome.html), part of [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 SES is Amazon's email service for **sending** and **receiving** mail. This package currently covers the **receiving** path — email identities, receipt rule sets, receipt filters, and rule actions. Sending-side builders (configuration sets, dedicated IP pools, VDM, reputation alarms) will follow.
 
@@ -78,11 +78,11 @@ Every rule gets AWS-recommended defaults, each individually overridable:
 
 A receipt rule set is **inert until it is the account's active rule set** — a separate, account-level `ses:SetActiveReceiptRuleSet` call that [has no CloudFormation resource](https://github.com/aws/aws-cdk/issues/28823) ([SES docs](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-managing-receipt-rule-sets.html)). Miss it and mail silently vanishes, so `.activate()` is **on by default** (opt out with `.activate(false)`).
 
-Activation is backed by a purpose-built provider (see [ADR-0016](../../docs/adr/0016-domain-action-custom-resource.md)) that **conditionally deactivates**: on delete it clears the active slot only if the currently-active set is this one, so tearing down a stack never disables another stack's rule set. The custom resource is exposed on the result as `activation`. It depends on every rule, so the set never goes live empty mid-deploy, and on teardown it is deactivated before its rules are removed.
+Activation is backed by a purpose-built provider (see [ADR-0016](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0016-domain-action-custom-resource.md)) that **conditionally deactivates**: on delete it clears the active slot only if the currently-active set is this one, so tearing down a stack never disables another stack's rule set. The custom resource is exposed on the result as `activation`. It depends on every rule, so the set never goes live empty mid-deploy, and on teardown it is deactivated before its rules are removed.
 
-Both provider Lambdas (the handler and CDK's provider framework) write to one declared log group, `activationLogGroup` on the result, carrying the [`@composurecdk/logs`](../logs) defaults (two-year retention, retained on delete). Without it Lambda would create `/aws/lambda/<name>` on first invocation with indefinite retention, outside the template. Change its removal policy with `activationLogGroup.applyRemovalPolicy(...)`.
+Both provider Lambdas (the handler and CDK's provider framework) write to one declared log group, `activationLogGroup` on the result, carrying the [`@composurecdk/logs`](https://github.com/laazyj/composureCDK/tree/main/packages/logs) defaults (two-year retention, retained on delete). Without it Lambda would create `/aws/lambda/<name>` on first invocation with indefinite retention, outside the template. Change its removal policy with `activationLogGroup.applyRemovalPolicy(...)`.
 
-> Only **one** rule set is active per account/region. If you run multiple rule sets across stacks and need bespoke arbitration, disable activation here and drive `setActiveReceiptRuleSet` yourself with [`@composurecdk/custom-resources`](../custom-resources).
+> Only **one** rule set is active per account/region. If you run multiple rule sets across stacks and need bespoke arbitration, disable activation here and drive `setActiveReceiptRuleSet` yourself with [`@composurecdk/custom-resources`](https://github.com/laazyj/composureCDK/tree/main/packages/custom-resources).
 
 ## Receipt filters
 

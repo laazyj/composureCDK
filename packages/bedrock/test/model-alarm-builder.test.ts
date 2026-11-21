@@ -2,10 +2,20 @@ import { describe, expect, it } from "vitest";
 import { CfnParameter } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
 import { FoundationModelIdentifier } from "aws-cdk-lib/aws-bedrock";
-import { buildFixture, tagsPerResource } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import {
+  assertAssignable,
+  buildFixture,
+  newStack,
+  tagsPerResource,
+} from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
 import { inferenceProfile } from "../src/inference-profile.js";
-import { createModelAlarmBuilder } from "../src/model-alarm-builder.js";
+import {
+  createModelAlarmBuilder,
+  type ModelAlarmBuilderResult,
+} from "../src/model-alarm-builder.js";
 import type { ModelAlarmTarget } from "../src/model-alarms.js";
 
 const MODEL_ID = "anthropic.claude-haiku-4-5-20251001-v1:0";
@@ -243,5 +253,50 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["outputTokens", "inputTokens"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth();
+    const typed: ModelAlarmBuilderResult = result;
+    const throttles = typed.alarms.invocationThrottles;
+
+    assertAssignable<Alarm | undefined, typeof throttles>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof throttles>();
+    expect(throttles).toBeDefined();
+    // @ts-expect-error -- "invocationThrottle" is not a model alarm key
+    expect(typed.alarms.invocationThrottle).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const system = compose(
+      {
+        model: createModelAlarmBuilder()
+          .model(PROFILE)
+          .addAlarm("outputTokens", (a) =>
+            a
+              .metric((m) => m.metric("OutputTokenCount", { statistic: "Sum" }))
+              .threshold(1_000_000),
+          ),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("model", (r: WithCustomAlarms<ModelAlarmBuilderResult, "outputTokens">) => {
+              // @ts-expect-error -- "outputToken" was not declared as a custom key
+              expect(r.alarms.outputToken).toBeUndefined();
+              return r.alarms.outputTokens;
+            }).resolve(context),
+          }),
+        },
+      },
+      { model: [], consumer: ["model"] },
+    );
+
+    const built = system.build(newStack(), "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.model.alarms.outputTokens);
   });
 });

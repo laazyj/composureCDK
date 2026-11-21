@@ -32,6 +32,7 @@ export {
 export { GUARDRAIL_DEFAULTS } from "./guardrail-defaults.js";
 export {
   type GuardrailAlarmConfig,
+  type GuardrailAlarmKey,
   type GuardrailMetrics,
   guardrailMetrics,
 } from "./guardrail-alarms.js";
@@ -41,7 +42,11 @@ export {
   type ModelAlarmBuilderProps,
   type ModelAlarmBuilderResult,
 } from "./model-alarm-builder.js";
-export { type ModelAlarmConfig, type QuotaAlarmConfig } from "./model-alarm-config.js";
+export {
+  type ModelAlarmConfig,
+  type ModelAlarmKey,
+  type QuotaAlarmConfig,
+} from "./model-alarm-config.js";
 export { MODEL_ALARM_DEFAULTS } from "./model-alarm-defaults.js";
 export { type ModelAlarmTarget, type ModelMetrics, modelMetrics } from "./model-alarms.js";
 export {
@@ -55,4 +60,5 @@ export {
 export {
   MODEL_INVOCATION_LOGGING_ALARM_DEFAULTS,
   type ModelInvocationLoggingAlarmConfig,
+  type ModelInvocationLoggingAlarmKey,
 } from "./model-invocation-logging-alarms.js";

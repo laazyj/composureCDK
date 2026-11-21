@@ -88,3 +88,9 @@ export interface ModelAlarmConfig {
    */
   estimatedTpmQuotaUsage?: QuotaAlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms a model alarm builder can create: every
+ * {@link ModelAlarmConfig} entry except the `enabled` master switch.
+ */
+export type ModelAlarmKey = Exclude<keyof ModelAlarmConfig, "enabled">;

@@ -10,7 +10,7 @@ import {
   toDefinition,
 } from "./alarm-definition.js";
 import type { ApplicationInferenceProfile, InferenceProfile } from "./inference-profile.js";
-import type { ModelAlarmConfig } from "./model-alarm-config.js";
+import type { ModelAlarmConfig, ModelAlarmKey } from "./model-alarm-config.js";
 import { MODEL_ALARM_DEFAULTS } from "./model-alarm-defaults.js";
 
 /** A model whose `AWS/Bedrock` metrics an alarm can read. */
@@ -43,7 +43,7 @@ export function modelMetrics(target: ModelAlarmTarget): ModelMetrics {
   };
 }
 
-type ThresholdAlarmKey = Exclude<keyof ModelAlarmConfig, "enabled" | "estimatedTpmQuotaUsage">;
+type ThresholdAlarmKey = Exclude<ModelAlarmKey, "estimatedTpmQuotaUsage">;
 
 function thresholdAlarms(modelId: string): Record<ThresholdAlarmKey, ThresholdAlarmSpec> {
   return {
@@ -116,7 +116,7 @@ function quotaAlarm(
   );
   return [
     toDefinition(
-      "estimatedTpmQuotaUsage",
+      "estimatedTpmQuotaUsage" satisfies ModelAlarmKey,
       metrics.metric("EstimatedTPMQuotaUsage", { statistic: "Maximum" }),
       cfg,
       `Estimated token usage for ${metrics.modelId} exceeds ${String(percent * 100)}% of the ` +

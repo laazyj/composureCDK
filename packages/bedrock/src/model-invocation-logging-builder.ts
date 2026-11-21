@@ -1,5 +1,4 @@
 import { ArnFormat, Stack } from "aws-cdk-lib";
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IRole, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import type { ILogGroup } from "aws-cdk-lib/aws-logs";
 import type { IBucket } from "aws-cdk-lib/aws-s3";
@@ -7,12 +6,13 @@ import { type AwsCustomResource, PhysicalResourceId } from "aws-cdk-lib/custom-r
 import type { IConstruct } from "constructs";
 import { type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { createAlarms } from "@composurecdk/cloudwatch";
+import { type AlarmsOf, createAlarms } from "@composurecdk/cloudwatch";
 import { createAwsCustomResourceBuilder } from "@composurecdk/custom-resources";
 import { createRoleBuilder } from "@composurecdk/iam";
 import { createLogGroupBuilder, type ILogGroupBuilder } from "@composurecdk/logs";
 import {
   type ModelInvocationLoggingAlarmConfig,
+  type ModelInvocationLoggingAlarmKey,
   resolveModelInvocationLoggingAlarmDefinitions,
 } from "./model-invocation-logging-alarms.js";
 
@@ -57,8 +57,13 @@ export interface ModelInvocationLoggingBuilderResult {
   role: IRole;
   /** The custom resource that applies the account's logging configuration. */
   configuration: AwsCustomResource;
-  /** The CloudWatch alarms created, keyed by alarm key. */
-  alarms: Record<string, Alarm>;
+  /**
+   * The CloudWatch alarms created, keyed by alarm key. A recommended alarm
+   * is `Alarm | undefined`: it may be disabled, and `largeDataS3DeliveryFailure`
+   * is created only with a large-data bucket. The builder has no `addAlarm`,
+   * so any other key is a compile error, on its own `build()` result too.
+   */
+  alarms: AlarmsOf<ModelInvocationLoggingAlarmKey>;
 }
 
 /**

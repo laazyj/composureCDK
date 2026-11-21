@@ -1,16 +1,18 @@
 import { Stack } from "aws-cdk-lib";
 import { CfnGuardrail, type CfnGuardrailProps, CfnGuardrailVersion } from "aws-cdk-lib/aws-bedrock";
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import {
   type AlarmConfigurer,
   AlarmDefinitionBuilder,
+  type AlarmsOf,
   createAlarms,
+  type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
 import {
   type GuardrailAlarmConfig,
+  type GuardrailAlarmKey,
   type GuardrailMetrics,
   guardrailMetrics,
   resolveGuardrailAlarmDefinitions,
@@ -44,8 +46,12 @@ export interface GuardrailBuilderResult {
   version: CfnGuardrailVersion;
   /** The guardrail's ARN and published version, for grants and invocations. */
   reference: GuardrailReference;
-  /** The CloudWatch alarms created, keyed by alarm key. */
-  alarms: Record<string, Alarm>;
+  /**
+   * The CloudWatch alarms created, keyed by alarm key. A recommended alarm
+   * is `Alarm | undefined`: both are opt-in. Any other key is a compile
+   * error; read a custom alarm through {@link WithCustomAlarms}.
+   */
+  alarms: AlarmsOf<GuardrailAlarmKey>;
 }
 
 /**
@@ -64,7 +70,7 @@ function fnv1a(value: string): string {
   return hash.toString(16).padStart(8, "0");
 }
 
-class GuardrailBuilder implements Lifecycle<GuardrailBuilderResult> {
+class GuardrailBuilder implements Lifecycle<WithCustomAlarms<GuardrailBuilderResult, string>> {
   props: Partial<GuardrailBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<GuardrailMetrics>[] = [];
 
@@ -97,7 +103,7 @@ class GuardrailBuilder implements Lifecycle<GuardrailBuilderResult> {
     scope: IConstruct,
     id: string,
     context: Record<string, object> = {},
-  ): GuardrailBuilderResult {
+  ): WithCustomAlarms<GuardrailBuilderResult, string> {
     const { kmsKeyArn, recommendedAlarms, ...rest } = this.props;
     if (!rest.name) {
       throw new Error(`GuardrailBuilder "${id}" requires a name. Call .name().`);

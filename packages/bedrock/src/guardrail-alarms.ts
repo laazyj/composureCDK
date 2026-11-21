@@ -57,10 +57,13 @@ export interface GuardrailAlarmConfig {
   invocationLatency?: AlarmConfig | false;
 }
 
-const GUARDRAIL_ALARMS: Record<
-  Exclude<keyof GuardrailAlarmConfig, "enabled">,
-  ThresholdAlarmSpec
-> = {
+/**
+ * Keys of the recommended alarms a guardrail builder can create: every
+ * {@link GuardrailAlarmConfig} entry except the `enabled` master switch.
+ */
+export type GuardrailAlarmKey = Exclude<keyof GuardrailAlarmConfig, "enabled">;
+
+const GUARDRAIL_ALARMS: Record<GuardrailAlarmKey, ThresholdAlarmSpec> = {
   invocationsIntervened: {
     metricName: "InvocationsIntervened",
     statistic: "Sum",

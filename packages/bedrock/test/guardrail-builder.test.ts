@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { App, CfnParameter, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { buildFixture, tagsPerResource } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
-import { createGuardrailBuilder } from "../src/guardrail-builder.js";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import {
+  assertAssignable,
+  buildFixture,
+  newStack,
+  tagsPerResource,
+} from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
+import { createGuardrailBuilder, type GuardrailBuilderResult } from "../src/guardrail-builder.js";
 
 const buildAndSynth = buildFixture(() => createGuardrailBuilder().name("support"), "Guardrail");
 
@@ -194,5 +201,50 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["textUnits", "invocations"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth((b) =>
+      b.recommendedAlarms({ invocationsIntervened: { threshold: 20 } }),
+    );
+    const typed: GuardrailBuilderResult = result;
+    const intervened = typed.alarms.invocationsIntervened;
+
+    assertAssignable<Alarm | undefined, typeof intervened>();
+    // @ts-expect-error -- a recommended alarm is opt-in, so it is not always an Alarm
+    assertAssignable<Alarm, typeof intervened>();
+    expect(intervened).toBeDefined();
+    // @ts-expect-error -- "invocationsIntervend" is not a guardrail alarm key
+    expect(typed.alarms.invocationsIntervend).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const system = compose(
+      {
+        guardrail: createGuardrailBuilder()
+          .name("support")
+          .addAlarm("textUnits", (a) =>
+            a.metric((m) => m.metric("TextUnitCount", { statistic: "Sum" })).threshold(1_000),
+          ),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("guardrail", (r: WithCustomAlarms<GuardrailBuilderResult, "textUnits">) => {
+              // @ts-expect-error -- "textUnit" was not declared as a custom key
+              expect(r.alarms.textUnit).toBeUndefined();
+              return r.alarms.textUnits;
+            }).resolve(context),
+          }),
+        },
+      },
+      { guardrail: [], consumer: ["guardrail"] },
+    );
+
+    const built = system.build(newStack(), "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.guardrail.alarms.textUnits);
   });
 });

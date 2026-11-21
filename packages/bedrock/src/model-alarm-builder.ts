@@ -1,13 +1,14 @@
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import {
   type AlarmConfigurer,
   AlarmDefinitionBuilder,
+  type AlarmsOf,
   createAlarms,
+  type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
-import type { ModelAlarmConfig } from "./model-alarm-config.js";
+import type { ModelAlarmConfig, ModelAlarmKey } from "./model-alarm-config.js";
 import {
   type ModelAlarmTarget,
   type ModelMetrics,
@@ -34,8 +35,12 @@ export interface ModelAlarmBuilderProps {
 
 /** The build output of an {@link IModelAlarmBuilder}. */
 export interface ModelAlarmBuilderResult {
-  /** The CloudWatch alarms created, keyed by alarm key. */
-  alarms: Record<string, Alarm>;
+  /**
+   * The CloudWatch alarms created, keyed by alarm key. A recommended alarm
+   * is `Alarm | undefined`: it may be disabled or opt-in. Any other key is
+   * a compile error; read a custom alarm through {@link WithCustomAlarms}.
+   */
+  alarms: AlarmsOf<ModelAlarmKey>;
 }
 
 /**
@@ -45,7 +50,7 @@ export interface ModelAlarmBuilderResult {
  */
 export type IModelAlarmBuilder = ITaggedBuilder<ModelAlarmBuilderProps, ModelAlarmBuilder>;
 
-class ModelAlarmBuilder implements Lifecycle<ModelAlarmBuilderResult> {
+class ModelAlarmBuilder implements Lifecycle<WithCustomAlarms<ModelAlarmBuilderResult, string>> {
   props: Partial<ModelAlarmBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ModelMetrics>[] = [];
 
@@ -79,7 +84,7 @@ class ModelAlarmBuilder implements Lifecycle<ModelAlarmBuilderResult> {
     scope: IConstruct,
     id: string,
     context: Record<string, object> = {},
-  ): ModelAlarmBuilderResult {
+  ): WithCustomAlarms<ModelAlarmBuilderResult, string> {
     if (this.props.model === undefined) {
       throw new Error(`ModelAlarmBuilder "${id}" requires a model. Call .model().`);
     }

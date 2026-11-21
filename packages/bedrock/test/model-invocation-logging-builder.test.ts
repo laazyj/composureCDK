@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
 import {
+  assertAssignable,
   buildFixture,
   newStack,
   tagsPerResource,
@@ -304,5 +306,23 @@ describe("createModelInvocationLoggingBuilder", () => {
     for (const type of ["AWS::Logs::LogGroup", "AWS::IAM::Role", "AWS::CloudWatch::Alarm"]) {
       expect(tagsPerResource(template, type)).toContainEqual([{ Key: "Owner", Value: "ml" }]);
     }
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  // The builder has no `addAlarm`, so its own build() result is typed by key.
+  it("types recommended alarms as optional and rejects any other key", () => {
+    const { result } = buildAndSynth();
+    const delivery = result.alarms.cloudWatchDeliveryFailure;
+
+    assertAssignable<Alarm | undefined, typeof delivery>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof delivery>();
+    expect(delivery).toBeDefined();
+    expect(result.alarms.largeDataS3DeliveryFailure).toBeUndefined();
+    // @ts-expect-error -- "cloudWatchDeliveryFailures" is not a model invocation logging alarm key
+    expect(result.alarms.cloudWatchDeliveryFailures).toBeUndefined();
   });
 });

@@ -7,7 +7,9 @@ import { type AlarmName, joinAlarmName } from "./alarm-name.js";
  * Builds a human-readable, stack-scoped {@link AlarmName} from the alarm's
  * scope, base id, and key.
  *
- * Format: `${stack}/${path}/${kebab(id)}/${kebab(key)}`. Slashes are valid in
+ * Format: `${stack}/${path}/${kebab(id)}/${kebab(key)}`, or
+ * `${stack}/${path}/${kebab(id)}` without a key, for an alarm that is the
+ * component itself, such as a composite alarm. Slashes are valid in
  * CloudWatch alarm names and render hierarchy clearly in the console. `stack`
  * is the stack's name or, inside a nested stack (named only at deploy time),
  * the top-level stack's name followed by each nested stack's construct id.
@@ -18,8 +20,13 @@ import { type AlarmName, joinAlarmName } from "./alarm-name.js";
  * Used by {@link createAlarms} as the fallback whenever an explicit
  * `alarmName` is not supplied on the {@link AlarmDefinition}.
  */
-export function defaultAlarmName(scope: IConstruct, id: string, key: string): AlarmName {
+export function defaultAlarmName(scope: IConstruct, id: string, key?: string): AlarmName {
   const scopes = scope.node.scopes;
   const path = scopes.slice(scopes.indexOf(Stack.of(scope)) + 1).map((c) => c.node.id);
-  return joinAlarmName([...stackNameSegments(scope), ...path, id, key]);
+  return joinAlarmName([
+    ...stackNameSegments(scope),
+    ...path,
+    id,
+    ...(key === undefined ? [] : [key]),
+  ]);
 }

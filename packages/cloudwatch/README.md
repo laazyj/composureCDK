@@ -1,6 +1,6 @@
 # @composurecdk/cloudwatch
 
-CloudWatch alarm primitives for [ComposureCDK](../../README.md).
+CloudWatch alarm primitives and the composite alarm builder for [ComposureCDK](../../README.md).
 
 This package provides the building blocks for CloudWatch alarms that follow ComposureCDK's conventions: readable, stack-scoped alarm names, alarm actions routed across a whole app, and alarm definitions that a builder resolves at build time. It serves two audiences:
 
@@ -16,6 +16,7 @@ Everything this package exports is public API. It is not a place for code that C
 | [`alarmActionsPolicy`](#alarmactionspolicy)                                  | Route alarm actions (e.g. SNS) to every alarm in a scope       |
 | [`alarmNamePolicy`](#alarmnamepolicy)                                        | Decorate or rewrite alarm names across a scope                 |
 | [`alarmName`, `AlarmName`](#alarm-names)                                     | Validate an explicit alarm name                                |
+| [`createCompositeAlarmBuilder`](#composite-alarms)                           | Build a composite alarm over other components' alarms          |
 | [`AlarmDefinitionBuilder`](#custom-alarms)                                   | Define a custom alarm in an `addAlarm()` callback              |
 | [`AlarmConfigurer`](#alarm-sets)                                             | Type an `addAlarm()` callback, or a set of them                |
 | [`AlarmConfig`, `AlarmConfigDefaults`](#alarmconfig-and-alarmconfigdefaults) | Type a recommended alarm's user overrides and its defaults     |
@@ -144,6 +145,44 @@ createFunctionBuilder()
 ```
 
 To change names across an app, use [alarmNamePolicy](#alarmnamepolicy) instead.
+
+### Composite alarms
+
+`createCompositeAlarmBuilder()` builds a [composite alarm](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Create_Composite_Alarm.html): an alarm whose state is a rule over other alarms. Use one to give a deployment pipeline a single rollback alarm, or to page once for a system instead of once per symptom.
+
+Its props are CDK's [`CompositeAlarmProps`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudwatch.CompositeAlarmProps.html). The build result is `{ alarm: CompositeAlarm }`. `alarmRule` is required, and it and `actionsSuppressor` accept a `Ref`, so the members can come from other components and the edges show in `compose()`. An `IAlarm` is itself an `IAlarmRule`, so CDK's `AlarmRule` combinators (`anyOf`, `allOf`, `not`, `fromAlarm(alarm, state)`) take member alarms directly. To combine alarms from several components, [`combine`](../../docs/architecture.md#combining-refs--one-consumer-many-dependencies) their refs:
+
+```ts
+import { combine, compose, ref } from "@composurecdk/core";
+import { createCompositeAlarmBuilder } from "@composurecdk/cloudwatch";
+import { AlarmRule } from "aws-cdk-lib/aws-cloudwatch";
+
+compose(
+  {
+    fold: createFunctionBuilder() /* … */,
+    dlq: createQueueBuilder("dlq") /* … */,
+    rollback: createCompositeAlarmBuilder()
+      .alarmDescription("A deploy may have broken the fold: roll it back.")
+      .alarmRule(
+        combine(
+          {
+            errors: ref("fold", (r: FunctionBuilderResult) => r.alarms["errors"]),
+            dlq: ref(
+              "dlq",
+              (r: QueueBuilderResult) => r.alarms["approximateNumberOfMessagesVisible"],
+            ),
+          },
+          (m) => AlarmRule.anyOf(...Object.values(m)),
+        ),
+      ),
+  },
+  { fold: [], dlq: [], rollback: ["fold", "dlq"] },
+);
+```
+
+The default name follows the [library convention](#alarm-names) without a key, `${stackName}/${path}/${kebab(id)}` (here `my-stack/rollback`). It is a plain string, not a token, so a pipeline can derive the alarm's ARN from it. To name it yourself, pass `compositeAlarmName(alarmName("…"))`. Both policies apply to composite alarms, and their `singleOnly` / `compositeOnly` rules let you notify on the composite and leave its members quiet, which is how AWS recommends using composites to reduce alarm noise.
+
+A composite can only watch alarms in its own account and region; CDK fails at synthesis on a member from another environment. CloudFront and Route 53 alarms live in `us-east-1` whatever the resource's region ([ADR-0004](../../docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md)), so build a composite over them into the `us-east-1` alarm stack.
 
 ### Custom alarms
 
@@ -356,7 +395,7 @@ Use this to adopt alarms that are already deployed. The construct ID becomes the
 
 ### defaultAlarmName
 
-`defaultAlarmName(scope, id, key)` returns the [default alarm name](#alarm-names) that `createAlarms` uses. Call it to give an alarm you create yourself, such as a `CompositeAlarm`, a name that matches the rest.
+`defaultAlarmName(scope, id, key?)` returns the [default alarm name](#alarm-names) that `createAlarms` uses; without a key, the name ends at `kebab(id)`. Call it to give an alarm you create yourself, such as a `CompositeAlarm`, a name that matches the rest.
 
 ### constraints
 

@@ -86,3 +86,10 @@ export interface TopicAlarmConfig {
    */
   numberOfNotificationsFailedToRedriveToDlq?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended SNS alarms a topic builder can create — every
+ * {@link TopicAlarmConfig} entry except the `enabled` master switch. Each
+ * entry creates its alarm under its own key.
+ */
+export type TopicAlarmKey = Exclude<keyof TopicAlarmConfig, "enabled">;

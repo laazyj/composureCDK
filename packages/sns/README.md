@@ -165,9 +165,24 @@ const topic = createTopicBuilder()
   );
 ```
 
+### Reading alarms by key
+
+`TopicBuilderResult` types `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled, or not apply to the topic's subscriptions. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("events", (r: TopicBuilderResult) => r.alarms.numberOfNotificationsFailed); // Alarm | undefined
+ref(
+  "events",
+  (r: WithCustomAlarms<TopicBuilderResult, "highPublishRate">) => r.alarms.highPublishRate,
+); // Alarm
+ref("events", (r: TopicBuilderResult) => r.alarms.numberOfNotificationFailed); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of the builder's own `build()` accepts any key, as `WithCustomAlarms<TopicBuilderResult, string>`. The recommended keys are exported as `TopicAlarmKey`.
+
 ### Applying alarm actions
 
-Alarms are returned in the build result as `Record<string, Alarm>`:
+Alarms are returned in the build result's `alarms`, keyed by alarm:
 
 ```ts
 const result = topic.build(stack, "MyTopic");

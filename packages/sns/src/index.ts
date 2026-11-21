@@ -8,7 +8,7 @@ export {
 } from "./topic-builder.js";
 export { topicGrants } from "./grants.js";
 export { TOPIC_DEFAULTS } from "./defaults.js";
-export { type TopicAlarmConfig } from "./topic-alarm-config.js";
+export { type TopicAlarmConfig, type TopicAlarmKey } from "./topic-alarm-config.js";
 export { TOPIC_ALARM_DEFAULTS } from "./topic-alarm-defaults.js";
 export { TOPIC_ALARM_SELF_NOTIFICATION_WARNING_ID } from "./topic-alarm-self-notification-guard.js";
 export {

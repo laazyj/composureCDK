@@ -1,12 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { Duration, type Stack } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
-import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { FilterOrPolicy, SubscriptionFilter, Topic } from "aws-cdk-lib/aws-sns";
 import { SqsSubscription, type SqsSubscriptionProps } from "aws-cdk-lib/aws-sns-subscriptions";
 import { Queue } from "aws-cdk-lib/aws-sqs";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { createTopicBuilder } from "../src/topic-builder.js";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
+import { createTopicBuilder, type TopicBuilderResult } from "../src/topic-builder.js";
 import type { TopicAlarmConfig } from "../src/topic-alarm-config.js";
 import { resolveTopicAlarmDefinitions } from "../src/topic-alarms.js";
 
@@ -300,25 +302,29 @@ describe("recommended alarms", () => {
   });
 });
 
+function customAlarm(builder: ReturnType<typeof createTopicBuilder>) {
+  return builder.addAlarm("numberOfMessagesPublished", (alarm) =>
+    alarm
+      .metric(
+        (topic) =>
+          new Metric({
+            namespace: "AWS/SNS",
+            metricName: "NumberOfMessagesPublished",
+            dimensionsMap: { TopicName: topic.topicName },
+            statistic: "Sum",
+            period: Duration.minutes(1),
+          }),
+      )
+      .threshold(10000)
+      .greaterThanOrEqual()
+      .description("Topic receiving unusually high message volume"),
+  );
+}
+
 describe("addAlarm", () => {
   it("creates a custom alarm alongside recommended alarms", () => {
     const { result, template } = buildAndSynth((b) => {
-      b.addAlarm("numberOfMessagesPublished", (alarm) =>
-        alarm
-          .metric(
-            (topic) =>
-              new Metric({
-                namespace: "AWS/SNS",
-                metricName: "NumberOfMessagesPublished",
-                dimensionsMap: { TopicName: topic.topicName },
-                statistic: "Sum",
-                period: Duration.minutes(1),
-              }),
-          )
-          .threshold(10000)
-          .greaterThanOrEqual()
-          .description("Topic receiving unusually high message volume"),
-      );
+      customAlarm(b);
     });
 
     expect(result.alarms.numberOfNotificationsFailed).toBeDefined();
@@ -348,25 +354,6 @@ describe("addAlarm", () => {
 
   // Regression: disabling the recommended alarms must not drop custom alarms
   // added via addAlarm() — see issue #305.
-  function customAlarm(builder: ReturnType<typeof createTopicBuilder>) {
-    return builder.addAlarm("numberOfMessagesPublished", (alarm) =>
-      alarm
-        .metric(
-          (topic) =>
-            new Metric({
-              namespace: "AWS/SNS",
-              metricName: "NumberOfMessagesPublished",
-              dimensionsMap: { TopicName: topic.topicName },
-              statistic: "Sum",
-              period: Duration.minutes(1),
-            }),
-        )
-        .threshold(10000)
-        .greaterThanOrEqual()
-        .description("Topic receiving unusually high message volume"),
-    );
-  }
-
   it("keeps a custom alarm when recommendedAlarms is false", () => {
     const { result, template } = buildAndSynth((b) => {
       customAlarm(b.recommendedAlarms(false));
@@ -416,5 +403,48 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["numberOfMessagesPublished", "publishSize"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth(() => undefined);
+    const typed: TopicBuilderResult = result;
+    const failed = typed.alarms.numberOfNotificationsFailed;
+
+    assertAssignable<Alarm | undefined, typeof failed>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof failed>();
+    expect(failed).toBeDefined();
+    // @ts-expect-error -- "numberOfNotificationFailed" is not an SNS alarm key
+    expect(typed.alarms.numberOfNotificationFailed).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const system = compose(
+      {
+        topic: customAlarm(createTopicBuilder()),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref(
+              "topic",
+              (r: WithCustomAlarms<TopicBuilderResult, "numberOfMessagesPublished">) => {
+                // @ts-expect-error -- "numberOfMessagesPublishd" was not declared as a custom key
+                expect(r.alarms.numberOfMessagesPublishd).toBeUndefined();
+                return r.alarms.numberOfMessagesPublished;
+              },
+            ).resolve(context),
+          }),
+        },
+      },
+      { topic: [], consumer: ["topic"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.topic.alarms.numberOfMessagesPublished);
   });
 });

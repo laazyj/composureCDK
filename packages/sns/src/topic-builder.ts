@@ -1,5 +1,4 @@
 import { CfnResource } from "aws-cdk-lib";
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import {
   Effect,
   PolicyStatement,
@@ -19,8 +18,13 @@ import {
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { TopicAlarmConfig } from "./topic-alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { TopicAlarmConfig, TopicAlarmKey } from "./topic-alarm-config.js";
 import { createTopicAlarms } from "./topic-alarms.js";
 import { TOPIC_DEFAULTS } from "./defaults.js";
 import { bindSubscription } from "./subscription-defaults.js";
@@ -79,14 +83,17 @@ export interface TopicBuilderResult {
    *
    * Includes both AWS-recommended alarms and any custom alarms added
    * via {@link ITopicBuilder.addAlarm}. Access individual alarms
-   * by key (e.g., `result.alarms.numberOfNotificationsFailed`).
+   * by key (e.g., `result.alarms.numberOfNotificationsFailed`). A
+   * recommended alarm is `Alarm | undefined`: it may be disabled, or not
+   * apply to the topic's subscriptions. Any other key is a compile error;
+   * read a custom alarm through {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SNS
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<TopicAlarmKey>;
 
   /**
    * Subscriptions added to the topic via
@@ -159,7 +166,7 @@ interface SubscriptionEntry {
   subscription: Resolvable<ITopicSubscription>;
 }
 
-class TopicBuilder implements Lifecycle<TopicBuilderResult> {
+class TopicBuilder implements Lifecycle<WithCustomAlarms<TopicBuilderResult, string>> {
   props: Partial<TopicBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<ITopic>[] = [];
   readonly #subscriptions: SubscriptionEntry[] = [];
@@ -246,7 +253,11 @@ class TopicBuilder implements Lifecycle<TopicBuilderResult> {
     target.#policyStatements.push(...this.#policyStatements);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): TopicBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<TopicBuilderResult, string> {
     const { recommendedAlarms: alarmConfig, masterKey, ...topicProps } = this.props;
 
     const mergedProps: TopicProps = {

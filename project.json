@@ -11,7 +11,15 @@
         "{workspaceRoot}/vitest.config.base.ts",
         "{workspaceRoot}/packages/eslint-plugin/src/**/*",
         {
-          "externalDependencies": ["eslint", "typescript-eslint", "@typescript-eslint/parser"]
+          "externalDependencies": [
+            "eslint",
+            "@eslint/js",
+            "typescript-eslint",
+            "@typescript-eslint/parser",
+            "eslint-config-prettier",
+            "@eslint-community/eslint-plugin-eslint-comments",
+            "@nx/eslint-plugin"
+          ]
         }
       ],
       "dependsOn": [{ "projects": ["@composurecdk/eslint-plugin"], "target": "build" }],

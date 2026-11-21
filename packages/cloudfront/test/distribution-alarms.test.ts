@@ -1,12 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { Duration, Stack } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
-import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
+import { FunctionCode, FunctionEventType } from "aws-cdk-lib/aws-cloudfront";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
-import { buildFixture } from "@composurecdk/cdk-testing";
-import { createDistributionBuilder } from "../src/distribution-builder.js";
+import { assertAssignable, buildFixture } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { ref } from "@composurecdk/core";
+import {
+  createDistributionBuilder,
+  type DistributionBuilderResult,
+} from "../src/distribution-builder.js";
 
 const buildAndSynth = buildFixture(createDistributionBuilder, "TestDistribution");
 
@@ -268,5 +274,76 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["clientErrors", "serverErrors"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  const code = FunctionCode.fromInline("function handler(event) { return event.request; }");
+
+  function withFunctions(b: ReturnType<typeof createDistributionBuilder>, stack: Stack) {
+    withOrigin(b, stack);
+    b.defaultBehavior({ functions: [{ eventType: FunctionEventType.VIEWER_REQUEST, code }] });
+    b.behavior("/api/*", {
+      origin: new HttpOrigin("api.example.com"),
+      functions: [{ eventType: FunctionEventType.VIEWER_RESPONSE, code }],
+    });
+  }
+
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth(withOrigin);
+    const typed: DistributionBuilderResult = result;
+    const errorRate = typed.alarms.errorRate;
+
+    assertAssignable<Alarm | undefined, typeof errorRate>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof errorRate>();
+    expect(errorRate).toBeDefined();
+    // @ts-expect-error -- "errorRat" is not a CloudFront alarm key
+    expect(typed.alarms.errorRat).toBeUndefined();
+  });
+
+  it("types behavior function alarm keys by scope, event type and suffix", () => {
+    const { result } = buildAndSynth(withFunctions);
+    const typed: DistributionBuilderResult = result;
+
+    assertAssignable<
+      Alarm | undefined,
+      typeof typed.alarms.defaultBehaviorViewerRequestThrottles
+    >();
+    expect(typed.alarms.defaultBehaviorViewerRequestThrottles).toBeDefined();
+    expect(typed.alarms.behaviorApiSlashStarViewerResponseExecutionErrors).toBeDefined();
+    expect(typed.alarms.behaviorApiSlashStarViewerResponseValidationErrors).toBeDefined();
+    // @ts-expect-error -- the suffix is "Throttles", not "Throttle"
+    expect(typed.alarms.defaultBehaviorViewerRequestThrottle).toBeUndefined();
+    // @ts-expect-error -- "ViewRequest" is not a CloudFront Function event type
+    expect(typed.alarms.defaultBehaviorViewRequestThrottles).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { result } = buildAndSynth((b, stack) => {
+      withOrigin(b, stack);
+      b.addAlarm("clientErrors", (alarm) =>
+        alarm
+          .metric(
+            (dist) =>
+              new Metric({
+                namespace: "AWS/CloudFront",
+                metricName: "4xxErrorRate",
+                dimensionsMap: { DistributionId: dist.distributionId, Region: "Global" },
+              }),
+          )
+          .threshold(10),
+      );
+    });
+    const alarm = ref("cdn", (r: WithCustomAlarms<DistributionBuilderResult, "clientErrors">) => {
+      // @ts-expect-error -- "clientError" was not declared as a custom key
+      expect(r.alarms.clientError).toBeUndefined();
+      return r.alarms.clientErrors;
+    }).resolve({ cdn: result });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(result.alarms.clientErrors);
   });
 });

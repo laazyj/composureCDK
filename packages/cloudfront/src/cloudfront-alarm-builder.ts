@@ -8,9 +8,11 @@ import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import {
   type AlarmConfigurer,
   AlarmDefinitionBuilder,
+  type AlarmsOf,
   createAlarms,
+  type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
-import type { DistributionAlarmConfig } from "./alarm-config.js";
+import type { DistributionAlarmConfig, DistributionAlarmKey } from "./alarm-config.js";
 import { resolveDistributionAlarmDefinitions } from "./distribution-alarms.js";
 import { resolveBehaviorFunctionAlarmDefinitions } from "./behavior-function-alarms.js";
 import type { DistributionBuilderResult } from "./distribution-builder.js";
@@ -52,8 +54,12 @@ export interface CloudFrontAlarmBuilderResult {
   /**
    * The CloudWatch alarms created by this builder, keyed by alarm name. Uses
    * the same key scheme as {@link DistributionBuilderResult.alarms}.
+   *
+   * A recommended alarm is `Alarm | undefined`: it may be disabled, or belong
+   * to a behavior function the distribution does not have. Any other key is a
+   * compile error; read a custom alarm through {@link WithCustomAlarms}.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<DistributionAlarmKey>;
 }
 
 /**
@@ -135,7 +141,9 @@ export function buildCloudFrontAlarms(
   return createAlarms(scope, id, allAlarmDefs);
 }
 
-class CloudFrontAlarmBuilder implements Lifecycle<CloudFrontAlarmBuilderResult> {
+class CloudFrontAlarmBuilder implements Lifecycle<
+  WithCustomAlarms<CloudFrontAlarmBuilderResult, string>
+> {
   props: Partial<CloudFrontAlarmBuilderProps> = {};
   #distribution?: Resolvable<DistributionBuilderResult>;
   readonly #customAlarms: AlarmDefinitionBuilder<Distribution>[] = [];
@@ -190,7 +198,7 @@ class CloudFrontAlarmBuilder implements Lifecycle<CloudFrontAlarmBuilderResult> 
     scope: IConstruct,
     id: string,
     context?: Record<string, object>,
-  ): CloudFrontAlarmBuilderResult {
+  ): WithCustomAlarms<CloudFrontAlarmBuilderResult, string> {
     if (!this.#distribution) {
       throw new Error(
         `CloudFrontAlarmBuilder "${id}" requires a distribution. ` +

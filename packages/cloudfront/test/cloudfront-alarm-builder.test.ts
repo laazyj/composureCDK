@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { App, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
-import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { type Distribution, FunctionCode, FunctionEventType } from "aws-cdk-lib/aws-cloudfront";
+import { assertAssignable } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
 import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createDistributionBuilder } from "../src/distribution-builder.js";
@@ -455,5 +457,57 @@ describe("addAlarms", () => {
 
     expect(Object.keys(alarmResult.alarms)).toEqual(["custom4xx", "custom5xx"]);
     Template.fromStack(stack).resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("uses the distribution's key scheme and rejects a misspelled key", () => {
+    const { stack, result } = buildDistribution((b) => {
+      b.defaultBehavior({ functions: [viewerRequestFn] });
+    });
+    const typed: CloudFrontAlarmBuilderResult = createCloudFrontAlarmBuilder()
+      .distribution(result)
+      .build(stack, "Alarms");
+    const throttles = typed.alarms.defaultBehaviorViewerRequestThrottles;
+
+    assertAssignable<Alarm | undefined, typeof throttles>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof throttles>();
+    expect(throttles).toBeDefined();
+    expect(typed.alarms.originLatency).toBeDefined();
+    // @ts-expect-error -- "originLatancy" is not a CloudFront alarm key
+    expect(typed.alarms.originLatancy).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { stack, result } = buildDistribution();
+    const alarmResult = createCloudFrontAlarmBuilder()
+      .distribution(result)
+      .addAlarm("custom4xx", (a) =>
+        a
+          .metric(
+            () =>
+              new Metric({
+                namespace: "AWS/CloudFront",
+                metricName: "4xxErrorRate",
+                statistic: "Average",
+              }),
+          )
+          .threshold(5),
+      )
+      .build(stack, "Alarms");
+    const alarm = ref(
+      "cdnAlarms",
+      (r: WithCustomAlarms<CloudFrontAlarmBuilderResult, "custom4xx">) => {
+        // @ts-expect-error -- "custom4x" was not declared as a custom key
+        expect(r.alarms.custom4x).toBeUndefined();
+        return r.alarms.custom4xx;
+      },
+    ).resolve({ cdnAlarms: alarmResult });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(alarmResult.alarms.custom4xx);
   });
 });

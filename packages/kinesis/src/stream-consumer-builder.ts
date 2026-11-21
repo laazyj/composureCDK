@@ -1,4 +1,3 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import {
   type IStreamConsumer,
   StreamConsumer,
@@ -7,8 +6,16 @@ import {
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { StreamConsumerAlarmConfig } from "./stream-consumer-alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type {
+  StreamConsumerAlarmConfig,
+  StreamConsumerAlarmKey,
+} from "./stream-consumer-alarm-config.js";
 import { createStreamConsumerAlarms } from "./stream-consumer-alarms.js";
 import { validateStreamConsumerName } from "./stream-name.js";
 
@@ -55,12 +62,16 @@ export interface StreamConsumerBuilderResult {
 
   /**
    * CloudWatch alarms created for the consumer, keyed by alarm name. Includes
-   * any custom alarms added via {@link IStreamConsumerBuilder.addAlarm}.
+   * the recommended `subscribeToShardEventMillisBehindLatest` alarm and any
+   * custom alarms added via {@link IStreamConsumerBuilder.addAlarm}. The
+   * recommended alarm is `Alarm | undefined`, because it can be disabled.
+   * Any other key is a compile error; read a custom alarm through
+   * {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<StreamConsumerAlarmKey>;
 }
 
 /**
@@ -84,7 +95,9 @@ export type IStreamConsumerBuilder = ITaggedBuilder<
   StreamConsumerBuilder
 >;
 
-class StreamConsumerBuilder implements Lifecycle<StreamConsumerBuilderResult> {
+class StreamConsumerBuilder implements Lifecycle<
+  WithCustomAlarms<StreamConsumerBuilderResult, string>
+> {
   props: Partial<StreamConsumerBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IStreamConsumer>[] = [];
 
@@ -113,7 +126,7 @@ class StreamConsumerBuilder implements Lifecycle<StreamConsumerBuilderResult> {
     scope: IConstruct,
     id: string,
     context?: Record<string, object>,
-  ): StreamConsumerBuilderResult {
+  ): WithCustomAlarms<StreamConsumerBuilderResult, string> {
     const { recommendedAlarms, stream, streamConsumerName, ...configured } = this.props;
 
     if (stream === undefined || !streamConsumerName) {

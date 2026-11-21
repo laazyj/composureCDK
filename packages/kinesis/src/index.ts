@@ -10,7 +10,7 @@ export {
 } from "./stream-builder.js";
 export { streamGrants } from "./grants.js";
 export { STREAM_DEFAULTS } from "./defaults.js";
-export { type StreamAlarmConfig } from "./stream-alarm-config.js";
+export { type StreamAlarmConfig, type StreamAlarmKey } from "./stream-alarm-config.js";
 export { STREAM_ALARM_DEFAULTS } from "./stream-alarm-defaults.js";
 
 // Enhanced fan-out consumers.
@@ -21,7 +21,10 @@ export {
   type IStreamConsumerBuilder,
 } from "./stream-consumer-builder.js";
 export { streamConsumerGrants } from "./grants.js";
-export { type StreamConsumerAlarmConfig } from "./stream-consumer-alarm-config.js";
+export {
+  type StreamConsumerAlarmConfig,
+  type StreamConsumerAlarmKey,
+} from "./stream-consumer-alarm-config.js";
 export { STREAM_CONSUMER_ALARM_DEFAULTS } from "./stream-consumer-alarm-defaults.js";
 
 /**

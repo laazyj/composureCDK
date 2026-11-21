@@ -1,19 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack, TagManager } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
-import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import {
   type IStreamConsumer,
   Stream,
   StreamConsumer,
   type StreamConsumerProps,
 } from "aws-cdk-lib/aws-kinesis";
-import { buildFixture } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import {
   createStreamConsumerBuilder,
   type StreamConsumerBuilderProps,
+  type StreamConsumerBuilderResult,
 } from "../src/stream-consumer-builder.js";
 
 const buildAndSynth = buildFixture(createStreamConsumerBuilder, "TestConsumer", {
@@ -254,5 +256,52 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["noRecords", "manyRecords"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types the recommended alarm as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth();
+    const typed: StreamConsumerBuilderResult = result;
+    const behind = typed.alarms.subscribeToShardEventMillisBehindLatest;
+
+    assertAssignable<Alarm | undefined, typeof behind>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof behind>();
+    expect(behind).toBeDefined();
+    // @ts-expect-error -- "subscribeToShardEventMilisBehindLatest" is not a consumer alarm key
+    expect(typed.alarms.subscribeToShardEventMilisBehindLatest).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const stream = new Stream(stack, "Stream", { streamName: "telemetry" });
+    const system = compose(
+      {
+        consumer: createStreamConsumerBuilder()
+          .streamConsumerName("alerter")
+          .stream(stream)
+          .addAlarm("noRecords", (a) => a.metric(subscribeToShardRate).threshold(1).lessThan()),
+        reader: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref(
+              "consumer",
+              (r: WithCustomAlarms<StreamConsumerBuilderResult, "noRecords">) => {
+                // @ts-expect-error -- "noRecord" was not declared as a custom key
+                expect(r.alarms.noRecord).toBeUndefined();
+                return r.alarms.noRecords;
+              },
+            ).resolve(context),
+          }),
+        },
+      },
+      { consumer: [], reader: ["consumer"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.reader.alarm>();
+    expect(built.reader.alarm).toBe(built.consumer.alarms.noRecords);
   });
 });

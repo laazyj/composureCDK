@@ -8,7 +8,11 @@ import {
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { REST_API_DEFAULTS } from "./defaults.js";
 import { resolveDeployOptions } from "./deploy-options.js";
@@ -58,7 +62,7 @@ export type RestApiBuilderResult = RestApiBuilderResultBase<RestApi>;
  */
 export type IRestApiBuilder = ITaggedBuilder<RestApiBuilderProps, RestApiBuilder>;
 
-class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
+class RestApiBuilder implements Lifecycle<WithCustomAlarms<RestApiBuilderResult, string>> {
   props: Partial<RestApiBuilderProps> = {};
   readonly #root = new ResourceBuilder();
   readonly #customAlarms: AlarmDefinitionBuilder<RestApiBase>[] = [];
@@ -123,7 +127,11 @@ class RestApiBuilder implements Lifecycle<RestApiBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): RestApiBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<RestApiBuilderResult, string> {
     const {
       accessLogging,
       executionLogging,

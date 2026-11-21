@@ -2,7 +2,11 @@ import { type RestApiBase, SpecRestApi, type SpecRestApiProps } from "aws-cdk-li
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { SPEC_REST_API_DEFAULTS } from "./defaults.js";
 import { resolveDeployOptions } from "./deploy-options.js";
@@ -80,7 +84,7 @@ export type SpecRestApiBuilderResult = RestApiBuilderResultBase<SpecRestApi>;
  */
 export type ISpecRestApiBuilder = ITaggedBuilder<SpecRestApiBuilderProps, SpecRestApiBuilder>;
 
-class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
+class SpecRestApiBuilder implements Lifecycle<WithCustomAlarms<SpecRestApiBuilderResult, string>> {
   props: Partial<SpecRestApiBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<RestApiBase>[] = [];
 
@@ -105,7 +109,11 @@ class SpecRestApiBuilder implements Lifecycle<SpecRestApiBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): SpecRestApiBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<SpecRestApiBuilderResult, string> {
     const {
       accessLogging,
       executionLogging,

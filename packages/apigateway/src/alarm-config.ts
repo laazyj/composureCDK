@@ -48,3 +48,11 @@ export interface RestApiAlarmConfig {
    */
   latency?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms an API Gateway REST API builder can create —
+ * every {@link RestApiAlarmConfig} entry except the `enabled` master switch.
+ * Shared by `RestApiBuilderResult` and `SpecRestApiBuilderResult`, whose
+ * builders create their alarms through the same definitions.
+ */
+export type RestApiAlarmKey = Exclude<keyof RestApiAlarmConfig, "enabled">;

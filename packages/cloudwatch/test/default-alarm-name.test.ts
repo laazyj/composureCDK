@@ -11,6 +11,11 @@ describe("defaultAlarmName", () => {
     );
   });
 
+  it("ends at the id when no key is given", () => {
+    const stack = new Stack(new App(), "MyServiceStack");
+    expect(defaultAlarmName(stack, "rollback")).toBe("my-service-stack/rollback");
+  });
+
   it("uses Stack.of(scope), not the scope's id directly", () => {
     const stack = new Stack(new App(), "OuterStack");
     expect(defaultAlarmName(stack, "cdnAlarms", "errorRate")).toBe(

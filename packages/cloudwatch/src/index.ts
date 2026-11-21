@@ -9,6 +9,12 @@ export {
   type AlarmThresholdBasisOptions,
   resolveAlarmThresholdBasis,
 } from "./alarm-threshold-basis.js";
+export {
+  createCompositeAlarmBuilder,
+  type CompositeAlarmBuilderProps,
+  type CompositeAlarmBuilderResult,
+  type ICompositeAlarmBuilder,
+} from "./composite-alarm-builder.js";
 export { defaultAlarmName } from "./default-alarm-name.js";
 export { createAlarms } from "./create-alarms.js";
 export { resolveAlarmConfig, type ResolvedAlarmConfig } from "./resolve-alarm-config.js";

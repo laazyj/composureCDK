@@ -1,4 +1,3 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IConnectable } from "aws-cdk-lib/aws-ec2";
 import {
   ClusterParameterGroup,
@@ -11,13 +10,18 @@ import {
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import { CLUSTER_DEFAULTS } from "./cluster-defaults.js";
 import {
   CLUSTER_PARAMETER_GROUP_DEFAULTS,
   clusterParameterGroupFamily,
 } from "./cluster-parameter-group-defaults.js";
-import type { NeptuneClusterAlarmConfig } from "./cluster-alarm-config.js";
+import type { NeptuneClusterAlarmConfig, NeptuneClusterAlarmKey } from "./cluster-alarm-config.js";
 import { createClusterAlarms } from "./cluster-alarms.js";
 
 /**
@@ -128,10 +132,15 @@ export interface ClusterBuilderResult {
   /**
    * CloudWatch alarms created for the cluster, keyed by alarm key (e.g.
    * `result.alarms.cpuUtilization`). Includes recommended alarms and any
-   * added via {@link IClusterBuilder.addAlarm}. No alarm actions are
-   * configured — apply them via the result or an `afterBuild` hook.
+   * added via {@link IClusterBuilder.addAlarm}. A recommended alarm is
+   * `Alarm | undefined`: it may be disabled, and `serverlessDatabaseCapacity`
+   * is only created for a serverless cluster. Any other key is a compile
+   * error; read a custom alarm through {@link WithCustomAlarms}.
+   *
+   * No alarm actions are configured — apply them via the result or an
+   * `afterBuild` hook.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<NeptuneClusterAlarmKey>;
 }
 
 interface AccessSpec {
@@ -173,7 +182,7 @@ interface AccessSpec {
  */
 export type IClusterBuilder = ITaggedBuilder<ClusterBuilderProps, ClusterBuilder>;
 
-class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
+class ClusterBuilder implements Lifecycle<WithCustomAlarms<ClusterBuilderResult, string>> {
   props: Partial<ClusterBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IDatabaseCluster>[] = [];
   readonly #access: AccessSpec[] = [];
@@ -249,7 +258,11 @@ class ClusterBuilder implements Lifecycle<ClusterBuilderResult> {
     target.#access.push(...this.#access);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): ClusterBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<ClusterBuilderResult, string> {
     const resolvedVpc = this.#vpc ? resolve(this.#vpc, context) : undefined;
     if (!resolvedVpc) {
       throw new Error(

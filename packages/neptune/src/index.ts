@@ -10,5 +10,8 @@ export {
   CLUSTER_PARAMETER_GROUP_DEFAULTS,
   clusterParameterGroupFamily,
 } from "./cluster-parameter-group-defaults.js";
-export { type NeptuneClusterAlarmConfig } from "./cluster-alarm-config.js";
+export {
+  type NeptuneClusterAlarmConfig,
+  type NeptuneClusterAlarmKey,
+} from "./cluster-alarm-config.js";
 export { CLUSTER_ALARM_DEFAULTS } from "./cluster-alarm-defaults.js";

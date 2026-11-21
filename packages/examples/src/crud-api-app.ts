@@ -12,6 +12,7 @@ import { createFunctionBuilder } from "@composurecdk/lambda";
 import { createTableBuilder, tableGrants, type TableBuilderResult } from "@composurecdk/dynamodb";
 import { createServiceRoleBuilder, type RoleBuilderResult } from "@composurecdk/iam";
 import { createKeyBuilder, type KeyBuilderResult } from "@composurecdk/kms";
+import { createWebAclBuilder } from "@composurecdk/wafv2";
 import { exampleApp } from "./app-context.js";
 
 /** Every method here returns a bare `200` — no error mapping. A production
@@ -19,6 +20,17 @@ import { exampleApp } from "./app-context.js";
  * DynamoDB's `ConditionalCheckFailedException`) to translate backend
  * failures into 4xx/5xx status codes. */
 const OK: MethodOptions = { methodResponses: [{ statusCode: "200" }] };
+
+/**
+ * The header each client integration identifies itself with. The web ACL
+ * rejects a request without it and rate-limits each value separately. It
+ * identifies a caller, it does not authenticate one: a client could send
+ * another's ID. An API with IAM auth would limit on `x-amz-security-token`
+ * instead, one limit per STS session; see the `@composurecdk/wafv2` README.
+ */
+export const CLIENT_ID_HEADER = "x-client-id";
+
+const THROTTLED = { json: { message: "Too many requests; slow down and retry." } };
 
 type DynamoAction = "GetItem" | "PutItem" | "DeleteItem" | "Scan";
 
@@ -144,7 +156,7 @@ exports.handler = async () => {
   for (const gadget of SEED) {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "${CLIENT_ID_HEADER}": "catalogue-seed" },
       body: JSON.stringify(gadget),
     });
     if (!response.ok) {
@@ -193,6 +205,20 @@ exports.handler = async () => {
  * the table's `encryptionKey`. `keyGrants` exists for what a resource grant
  * cannot infer — a principal decrypting ciphertext it fetched elsewhere, say —
  * and adding one here would be redundant permission, not extra safety.
+ *
+ * The API sits behind an AWS WAF web ACL, `waf`, associated with its stage by
+ * `ref`, that identifies and rate-limits each client by its
+ * {@link CLIENT_ID_HEADER}. Three choices in it are not obvious from the code:
+ *
+ * - the IP reputation group only counts, the way a managed group is rolled
+ *   out: watch what it would catch before trusting it to block;
+ * - WAF does not rate-limit a request missing the header it aggregates on,
+ *   so `RequireClientId` is what makes `PerClientRate` hold;
+ * - the per-IP limit is a backstop set well above the per-client one, since
+ *   many clients may share a NAT address.
+ *
+ * Logging with credentials redacted, metrics and per-rule alarms are the
+ * builder's defaults.
  */
 export function createCrudApiApp(app = exampleApp()) {
   const stack = new Stack(app, "ComposureCDK-CrudApiStack");
@@ -240,6 +266,27 @@ export function createCrudApiApp(app = exampleApp()) {
         // The whole component, not one construct out of it: the call needs the
         // stage deployed, not merely the RestApi created.
         .invokeOnDeploy({ after: [ref<RestApiBuilderResult>("api")] }),
+
+      waf: createWebAclBuilder()
+        .description("Identifies and rate-limits the client integrations of the gadget API")
+        .associateWith(ref("api", (r: RestApiBuilderResult) => r.api.deploymentStage))
+        .addRule("IpReputation", (rule) =>
+          rule.managedRuleGroup("AWSManagedRulesAmazonIpReputationList").count(),
+        )
+        .addRule("RequireClientId", (rule) =>
+          rule
+            .blockUnlessHeader(CLIENT_ID_HEADER)
+            .respond(401, { json: { message: `Send an ${CLIENT_ID_HEADER} header.` } }),
+        )
+        .addRule("PerClientRate", (rule) =>
+          rule
+            .rateLimit(300, Duration.minutes(1))
+            .aggregateOnHeader(CLIENT_ID_HEADER)
+            .respond(429, THROTTLED, { "Retry-After": "60" }),
+        )
+        .addRule("PerIpRate", (rule) =>
+          rule.rateLimit(3000).respond(429, THROTTLED, { "Retry-After": "300" }),
+        ),
     },
     {
       tableKey: [],
@@ -247,6 +294,7 @@ export function createCrudApiApp(app = exampleApp()) {
       apiRole: ["table"],
       api: ["table", "apiRole"],
       seedCatalogue: ["api"],
+      waf: ["api"],
     },
   ).build(stack, "CrudApiApp");
 

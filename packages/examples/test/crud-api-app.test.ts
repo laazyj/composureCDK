@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { createCrudApiApp } from "../src/crud-api-app.js";
+import { CLIENT_ID_HEADER, createCrudApiApp } from "../src/crud-api-app.js";
 
 describe("crud-api-app", () => {
   const { stack } = createCrudApiApp();
@@ -136,6 +136,69 @@ describe("crud-api-app", () => {
           LOG_LEVEL: "info",
         },
       },
+    });
+  });
+
+  describe("web ACL", () => {
+    it("protects the API's stage", () => {
+      template.resourceCountIs("AWS::WAFv2::WebACL", 1);
+      template.hasResourceProperties("AWS::WAFv2::WebACLAssociation", {
+        ResourceArn: Match.objectLike({ "Fn::Join": Match.anyValue() }),
+      });
+    });
+
+    it("counts the IP reputation list, then requires and rate-limits a client ID", () => {
+      template.hasResourceProperties("AWS::WAFv2::WebACL", {
+        Rules: [
+          Match.objectLike({ Name: "IpReputation", OverrideAction: { Count: {} } }),
+          Match.objectLike({
+            Name: "RequireClientId",
+            Action: { Block: { CustomResponse: Match.objectLike({ ResponseCode: 401 }) } },
+            Statement: {
+              NotStatement: {
+                Statement: {
+                  SizeConstraintStatement: Match.objectLike({
+                    FieldToMatch: { SingleHeader: { Name: CLIENT_ID_HEADER } },
+                  }),
+                },
+              },
+            },
+          }),
+          Match.objectLike({
+            Name: "PerClientRate",
+            Action: { Block: { CustomResponse: Match.objectLike({ ResponseCode: 429 }) } },
+            Statement: {
+              RateBasedStatement: Match.objectLike({
+                Limit: 300,
+                EvaluationWindowSec: 60,
+                AggregateKeyType: "CUSTOM_KEYS",
+                CustomKeys: [{ Header: Match.objectLike({ Name: CLIENT_ID_HEADER }) }],
+              }),
+            },
+          }),
+          Match.objectLike({
+            Name: "PerIpRate",
+            Statement: {
+              RateBasedStatement: Match.objectLike({ Limit: 3000, AggregateKeyType: "IP" }),
+            },
+          }),
+        ],
+      });
+    });
+
+    it("logs to a redacted aws-waf-logs- log group", () => {
+      template.hasResourceProperties("AWS::Logs::LogGroup", {
+        LogGroupName: Match.stringLikeRegexp("^aws-waf-logs-"),
+      });
+      template.hasResourceProperties("AWS::WAFv2::LoggingConfiguration", {
+        RedactedFields: Match.arrayWith([{ SingleHeader: { Name: "authorization" } }]),
+      });
+    });
+
+    it("has the seeder name its client, so it gets past the web ACL", () => {
+      template.hasResourceProperties("AWS::Lambda::Function", {
+        Code: { ZipFile: Match.stringLikeRegexp(`"${CLIENT_ID_HEADER}": "catalogue-seed"`) },
+      });
     });
   });
 

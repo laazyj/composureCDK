@@ -2,9 +2,16 @@
 // DynamoDB `AwsIntegration` wiring (and the role's consumer-side tableGrants)
 // work against live AWS, not just that the endpoint responds. api-endpoints.smoke.mjs
 // only checks a single path per API — this stack's runtime surface is the
-// CRUD flow itself, so it gets a dedicated smoke test.
+// CRUD flow itself, so it gets a dedicated smoke test. It also checks the web
+// ACL in front of the API turns away a request that names no client.
 
-import { findRestApi, jsonRequest, restApiUrl } from "./_helpers.mjs";
+import { findRestApi, jsonRequest, pollUntil, restApiUrl } from "./_helpers.mjs";
+
+// Every request names its client: the web ACL in front of the API blocks one
+// without this header (CLIENT_ID_HEADER in src/crud-api-app.ts).
+const HEADER = "x-client-id";
+const CLIENT = { [HEADER]: "smoke-test" };
+const request = (url, options = {}) => jsonRequest(url, { ...options, headers: CLIENT });
 
 export default {
   name: "CRUD API gadget lifecycle",
@@ -23,7 +30,7 @@ export default {
     // actually ran and actually reached the API — a green deploy alone only
     // proves the trigger did not report failure.
     try {
-      const { gadgets } = await jsonRequest(base);
+      const { gadgets } = await request(base);
       const seeded = (gadgets ?? []).filter((g) =>
         g.description?.includes("seeded at deploy time"),
       );
@@ -42,7 +49,7 @@ export default {
     }
 
     try {
-      const created = await jsonRequest(base, {
+      const created = await request(base, {
         method: "POST",
         body: { name: marker, description: "created by smoke test" },
       });
@@ -54,25 +61,25 @@ export default {
 
       const itemUrl = `${base}/${created.id}`;
 
-      const read = await jsonRequest(itemUrl);
+      const read = await request(itemUrl);
       if (read.name !== marker) {
         fail(`GET ${itemUrl} — expected name "${marker}", got ${JSON.stringify(read)}`);
         return;
       }
       pass(`GET ${itemUrl} — read back the created gadget`);
 
-      await jsonRequest(itemUrl, {
+      await request(itemUrl, {
         method: "PUT",
         body: { name: marker, description: "updated by smoke test" },
       });
-      const updated = await jsonRequest(itemUrl);
+      const updated = await request(itemUrl);
       if (updated.description !== "updated by smoke test") {
         fail(`PUT ${itemUrl} — update did not persist: ${JSON.stringify(updated)}`);
         return;
       }
       pass(`PUT ${itemUrl} — update persisted`);
 
-      const del = await fetch(itemUrl, { method: "DELETE" });
+      const del = await fetch(itemUrl, { method: "DELETE", headers: CLIENT });
       if (!del.ok) {
         fail(`DELETE ${itemUrl} — ${del.status} ${del.statusText}`);
         return;
@@ -80,6 +87,23 @@ export default {
       pass(`DELETE ${itemUrl} — ${del.status}`);
     } catch (err) {
       fail(`${base} — ${err.message}`);
+    }
+
+    // RequireClientId answers a request without the header with its own 401.
+    // An association can take a while to reach the stage, so poll.
+    let last;
+    const blocked = await pollUntil(
+      async () => {
+        const res = await fetch(base);
+        last = `${res.status} ${await res.text()}`;
+        return res.status === 401 && last.includes(HEADER);
+      },
+      { timeoutMs: 120_000, intervalMs: 5_000 },
+    );
+    if (blocked) {
+      pass(`GET ${base} without ${HEADER} — blocked by the web ACL with 401`);
+    } else {
+      fail(`GET ${base} without ${HEADER} — expected the web ACL's 401, last got ${last}`);
     }
   },
 };

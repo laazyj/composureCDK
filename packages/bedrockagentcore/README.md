@@ -177,6 +177,25 @@ createRuntimeBuilder().recommendedAlarms({
 });
 ```
 
+### Reading alarms by key
+
+Each result types `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled or be opt-in. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("agent", (r: RuntimeBuilderResult) => r.alarms.userErrors); // Alarm | undefined
+ref("agent", (r: WithCustomAlarms<RuntimeBuilderResult, "sessions">) => r.alarms.sessions); // Alarm
+ref("agent", (r: RuntimeBuilderResult) => r.alarms.userError); // compile error
+```
+
+| Result                                                 | Recommended keys                                       |
+| ------------------------------------------------------ | ------------------------------------------------------ |
+| `RuntimeBuilderResult`, `RuntimeEndpointBuilderResult` | `AgentCoreAlarmKey`                                    |
+| `GatewayBuilderResult`                                 | `GatewayAlarmKey`: the above and `targetExecutionTime` |
+| `MemoryBuilderResult`                                  | none: every key is custom                              |
+| `OnlineEvaluationBuilderResult`                        | `OnlineEvaluationAlarmKey`: any evaluator name         |
+
+A runtime's own `alarms` watch its `DEFAULT` endpoint and hold its custom alarms; an endpoint added with `addEndpoint()` has only the recommended ones. Score alarms are keyed by the caller's evaluator names, so an online evaluation accepts any key. The custom keys you name are not checked against the builder's `addAlarm` calls, and the result of a builder's own `build()` accepts any key.
+
 ### Session quotas
 
 `ActiveSessionCount` covers the whole account and Region, so its alarms come from one `createSessionQuotaAlarmBuilder()` per account and Region, not from each runtime. Each alarm is opt-in and needs the account's quota from Service Quotas, because quotas vary by Region and can be raised. It fires at 80% of the quota unless `thresholdPercent` says otherwise.

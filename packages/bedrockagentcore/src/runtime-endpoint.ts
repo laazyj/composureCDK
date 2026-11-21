@@ -3,15 +3,20 @@ import {
   RuntimeEndpoint,
   type RuntimeEndpointProps,
 } from "aws-cdk-lib/aws-bedrockagentcore";
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type ILogGroup, LogGroup, LogRetention } from "aws-cdk-lib/aws-logs";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import { LOG_GROUP_DEFAULTS } from "@composurecdk/logs";
 import {
   type AgentCoreAlarmConfig,
+  type AgentCoreAlarmKey,
   type AgentCoreMetricSource,
   buildAgentCoreAlarms,
   perMinute,
@@ -30,8 +35,12 @@ export interface RuntimeEndpointObservability {
   logGroup: ILogGroup;
   /** Sets the `@composurecdk/logs` default retention on {@link logGroup}. */
   logRetention: LogRetention;
-  /** The CloudWatch alarms created, keyed by alarm key. */
-  alarms: Record<string, Alarm>;
+  /**
+   * The CloudWatch alarms created, keyed by alarm key. A recommended alarm is
+   * `Alarm | undefined`: it may be disabled or opt-in. Any other key is a
+   * compile error; read a custom alarm through {@link WithCustomAlarms}.
+   */
+  alarms: AlarmsOf<AgentCoreAlarmKey>;
 }
 
 /**
@@ -70,7 +79,7 @@ export function buildEndpointObservability(
   alarmConfig: AgentCoreAlarmConfig | false | undefined,
   endpoint: IConstruct,
   customAlarms: AlarmDefinitionBuilder<AgentCoreMetricSource>[] = [],
-): RuntimeEndpointObservability {
+): WithCustomAlarms<RuntimeEndpointObservability, string> {
   const logGroupName = `/aws/bedrock-agentcore/runtimes/${runtime.agentRuntimeId}-${endpointName}`;
   const logRetention = new LogRetention(scope, `${id}LogRetention`, {
     logGroupName,
@@ -122,7 +131,9 @@ export type IRuntimeEndpointBuilder = ITaggedBuilder<
   RuntimeEndpointBuilder
 >;
 
-class RuntimeEndpointBuilder implements Lifecycle<RuntimeEndpointBuilderResult> {
+class RuntimeEndpointBuilder implements Lifecycle<
+  WithCustomAlarms<RuntimeEndpointBuilderResult, string>
+> {
   props: Partial<RuntimeEndpointBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<AgentCoreMetricSource>[] = [];
 
@@ -152,7 +163,7 @@ class RuntimeEndpointBuilder implements Lifecycle<RuntimeEndpointBuilderResult> 
     scope: IConstruct,
     id: string,
     context: Record<string, object> = {},
-  ): RuntimeEndpointBuilderResult {
+  ): WithCustomAlarms<RuntimeEndpointBuilderResult, string> {
     const { runtime: runtimeRef, recommendedAlarms, ...rest } = this.props;
     if (runtimeRef === undefined || !rest.endpointName) {
       throw new Error(

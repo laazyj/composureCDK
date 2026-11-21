@@ -18,7 +18,11 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import { createSecurityGroupBuilder } from "@composurecdk/ec2";
 import type { AgentCoreAlarmConfig, AgentCoreMetricSource } from "./alarms.js";
 import { RUNTIME_DEFAULTS } from "./runtime-defaults.js";
@@ -76,7 +80,7 @@ export interface RuntimeBuilderResult extends RuntimeEndpointObservability {
  */
 export type IRuntimeBuilder = ITaggedBuilder<RuntimeBuilderProps, RuntimeBuilder>;
 
-class RuntimeBuilder implements Lifecycle<RuntimeBuilderResult> {
+class RuntimeBuilder implements Lifecycle<WithCustomAlarms<RuntimeBuilderResult, string>> {
   props: Partial<RuntimeBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<AgentCoreMetricSource>[] = [];
   readonly #endpoints = new Map<string, AddEndpointOptions | undefined>();
@@ -127,7 +131,11 @@ class RuntimeBuilder implements Lifecycle<RuntimeBuilderResult> {
     this.#grants.copyInto(target.#grants);
   }
 
-  build(scope: IConstruct, id: string, context: Record<string, object> = {}): RuntimeBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context: Record<string, object> = {},
+  ): WithCustomAlarms<RuntimeBuilderResult, string> {
     const {
       agentRuntimeArtifact,
       executionRole,

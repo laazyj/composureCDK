@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import type { IBedrockAgentRuntime } from "aws-cdk-lib/aws-bedrockagentcore";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import { ref } from "@composurecdk/core";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { AlarmDefinitionBuilder, WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
 import type { AgentCoreMetricSource } from "../src/alarms.js";
-import { createRuntimeEndpointBuilder } from "../src/runtime-endpoint.js";
+import {
+  createRuntimeEndpointBuilder,
+  type RuntimeEndpointBuilderResult,
+} from "../src/runtime-endpoint.js";
 import { importedRuntime } from "./fixtures.js";
 
 const buildAndSynth = buildFixture(createRuntimeEndpointBuilder, "Prod");
@@ -89,5 +93,58 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["invocations", "sessions"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth((b, stack) =>
+      b.runtime(importedRuntime(stack)).endpointName("prod"),
+    );
+    const typed: RuntimeEndpointBuilderResult = result;
+    const userErrors = typed.alarms.userErrors;
+
+    assertAssignable<Alarm | undefined, typeof userErrors>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof userErrors>();
+    expect(userErrors).toBeDefined();
+    // @ts-expect-error -- "targetExecutionTime" is a gateway alarm, not an endpoint's
+    expect(typed.alarms.targetExecutionTime).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const system = compose(
+      {
+        endpoint: createRuntimeEndpointBuilder()
+          .runtime(importedRuntime(stack))
+          .endpointName("prod")
+          .addAlarm("sessions", (a) =>
+            a
+              .metric((m) => m.metric("SessionCount"))
+              .threshold(10)
+              .greaterThan(),
+          ),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref(
+              "endpoint",
+              (r: WithCustomAlarms<RuntimeEndpointBuilderResult, "sessions">) => {
+                // @ts-expect-error -- "session" was not declared as a custom key
+                expect(r.alarms.session).toBeUndefined();
+                return r.alarms.sessions;
+              },
+            ).resolve(context),
+          }),
+        },
+      },
+      { endpoint: [], consumer: ["endpoint"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.endpoint.alarms.sessions);
   });
 });

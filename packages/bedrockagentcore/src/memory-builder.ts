@@ -1,12 +1,13 @@
 import { Memory, type MemoryProps } from "aws-cdk-lib/aws-bedrockagentcore";
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import {
   type AlarmConfigurer,
   AlarmDefinitionBuilder,
+  type AlarmsOf,
   createAlarms,
+  type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
 import { type AgentCoreMetricSource, perMinute } from "./alarms.js";
 
@@ -25,8 +26,13 @@ export interface MemoryBuilderProps extends Omit<MemoryProps, "kmsKey" | "execut
 /** The build output of an {@link IMemoryBuilder}. */
 export interface MemoryBuilderResult {
   memory: Memory;
-  /** The CloudWatch alarms created, keyed by alarm key. */
-  alarms: Record<string, Alarm>;
+  /**
+   * The CloudWatch alarms created, keyed by alarm key. Memory has no
+   * recommended alarms, so every key is a compile error; read a custom alarm
+   * through {@link WithCustomAlarms}.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-generated-empty-object-type -- deliberately `{}`: memory has no recommended alarm keys
+  alarms: AlarmsOf<never>;
 }
 
 /**
@@ -36,7 +42,7 @@ export interface MemoryBuilderResult {
  */
 export type IMemoryBuilder = ITaggedBuilder<MemoryBuilderProps, MemoryBuilder>;
 
-class MemoryBuilder implements Lifecycle<MemoryBuilderResult> {
+class MemoryBuilder implements Lifecycle<WithCustomAlarms<MemoryBuilderResult, string>> {
   props: Partial<MemoryBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<AgentCoreMetricSource>[] = [];
 
@@ -66,7 +72,11 @@ class MemoryBuilder implements Lifecycle<MemoryBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string, context: Record<string, object> = {}): MemoryBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context: Record<string, object> = {},
+  ): WithCustomAlarms<MemoryBuilderResult, string> {
     const { kmsKey, executionRole, ...rest } = this.props;
     const memory = new Memory(scope, id, {
       ...rest,

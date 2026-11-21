@@ -76,8 +76,12 @@
         {
           "externalDependencies": [
             "eslint",
+            "@eslint/js",
             "typescript-eslint",
             "@typescript-eslint/parser",
+            "eslint-config-prettier",
+            "@eslint-community/eslint-plugin-eslint-comments",
+            "@nx/eslint-plugin",
             "@composure-labs/dynamodb-guard"
           ]
         }

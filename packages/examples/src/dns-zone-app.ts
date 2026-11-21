@@ -48,13 +48,16 @@ import { exampleApp } from "./app-context.js";
  * - NS delegation of an internal subdomain
  * - HTTPS service-binding record advertising HTTP/3 + HTTP/2 at the apex
  * - DNS query logging, which Route 53 accepts only in `us-east-1`
+ * - CloudFront standard logging (v2) to an ACL-free bucket, which also needs
+ *   the distribution's stack in `us-east-1`
  * - Composing the record set with a hosted zone and surfacing the delegation
  *   name servers as a CloudFormation output
  */
 export function createDnsZoneApp(app = exampleApp()): void {
   const { stack } = createStackBuilder()
     .description("Public DNS zone (DSL example)")
-    // Route 53 query logging requires us-east-1 — see packages/route53/README.md.
+    // Route 53 query logging and CloudFront standard logging (v2) both
+    // require us-east-1 — see the route53 and cloudfront READMEs.
     .env({ account: process.env.CDK_DEFAULT_ACCOUNT, region: "us-east-1" })
     .build(app, "ComposureCDK-DnsZoneStack");
 
@@ -70,7 +73,10 @@ export function createDnsZoneApp(app = exampleApp()): void {
       // app you would bring your own origin (ALB, S3, etc.).
       cdn: createDistributionBuilder()
         .comment("Front door for www.composurecdk-zone-dsl-demo.com")
-        .origin(new HttpOrigin("origin.composurecdk-zone-dsl-demo.com")),
+        .origin(new HttpOrigin("origin.composurecdk-zone-dsl-demo.com"))
+        // Access logs through vended-log delivery, so the log bucket keeps
+        // ACLs disabled.
+        .accessLogs({ v2: {} }),
 
       records: zoneRecords([
         // ------------------------------------------------------------

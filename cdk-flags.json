@@ -8,7 +8,7 @@
     "budgets": ["aws-budgets"],
     "cdk-testing": [],
     "cloudformation": ["aws-cloudformation"],
-    "cloudfront": ["aws-cloudfront", "aws-cloudfront-origins"],
+    "cloudfront": ["aws-cloudfront", "aws-cloudfront-origins", "aws-logs"],
     "cloudwatch": ["aws-cloudwatch", "aws-cloudwatch-actions"],
     "core": ["core"],
     "custom-resources": ["customresources", "custom-resources"],

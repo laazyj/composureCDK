@@ -8,6 +8,7 @@ import {
   ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
 import type { DistributionBuilderProps, InlineFunctionDefinition } from "./distribution-builder.js";
+import type { StandardLoggingOutputFormat } from "./standard-logging.js";
 
 /**
  * Defaults applied to every cache behavior — the default behavior and each
@@ -120,3 +121,11 @@ export const INLINE_FUNCTION_DEFAULTS: Partial<InlineFunctionDefinition> = {
    */
   runtime: FunctionRuntime.JS_2_0,
 };
+
+/**
+ * The `outputFormat` standard logging (v2) writes to an S3 destination when
+ * none is set: W3C extended log format, the closest match to the files legacy
+ * logging writes, so tools that read legacy logs need the fewest changes.
+ * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/standard-logging.html#supported-log-file-format
+ */
+export const STANDARD_LOGGING_S3_OUTPUT_FORMAT: StandardLoggingOutputFormat = "w3c";

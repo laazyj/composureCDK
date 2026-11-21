@@ -1,4 +1,5 @@
 import {
+  type CfnDistribution,
   Distribution,
   type DistributionProps,
   type AddBehaviorOptions,
@@ -11,23 +12,25 @@ import {
 } from "aws-cdk-lib/aws-cloudfront";
 import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type Bucket, type IBucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
-import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
 import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import {
-  DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES,
-  createBucketBuilder,
-  type IBucketBuilder,
-} from "@composurecdk/s3";
+import { type IBucketBuilder } from "@composurecdk/s3";
 import type { DistributionAlarmConfig, FunctionAlarmConfig } from "./alarm-config.js";
 import { effectiveDistributionDefaults } from "./defaults.js";
+import { accessLogBucketBuilder } from "./access-log-bucket.js";
 import { acknowledgeListBucketRisk } from "./list-bucket-acknowledgement.js";
 import { guardOriginObjectExpiration } from "./origin-expiration-guard.js";
 import { resolveBehaviors } from "./resolve-behaviors.js";
 import { pathPatternSlug } from "./behavior-function-alarms.js";
 import { buildCloudFrontAlarms } from "./cloudfront-alarm-builder.js";
+import {
+  type CloudFrontLogDeliveryBuilderResult,
+  createCloudFrontLogDeliveryBuilder,
+  type StandardLogDelivery,
+  type StandardLoggingConfig,
+} from "./standard-logging.js";
 
 /**
  * Per-function metadata exposed on {@link DistributionBuilderResult.functions}.
@@ -161,31 +164,43 @@ export interface AdditionalBehaviorConfig extends Omit<
 }
 
 /**
- * Configures how CloudFront standard access logs are handled. Pass `false`
- * to disable logging; pass an object to wire a destination, prefix,
- * include cookies, or customize the auto-created sub-builder.
+ * CloudFront standard logging (legacy) to S3. CloudFront writes these logs
+ * through bucket ACLs, so the destination bucket must have ACLs enabled
+ * (`BUCKET_OWNER_PREFERRED`). For an ACL-free bucket, use
+ * {@link StandardLoggingConfig | standard logging (v2)} instead.
  *
  * `configure` cannot be combined with `destination` — a user-managed
  * destination is not built by this builder.
+ *
+ * @see https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/standard-logging-legacy-s3.html
  */
-export type AccessLogsConfig =
-  | false
-  | {
-      destination?: IBucket;
-      prefix?: string;
-      includeCookies?: boolean;
-      /**
-       * Customize the auto-created logging sub-builder. Receives a builder
-       * pre-seeded with `versioned: false`, `objectOwnership:
-       * BUCKET_OWNER_PREFERRED`, `removalPolicy: RETAIN`, and recursive
-       * S3 server access logging disabled.
-       *
-       * The callback receives the build context, so anything `IBucketBuilder`
-       * accepts as a `Resolvable` can be a `ref` to a sibling component.
-       * Declare that component as a dependency.
-       */
-      configure?: (b: IBucketBuilder) => IBucketBuilder;
-    };
+export interface LegacyAccessLogsConfig {
+  destination?: IBucket;
+  prefix?: string;
+  includeCookies?: boolean;
+  /**
+   * Customize the auto-created logging sub-builder. Receives a builder
+   * pre-seeded with `versioned: false`, `objectOwnership:
+   * BUCKET_OWNER_PREFERRED`, `removalPolicy: RETAIN`, and recursive
+   * S3 server access logging disabled.
+   *
+   * The callback receives the build context, so anything `IBucketBuilder`
+   * accepts as a `Resolvable` can be a `ref` to a sibling component.
+   * Declare that component as a dependency.
+   */
+  configure?: (b: IBucketBuilder) => IBucketBuilder;
+}
+
+/**
+ * Configures how CloudFront access logs are handled:
+ *
+ * - `false` disables them;
+ * - `{ v2: {...} }` uses {@link StandardLoggingConfig | standard logging (v2)},
+ *   whose S3 destination keeps ACLs disabled;
+ * - any other object uses {@link LegacyAccessLogsConfig | legacy logging},
+ *   which needs a bucket with ACLs enabled.
+ */
+export type AccessLogsConfig = false | LegacyAccessLogsConfig | { v2: StandardLoggingConfig };
 
 /**
  * Configuration properties for the CloudFront distribution builder.
@@ -294,9 +309,15 @@ export interface DistributionBuilderResult {
 
   /**
    * The S3 bucket created for access logging, or `undefined` if access
-   * logging was disabled or the user provided their own bucket.
+   * logging was disabled or the user provided their own destination.
    */
   accessLogsBucket?: Bucket;
+
+  /**
+   * The CloudWatch Logs delivery resources, when access logs use
+   * standard logging (v2).
+   */
+  logDelivery?: StandardLogDelivery;
 
   /**
    * CloudFront Functions created by the builder for inline function
@@ -460,9 +481,12 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       defaultBehavior: defaultBehaviorDefaults,
       ...cdkDefaults
     } = effectiveDistributionDefaults(resolvedCertificate !== undefined);
-    const cfg = accessLogs ?? defaultAccessLogs;
-
-    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg, context);
+    const { accessLogsBucket, accessLogProps, standardLogging } = resolveAccessLogs(
+      scope,
+      id,
+      accessLogs ?? defaultAccessLogs,
+      context,
+    );
 
     const behaviors = resolveBehaviors({
       scope,
@@ -493,6 +517,18 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
       distribution.node.addDependency(accessLogsBucket);
     }
 
+    const logDelivery =
+      standardLogging && buildLogDelivery(scope, id, distribution, standardLogging, context);
+    // Cookie logging is a distribution-wide setting, so it lives on the
+    // distribution rather than the delivery. The L2 renders `Logging` only
+    // for a legacy bucket, hence the override.
+    if (standardLogging?.includeCookies) {
+      (distribution.node.defaultChild as CfnDistribution).addPropertyOverride(
+        "DistributionConfig.Logging.IncludeCookies",
+        true,
+      );
+    }
+
     acknowledgeListBucketRisk(distribution, mergedProps.defaultRootObject);
     guardOriginObjectExpiration(distribution, id);
 
@@ -505,7 +541,8 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
 
     return {
       distribution,
-      accessLogsBucket,
+      accessLogsBucket: accessLogsBucket ?? logDelivery?.bucket,
+      logDelivery,
       functions: behaviors.functions,
       alarms,
     };
@@ -545,6 +582,22 @@ export function createDistributionBuilder(): IDistributionBuilder {
   return taggedBuilder<DistributionBuilderProps, DistributionBuilder>(DistributionBuilder);
 }
 
+/**
+ * Builds standard logging (v2) for `distribution` with the delivery builder,
+ * configured by the user's `configure` callback. Pass the build context down,
+ * so the callback can hand the builder a `ref()` to a sibling component.
+ */
+function buildLogDelivery(
+  scope: IConstruct,
+  id: string,
+  distribution: Distribution,
+  { configure }: StandardLoggingConfig,
+  context?: Record<string, object>,
+): CloudFrontLogDeliveryBuilderResult {
+  const builder = createCloudFrontLogDeliveryBuilder().distribution(distribution);
+  return (configure ? configure(builder) : builder).build(scope, `${id}LogDelivery`, context);
+}
+
 function resolveAccessLogs(
   scope: IConstruct,
   id: string,
@@ -555,9 +608,14 @@ function resolveAccessLogs(
   accessLogProps: Partial<
     Pick<DistributionProps, "enableLogging" | "logBucket" | "logFilePrefix" | "logIncludesCookies">
   >;
+  /** Set for standard logging (v2), which is built once the distribution exists. */
+  standardLogging?: StandardLoggingConfig;
 } {
   if (cfg === false || cfg === undefined) {
     return { accessLogProps: {} };
+  }
+  if ("v2" in cfg) {
+    return { accessLogProps: {}, standardLogging: cfg.v2 };
   }
 
   const extras = {
@@ -581,13 +639,8 @@ function resolveAccessLogs(
     };
   }
 
-  let subBuilder = createBucketBuilder()
-    .serverAccessLogs(false)
-    .versioned(false)
-    // CloudFront standard logging writes via ACLs, which requires BucketOwnerPreferred.
-    .objectOwnership(ObjectOwnership.BUCKET_OWNER_PREFERRED)
-    .removalPolicy(RemovalPolicy.RETAIN)
-    .lifecycleRules(DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES);
+  // CloudFront legacy logging writes via ACLs, which requires BucketOwnerPreferred.
+  let subBuilder = accessLogBucketBuilder(ObjectOwnership.BUCKET_OWNER_PREFERRED);
   if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }

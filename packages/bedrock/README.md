@@ -124,6 +124,21 @@ createModelAlarmBuilder()
 
 No alarm actions are configured; route them with `alarmActionsPolicy`.
 
+### Reading alarms by key
+
+`ModelAlarmBuilderResult`, `GuardrailBuilderResult` and `ModelInvocationLoggingBuilderResult` type `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled or opt-in. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("haikuAlarms", (r: ModelAlarmBuilderResult) => r.alarms.invocationThrottles); // Alarm | undefined
+ref(
+  "haikuAlarms",
+  (r: WithCustomAlarms<ModelAlarmBuilderResult, "outputTokens">) => r.alarms.outputTokens,
+); // Alarm
+ref("haikuAlarms", (r: ModelAlarmBuilderResult) => r.alarms.invocationThrottle); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of a model alarm or guardrail builder's own `build()` accepts any key, as `WithCustomAlarms<…, string>`. The model invocation logging builder has no `addAlarm`, so its own `build()` result is typed by key too. The recommended keys are exported as `ModelAlarmKey`, `GuardrailAlarmKey` and `ModelInvocationLoggingAlarmKey`.
+
 ## Model invocation logging
 
 `createModelInvocationLoggingBuilder()` turns on [model invocation logging](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html) for the account in the stack's Region ([GENSEC01-BP04](https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp04.html)). The setting has no CloudFormation resource, so a custom resource applies it on deploy and deletes it with the stack.

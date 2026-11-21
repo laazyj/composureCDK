@@ -36,7 +36,15 @@ export interface ModelInvocationLoggingAlarmConfig {
   largeDataS3DeliveryFailure?: AlarmConfig | false;
 }
 
-type DeliveryAlarmKey = Exclude<keyof ModelInvocationLoggingAlarmConfig, "enabled">;
+/**
+ * Keys of the recommended alarms a model invocation logging builder can
+ * create: every {@link ModelInvocationLoggingAlarmConfig} entry except the
+ * `enabled` master switch.
+ */
+export type ModelInvocationLoggingAlarmKey = Exclude<
+  keyof ModelInvocationLoggingAlarmConfig,
+  "enabled"
+>;
 
 /** A failed delivery is an invocation missing from the audit record. */
 const ANY_FAILURE: AlarmConfigDefaults = {
@@ -53,7 +61,7 @@ const ANY_FAILURE: AlarmConfigDefaults = {
  * @see https://docs.aws.amazon.com/wellarchitected/latest/generative-ai-lens/gensec01-bp04.html
  */
 export const MODEL_INVOCATION_LOGGING_ALARM_DEFAULTS: Record<
-  DeliveryAlarmKey,
+  ModelInvocationLoggingAlarmKey,
   AlarmConfigDefaults
 > = {
   cloudWatchDeliveryFailure: ANY_FAILURE,
@@ -61,7 +69,7 @@ export const MODEL_INVOCATION_LOGGING_ALARM_DEFAULTS: Record<
 };
 
 const DELIVERY_ALARMS: Record<
-  DeliveryAlarmKey,
+  ModelInvocationLoggingAlarmKey,
   { metricName: string; destination: string; requiresBucket: boolean }
 > = {
   cloudWatchDeliveryFailure: {
@@ -85,8 +93,8 @@ export function resolveModelInvocationLoggingAlarmDefinitions(
 
   return (
     Object.entries(DELIVERY_ALARMS) as [
-      DeliveryAlarmKey,
-      (typeof DELIVERY_ALARMS)[DeliveryAlarmKey],
+      ModelInvocationLoggingAlarmKey,
+      (typeof DELIVERY_ALARMS)[ModelInvocationLoggingAlarmKey],
     ][]
   ).flatMap(([key, spec]) => {
     const userConfig = config?.[key];

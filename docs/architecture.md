@@ -93,6 +93,10 @@ The id rides on a `Symbol.for` brand that only `compose` reads; the wiring key (
 
 The derived `` `${parentId}/${key}` `` is not real nesting: `constructs` rewrites the `/` to `--`, so a nested system's components land beside the parent's as siblings. `scoped(system)` creates `new Construct(scope, id)` and builds the system into it with each component at its key, so `App--failures--bucket` becomes `App--failures/bucket`. A composite builder uses it to keep what it creates under one node, which `Tags.of()` and Aspects can then target alone: its `build` returns `scoped(compose(...)).build(scope, id, context)`. Unwrapped systems derive ids as before. See [ADR-0020](adr/0020-scoped-system-construct.md).
 
+### Ordering deployment with `deployAfter`
+
+The dependency record orders builds, not deploys. When nothing in a component's template references what it must deploy after, `deployAfter(sources, component, target)` adds the edge. See [ADR-0021](adr/0021-deploy-order-is-a-composition-concern.md).
+
 ### Dependency declarations are exhaustive
 
 Every component must appear as a key in the dependencies record, even if it has no dependencies (in which case the value is `[]`). This is enforced by the type system. The alternative — making the dependencies record partial and defaulting missing keys to no dependencies — was rejected because it makes it too easy to forget a component and mask a missing dependency declaration.

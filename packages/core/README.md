@@ -134,6 +134,34 @@ A construct-level dependency already covers that construct's own children, so na
 
 It backs `dependsOn` in [`@composurecdk/custom-resources`](../custom-resources/README.md) and `after` in [`@composurecdk/lambda`](../lambda/README.md)'s `.invokeOnDeploy()`, so both spell ordering the same way.
 
+### Ordering a component: `deployAfter`
+
+In a composed system you don't need to call `addDependencies` yourself. Wrap the component in `deployAfter(sources, component, target)` instead, and the edge is declared beside the component it orders. `target` selects the construct that gets the edge:
+
+```ts
+import { compose, deployAfter, ref } from "@composurecdk/core";
+
+compose(
+  {
+    zone: createHostedZoneBuilder().zoneName("app.example.com"),
+    delegation: createCrossAccountZoneDelegationBuilder()
+      .delegatedZone(ref("zone", zoneOf))
+      .parentHostedZoneName("example.com")
+      .delegationRole(delegationRoleArn),
+    // ACM can only validate once the parent zone delegates to `zone`, but
+    // nothing in the certificate's template references the NS record.
+    certificate: deployAfter(
+      [ref("delegation", (r: CrossAccountZoneDelegationBuilderResult) => r.record)],
+      createCertificateBuilder().domainName("app.example.com").validationZone(ref("zone", zoneOf)),
+      (r) => r.certificate,
+    ),
+  },
+  { zone: [], delegation: ["zone"], certificate: ["zone", "delegation"] },
+);
+```
+
+`target` is required, and the sibling must still be a declared dependency, since refs in `sources` resolve against the build context. See [ADR-0021](../../docs/adr/0021-deploy-order-is-a-composition-concern.md).
+
 ## Examples
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`

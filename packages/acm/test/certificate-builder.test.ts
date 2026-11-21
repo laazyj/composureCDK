@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { type CfnResource, Duration } from "aws-cdk-lib";
+import { type CfnResource, CfnWaitConditionHandle, Duration } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import {
   CertificateValidation,
@@ -9,7 +9,7 @@ import {
 import { Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { PublicHostedZone } from "aws-cdk-lib/aws-route53";
 import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
+import { compose, deployAfter, type Lifecycle, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { createCertificateBuilder } from "../src/certificate-builder.js";
 import { CERTIFICATE_DEFAULTS } from "../src/defaults.js";
@@ -178,6 +178,37 @@ describe("CertificateBuilder", () => {
       template.hasResourceProperties("AWS::CertificateManager::Certificate", {
         KeyAlgorithm: "EC_prime256v1",
         CertificateTransparencyLoggingPreference: "DISABLED",
+      });
+    });
+  });
+
+  // Core's own tests cover deployAfter; this one checks it infers against a
+  // real builder and that the edge reaches the synthesised DependsOn.
+  describe("deployAfter", () => {
+    it("orders the certificate after a sibling it does not reference", () => {
+      const stack = newStack();
+      const zone = new PublicHostedZone(stack, "Zone", { zoneName: "example.com" });
+      const delegation: Lifecycle<{ record: CfnWaitConditionHandle }> = {
+        build: (scope, id) => ({ record: new CfnWaitConditionHandle(scope, id) }),
+      };
+
+      const result = compose(
+        {
+          delegation,
+          certificate: deployAfter(
+            [ref("delegation", (r: { record: CfnWaitConditionHandle }) => r.record)],
+            createCertificateBuilder()
+              .domainName("example.com")
+              .validationZone(zone)
+              .recommendedAlarms(false),
+            (r) => r.certificate,
+          ),
+        },
+        { delegation: [], certificate: ["delegation"] },
+      ).build(stack, "Site");
+
+      Template.fromStack(stack).hasResource("AWS::CertificateManager::Certificate", {
+        DependsOn: [stack.getLogicalId(result.delegation.record)],
       });
     });
   });

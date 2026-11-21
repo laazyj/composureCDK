@@ -39,3 +39,10 @@ export interface KeyAlarmConfig {
    */
   keyMaterialExpiration?: AlarmConfig | boolean;
 }
+
+/**
+ * Keys of the recommended KMS alarms a key builder can create — every
+ * {@link KeyAlarmConfig} entry except the `enabled` master switch. Each one
+ * is created under its own config key.
+ */
+export type KeyAlarmKey = Exclude<keyof KeyAlarmConfig, "enabled">;

@@ -219,9 +219,21 @@ const key = createKeyBuilder().addAlarm("urgentExpiry", (alarm) =>
 );
 ```
 
+### Reading alarms by key
+
+`KeyBuilderResult` types `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it is opt-in and can be disabled. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("tableKey", (r: KeyBuilderResult) => r.alarms.keyMaterialExpiration); // Alarm | undefined
+ref("tableKey", (r: WithCustomAlarms<KeyBuilderResult, "urgentExpiry">) => r.alarms.urgentExpiry); // Alarm
+ref("tableKey", (r: KeyBuilderResult) => r.alarms.keyMaterialExpiry); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of the builder's own `build()` accepts any key, as `WithCustomAlarms<KeyBuilderResult, string>`. The recommended keys are exported as `KeyAlarmKey`.
+
 ### Applying alarm actions
 
-Alarms are returned in the build result as `Record<string, Alarm>`:
+Alarms are returned in the build result's `alarms`, keyed by alarm name:
 
 ```ts
 const result = key.build(stack, "OrdersTableKey");

@@ -1,6 +1,6 @@
 # @composurecdk/cloudformation
 
-CloudFormation builders for [ComposureCDK](../../README.md).
+CloudFormation builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for CloudFormation Stacks, convenience stack strategies, and a post-build hook for creating CloudFormation outputs from composed systems.
 
@@ -129,7 +129,7 @@ compose(
 
 CloudFormation stores template text as ASCII. An em-dash, a curly quote or an ellipsis is **silently transliterated to `?` at deploy time** — no error, no `CREATE_FAILED`. The deployed template simply stops matching the synthesised one, so `cdk diff` reports a change on every run afterwards, forever, on a stack nobody touched. The only way out is to notice the character and strip it by hand.
 
-`templateTextPolicy` is a [Policy](../../docs/architecture.md#policies) that finds those characters at synth time instead.
+`templateTextPolicy` is a [Policy](https://github.com/laazyj/composureCDK/blob/main/docs/architecture.md#policies) that finds those characters at synth time instead.
 
 ```ts
 import { templateTextPolicy } from "@composurecdk/cloudformation";
@@ -158,7 +158,7 @@ One field is not cosmetic: `AWS::CloudFront::Function`'s `functionCode` is execu
 
 ### Why it is opt-in
 
-Enforcing this inside every builder would turn a working — if diff-noisy — deployment into a synth failure for anyone who has been living with the transliteration. Installing the policy is how you say you would rather know. Constraints whose violation fails the _deploy_ rather than merely the diff, such as an EC2 `GroupDescription`, stay enforced at the builder regardless ([ADR-0010](../../docs/adr/0010-aws-property-constraints.md)).
+Enforcing this inside every builder would turn a working — if diff-noisy — deployment into a synth failure for anyone who has been living with the transliteration. Installing the policy is how you say you would rather know. Constraints whose violation fails the _deploy_ rather than merely the diff, such as an EC2 `GroupDescription`, stay enforced at the builder regardless ([ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md)).
 
 An Aspect also reaches further than a builder can. A per-builder validator only covers fields someone remembered to wire one into — which is exactly how the stack-level `Description` slipped through, since `StackBuilder` passes `description` straight to `StackProps`. The Aspect walks the whole construct tree, so for the resource types it knows about it also catches constructs this library never built: raw L1s and other libraries' L2s alike.
 
@@ -195,7 +195,7 @@ Keys are CloudFormation resource types; values are **CDK L1 property names** (ca
 - Nested properties such as `DistributionConfig.Comment` and `FunctionConfig.Comment`. The two CloudFront rows above are the whole of what is reachable in that service — every other free-text field it declares sits behind a `*Config` object — so CloudFront is covered where the registry can see, not wherever a comment can be typed.
 - Resource types and properties not in the table above, until you add them. A property name that does not match an L1 accessor is skipped silently — the same outcome as not listing it.
 
-To check a single value directly rather than a whole tree, use `constraints.validate.templateText` / `constraints.sanitize.templateText` ([catalogue](../../docs/constraints.md)).
+To check a single value directly rather than a whole tree, use `constraints.validate.templateText` / `constraints.sanitize.templateText` ([catalogue](https://github.com/laazyj/composureCDK/blob/main/docs/constraints.md)).
 
 ## stackNameSegments
 
@@ -209,7 +209,7 @@ const name = `/aws/lambda/${stackNameSegments(scope).join("/")}-my-function`;
 
 ## Constraints for builder authors
 
-Some property strings, such as a non-ASCII security group description, pass `cdk synth` and are rejected only at deploy. A constraint records one property's allowed characters and length limits as data, so your builder can fail at synth instead, with an error that names the allowed characters and links the AWS doc. Every package's [`constraints`](../../docs/constraints.md) namespace is built on it; [ADR-0010](../../docs/adr/0010-aws-property-constraints.md) explains the design.
+Some property strings, such as a non-ASCII security group description, pass `cdk synth` and are rejected only at deploy. A constraint records one property's allowed characters and length limits as data, so your builder can fail at synth instead, with an error that names the allowed characters and links the AWS doc. Every package's [`constraints`](https://github.com/laazyj/composureCDK/blob/main/docs/constraints.md) namespace is built on it; [ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md) explains the design.
 
 Declare the constraint once, next to the builder that enforces it, and keep it module-private. `charSets` holds character classes shared across AWS properties; append your property's own characters.
 
@@ -238,9 +238,9 @@ export const constraints = {
 Call `constraints.validate.widgetName(this.props.name)` from your builder's `build()`. Typing the object with `satisfies ConstraintNamespace` gives consumers the same call shape in every package.
 
 - **`validateString`** throws, for values the author wrote and can fix. **`sanitizeString`** returns a legal copy, for values the author does not control: it replaces runs of disallowed characters (with `-` by default) and truncates to `maxLength`. Both skip a value holding an unresolved CDK token.
-- **`name` and `source` appear in every error, and `allowed` in every character-set error**, so give each a real value. The [`composurecdk/constraint-metadata-required`](../eslint-plugin/docs/rules/constraint-metadata-required.md) lint rule catches empty ones; it is not in the presets a builder author extends, so enable it in your own `rules`.
+- **`name` and `source` appear in every error, and `allowed` in every character-set error**, so give each a real value. The [`composurecdk/constraint-metadata-required`](https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/constraint-metadata-required.md) lint rule catches empty ones; it is not in the presets a builder author extends, so enable it in your own `rules`.
 
 ## Examples
 
-- [MultiStackApp](../examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`
-- [StaticWebsiteStack](../examples/src/static-website/app.ts) — CloudFormation outputs with `afterBuild` and `outputs`
+- [MultiStackApp](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`
+- [StaticWebsiteStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/static-website/app.ts) — CloudFormation outputs with `afterBuild` and `outputs`

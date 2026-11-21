@@ -1,6 +1,6 @@
 # @composurecdk/cloudfront
 
-CloudFront builders for [ComposureCDK](../../README.md).
+CloudFront builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for CloudFront distributions with secure, AWS-recommended defaults. It wraps the CDK [Distribution](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudfront.Distribution.html) construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -33,7 +33,7 @@ const cdn = createDistributionBuilder().origin(
 compose({ site: createBucketBuilder(), cdn }, { site: [], cdn: ["site"] }).build(stack, "Website");
 ```
 
-`.certificate(...)` takes a `Ref` the same way, so an [`@composurecdk/acm`](../acm/README.md) certificate (issued in `us-east-1`) can be a component of the same system. Its inner type is read from CDK's own `DistributionProps.certificate` rather than pinned to `ICertificate`, so it accepts whatever the `aws-cdk-lib` you have installed accepts — including the broader [`acm.ICertificateRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_certificatemanager.ICertificateRef.html) where CDK has widened the prop.
+`.certificate(...)` takes a `Ref` the same way, so an [`@composurecdk/acm`](https://github.com/laazyj/composureCDK/blob/main/packages/acm/README.md) certificate (issued in `us-east-1`) can be a component of the same system. Its inner type is read from CDK's own `DistributionProps.certificate` rather than pinned to `ICertificate`, so it accepts whatever the `aws-cdk-lib` you have installed accepts — including the broader [`acm.ICertificateRef`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_certificatemanager.ICertificateRef.html) where CDK has widened the prop.
 
 ## Secure Defaults
 
@@ -347,4 +347,4 @@ Set `crossRegionReferences: true` on both stacks so CDK can export `Distribution
 
 ## Examples
 
-- [StaticWebsiteStack](../examples/src/static-website/app.ts) — S3 + CloudFront static website with OAC, error pages, and content deployment
+- [StaticWebsiteStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/static-website/app.ts) — S3 + CloudFront static website with OAC, error pages, and content deployment

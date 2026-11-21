@@ -1,6 +1,6 @@
 # @composurecdk/core
 
-Core primitives for [ComposureCDK](../../README.md).
+Core primitives for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides the foundational types and utilities that all ComposureCDK resource packages build on: the fluent `Builder` proxy, the `compose` function for assembling component systems with dependency resolution, lazy `Ref` cross-references, and stack strategies for routing components to scopes.
 
@@ -85,7 +85,7 @@ class FailureCaptureBuilder implements Lifecycle<FailureCaptureResult> {
 
 The new construct is a target for `Tags.of()` and Aspects that reaches only the system. Hooks added with `afterBuild` on the wrapped system get it as their scope, so `tags()` there tags the system's resources alone. `at()` pins still win over keys, and a component routed to another stack keeps its prefixed id.
 
-Wrapping a system that is already deployed changes its construct paths, which replaces its resources. See [ADR-0020](../../docs/adr/0020-scoped-system-construct.md).
+Wrapping a system that is already deployed changes its construct paths, which replaces its resources. See [ADR-0020](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0020-scoped-system-construct.md).
 
 ## Ref
 
@@ -132,11 +132,11 @@ addDependencies(
 
 A construct-level dependency already covers that construct's own children, so naming one is enough whenever what you need sits under it — ordering against a `RestApi` also orders against its deployment and stage. Naming the component instead also reaches its _peers_: an API's access log group, a queue's dead-letter queue.
 
-It backs `dependsOn` in [`@composurecdk/custom-resources`](../custom-resources/README.md) and `after` in [`@composurecdk/lambda`](../lambda/README.md)'s `.invokeOnDeploy()`, so both spell ordering the same way.
+It backs `dependsOn` in [`@composurecdk/custom-resources`](https://github.com/laazyj/composureCDK/blob/main/packages/custom-resources/README.md) and `after` in [`@composurecdk/lambda`](https://github.com/laazyj/composureCDK/blob/main/packages/lambda/README.md)'s `.invokeOnDeploy()`, so both spell ordering the same way.
 
 ## Construct IDs
 
-Use these when a builder derives a construct ID from something the user supplied, such as a map key or a record name. `constructId` replaces `/` and control characters with `-`, and throws on `{ } [ ]`, because they mean an unresolved CDK token has leaked into the ID, which would give a logical ID that changes between synths. Given several parts, it sanitises each and joins them with `-`. To sanitise one fragment inside a larger ID, use `sanitizeConstructId`. Sanitise only the part you derive, never the `id` your builder was given: under `compose` it can contain `/` on purpose ([ADR-0012](../../docs/adr/0012-explicit-build-id-decoupled-from-compose-key.md)).
+Use these when a builder derives a construct ID from something the user supplied, such as a map key or a record name. `constructId` replaces `/` and control characters with `-`, and throws on `{ } [ ]`, because they mean an unresolved CDK token has leaked into the ID, which would give a logical ID that changes between synths. Given several parts, it sanitises each and joins them with `-`. To sanitise one fragment inside a larger ID, use `sanitizeConstructId`. Sanitise only the part you derive, never the `id` your builder was given: under `compose` it can contain `/` on purpose ([ADR-0012](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0012-explicit-build-id-decoupled-from-compose-key.md)).
 
 ```ts
 import { constructId } from "@composurecdk/core";
@@ -153,6 +153,6 @@ A construct ID is part of the resource's logical ID. Adopting these in a builder
 
 ## Examples
 
-- [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`
-- [StaticWebsiteStack](../examples/src/static-website/app.ts) — S3 + CloudFront composed system with `ref` and `afterBuild`
-- [DynamoStreamProcessorStack](../examples/src/dynamo-stream-processor-app.ts) — Stream consumer and its DLQ built under one construct with `scoped`, tagged as a unit
+- [MultiStackApp](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`
+- [StaticWebsiteStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/static-website/app.ts) — S3 + CloudFront composed system with `ref` and `afterBuild`
+- [DynamoStreamProcessorStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/dynamo-stream-processor-app.ts) — Stream consumer and its DLQ built under one construct with `scoped`, tagged as a unit

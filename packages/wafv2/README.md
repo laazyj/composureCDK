@@ -1,6 +1,6 @@
 # @composurecdk/wafv2
 
-AWS WAF web ACL builder for [ComposureCDK](../../README.md).
+AWS WAF web ACL builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for [AWS WAF](https://docs.aws.amazon.com/waf/latest/developerguide/waf-chapter.html) web ACLs, their rules and their associations. CDK has no L2 for WAF, so it wraps the [`CfnWebACL`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_wafv2.CfnWebACL.html) and [`CfnWebACLAssociation`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_wafv2.CfnWebACLAssociation.html) L1s directly, and handles the parts of them that only fail at deploy time.
 
@@ -138,7 +138,7 @@ A custom response only applies to Block, so `respond()` after another action, or
 
 Logging is on by default, because the [Well-Architected security pillar](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_detect_investigate_events_app_service_logging.html) asks for it and cdk-nag's NIST 800-53, PCI DSS and HIPAA packs fail a web ACL without it (`WAFv2LoggingEnabled`). The builder:
 
-- creates a CloudWatch log group through [`@composurecdk/logs`](../logs/README.md), so it gets that package's retention and removal defaults, named `aws-waf-logs-<web ACL name>` (or a name derived from the construct path), since WAF only logs to names with that prefix;
+- creates a CloudWatch log group through [`@composurecdk/logs`](https://github.com/laazyj/composureCDK/blob/main/packages/logs/README.md), so it gets that package's retention and removal defaults, named `aws-waf-logs-<web ACL name>` (or a name derived from the construct path), since WAF only logs to names with that prefix;
 - points an `AWS::WAFv2::LoggingConfiguration` at it, using the log group ARN **without** the trailing `:*` that `logGroup.logGroupArn` has, which WAF rejects;
 - keeps only the requests WAF blocks, counts, or answers with a CAPTCHA or challenge (`DEFAULT_LOGGING_FILTER`). Filtering is AWS's main lever on log [volume and cost](https://docs.aws.amazon.com/waf/latest/developerguide/logging-management.html);
 - redacts the `authorization` and `cookie` headers (`DEFAULT_LOGGING_REDACTED_HEADERS`), which carry replayable credentials and are no help when tuning a rule.
@@ -185,7 +185,7 @@ The dimensions follow what WAF actually publishes, which differs from its docume
 
 ## Alarms
 
-The recommended alarms are per rule. AWS publishes [no recommended alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) for WAF, so the defaults below (`WEB_ACL_RULE_ALARM_DEFAULTS`) are this library's starting points. Every alarm treats missing data as not breaching, because WAF publishes a datapoint only when its count is non-zero. No alarm actions are configured — apply them from the result or with [`alarmActionsPolicy`](../cloudwatch/README.md).
+The recommended alarms are per rule. AWS publishes [no recommended alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html) for WAF, so the defaults below (`WEB_ACL_RULE_ALARM_DEFAULTS`) are this library's starting points. Every alarm treats missing data as not breaching, because WAF publishes a datapoint only when its count is non-zero. No alarm actions are configured — apply them from the result or with [`alarmActionsPolicy`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/README.md).
 
 | Alarm key               | Created for                                | Metric                         | Default threshold | Why                                                                                                                                                                                                          |
 | ----------------------- | ------------------------------------------ | ------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -241,7 +241,7 @@ const { webAcl } = createWebAclBuilder().scope("CLOUDFRONT").build(usEast1Stack,
 
 ## Constraints
 
-Names, metric names and labels are validated at build against the AWS rules above ([ADR-0010](../../docs/adr/0010-aws-property-constraints.md)). The validators are exported for direct use:
+Names, metric names and labels are validated at build against the AWS rules above ([ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md)). The validators are exported for direct use:
 
 ```ts
 import { constraints } from "@composurecdk/wafv2";

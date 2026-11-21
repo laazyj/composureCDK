@@ -1,6 +1,6 @@
 # @composurecdk/ec2
 
-EC2 and VPC builders for [ComposureCDK](../../README.md).
+EC2 and VPC builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for AWS EC2 instances and VPCs with secure, AWS-recommended defaults. It wraps the CDK [Instance](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ec2.Instance.html) and [Vpc](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_ec2.Vpc.html) constructs — refer to the CDK documentation for the full set of configurable properties.
 
@@ -21,7 +21,7 @@ Every [InstanceProps](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aw
 
 ### Granting access to other resources
 
-An EC2 instance is a grantee: `.grant()` takes the capability helpers resource packages expose, and the permissions land on whichever role the instance runs as ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)).
+An EC2 instance is a grantee: `.grant()` takes the capability helpers resource packages expose, and the permissions land on whichever role the instance runs as ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)).
 
 ```ts
 import { createInstanceBuilder } from "@composurecdk/ec2";
@@ -658,4 +658,4 @@ compose(
 
 ## Examples
 
-- [Ec2Stack](../examples/src/ec2-app.ts) — VPC + EC2 instance with alarms wired to an SNS topic via `alarmActionsPolicy`.
+- [Ec2Stack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/ec2-app.ts) — VPC + EC2 instance with alarms wired to an SNS topic via `alarmActionsPolicy`.

@@ -1,6 +1,6 @@
 # @composurecdk/lambda
 
-Lambda builders for [ComposureCDK](../../README.md).
+Lambda builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for AWS Lambda functions with secure, AWS-recommended defaults. It wraps the CDK [Function](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_lambda.Function.html) construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -73,11 +73,11 @@ compose(
 );
 ```
 
-Per value rather than over the whole record, because mixing the two is the common case: wrapping the record would push every literal through the same `ref`, and through [`combine`](../core/README.md) as soon as two siblings are involved.
+Per value rather than over the whole record, because mixing the two is the common case: wrapping the record would push every literal through the same `ref`, and through [`combine`](https://github.com/laazyj/composureCDK/blob/main/packages/core/README.md) as soon as two siblings are involved.
 
 ## Environment variable encryption
 
-Lambda encrypts environment variables at rest with an AWS-managed key. `.environmentEncryption(...)` opts into a customer-managed one, and accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system rather than a construct created before `compose`:
+Lambda encrypts environment variables at rest with an AWS-managed key. `.environmentEncryption(...)` opts into a customer-managed one, and accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) can be a component of the same system rather than a construct created before `compose`:
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
@@ -141,7 +141,7 @@ const handler = createFunctionBuilder()
   );
 ```
 
-The callback receives the internal [`IRoleBuilder`](../iam/README.md). Calling `configureRole` more than once replaces the previous callback. The reserved `LogsWriter` name throws at build time if added a second time.
+The callback receives the internal [`IRoleBuilder`](https://github.com/laazyj/composureCDK/blob/main/packages/iam/README.md). Calling `configureRole` more than once replaces the previous callback. The reserved `LogsWriter` name throws at build time if added a second time.
 
 ### Supplying a role: `.role(role)`
 
@@ -324,7 +324,7 @@ consume permission (SQS `ReceiveMessage`, DynamoDB `grantStreamRead`, or Kinesis
 the builder's role rather than CDK's auto-role.
 
 `dynamoEventSource(table, props?)` mirrors the SQS factory for DynamoDB streams.
-The table must have a stream enabled (via the [DynamoDB builder](../dynamodb)'s
+The table must have a stream enabled (via the [DynamoDB builder](https://github.com/laazyj/composureCDK/tree/main/packages/dynamodb)'s
 `.dynamoStream(...)` / `.stream(...)`, or `TableProps.stream`); otherwise CDK
 throws `DynamoDB Streams must be enabled` at build time. `startingPosition`
 defaults to `LATEST` and is overridable via `props`:
@@ -390,7 +390,7 @@ retried until the stream's 24 h retention window expires unless you bound
 `retryAttempts` / `maxRecordAge`. Bounding retries **without** a dead-letter
 destination drops those records silently — so for durable failure handling, set
 `onFailure` too. `dynamoEventSource` widens `onFailure` to accept a queue (or a
-`ref()` to a sibling [`createQueueBuilder("dlq")`](../sqs) result) and wraps it
+`ref()` to a sibling [`createQueueBuilder("dlq")`](https://github.com/laazyj/composureCDK/tree/main/packages/sqs) result) and wraps it
 in an `SqsDlq` for you, resolving it alongside the table `ref` via `combine`:
 
 ```ts
@@ -429,7 +429,7 @@ durable copy of a failure.
 and passes it through unwrapped, so `new S3OnFailureDestination(bucket)` still
 opts into CDK's wider grant. That class needs **aws-cdk-lib ≥ 2.184.0** on a
 DynamoDB stream (or [Kinesis](#kinesis-data-streams)) mapping, above this
-package's [floor](../../docs/adr/0008-aws-cdk-lib-version-floors.md) of
+package's [floor](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0008-aws-cdk-lib-version-floors.md) of
 2.180.0: below it CDK rejects it at synth with `S3 onFailure Destination is
 not supported for this event source`. CDK's check is an `instanceof` on its own
 class, so a bare bucket is not subject to it and works at the floor.
@@ -446,12 +446,12 @@ suppressible synth-time warnings:
 
 - **Visibility timeout ≥ 6× the function timeout** — a relationship guard in
   this package, checked even when the queue arrives as a `ref()` (see
-  [ADR-0011](../../docs/adr/0011-cross-component-relationship-guards.md)). It
+  [ADR-0011](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0011-cross-component-relationship-guards.md)). It
   stays quiet for imported queues and token values. Silence it with
   `Annotations.of(scope).acknowledgeWarning(SQS_VISIBILITY_TIMEOUT_WARNING_ID)`.
 - **Redrive `maxReceiveCount` ≥ 5 before the DLQ** — checked by
   `@composurecdk/sqs`'s `QueueBuilder`, so only for queues it builds. See
-  [its dead-letter docs](../sqs/README.md#dead-letter-queues-dlq-fifo-dlq) for
+  [its dead-letter docs](https://github.com/laazyj/composureCDK/blob/main/packages/sqs/README.md#dead-letter-queues-dlq-fifo-dlq) for
   the warning id.
 
 ### Kinesis Data Streams
@@ -465,7 +465,7 @@ which includes `kms:Decrypt` for a customer-managed key.
 
 To build the stream and its consumer as composed components, with
 well-architected defaults and recommended alarms, use `createStreamBuilder()`
-and `createStreamConsumerBuilder()` from [`@composurecdk/kinesis`](../kinesis/README.md)
+and `createStreamConsumerBuilder()` from [`@composurecdk/kinesis`](https://github.com/laazyj/composureCDK/blob/main/packages/kinesis/README.md)
 and pass `ref("stream", (r) => r.stream)` or `ref("consumer", (r) => r.consumer)`.
 
 ```ts
@@ -598,12 +598,12 @@ Worth stating plainly, because the other two tools look right and are not.
 `custom_resources.Provider` wants a handler of yours that speaks the
 CloudFormation custom-resource protocol. `AwsCustomResource` runs one fixed SDK
 call with no handler of yours — and reaching for `Lambda.invoke` there
-[reports success when your handler fails](../custom-resources/README.md).
+[reports success when your handler fails](https://github.com/laazyj/composureCDK/blob/main/packages/custom-resources/README.md).
 `Trigger` is the one that invokes a plain handler and fails the stack on an
 error, and it is the least known of the three.
 
 It is a domain action on the function builder
-([ADR-0016](../../docs/adr/0016-domain-action-custom-resource.md)): you declare
+([ADR-0016](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0016-domain-action-custom-resource.md)): you declare
 the intent, the builder owns the invocation semantics, the wait derivation, the
 execution-role ordering and the IAM. The custom resource is exposed on the build
 result as `deploymentTrigger`, so a sibling can be ordered against the call
@@ -653,9 +653,9 @@ where this ordering does not reach. If the handler needs it at deploy time, name
 that resource in `after`.
 
 Everything else the call depends on goes in `after` as well. It takes any
-[`DependencySource`](../core/README.md#ordering-adddependencies) — the same
+[`DependencySource`](https://github.com/laazyj/composureCDK/blob/main/packages/core/README.md#ordering-adddependencies) — the same
 shapes as `dependsOn` in
-[`@composurecdk/custom-resources`](../custom-resources/README.md).
+[`@composurecdk/custom-resources`](https://github.com/laazyj/composureCDK/blob/main/packages/custom-resources/README.md).
 
 One caveat on "always": a role supplied with `.role(Role.fromRoleArn(...))`
 contributes no resources to the template, so there is nothing to sequence and
@@ -696,7 +696,7 @@ on the derived path so the provider outlives the call it is waiting on.
   the invocation re-runs when the handler changes; with `false` it runs only on
   the stack's first deployment. CDK's `Trigger` offers no "always" mode.
 - **It does not invoke on stack deletion.** For teardown-time work, use
-  [`@composurecdk/custom-resources`](../custom-resources/README.md), which has
+  [`@composurecdk/custom-resources`](https://github.com/laazyj/composureCDK/blob/main/packages/custom-resources/README.md), which has
   create/update/**delete** semantics.
 - **It creates no alarms.** The custom resource runs once per deployment, not
   continuously; there is no steady-state signal to alarm on. Failures surface as
@@ -708,7 +708,7 @@ on the derived path so the provider outlives the call it is waiting on.
 
 ## Examples
 
-- [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with recommended alarms, custom alarms, and SNS alarm actions
-- [MultiStackApp](../examples/src/multi-stack-app.ts) — Lambda split across stacks via `.withStacks()`, wired with `ref`
-- [OrderProcessorStack](../examples/src/order-processor-app.ts) — SQS queue wired to a Lambda consumer via `sqsEventSource`
-- [DynamoStreamProcessorStack](../examples/src/dynamo-stream-processor-app.ts) — DynamoDB stream wired to a Lambda consumer via `dynamoEventSource`, with bisect-on-error, bounded retries, and an `onFailure` SQS DLQ
+- [DualFunctionStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/dual-function-app.ts) — Two Lambda functions with recommended alarms, custom alarms, and SNS alarm actions
+- [MultiStackApp](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/multi-stack-app.ts) — Lambda split across stacks via `.withStacks()`, wired with `ref`
+- [OrderProcessorStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/order-processor-app.ts) — SQS queue wired to a Lambda consumer via `sqsEventSource`
+- [DynamoStreamProcessorStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/dynamo-stream-processor-app.ts) — DynamoDB stream wired to a Lambda consumer via `dynamoEventSource`, with bisect-on-error, bounded retries, and an `onFailure` SQS DLQ

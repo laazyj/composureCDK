@@ -1,6 +1,6 @@
 # @composurecdk/organizations
 
-AWS Organizations builders for [ComposureCDK](../../README.md).
+AWS Organizations builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for **service control policies** (SCPs). CDK ships no Organizations L2, so the builder wraps the [`CfnPolicy`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_organizations.CfnPolicy.html) L1 construct, following the same pattern as `@composurecdk/budgets`: typed setters, synth-time validation, and builder tags.
 
@@ -130,4 +130,4 @@ Each factory's JSDoc links the AWS example it follows. Extend one with the state
 
 ## Constraints
 
-`constraints.validate` exposes this package's validators: `policyName`, `policyDescription`, `rootId`, `organizationalUnitId`, `accountId` and `policyTargetId`. See [ADR-0010](../../docs/adr/0010-aws-property-constraints.md).
+`constraints.validate` exposes this package's validators: `policyName`, `policyDescription`, `rootId`, `organizationalUnitId`, `accountId` and `policyTargetId`. See [ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md).

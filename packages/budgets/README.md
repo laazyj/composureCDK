@@ -1,6 +1,6 @@
 # @composurecdk/budgets
 
-AWS Budgets builder for [ComposureCDK](../../README.md).
+AWS Budgets builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for `AWS::Budgets::Budget` with well-architected defaults, percentage-threshold notification helpers, and automatic `budgets.amazonaws.com` publish permission on SNS subscriber topics. It wraps the CDK L1 [CfnBudget](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_budgets.CfnBudget.html) construct — there is no L2 for Budgets.
 
@@ -85,7 +85,7 @@ Exported as `BUDGET_DEFAULTS`.
 
 When at least one notification subscriber is an SNS topic, the builder grants `SNS:Publish` to the `budgets.amazonaws.com` service principal. Without that grant, budget notifications to SNS silently fail to deliver — one of the most common footguns when wiring Budgets by hand.
 
-The statement is added to the topic's own access policy with `topic.addToResourcePolicy(...)`, next to any statement already there, such as the `enforceSSL` statement [`@composurecdk/sns`](../sns/README.md) adds by default. An SNS topic has exactly one access policy and every `AWS::SNS::TopicPolicy` replaces it, so a second policy resource would race the first. [`topicPolicyConflictPolicy`](../sns/README.md#topic-policy-conflict-policy) catches that at synth.
+The statement is added to the topic's own access policy with `topic.addToResourcePolicy(...)`, next to any statement already there, such as the `enforceSSL` statement [`@composurecdk/sns`](https://github.com/laazyj/composureCDK/blob/main/packages/sns/README.md) adds by default. An SNS topic has exactly one access policy and every `AWS::SNS::TopicPolicy` replaces it, so a second policy resource would race the first. [`topicPolicyConflictPolicy`](https://github.com/laazyj/composureCDK/blob/main/packages/sns/README.md#topic-policy-conflict-policy) catches that at synth.
 
 An imported topic (`Topic.fromTopicArn`) is the exception: CDK cannot add to its policy, so the builder creates a standalone `TopicPolicy` granting only the Budgets statement. It replaces whatever policy the topic already has, and the builder emits a synth warning (`@composurecdk/budgets:imported-topic-policy`) saying so. `result.topicPolicies` holds these policies, keyed by the topic's fully-qualified node path (unique within the CDK app); it is empty when every SNS subscriber is a topic created in CDK.
 
@@ -174,7 +174,7 @@ The custom keys you name are not checked against the builder's `addAlarm` calls.
 
 ### Applying alarm actions
 
-No alarm actions are configured by default. Wire SNS or other actions via [`alarmActionsPolicy`](../cloudwatch/README.md#alarm-actions-policy) (or an `afterBuild` hook) — for cross-region deployments, the policy applied to the `us-east-1` monitoring stack covers both recommended and custom alarms.
+No alarm actions are configured by default. Wire SNS or other actions via [`alarmActionsPolicy`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/README.md#alarm-actions-policy) (or an `afterBuild` hook) — for cross-region deployments, the policy applied to the `us-east-1` monitoring stack covers both recommended and custom alarms.
 
 ### Cross-region: `AWS/Billing EstimatedCharges` lives in `us-east-1` only
 
@@ -208,7 +208,7 @@ compose(
   .build(app, "App");
 ```
 
-If your custom `addAlarm` definitions reference the budget construct, set `crossRegionReferences: true` on both stacks so CDK can export the budget's properties from the app stack and import them in the alarm stack. The same pattern is documented for CloudFront and Route 53 alarms, and codified in [ADR-0004](../../docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md).
+If your custom `addAlarm` definitions reference the budget construct, set `crossRegionReferences: true` on both stacks so CDK can export the budget's properties from the app stack and import them in the alarm stack. The same pattern is documented for CloudFront and Route 53 alarms, and codified in [ADR-0004](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md).
 
 ## Build Result
 

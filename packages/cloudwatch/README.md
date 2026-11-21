@@ -7,7 +7,7 @@ This package provides the building blocks for CloudWatch alarms that follow Comp
 - **[App builders](#for-app-builders)**, who use ComposureCDK builders to define infrastructure.
 - **[Builder-package authors](#for-builder-package-authors)**, who write builders that ship recommended alarms, whether in this repository or their own.
 
-Everything this package exports is public API. It is not a place for code that ComposureCDK's own packages happen to share: new exports must clear [the bar below](#adding-an-export).
+Everything this package exports is [public API](../../docs/architecture.md#public-api). It supplies the alarm mechanism (merging config, creating constructs, naming); which alarms a service gets, and their thresholds, belong to that service's package.
 
 ## Contents
 
@@ -400,12 +400,3 @@ Use this to adopt alarms that are already deployed. The construct ID becomes the
 ### constraints
 
 `constraints.validate.alarmName` checks a string against CloudWatch's alarm-name rules and throws if it fails. Every ComposureCDK package exports its AWS-property checks in this `constraints.validate` / `constraints.sanitize` shape; see [Constraints](../../docs/constraints.md). Most code wants `alarmName()`, which runs the same check and returns an `AlarmName`.
-
-## Adding an export
-
-Every export is a promise to every user of the package: once published, it can change only in a major version. A new export must meet both conditions:
-
-1. **It is a primitive, not an opinion.** Mechanism that any alarm needs, such as merging config, creating constructs or naming, qualifies. Choices about what to alarm on, which thresholds or evaluation windows to use, or which alarms a family of services should share are opinions. They belong in the package that holds them.
-2. **It has a use outside this repository, or it has settled into the same shape in at least three packages.**
-
-Until both hold, keep the code in the package that needs it. If a second package needs the same code, copy it. Duplicated code can change freely; a public export cannot.

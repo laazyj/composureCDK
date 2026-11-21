@@ -13,10 +13,18 @@ export {
   type WebAclBuilderResult,
 } from "./web-acl-builder.js";
 export {
+  type IpSetForwardedIpOptions,
   type IWebAclRuleBuilder,
   type WebAclRuleAction,
   type WebAclRuleBuilderProps,
 } from "./rule-builder.js";
+export { type ForwardedIpFallback, type RateLimitAggregateKey } from "./rate-limit.js";
+export {
+  AWS_MANAGED_RULE_GROUP_RULES,
+  type AwsManagedRuleGroupName,
+  type ManagedRuleGroupOptions,
+  type ManagedRuleName,
+} from "./managed-rule-groups.js";
 export { type WebAclAssociationTarget } from "./association.js";
 export {
   type CustomResponse,

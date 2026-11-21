@@ -14,17 +14,11 @@ compose(
     api: createRestApiBuilder(),
     waf: createWebAclBuilder()
       .associateWith(ref("api", (r: RestApiBuilderResult) => r.api.deploymentStage))
-      .addRule("BlockAdmin", (rule) =>
-        rule
-          .statement({
-            byteMatchStatement: {
-              fieldToMatch: { uriPath: {} },
-              positionalConstraint: "STARTS_WITH",
-              searchString: "/admin",
-              textTransformations: [{ priority: 0, type: "NONE" }],
-            },
-          })
-          .respond(404, { json: { message: "Not found" } }),
+      .addRule("PerIpRate", (rule) =>
+        rule.rateLimit(3000).respond(429, { json: { reason: "throttled" } }),
+      )
+      .addRule("IpReputation", (rule) =>
+        rule.managedRuleGroup("AWSManagedRulesAmazonIpReputationList"),
       ),
   },
   { api: [], waf: ["api"] },
@@ -60,18 +54,66 @@ The result is `{ webAcl, associations, logGroup?, logging?, metrics, alarms }`:
 
 `addRule(name, configure)` adds a rule. `configure` receives a rule builder:
 
-| Method                                                          | What it does                                                                         |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `statement(raw)`                                                | The rule's statement, as CloudFormation's `StatementProperty`. Exactly one per rule. |
-| `block()` · `allow()` · `count()` · `captcha()` · `challenge()` | The action. `block()` is the default.                                                |
-| `respond(status, body?, headers?)`                              | Block with a custom response — see [Custom responses](#custom-responses).            |
-| `labels(...labels)`                                             | Labels to add to matching requests, for later rules to match on.                     |
-| `priority(n)`                                                   | Overrides the priority — see [Priorities](#priorities).                              |
-| `metricName(name)`                                              | The rule's CloudWatch metric name. Defaults to the rule's name.                      |
-| `sampledRequests(enabled)`                                      | Overrides the web ACL's sampling setting for this rule.                              |
-| `captchaConfig(…)` · `challengeConfig(…)`                       | Passed through to the rule.                                                          |
+| Method                                                          | What it does                                                                       |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `rateLimit(limit, window?)`                                     | A rate-based statement — see [Rate limits](#rate-limits).                          |
+| `blockUnlessHeader(name)`                                       | Matches requests without a header — see [Requiring a header](#requiring-a-header). |
+| `managedRuleGroup(name, options?)`                              | Evaluates a managed rule group — see [Managed rule groups](#managed-rule-groups).  |
+| `ipSet(arn, forwardedIp?)`                                      | Matches the addresses in an IP set — see [IP sets](#ip-sets).                      |
+| `statement(raw)`                                                | The rule's statement, as CloudFormation's `StatementProperty`, for anything else.  |
+| `block()` · `allow()` · `count()` · `captcha()` · `challenge()` | The action. `block()` is the default.                                              |
+| `respond(status, body?, headers?)`                              | Block with a custom response — see [Custom responses](#custom-responses).          |
+| `labels(...labels)`                                             | Labels to add to matching requests, for later rules to match on.                   |
+| `priority(n)`                                                   | Overrides the priority — see [Priorities](#priorities).                            |
+| `metricName(name)`                                              | The rule's CloudWatch metric name. Defaults to the rule's name.                    |
+| `sampledRequests(enabled)`                                      | Overrides the web ACL's sampling setting for this rule.                            |
+| `captchaConfig(…)` · `challengeConfig(…)`                       | Passed through to the rule.                                                        |
 
-Rule names are checked when the rule is added: 1–128 characters of `[A-Za-z0-9_-]`, and unique within the web ACL.
+Each rule has exactly one statement, from one of the first five methods; a second throws. Rule names are checked when the rule is added: 1–128 characters of `[A-Za-z0-9_-]`, and unique within the web ACL.
+
+### Rate limits
+
+`rateLimit(limit, window?)` matches each client's requests once it has sent more than `limit` of them in `window`, and keeps matching until its rate falls back under the limit. The window is 1, 2, 5 (the default) or 10 minutes; the limit 10 to 2,000,000,000. A client is an IP address unless you say otherwise:
+
+| Method                                     | Counts requests per                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `aggregateOnIp()`                          | client IP address. The default.                                                           |
+| `aggregateOnForwardedIp(header, fallback)` | IP address in a header such as `X-Forwarded-For`, for a web ACL behind a proxy.           |
+| `aggregateOnHeader(name)`                  | value of a header, as sent.                                                               |
+| `aggregateOn(...keys)`                     | anything else CloudFormation's `RateBasedStatementCustomKey` takes: a cookie, the path, … |
+| `scopeDown(statement)`                     | — counts only the requests that match `statement`, such as a login path.                  |
+
+The aggregate methods add up: `.aggregateOnIp().aggregateOnHeader("x-api-key")` limits each key from each address. One key of IP or forwarded IP is emitted as WAF's `IP` or `FORWARDED_IP` aggregate key type, since WAF takes those among custom keys only alongside another; anything else is `CUSTOM_KEYS`. At most five keys, and none twice, are checked at synth.
+
+**A request missing a key is not counted or limited at all.** WAF [omits requests missing any aggregation component](https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-rate-based-request-limiting.html), so a limit on a header needs a rule before it that blocks requests without the header, or a client sidesteps the limit by leaving it out. For an API called with temporary AWS credentials, that is a limit per STS session:
+
+```ts
+createWebAclBuilder()
+  .addRule("RequireSessionToken", (rule) => rule.blockUnlessHeader("x-amz-security-token"))
+  .addRule("PerCredentialRate", (rule) =>
+    rule
+      .rateLimit(60, Duration.minutes(1))
+      .aggregateOnHeader("x-amz-security-token")
+      .respond(429, { json: { reason: "throttled" } }),
+  )
+  .addRule("PerIpRate", (rule) =>
+    rule.rateLimit(3000).respond(429, { json: { reason: "throttled" } }),
+  );
+```
+
+The per-IP limit is a backstop, set well above the per-credential one because many clients may share a NAT address. Answering `429` rather than WAF's `403` lets a client tell throttling from an IAM denial.
+
+### Requiring a header
+
+`blockUnlessHeader(name)` matches requests that lack the header or send it empty, and blocks them unless you choose another action. WAF treats a request without the header as [not matching a statement that inspects it](https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-fields-list.html), so the builder emits a `NotStatement` around a size check, which matches exactly those requests. The header name is not case-sensitive. It checks presence only: whether the value is valid is for the application to decide.
+
+### IP sets
+
+`ipSet(arn, forwardedIp?)` matches requests from the addresses in an `AWS::WAFv2::IPSet`, given by ARN or as a `ref`. It blocks by default; `.allow()` makes it an allow-list. Pass `{ headerName, fallbackBehavior, position }` to match the address in a header such as `X-Forwarded-For` instead.
+
+```ts
+.addRule("Office", (rule) => rule.ipSet(ref("ips", (r: CfnIPSet) => r.attrArn)).allow())
+```
 
 ### Raw statements and CloudFormation casing
 
@@ -94,23 +136,47 @@ The `any`-typed fields are `FieldToMatch`'s `singleHeader`, `singleQueryArgument
 
 WAF evaluates rules from the lowest priority up. Each rule's priority defaults to ten times its position in `addRule` order — 0, 10, 20, … — so rules run in the order they are declared, and there is room to insert one with an explicit `.priority(n)` without renumbering the rest. Two rules with the same priority throw at build, naming both. Changing a priority updates the web ACL in place.
 
-### Rule groups
+### Managed rule groups
 
-A rule whose statement is a `managedRuleGroupStatement` or a `ruleGroupReferenceStatement` evaluates a group of rules that keep their own actions, so CloudFormation gives it an `overrideAction` instead of an `action`. The builder emits `overrideAction: { None: {} }`, or `{ Count: {} }` when the rule calls `.count()` — the way to try a group out before it blocks anything. Any other action throws.
+`managedRuleGroup(name, options?)` evaluates a group of rules that AWS or a Marketplace vendor maintains. A rule-group rule keeps its rules' own actions, so CloudFormation gives it an `overrideAction` instead of an `action`. The builder emits `overrideAction: { None: {} }`, or `{ Count: {} }` when the rule calls `.count()`; any other action throws.
 
 ```ts
 createWebAclBuilder().addRule("CommonRuleSet", (rule) =>
-  rule
-    .statement({
-      managedRuleGroupStatement: { vendorName: "AWS", name: "AWSManagedRulesCommonRuleSet" },
-    })
-    .count(),
+  rule.managedRuleGroup("AWSManagedRulesCommonRuleSet", {
+    version: "Version_1.12",
+    overrides: { SizeRestrictions_BODY: "count" },
+  }),
 );
+```
+
+| Option                    | Effect                                                                                                                                                                                                                                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vendorName`              | Defaults to `AWS`.                                                                                                                                                                                                                                                                                    |
+| `version`                 | Pins a static version, and adds a `DaysToExpiry` alarm — see [Alarms](#alarms). The IP reputation groups have no versions, so pinning one throws.                                                                                                                                                     |
+| `overrides`               | Rule action overrides, by rule name. [WAF silently ignores](https://docs.aws.amazon.com/waf/latest/APIReference/API_RuleActionOverride.html) a name that matches no rule, case-sensitively, so a name this package does not know for an AWS group warns (`@composurecdk/wafv2:unknown-managed-rule`). |
+| `managedRuleGroupConfigs` | Configuration a group needs, such as Bot Control's inspection level. Passed through.                                                                                                                                                                                                                  |
+
+`scopeDown(statement)` limits the group to matching requests. `AWS_MANAGED_RULE_GROUP_RULES` lists the AWS groups that carry no subscription fee and the names of their rules, which the editor offers for `overrides`. A `ruleGroupReferenceStatement` for your own rule group goes through `statement()`, and gets the same `overrideAction` handling.
+
+**No managed group is added by default.** Each blocks some legitimate traffic until it is tuned: CommonRuleSet's `SizeRestrictions_BODY` blocks bodies over 8 KB and `NoUserAgent_HEADER` blocks clients that send no `User-Agent`, which some SDKs and webhooks do not; AnonymousIpList blocks hosting providers' addresses. A default that blocked would break applications, and one that only counted would cost capacity while implying a protection that isn't there.
+
+A reasonable baseline for most applications is CommonRuleSet, KnownBadInputs and AmazonIpReputationList, 925 WCU between them. AWS [recommends rolling a group out in count mode first](https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-testing.html): add it with `.count()`, watch its `CountedRequests` and the logs for the rules that match legitimate traffic, override those, then drop `.count()`.
+
+```ts
+createWebAclBuilder()
+  .addRule("IpReputation", (rule) =>
+    rule.managedRuleGroup("AWSManagedRulesAmazonIpReputationList").count(),
+  )
+  .addRule("CommonRuleSet", (rule) => rule.managedRuleGroup("AWSManagedRulesCommonRuleSet").count())
+  .addRule("KnownBadInputs", (rule) =>
+    rule.managedRuleGroup("AWSManagedRulesKnownBadInputsRuleSet").count(),
+  );
 ```
 
 ### Other checks at synth
 
 - A rate-based rule cannot Allow, and a web ACL can have at most ten of them.
+- The `aggregateOn*` methods apply to `rateLimit()` rules only, and `scopeDown()` to `rateLimit()` and `managedRuleGroup()` rules.
 - Labels are 1–128 characters of `[A-Za-z0-9_-]` per colon-separated part, with at most five namespaces, and none of WAF's reserved words (`awswaf`, `aws`, `waf`, `rulegroup`, `webacl`, `regexpatternset`, `ipset`, `managed`). WAF adds the `awswaf:<account>:webacl:<name>:` prefix itself.
 - Metric names follow the rule for names, and `All` and `Default_Action` are reserved.
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Duration, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import {
   AccountPrincipal,
   PolicyDocument,
@@ -9,11 +9,11 @@ import {
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
 import { type IKey, KeySpec, KeyUsage } from "aws-cdk-lib/aws-kms";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import { compose, ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import { createKeyBuilder } from "../src/key-builder.js";
+import type { AlarmDefinitionBuilder, WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { createKeyBuilder, type KeyBuilderResult } from "../src/key-builder.js";
 
 const buildAndSynth = buildFixture(createKeyBuilder, "TestKey");
 
@@ -245,6 +245,46 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["urgentExpiry", "soonExpiry"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth((b) => b.recommendedAlarms({ keyMaterialExpiration: true }));
+    const typed: KeyBuilderResult = result;
+    const expiry = typed.alarms.keyMaterialExpiration;
+
+    assertAssignable<Alarm | undefined, typeof expiry>();
+    // @ts-expect-error -- a recommended alarm is opt-in, so it is not always an Alarm
+    assertAssignable<Alarm, typeof expiry>();
+    expect(expiry).toBeDefined();
+    // @ts-expect-error -- "keyMaterialExpiry" is not a KMS alarm key
+    expect(typed.alarms.keyMaterialExpiry).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const system = compose(
+      {
+        key: createKeyBuilder().addAlarm("urgentExpiry", (alarm) => expiryAlarm(alarm, 1)),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("key", (r: WithCustomAlarms<KeyBuilderResult, "urgentExpiry">) => {
+              // @ts-expect-error -- "urgentExpirey" was not declared as a custom key
+              expect(r.alarms.urgentExpirey).toBeUndefined();
+              return r.alarms.urgentExpiry;
+            }).resolve(context),
+          }),
+        },
+      },
+      { key: [], consumer: ["key"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.key.alarms.urgentExpiry);
   });
 });
 

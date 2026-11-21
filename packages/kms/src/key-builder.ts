@@ -1,11 +1,15 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { type Alias, type IKey, Key, KeySpec, type KeyProps } from "aws-cdk-lib/aws-kms";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { KeyAlarmConfig } from "./alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { KeyAlarmConfig, KeyAlarmKey } from "./alarm-config.js";
 import { createKeyAlarms } from "./key-alarms.js";
 import { KEY_DEFAULTS } from "./defaults.js";
 
@@ -50,9 +54,12 @@ export interface KeyBuilderResult {
   /**
    * CloudWatch alarms created for the key, keyed by alarm name — both the
    * AWS-recommended alarms and any added via {@link IKeyBuilder.addAlarm}.
+   * A recommended alarm (`result.alarms.keyMaterialExpiration`) is
+   * `Alarm | undefined`: it is opt-in, and may be disabled. Any other key is
+   * a compile error; read a custom alarm through {@link WithCustomAlarms}.
    * No alarm actions are configured.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<KeyAlarmKey>;
 }
 
 /**
@@ -91,7 +98,7 @@ export interface KeyBuilderResult {
  */
 export type IKeyBuilder = ITaggedBuilder<KeyBuilderProps, KeyBuilder>;
 
-class KeyBuilder implements Lifecycle<KeyBuilderResult> {
+class KeyBuilder implements Lifecycle<WithCustomAlarms<KeyBuilderResult, string>> {
   props: Partial<KeyBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IKey>[] = [];
   readonly #policyStatements: Resolvable<PolicyStatement>[] = [];
@@ -132,7 +139,11 @@ class KeyBuilder implements Lifecycle<KeyBuilderResult> {
     target.#policyStatements.push(...this.#policyStatements);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): KeyBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<KeyBuilderResult, string> {
     const { recommendedAlarms: alarmConfig, alias, ...configured } = this.props;
 
     const key = new Key(scope, id, mergeKeyDefaults(configured));

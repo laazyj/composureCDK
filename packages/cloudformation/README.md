@@ -207,6 +207,39 @@ import { stackNameSegments } from "@composurecdk/cloudformation";
 const name = `/aws/lambda/${stackNameSegments(scope).join("/")}-my-function`;
 ```
 
+## Constraints for builder authors
+
+Some property strings, such as a non-ASCII security group description, pass `cdk synth` and are rejected only at deploy. A constraint records one property's allowed characters and length limits as data, so your builder can fail at synth instead, with an error that names the allowed characters and links the AWS doc. Every package's [`constraints`](../../docs/constraints.md) namespace is built on it; [ADR-0010](../../docs/adr/0010-aws-property-constraints.md) explains the design.
+
+Declare the constraint once, next to the builder that enforces it, and keep it module-private. `charSets` holds character classes shared across AWS properties; append your property's own characters.
+
+```ts
+import {
+  charSets,
+  type ConstraintNamespace,
+  stringConstraint,
+  validateString,
+} from "@composurecdk/cloudformation";
+
+const WIDGET_NAME = stringConstraint({
+  name: "Widget Name",
+  charClass: `${charSets.ALNUM}${charSets.AWS_NAME_PUNCT}`,
+  maxLength: 128,
+  allowed: "ASCII letters, digits, spaces and _./:+=@#()-",
+  source: "https://docs.aws.amazon.com/…",
+});
+
+export const constraints = {
+  validate: { widgetName: (raw: string) => validateString(raw, WIDGET_NAME) },
+  sanitize: {},
+} satisfies ConstraintNamespace;
+```
+
+Call `constraints.validate.widgetName(this.props.name)` from your builder's `build()`. Typing the object with `satisfies ConstraintNamespace` gives consumers the same call shape in every package.
+
+- **`validateString`** throws, for values the author wrote and can fix. **`sanitizeString`** returns a legal copy, for values the author does not control: it replaces runs of disallowed characters (with `-` by default) and truncates to `maxLength`. Both skip a value holding an unresolved CDK token.
+- **`name` and `source` appear in every error, and `allowed` in every character-set error**, so give each a real value. The [`composurecdk/constraint-metadata-required`](../eslint-plugin/docs/rules/constraint-metadata-required.md) lint rule catches empty ones; it is not in the presets a builder author extends, so enable it in your own `rules`.
+
 ## Examples
 
 - [MultiStackApp](../examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`

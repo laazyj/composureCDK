@@ -31,3 +31,9 @@ export interface ActivityAlarmConfig {
    */
   activitiesHeartbeatTimedOut?: AlarmConfig | false;
 }
+
+/**
+ * The recommended alarm keys of `ActivityBuilderResult.alarms`. Each config field
+ * creates the alarm of the same name.
+ */
+export type ActivityAlarmKey = Exclude<keyof ActivityAlarmConfig, "enabled">;

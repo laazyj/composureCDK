@@ -1,8 +1,8 @@
 import { Annotations, Duration, Token } from "aws-cdk-lib";
-import { type Alarm, Metric, Stats } from "aws-cdk-lib/aws-cloudwatch";
+import { Metric, Stats } from "aws-cdk-lib/aws-cloudwatch";
 import { CfnStateMachineAlias, type StateMachine } from "aws-cdk-lib/aws-stepfunctions";
 import type { IConstruct } from "constructs";
-import type { AlarmConfig, AlarmConfigDefaults } from "@composurecdk/cloudwatch";
+import type { AlarmConfig, AlarmConfigDefaults, AlarmsOf } from "@composurecdk/cloudwatch";
 import { ANY_OCCURRENCE } from "./alarm-defaults.js";
 import { type AlarmSet, createSpecAlarms } from "./alarm-specs.js";
 
@@ -108,6 +108,12 @@ export interface StateMachineAliasAlarmConfig {
   executionsTimedOut?: AlarmConfig | false;
 }
 
+/**
+ * The keys of an alias's rollback alarms, as keyed in
+ * {@link StateMachineAliasResult.alarms}.
+ */
+export type StateMachineAliasAlarmKey = Exclude<keyof StateMachineAliasAlarmConfig, "enabled">;
+
 /** Options for {@link IStateMachineBuilder.addAlias}. */
 export interface AddAliasOptions {
   /** @default - no description */
@@ -129,8 +135,11 @@ export interface AddAliasOptions {
 export interface StateMachineAliasResult {
   /** The alias; callers start executions against its `attrArn`. */
   readonly alias: CfnStateMachineAlias;
-  /** The rollback alarms, keyed by alarm name. */
-  readonly alarms: Record<string, Alarm>;
+  /**
+   * The rollback alarms that are on, keyed by alarm key. An alias takes no
+   * custom alarms.
+   */
+  readonly alarms: AlarmsOf<StateMachineAliasAlarmKey>;
 }
 
 /** Defaults for the rollback alarms; alarm on the first occurrence. */
@@ -148,9 +157,7 @@ export const STATE_MACHINE_ALIAS_ALARM_DEFAULTS: {
  * The rollback alarms for one alias: executions started through it, by the
  * `{StateMachineArn, Alias}` dimensions.
  */
-function aliasAlarms(
-  name: string,
-): AlarmSet<StateMachine, Exclude<keyof StateMachineAliasAlarmConfig, "enabled">> {
+function aliasAlarms(name: string): AlarmSet<StateMachine, StateMachineAliasAlarmKey> {
   const metric = (metricName: string) => (sm: StateMachine, options: { period?: Duration }) =>
     new Metric({
       namespace: "AWS/States",

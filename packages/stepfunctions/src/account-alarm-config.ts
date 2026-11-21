@@ -83,3 +83,9 @@ export interface AccountAlarmConfig {
    */
   stateTransitionThrottled?: AlarmConfig | false;
 }
+
+/**
+ * The recommended alarm keys of `AccountAlarmBuilderResult.alarms`. Each config field
+ * creates the alarm of the same name.
+ */
+export type AccountAlarmKey = Exclude<keyof AccountAlarmConfig, "enabled">;

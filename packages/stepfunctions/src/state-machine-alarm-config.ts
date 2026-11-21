@@ -52,3 +52,9 @@ export interface StateMachineAlarmConfig {
    */
   executionThrottled?: AlarmConfig | false;
 }
+
+/**
+ * The recommended alarm keys of `StateMachineBuilderResult.alarms`. Each config field
+ * creates the alarm of the same name.
+ */
+export type StateMachineAlarmKey = Exclude<keyof StateMachineAlarmConfig, "enabled">;

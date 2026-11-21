@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { Duration } from "aws-cdk-lib";
 import { Annotations, Match, Template } from "aws-cdk-lib/assertions";
 import { Pass, StateMachineType } from "aws-cdk-lib/aws-stepfunctions";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { Construct } from "constructs";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
 import { DEFAULT_RETAINED_VERSIONS } from "../src/defaults.js";
 import { createStateMachineBuilder } from "../src/state-machine-builder.js";
@@ -12,6 +13,7 @@ import {
   DEFAULT_CANARY_DEPLOYMENT,
   INEFFECTIVE_ROLLBACK_ALARMS_WARNING_ID,
   linearDeployment,
+  type StateMachineAliasResult,
 } from "../src/state-machine-alias.js";
 import { VERSION_PRUNER_TAG_KEY } from "../src/version-pruner.js";
 
@@ -309,5 +311,24 @@ describe("aliases", () => {
       build: (b) => b.build(newStack(), "Workflow"),
       inspect: (r) => Object.keys(r.aliases).sort(),
     });
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alias alarm keys (type-level)", () => {
+  it("types rollback alarms as optional and rejects a misspelled or custom key", () => {
+    const { result } = versioned((b) => b.addAlias("live", { deployment: canaryDeployment() }));
+    const alarms: StateMachineAliasResult["alarms"] = result.aliases.live.alarms;
+    const failed = alarms.executionsFailed;
+
+    assertAssignable<Alarm | undefined, typeof failed>();
+    // @ts-expect-error -- a rollback alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof failed>();
+    expect(failed).toBeDefined();
+    // @ts-expect-error -- "executionFailed" is not a rollback alarm key
+    expect(alarms.executionFailed).toBeUndefined();
+    // @ts-expect-error -- an alias takes no custom alarms
+    expect(alarms.aborted).toBeUndefined();
   });
 });

@@ -1,4 +1,3 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IGrantable, IRole } from "aws-cdk-lib/aws-iam";
 import type { LogGroup } from "aws-cdk-lib/aws-logs";
 import { type CustomResource, RemovalPolicy } from "aws-cdk-lib";
@@ -22,9 +21,17 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import { createLogGroupBuilder } from "@composurecdk/logs";
-import type { StateMachineAlarmConfig } from "./state-machine-alarm-config.js";
+import type {
+  StateMachineAlarmConfig,
+  StateMachineAlarmKey,
+} from "./state-machine-alarm-config.js";
 import { createSpecAlarms } from "./alarm-specs.js";
 import { STATE_MACHINE_ALARMS } from "./state-machine-alarms.js";
 import {
@@ -184,10 +191,12 @@ export interface StateMachineBuilderResult {
   logGroup?: LogGroup;
 
   /**
-   * CloudWatch alarms created for the state machine, keyed by alarm name —
-   * the recommended alarms and any added via {@link IStateMachineBuilder.addAlarm}.
+   * CloudWatch alarms created for the state machine, keyed by alarm key — the
+   * recommended alarms that are on, and any added via
+   * {@link IStateMachineBuilder.addAlarm}. To read a custom alarm by key, name
+   * it with {@link WithCustomAlarms}.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<StateMachineAlarmKey>;
 
   /**
    * The version published for this deployment's revision, or `undefined`
@@ -229,7 +238,9 @@ export interface StateMachineBuilderResult {
  */
 export type IStateMachineBuilder = ITaggedBuilder<StateMachineBuilderProps, StateMachineBuilder>;
 
-class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
+class StateMachineBuilder implements Lifecycle<
+  WithCustomAlarms<StateMachineBuilderResult, string>
+> {
   props: Partial<StateMachineBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<StateMachine>[] = [];
   readonly #grants = new GrantQueue<IGrantable>();
@@ -326,7 +337,7 @@ class StateMachineBuilder implements Lifecycle<StateMachineBuilderResult> {
     scope: IConstruct,
     id: string,
     context: Record<string, object> = {},
-  ): StateMachineBuilderResult {
+  ): WithCustomAlarms<StateMachineBuilderResult, string> {
     const {
       definitionBody,
       definitionSubstitutions,

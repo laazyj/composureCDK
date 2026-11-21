@@ -1,10 +1,10 @@
 import type { Activity } from "aws-cdk-lib/aws-stepfunctions";
-import type { ActivityAlarmConfig } from "./activity-alarm-config.js";
+import type { ActivityAlarmKey } from "./activity-alarm-config.js";
 import { ACTIVITY_ALARM_DEFAULTS } from "./activity-alarm-defaults.js";
 import type { AlarmSet } from "./alarm-specs.js";
 
 /** An activity's recommended alarms, keyed so a config field without a spec is a type error. */
-export const ACTIVITY_ALARMS: AlarmSet<Activity, Exclude<keyof ActivityAlarmConfig, "enabled">> = {
+export const ACTIVITY_ALARMS: AlarmSet<Activity, ActivityAlarmKey> = {
   defaults: ACTIVITY_ALARM_DEFAULTS,
   specs: {
     activitiesFailed: {

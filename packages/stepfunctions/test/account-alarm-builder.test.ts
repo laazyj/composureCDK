@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { Match } from "aws-cdk-lib/assertions";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createAccountAlarmBuilder } from "../src/account-alarm-builder.js";
+import {
+  type AccountAlarmBuilderResult,
+  createAccountAlarmBuilder,
+} from "../src/account-alarm-builder.js";
 
 const buildAndSynth = buildFixture(createAccountAlarmBuilder, "StepFunctionsAccount");
 
@@ -180,5 +186,41 @@ describe("createAccountAlarmBuilder", () => {
       build: (b) => b.build(newStack(), "StepFunctionsAccount"),
       inspect: (r) => Object.keys(r.alarms).sort(),
     });
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth();
+    const typed: AccountAlarmBuilderResult = result;
+    const open = typed.alarms.openExecutions;
+
+    assertAssignable<Alarm | undefined, typeof open>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof open>();
+    expect(open).toBeDefined();
+    // An opt-in alarm is a key too, absent until configured.
+    expect(typed.alarms.mapRunBacklog).toBeUndefined();
+    // @ts-expect-error -- "openExecution" is not an account alarm key
+    expect(typed.alarms.openExecution).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { result } = buildAndSynth((b) =>
+      b.addAlarm("failed", (a) => a.metric((m) => m.metric("ExecutionsFailed")).threshold(10)),
+    );
+    const alarm = ref(
+      "stepFunctionsAccount",
+      (r: WithCustomAlarms<AccountAlarmBuilderResult, "failed">) => {
+        // @ts-expect-error -- "fail" was not declared as a custom key
+        expect(r.alarms.fail).toBeUndefined();
+        return r.alarms.failed;
+      },
+    ).resolve({ stepFunctionsAccount: result });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(result.alarms.failed);
   });
 });

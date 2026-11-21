@@ -33,3 +33,9 @@ export interface CertificateAlarmConfig {
    */
   daysToExpiry?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms a certificate builder can create — every
+ * {@link CertificateAlarmConfig} entry except the `enabled` master switch.
+ */
+export type CertificateAlarmKey = Exclude<keyof CertificateAlarmConfig, "enabled">;

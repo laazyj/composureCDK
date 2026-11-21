@@ -102,3 +102,21 @@ export interface FunctionAlarmConfig {
    */
   throttles?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms a distribution can have, as they appear in
+ * `DistributionBuilderResult.alarms` and `CloudFrontAlarmBuilderResult.alarms`,
+ * which share one key scheme.
+ *
+ * These are more than the {@link DistributionAlarmConfig} keys. Each inline
+ * function adds three alarms, keyed by its behavior scope, its event type and
+ * the alarm (`defaultBehaviorViewerRequestThrottles`,
+ * `behaviorApiSlashStarViewerResponseExecutionErrors`), so they are typed as
+ * template-literal patterns: any path-pattern slug is accepted, a misspelled
+ * scope, event type or suffix is not. CloudFront Functions run on viewer
+ * events only.
+ */
+export type DistributionAlarmKey =
+  | "errorRate"
+  | "originLatency"
+  | `${"defaultBehavior" | `behavior${string}`}${"ViewerRequest" | "ViewerResponse"}${"ExecutionErrors" | "ValidationErrors" | "Throttles"}`;

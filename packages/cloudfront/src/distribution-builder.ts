@@ -9,19 +9,27 @@ import {
   type FunctionProps,
   type FunctionRuntime,
 } from "aws-cdk-lib/aws-cloudfront";
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type Bucket, type IBucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import {
   DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES,
   createBucketBuilder,
   type IBucketBuilder,
 } from "@composurecdk/s3";
-import type { DistributionAlarmConfig, FunctionAlarmConfig } from "./alarm-config.js";
+import type {
+  DistributionAlarmConfig,
+  DistributionAlarmKey,
+  FunctionAlarmConfig,
+} from "./alarm-config.js";
 import { effectiveDistributionDefaults } from "./defaults.js";
 import { acknowledgeListBucketRisk } from "./list-bucket-acknowledgement.js";
 import { guardOriginObjectExpiration } from "./origin-expiration-guard.js";
@@ -317,8 +325,12 @@ export interface DistributionBuilderResult {
    * Includes both recommended alarms and custom alarms added via
    * {@link IDistributionBuilder.addAlarm}. Empty when `recommendedAlarms` is
    * `false` and no custom alarms were added. No alarm actions are configured.
+   *
+   * A recommended alarm is `Alarm | undefined`: it may be disabled, or belong
+   * to a behavior function the distribution does not have. Any other key is a
+   * compile error; read a custom alarm through {@link WithCustomAlarms}.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<DistributionAlarmKey>;
 }
 
 /**
@@ -357,7 +369,9 @@ export interface DistributionBuilderResult {
  */
 export type IDistributionBuilder = ITaggedBuilder<DistributionBuilderProps, DistributionBuilder>;
 
-class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
+class DistributionBuilder implements Lifecycle<
+  WithCustomAlarms<DistributionBuilderResult, string>
+> {
   props: Partial<DistributionBuilderProps> = {};
   #origin?: Resolvable<BehaviorOptions["origin"]>;
   readonly #additionalBehaviors = new Map<string, AdditionalBehaviorConfig>();
@@ -437,7 +451,7 @@ class DistributionBuilder implements Lifecycle<DistributionBuilderResult> {
     scope: IConstruct,
     id: string,
     context?: Record<string, object>,
-  ): DistributionBuilderResult {
+  ): WithCustomAlarms<DistributionBuilderResult, string> {
     const resolvedOrigin = this.#origin ? resolve(this.#origin, context ?? {}) : undefined;
 
     if (!resolvedOrigin) {

@@ -263,9 +263,25 @@ const cdn = createDistributionBuilder()
   );
 ```
 
+### Reading alarms by key
+
+`DistributionBuilderResult` and `CloudFrontAlarmBuilderResult` type `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled or belong to a behavior function the distribution does not have. The function alarm keys are typed by pattern: `defaultBehavior` or `behavior<Slug>`, then `ViewerRequest` or `ViewerResponse`, then `ExecutionErrors`, `ValidationErrors` or `Throttles`. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("cdn", (r: DistributionBuilderResult) => r.alarms.errorRate); // Alarm | undefined
+ref("cdn", (r: DistributionBuilderResult) => r.alarms.behaviorApiSlashStarViewerRequestThrottles); // Alarm | undefined
+ref(
+  "cdn",
+  (r: WithCustomAlarms<DistributionBuilderResult, "functionErrors">) => r.alarms.functionErrors,
+); // Alarm
+ref("cdn", (r: DistributionBuilderResult) => r.alarms.errorRat); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of a builder's own `build()` accepts any key, as `WithCustomAlarms<…, string>`. The recommended keys are exported as `DistributionAlarmKey`.
+
 ### Applying alarm actions
 
-Alarms are returned in the build result as `Record<string, Alarm>`:
+Alarms are returned in the build result's `alarms`, keyed by alarm:
 
 ```ts
 const result = cdn.build(stack, "CDN");

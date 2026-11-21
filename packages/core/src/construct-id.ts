@@ -7,8 +7,9 @@
  * to `--`, which produces unreadable CloudFormation logical IDs. Control
  * characters are likewise unsafe.
  *
- * These helpers consolidate that sanitization in one place so every builder
- * in the monorepo applies the same constraints.
+ * These helpers consolidate that sanitization in one place, so every builder
+ * that derives an ID from a user-supplied string applies the same rules. IDs
+ * built only from literals need neither.
  */
 
 // eslint-disable-next-line no-control-regex -- the regex must literally match control characters to strip them from construct IDs

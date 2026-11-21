@@ -18,6 +18,7 @@ Everything this package exports is [public API](../../docs/architecture.md#publi
 | [`alarmName`, `AlarmName`](#alarm-names)                                     | Validate an explicit alarm name                                |
 | [`createCompositeAlarmBuilder`](#composite-alarms)                           | Build a composite alarm over other components' alarms          |
 | [`AlarmDefinitionBuilder`](#custom-alarms)                                   | Define a custom alarm in an `addAlarm()` callback              |
+| [`requireAlarms`](#requirealarms)                                            | Fail at synth when an alarm you depend on is absent            |
 | [`AlarmConfigurer`](#alarm-sets)                                             | Type an `addAlarm()` callback, or a set of them                |
 | [`AlarmConfig`, `AlarmConfigDefaults`](#alarmconfig-and-alarmconfigdefaults) | Type a recommended alarm's user overrides and its defaults     |
 | [`resolveAlarmConfig`](#resolvealarmconfig)                                  | Merge user overrides onto defaults                             |
@@ -151,29 +152,35 @@ To change names across an app, use [alarmNamePolicy](#alarmnamepolicy) instead.
 
 `createCompositeAlarmBuilder()` builds a [composite alarm](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Create_Composite_Alarm.html): an alarm whose state is a rule over other alarms. Use one to give a deployment pipeline a single rollback alarm, or to page once for a system instead of once per symptom.
 
-Its props are CDK's [`CompositeAlarmProps`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudwatch.CompositeAlarmProps.html). The build result is `{ alarm: CompositeAlarm }`. `alarmRule` is required, and it and `actionsSuppressor` accept a `Ref`, so the members can come from other components and the edges show in `compose()`. An `IAlarm` is itself an `IAlarmRule`, so CDK's `AlarmRule` combinators (`anyOf`, `allOf`, `not`, `fromAlarm(alarm, state)`) take member alarms directly. To combine alarms from several components, [`combine`](../../docs/architecture.md#combining-refs--one-consumer-many-dependencies) their refs:
+Its props are CDK's [`CompositeAlarmProps`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudwatch.CompositeAlarmProps.html). The build result is `{ alarm: CompositeAlarm }`. `alarmRule` is required, and it and `actionsSuppressor` accept a `Ref`, so the members can come from other components and the edges show in `compose()`. An `IAlarm` is itself an `IAlarmRule`, so CDK's `AlarmRule` combinators (`anyOf`, `allOf`, `not`, `fromAlarm(alarm, state)`) take member alarms directly. To combine alarms from several components, [`combine`](../../docs/architecture.md#combining-refs--one-consumer-many-dependencies) their refs. A recommended alarm is typed `Alarm | undefined` ([AlarmsOf](#alarmsof)), so pass the members through [`requireAlarms`](#requirealarms): a member that is disabled then fails at synth rather than silently dropping out of the rule.
 
 ```ts
 import { combine, compose, ref } from "@composurecdk/core";
-import { createCompositeAlarmBuilder } from "@composurecdk/cloudwatch";
+import {
+  createCompositeAlarmBuilder,
+  requireAlarms,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import { AlarmRule } from "aws-cdk-lib/aws-cloudwatch";
 
 compose(
   {
-    fold: createFunctionBuilder() /* … */,
+    fold: createFunctionBuilder() /* … */
+      .addAlarm("stateStale", (a) => a /* … */),
     dlq: createQueueBuilder("dlq") /* … */,
     rollback: createCompositeAlarmBuilder()
       .alarmDescription("A deploy may have broken the fold: roll it back.")
       .alarmRule(
         combine(
           {
-            errors: ref("fold", (r: FunctionBuilderResult) => r.alarms["errors"]),
-            dlq: ref(
-              "dlq",
-              (r: QueueBuilderResult) => r.alarms["approximateNumberOfMessagesVisible"],
+            errors: ref("fold", (r: FunctionBuilderResult) => r.alarms.errors),
+            stale: ref(
+              "fold",
+              (r: WithCustomAlarms<FunctionBuilderResult, "stateStale">) => r.alarms.stateStale,
             ),
+            dlq: ref("dlq", (r: QueueBuilderResult) => r.alarms.approximateNumberOfMessagesVisible),
           },
-          (m) => AlarmRule.anyOf(...Object.values(m)),
+          (m) => AlarmRule.anyOf(...Object.values(requireAlarms(m))),
         ),
       ),
   },
@@ -269,6 +276,24 @@ alarm
 ```
 
 CloudWatch can alarm only on an expression that returns a single time series. It rejects a `MathExpression` that uses `SEARCH(...)`, or otherwise returns several series, at deploy time.
+
+### requireAlarms
+
+A builder result types each recommended alarm as `Alarm | undefined`, because you can disable it and some depend on configuration ([AlarmsOf](#alarmsof)). Where another component depends on an alarm, such as a member of a rollback composite alarm, an absent one is a defect. `requireAlarms(record)` returns the record with every alarm typed as present, and throws at synth naming any key that is `undefined`:
+
+```ts
+import { combine, ref } from "@composurecdk/core";
+import { requireAlarms, type WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { AlarmRule } from "aws-cdk-lib/aws-cloudwatch";
+
+combine(
+  {
+    stale: ref("fold", (r: WithCustomAlarms<FunctionBuilderResult, "stale">) => r.alarms.stale),
+    dlq: ref("dlq", (r: QueueBuilderResult) => r.alarms.approximateNumberOfMessagesVisible),
+  },
+  (m) => AlarmRule.anyOf(...Object.values(requireAlarms(m))),
+);
+```
 
 ## For builder-package authors
 

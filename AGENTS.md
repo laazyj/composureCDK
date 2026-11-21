@@ -2,16 +2,13 @@
 
 ## Architecture
 
-Read [docs/architecture.md](docs/architecture.md) first — it's the primary guide to the library's shape: lifecycle, builders, composition, refs, defaults. For decisions that amend or add detail (and the rationale behind non-obvious patterns), see [docs/adr/](docs/adr/).
+Read [docs/architecture.md](docs/architecture.md) first — it's the primary guide to the library's shape: lifecycle, builders, composition, refs, defaults, public API. For decisions that amend or add detail (and the rationale behind non-obvious patterns), see [docs/adr/](docs/adr/).
 
 **ADRs are for architecturally significant decisions only** — ones that change the library's shape or bind work across packages. An implementation choice localised to one feature, or to a set of features inside a single package, does not get an ADR: document it in the package README and the PR body. Applying an existing pattern to a new service is not a new decision. Read [when to write an ADR](docs/adr/README.md#when-to-write-an-adr) before adding one; the default answer is no.
 
 ## Public APIs
 
-Each package is published to npm on its own; its exports and dependencies are what its consumers get. Reuse code freely within a package; across packages, judge a change by its effect on consumers:
-
-- **Export only what a consumer will call.** An export only another package uses is a public promise with no consumer behind it. Until shared code meets the bar in cloudwatch's [Adding an export](packages/cloudwatch/README.md#adding-an-export), copy it between packages instead.
-- **A new dependency needs a reason of its own.** Every consumer installs it, so removing duplication is not enough.
+Each package is published to npm on its own, so its exports and dependencies are what its consumers get: app authors, and builder authors writing their own builders. Reuse code freely within a package. Across packages, read [Public API](docs/architecture.md#public-api) before adding an export or a dependency: add to a package's public API only what its consumers need or will benefit from, and otherwise copy the code with a comment naming its source.
 
 ## After making changes
 

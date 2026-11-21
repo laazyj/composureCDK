@@ -463,6 +463,24 @@ alarmActionsPolicy(app, {
 
 See [ADR-0002](adr/0002-policies.md).
 
+## Public API
+
+Each package is published to npm on its own. Its public API is what it intentionally offers its consumers: app authors, who define infrastructure with ComposureCDK, and builder authors, who write their own builders on it. A package's exports are its public API made concrete.
+
+Something belongs in the public API when consumers need it or will benefit from it. Something only ComposureCDK's own packages need does not, however many share it: copy it into each package that needs it, with a comment naming its source. Test code is the exception; see [Test helpers](#test-helpers).
+
+Adding to the public API is not a light decision. Once published, it must be documented, tested and supported, and removing it or changing it incompatibly is a major version bump.
+
+A package's public API commonly includes: builders, with their props and result types; the types their emitted declarations name ([ADR-0001](adr/0001-builder-type-emission.md)); `*_DEFAULTS`; the [`constraints`](constraints.md) namespace; warning ids a consumer may acknowledge ([ADR-0011](adr/0011-cross-component-relationship-guards.md)); predicates such as `isRef`, and protocol symbols such as `COPY_STATE` ([ADR-0005](adr/0005-builder-copy.md)), but never the `Symbol.for` brand behind them; and mechanism for builder authors, such as `@composurecdk/cloudwatch`'s `createAlarms`.
+
+### Dependencies
+
+A dependency on another package is part of the public API too, because every consumer installs it. It needs a reason of its own, such as composing that package's builders or naming its types; removing duplication is not enough.
+
+### Test helpers
+
+Test helpers are shared through two packages: `@composurecdk/core/testing`, which is public API, and `@composurecdk/cdk-testing`, which is private to this repository. [`cdk-testing`'s README](../packages/cdk-testing/README.md#why-this-package-exists) says which helper goes where.
+
 ## How the pieces fit together
 
 ```

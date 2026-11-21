@@ -143,3 +143,22 @@ export interface FunctionAlarmConfig {
    */
   eventSourceIteratorAge?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms a function builder can create, as they
+ * appear in {@link FunctionBuilderResult.alarms}.
+ *
+ * These are not the {@link FunctionAlarmConfig} keys. The per-mapping
+ * event-source alarms are keyed by the `addEventSource` key with a suffix
+ * (`ordersFailedInvocations`, `ordersDroppedEvents`), so they are typed as
+ * template-literal patterns: any prefix is accepted, a misspelled suffix is
+ * not. `eventSourceIteratorAge` creates the single `iteratorAge` alarm.
+ */
+export type FunctionAlarmKey =
+  | "errors"
+  | "throttles"
+  | "duration"
+  | "concurrentExecutions"
+  | "iteratorAge"
+  | `${string}FailedInvocations`
+  | `${string}DroppedEvents`;

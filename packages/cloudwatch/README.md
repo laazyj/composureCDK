@@ -22,6 +22,7 @@ Everything this package exports is public API. It is not a place for code that C
 | [`resolveAlarmConfig`](#resolvealarmconfig)                                  | Merge user overrides onto defaults                             |
 | [`resolveAlarmThresholdBasis`](#resolvealarmthresholdbasis)                  | Skip an alarm whose threshold derives from an unresolved token |
 | [`AlarmDefinition`, `AlarmMetric`](#alarmdefinition)                         | The resolved alarm descriptor                                  |
+| [`AlarmsOf`, `WithCustomAlarms`](#alarmsof)                                  | Type a builder result's `alarms` by key                        |
 | [`createAlarms`](#createalarms)                                              | Create `Alarm` constructs from definitions                     |
 | [`defaultAlarmName`](#defaultalarmname)                                      | The default name, for an alarm created outside `createAlarms`  |
 | [`constraints`](#constraints)                                                | The alarm-name validator, in the shape every package exports   |
@@ -353,6 +354,34 @@ const alarms = createAlarms(scope, "MyFunction", [
 ```
 
 Use this to adopt alarms that are already deployed. The construct ID becomes the CloudFormation logical ID, and changing the logical ID replaces the alarm (deletes and recreates it) on the next deploy.
+
+### AlarmsOf
+
+`AlarmsOf<Recommended>` is the type of a builder result's `alarms`. Each recommended key is optional, because the alarm can be disabled, depend on configuration, or be skipped by `resolveAlarmThresholdBasis`. Any other key is a compile error.
+
+`WithCustomAlarms<Result, Custom>` adds custom alarm keys to a result from outside, each typed `Alarm`, because `addAlarm` always creates its alarm. A builder's `build()` returns `WithCustomAlarms<…, string>`, which accepts any key ([ADR-0021](../../docs/adr/0021-alarm-keys-typed-on-the-result.md) explains both choices):
+
+```ts
+import type { AlarmsOf, WithCustomAlarms } from "@composurecdk/cloudwatch";
+
+export type WidgetAlarmKey = "errors" | `${string}Backlog`;
+
+export interface WidgetBuilderResult {
+  widget: Widget;
+  alarms: AlarmsOf<WidgetAlarmKey>;
+}
+
+class WidgetBuilder implements Lifecycle<WithCustomAlarms<WidgetBuilderResult, string>> {
+  build(scope: IConstruct, id: string): WithCustomAlarms<WidgetBuilderResult, string> {
+    // createAlarms' Record<string, Alarm> is assignable as it is.
+  }
+}
+
+// A consumer reads a custom alarm by naming its key:
+ref("widget", (r: WithCustomAlarms<WidgetBuilderResult, "highLoad">) => r.alarms.highLoad);
+```
+
+List the keys the builder really creates, which are not always the config keys. A key derived from another key (`${source}Backlog`) is a template-literal pattern.
 
 ### defaultAlarmName
 

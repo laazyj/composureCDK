@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { App, CfnParameter, Duration, Stack } from "aws-cdk-lib";
 import { Annotations, Match } from "aws-cdk-lib/assertions";
-import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Code, type Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
-import { buildFixture } from "@composurecdk/cdk-testing";
-import { type AlarmConfigurer, alarmName } from "@composurecdk/cloudwatch";
+import { assertAssignable, buildFixture } from "@composurecdk/cdk-testing";
+import { ref } from "@composurecdk/core";
+import { type AlarmConfigurer, alarmName, type WithCustomAlarms } from "@composurecdk/cloudwatch";
 import type { FunctionAlarmConfig } from "../src/alarm-config.js";
-import { createFunctionBuilder } from "../src/function-builder.js";
+import { createFunctionBuilder, type FunctionBuilderResult } from "../src/function-builder.js";
 
 const buildAndSynth = buildFixture(createFunctionBuilder, "TestFunction");
 
@@ -574,5 +575,55 @@ describe("addAlarm", () => {
     expect(result.alarms.invocations).toBeDefined();
     expect(Object.keys(result.alarms)).toEqual(["invocations"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  function withHighInvocations(b: ReturnType<typeof createFunctionBuilder>) {
+    minimalFunction(b);
+    b.addAlarm("highInvocations", (alarm) =>
+      alarm.metric((fn) => fn.metricInvocations()).threshold(1000),
+    );
+  }
+
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth(minimalFunction);
+    const typed: FunctionBuilderResult = result;
+    const errors = typed.alarms.errors;
+
+    assertAssignable<Alarm | undefined, typeof errors>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof errors>();
+    expect(errors).toBeDefined();
+    // @ts-expect-error -- "error" is not a Lambda alarm key
+    expect(typed.alarms.error).toBeUndefined();
+  });
+
+  it("types event-source alarm keys by suffix", () => {
+    const { result } = buildAndSynth(minimalFunction);
+    const typed: FunctionBuilderResult = result;
+
+    assertAssignable<Alarm | undefined, typeof typed.alarms.ordersFailedInvocations>();
+    assertAssignable<Alarm | undefined, typeof typed.alarms.ordersDroppedEvents>();
+    assertAssignable<Alarm | undefined, typeof typed.alarms.iteratorAge>();
+    // @ts-expect-error -- the suffix is "DroppedEvents", not "DroppedEvent"
+    expect(typed.alarms.ordersDroppedEvent).toBeUndefined();
+  });
+
+  it("types a declared custom key as present, and rejects an undeclared one", () => {
+    const { result } = buildAndSynth(withHighInvocations);
+    const alarm = ref(
+      "handler",
+      (r: WithCustomAlarms<FunctionBuilderResult, "highInvocations">) => {
+        // @ts-expect-error -- "highInvocation" was not declared as a custom key
+        expect(r.alarms.highInvocation).toBeUndefined();
+        return r.alarms.highInvocations;
+      },
+    ).resolve({ handler: result });
+
+    assertAssignable<Alarm, typeof alarm>();
+    expect(alarm).toBe(result.alarms.highInvocations);
   });
 });

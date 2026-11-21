@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 
 import { Match } from "aws-cdk-lib/assertions";
-import { TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Queue } from "aws-cdk-lib/aws-sqs";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { createQueueBuilder } from "../src/queue-builder.js";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
+import { createQueueBuilder, type QueueBuilderResult } from "../src/queue-builder.js";
 import { resolveQueueAlarmDefinitions } from "../src/queue-alarms.js";
 import { PRIMARY_ALARM_PROFILE } from "../src/queue-alarm-profiles.js";
 
@@ -217,5 +219,50 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["backlogDepth", "oldestMessage"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  const backlogDepth = (b: ReturnType<typeof createQueueBuilder>) =>
+    b.addAlarm("backlogDepth", (alarm) =>
+      alarm.metric((queue) => queue.metricApproximateNumberOfMessagesVisible()).threshold(1000),
+    );
+
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth(() => undefined);
+    const typed: QueueBuilderResult = result;
+    const age = typed.alarms.approximateAgeOfOldestMessage;
+
+    assertAssignable<Alarm | undefined, typeof age>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof age>();
+    expect(age).toBeDefined();
+    // @ts-expect-error -- "approximateAgeOfOldestMesage" is not an SQS alarm key
+    expect(typed.alarms.approximateAgeOfOldestMesage).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const system = compose(
+      {
+        queue: backlogDepth(createQueueBuilder()),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("queue", (r: WithCustomAlarms<QueueBuilderResult, "backlogDepth">) => {
+              // @ts-expect-error -- "backlogDepht" was not declared as a custom key
+              expect(r.alarms.backlogDepht).toBeUndefined();
+              return r.alarms.backlogDepth;
+            }).resolve(context),
+          }),
+        },
+      },
+      { queue: [], consumer: ["queue"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.queue.alarms.backlogDepth);
   });
 });

@@ -1,4 +1,3 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IGrantable, type IRole, ManagedPolicy } from "aws-cdk-lib/aws-iam";
 import {
   Function as LambdaFunction,
@@ -18,14 +17,19 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import {
   createServiceRoleBuilder,
   createStatementBuilder,
   type IRoleBuilder,
 } from "@composurecdk/iam";
 import { createLogGroupBuilder } from "@composurecdk/logs";
-import type { FunctionAlarmConfig } from "./alarm-config.js";
+import type { FunctionAlarmConfig, FunctionAlarmKey } from "./alarm-config.js";
 import { createFunctionAlarms } from "./function-alarms.js";
 import { FUNCTION_DEFAULTS } from "./defaults.js";
 import {
@@ -195,14 +199,17 @@ export interface FunctionBuilderResult {
    *
    * Includes both AWS-recommended alarms and any custom alarms added
    * via {@link IFunctionBuilder.addAlarm}. Access individual alarms
-   * by key (e.g., `result.alarms.errors`).
+   * by key (e.g., `result.alarms.errors`). A recommended alarm is
+   * `Alarm | undefined`: it may be disabled, or depend on configuration
+   * the function does not have. Any other key is a compile error; read a
+   * custom alarm through {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Lambda
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<FunctionAlarmKey>;
 
   /**
    * Event sources attached to the function via
@@ -292,7 +299,7 @@ interface EventSourceEntry {
   source: Resolvable<ComposureEventSource | IEventSource>;
 }
 
-class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
+class FunctionBuilder implements Lifecycle<WithCustomAlarms<FunctionBuilderResult, string>> {
   props: Partial<FunctionBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<LambdaFunction>[] = [];
   readonly #eventSources: EventSourceEntry[] = [];
@@ -465,7 +472,7 @@ class FunctionBuilder implements Lifecycle<FunctionBuilderResult> {
     scope: IConstruct,
     id: string,
     context: Record<string, object> = {},
-  ): FunctionBuilderResult {
+  ): WithCustomAlarms<FunctionBuilderResult, string> {
     const {
       role: roleResolvable,
       environmentEncryption,

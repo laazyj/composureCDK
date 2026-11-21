@@ -1,4 +1,3 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import {
   InterfaceVpcEndpoint,
   type IConnectable,
@@ -8,10 +7,18 @@ import {
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import { createSecurityGroupBuilder } from "./security-group-builder.js";
 import { INTERFACE_ENDPOINT_DEFAULTS } from "./interface-endpoint-defaults.js";
-import type { InterfaceEndpointAlarmConfig } from "./interface-endpoint-alarm-config.js";
+import type {
+  InterfaceEndpointAlarmConfig,
+  InterfaceEndpointAlarmKey,
+} from "./interface-endpoint-alarm-config.js";
 import { createInterfaceEndpointAlarms } from "./interface-endpoint-alarms.js";
 
 /**
@@ -58,7 +65,15 @@ export interface InterfaceEndpointBuilderProps extends Omit<
 export interface InterfaceEndpointBuilderResult {
   endpoint: InterfaceVpcEndpoint;
   securityGroup?: SecurityGroup;
-  alarms: Record<string, Alarm>;
+
+  /**
+   * CloudWatch alarms created for the endpoint, keyed by alarm key: the
+   * AWS-recommended alarms and any custom alarms added via `addAlarm`. A
+   * recommended alarm is `Alarm | undefined`, because it may be disabled.
+   * Any other key is a compile error; read a custom alarm through
+   * {@link WithCustomAlarms}.
+   */
+  alarms: AlarmsOf<InterfaceEndpointAlarmKey>;
 }
 
 interface AccessSpec {
@@ -107,7 +122,9 @@ export type IInterfaceEndpointBuilder = ITaggedBuilder<
   InterfaceEndpointBuilder
 >;
 
-class InterfaceEndpointBuilder implements Lifecycle<InterfaceEndpointBuilderResult> {
+class InterfaceEndpointBuilder implements Lifecycle<
+  WithCustomAlarms<InterfaceEndpointBuilderResult, string>
+> {
   props: Partial<InterfaceEndpointBuilderProps> = {};
   readonly #access: AccessSpec[] = [];
   readonly #customAlarms: AlarmDefinitionBuilder<InterfaceVpcEndpoint>[] = [];
@@ -192,7 +209,7 @@ class InterfaceEndpointBuilder implements Lifecycle<InterfaceEndpointBuilderResu
     scope: IConstruct,
     id: string,
     context?: Record<string, object>,
-  ): InterfaceEndpointBuilderResult {
+  ): WithCustomAlarms<InterfaceEndpointBuilderResult, string> {
     const resolvedVpc = this.#vpc ? resolve(this.#vpc, context) : undefined;
     if (!resolvedVpc) {
       throw new Error(

@@ -11,10 +11,13 @@ export {
   type InstanceBuilderResult,
 } from "./instance-builder.js";
 export { INSTANCE_DEFAULTS } from "./instance-defaults.js";
-export { type InstanceAlarmConfig } from "./instance-alarm-config.js";
+export { type InstanceAlarmConfig, type InstanceAlarmKey } from "./instance-alarm-config.js";
 export { INSTANCE_ALARM_DEFAULTS } from "./instance-alarm-defaults.js";
 export { type AttachVolumeOptions } from "./instance-volume-attachments.js";
-export { type VolumeAttachmentAlarmConfig } from "./instance-volume-attachment-config.js";
+export {
+  type VolumeAttachmentAlarmConfig,
+  type VolumeAttachmentAlarmKey,
+} from "./instance-volume-attachment-config.js";
 export { VOLUME_ATTACHMENT_ALARM_DEFAULTS } from "./instance-volume-attachment-defaults.js";
 
 export {
@@ -24,7 +27,7 @@ export {
   type VolumeBuilderResult,
 } from "./volume-builder.js";
 export { VOLUME_DEFAULTS } from "./volume-defaults.js";
-export { type VolumeAlarmConfig } from "./volume-alarm-config.js";
+export { type VolumeAlarmConfig, type VolumeAlarmKey } from "./volume-alarm-config.js";
 export { VOLUME_ALARM_DEFAULTS } from "./volume-alarm-defaults.js";
 
 export {
@@ -51,7 +54,10 @@ export {
   type InterfaceEndpointBuilderResult,
 } from "./interface-endpoint-builder.js";
 export { INTERFACE_ENDPOINT_DEFAULTS } from "./interface-endpoint-defaults.js";
-export { type InterfaceEndpointAlarmConfig } from "./interface-endpoint-alarm-config.js";
+export {
+  type InterfaceEndpointAlarmConfig,
+  type InterfaceEndpointAlarmKey,
+} from "./interface-endpoint-alarm-config.js";
 export { INTERFACE_ENDPOINT_ALARM_DEFAULTS } from "./interface-endpoint-alarm-defaults.js";
 
 /**

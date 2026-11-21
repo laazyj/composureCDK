@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
 import {
   InterfaceVpcEndpointAwsService,
   SecurityGroup,
@@ -364,6 +366,59 @@ describe("InterfaceEndpointBuilder", () => {
 
       expect(Object.keys(result.alarms)).toEqual(["customThrottle"]);
       template.resourceCountIs("AWS::CloudWatch::Alarm", 1);
+    });
+  });
+
+  // The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+  // target, run before `test`) fails if any of them stops being an error.
+  describe("alarm keys (type-level)", () => {
+    it("types recommended alarms as optional and rejects a misspelled key", () => {
+      const { stack, vpc } = freshScope();
+      const result = createInterfaceEndpointBuilder()
+        .vpc(vpc)
+        .service(InterfaceVpcEndpointAwsService.SSM)
+        .build(stack, "Endpoint");
+      const typed: InterfaceEndpointBuilderResult = result;
+      const dropped = typed.alarms.packetsDropped;
+
+      assertAssignable<Alarm | undefined, typeof dropped>();
+      // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+      assertAssignable<Alarm, typeof dropped>();
+      expect(dropped).toBeDefined();
+      // @ts-expect-error -- "packetDropped" is not an interface-endpoint alarm key
+      expect(typed.alarms.packetDropped).toBeUndefined();
+    });
+
+    it("types a declared custom key as present, and rejects an undeclared one", () => {
+      const { stack, vpc } = freshScope();
+      const result = createInterfaceEndpointBuilder()
+        .vpc(vpc)
+        .service(InterfaceVpcEndpointAwsService.SSM)
+        .addAlarm("customThrottle", (alarm) =>
+          alarm
+            .metric(
+              (endpoint) =>
+                new Metric({
+                  namespace: "AWS/PrivateLinkEndpoints",
+                  metricName: "RstPacketsSent",
+                  dimensionsMap: { "VPC Endpoint Id": endpoint.vpcEndpointId },
+                  statistic: "Sum",
+                }),
+            )
+            .threshold(1),
+        )
+        .build(stack, "Endpoint");
+      const alarm = ref(
+        "ssm",
+        (r: WithCustomAlarms<InterfaceEndpointBuilderResult, "customThrottle">) => {
+          // @ts-expect-error -- "customThrotle" was not declared as a custom key
+          expect(r.alarms.customThrotle).toBeUndefined();
+          return r.alarms.customThrottle;
+        },
+      ).resolve({ ssm: result });
+
+      assertAssignable<Alarm, typeof alarm>();
+      expect(alarm).toBe(result.alarms.customThrottle);
     });
   });
 

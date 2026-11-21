@@ -1,10 +1,14 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { Volume, type VolumeProps } from "aws-cdk-lib/aws-ec2";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { VolumeAlarmConfig } from "./volume-alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { VolumeAlarmConfig, VolumeAlarmKey } from "./volume-alarm-config.js";
 import { createVolumeAlarms } from "./volume-alarms.js";
 import { VOLUME_DEFAULTS } from "./volume-defaults.js";
 
@@ -80,14 +84,17 @@ export interface VolumeBuilderResult {
    *
    * Includes both AWS-recommended alarms and any custom alarms added
    * via {@link IVolumeBuilder.addAlarm}. Access individual alarms by
-   * key (e.g., `result.alarms.burstBalance`).
+   * key (e.g., `result.alarms.burstBalance`). A recommended alarm is
+   * `Alarm | undefined`: it may be disabled, or skipped for the volume
+   * type (`burstBalance` needs a burstable type). Any other key is a
+   * compile error; read a custom alarm through {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#EBS
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<VolumeAlarmKey>;
 }
 
 /**
@@ -124,7 +131,7 @@ export interface VolumeBuilderResult {
  */
 export type IVolumeBuilder = ITaggedBuilder<VolumeBuilderProps, VolumeBuilder>;
 
-class VolumeBuilder implements Lifecycle<VolumeBuilderResult> {
+class VolumeBuilder implements Lifecycle<WithCustomAlarms<VolumeBuilderResult, string>> {
   props: Partial<VolumeBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Volume>[] = [];
   #availabilityZone?: Resolvable<string>;
@@ -176,7 +183,11 @@ class VolumeBuilder implements Lifecycle<VolumeBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): VolumeBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<VolumeBuilderResult, string> {
     const resolvedAz = this.#availabilityZone
       ? resolve(this.#availabilityZone, context)
       : undefined;

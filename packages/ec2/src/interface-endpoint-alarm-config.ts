@@ -33,3 +33,10 @@ export interface InterfaceEndpointAlarmConfig {
    */
   packetsDropped?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms the interface-endpoint builder creates —
+ * every {@link InterfaceEndpointAlarmConfig} entry except the `enabled`
+ * master switch.
+ */
+export type InterfaceEndpointAlarmKey = Exclude<keyof InterfaceEndpointAlarmConfig, "enabled">;

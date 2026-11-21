@@ -1,4 +1,3 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type CfnVolumeAttachment, Instance, type InstanceProps } from "aws-cdk-lib/aws-ec2";
 import { type IGrantable } from "aws-cdk-lib/aws-iam";
 import { type IConstruct } from "constructs";
@@ -11,8 +10,14 @@ import {
   type Resolvable,
 } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { InstanceAlarmConfig } from "./instance-alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { InstanceAlarmConfig, InstanceAlarmKey } from "./instance-alarm-config.js";
+import type { VolumeAttachmentAlarmKey } from "./instance-volume-attachment-config.js";
 import { createInstanceAlarms } from "./instance-alarms.js";
 import { INSTANCE_DEFAULTS } from "./instance-defaults.js";
 import {
@@ -116,13 +121,17 @@ export interface InstanceBuilderResult {
    * via {@link IInstanceBuilder.addAlarm}, and per-attachment alarms
    * added by {@link IInstanceBuilder.attachVolume} (keyed
    * `${attachmentKey}.${alarmKey}`, e.g. `AgentData.volumeStalledIo`).
+   * A recommended or per-attachment alarm is `Alarm | undefined`: it may
+   * be disabled, or depend on configuration (`cpuCreditBalance` needs a
+   * burstable instance type). Any other key is a compile error; read a
+   * custom alarm through {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#EC2
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<InstanceAlarmKey | VolumeAttachmentAlarmKey>;
 
   /**
    * `AWS::EC2::VolumeAttachment` constructs created via
@@ -172,7 +181,7 @@ export interface InstanceBuilderResult {
  */
 export type IInstanceBuilder = ITaggedBuilder<InstanceBuilderProps, InstanceBuilder>;
 
-class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
+class InstanceBuilder implements Lifecycle<WithCustomAlarms<InstanceBuilderResult, string>> {
   props: Partial<InstanceBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Instance>[] = [];
   readonly #volumeAttachments: PendingVolumeAttachment[] = [];
@@ -297,7 +306,7 @@ class InstanceBuilder implements Lifecycle<InstanceBuilderResult> {
     scope: IConstruct,
     id: string,
     context: Record<string, object> = {},
-  ): InstanceBuilderResult {
+  ): WithCustomAlarms<InstanceBuilderResult, string> {
     const resolvedVpc = this.#vpc ? resolve(this.#vpc, context) : undefined;
 
     if (!resolvedVpc) {

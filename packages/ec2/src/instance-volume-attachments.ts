@@ -1,5 +1,5 @@
 import { Duration, Token } from "aws-cdk-lib";
-import { type Alarm, ComparisonOperator, Metric, Stats } from "aws-cdk-lib/aws-cloudwatch";
+import { ComparisonOperator, Metric, Stats } from "aws-cdk-lib/aws-cloudwatch";
 import {
   CfnVolumeAttachment,
   type Instance,
@@ -9,9 +9,17 @@ import {
 } from "aws-cdk-lib/aws-ec2";
 import type { IConstruct } from "constructs";
 import { resolve, type Resolvable } from "@composurecdk/core";
-import { type AlarmDefinition, createAlarms, resolveAlarmConfig } from "@composurecdk/cloudwatch";
+import {
+  type AlarmDefinition,
+  type AlarmsOf,
+  createAlarms,
+  resolveAlarmConfig,
+} from "@composurecdk/cloudwatch";
 import type { VolumeBuilderResult } from "./volume-builder.js";
-import type { VolumeAttachmentAlarmConfig } from "./instance-volume-attachment-config.js";
+import type {
+  VolumeAttachmentAlarmConfig,
+  VolumeAttachmentAlarmKey,
+} from "./instance-volume-attachment-config.js";
 import { VOLUME_ATTACHMENT_ALARM_DEFAULTS } from "./instance-volume-attachment-defaults.js";
 
 const STALLED_IO_PERIOD = Duration.minutes(1);
@@ -160,7 +168,10 @@ export function createVolumeAttachments(
   instanceProps: InstanceProps,
   attachments: PendingVolumeAttachment[],
   context?: Record<string, object>,
-): { attachments: Record<string, CfnVolumeAttachment>; alarms: Record<string, Alarm> } {
+): {
+  attachments: Record<string, CfnVolumeAttachment>;
+  alarms: AlarmsOf<VolumeAttachmentAlarmKey>;
+} {
   const attachmentRecords: Record<string, CfnVolumeAttachment> = {};
   const alarmDefinitions: AlarmDefinition[] = [];
 

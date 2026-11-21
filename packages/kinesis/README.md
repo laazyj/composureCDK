@@ -1,6 +1,6 @@
 # @composurecdk/kinesis
 
-Kinesis Data Streams builder for [ComposureCDK](../../README.md).
+Kinesis Data Streams builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for Amazon Kinesis data streams with secure, AWS-recommended defaults. It wraps the CDK [Stream](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kinesis.Stream.html) construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -66,7 +66,7 @@ createStreamBuilder().retentionPeriod(Duration.hours(24));
 
 ### Customer-managed encryption keys
 
-`.encryptionKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+`.encryptionKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) can be a component of the same system:
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
@@ -82,13 +82,13 @@ compose(
 );
 ```
 
-Supplying a key switches `encryption` from the `MANAGED` default to `StreamEncryption.KMS` ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)). An explicit `encryption` still wins.
+Supplying a key switches `encryption` from the `MANAGED` default to `StreamEncryption.KMS` ([ADR-0009](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)). An explicit `encryption` still wins.
 
 A customer-managed key is billed and must allow the stream's producers and consumers to use it — the [`streamGrants`](#grants) helpers grant the matching `kms:` actions alongside the `kinesis:` ones. See [permissions to use user-generated KMS keys](https://docs.aws.amazon.com/streams/latest/dev/permissions-user-key-KMS.html).
 
 ## Grants
 
-`streamGrants` are consumer-side grant helpers ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)): pass one to a grantee builder's `grant(...)`. Each delegates to the stream's native `grant*` method, so a customer-managed key's `kms:` actions come with it.
+`streamGrants` are consumer-side grant helpers ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)): pass one to a grantee builder's `grant(...)`. Each delegates to the stream's native `grant*` method, so a customer-managed key's `kms:` actions come with it.
 
 | Helper      | Grants                                                                                      |
 | ----------- | ------------------------------------------------------------------------------------------- |
@@ -135,15 +135,15 @@ createStreamBuilder().addToResourcePolicy(
 );
 ```
 
-A stream encrypted with a customer-managed key also needs that key's policy to allow the other account — see [`@composurecdk/kms`](../kms/README.md).
+A stream encrypted with a customer-managed key also needs that key's policy to allow the other account — see [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md).
 
 The statement — or the function's return value — may be a `ref` or `combine`, so it can name a sibling the stream's policy depends on. Declare that sibling as a dependency of the stream.
 
-A component that depends on the stream cannot be named here: `compose` rejects the cycle. Access for an IAM principal in this app belongs on the grantee, as a [`streamGrants`](#grants) grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). Where neither fits, add the statement in an `afterBuild` hook, which sees every component's result.
+A component that depends on the stream cannot be named here: `compose` rejects the cycle. Access for an IAM principal in this app belongs on the grantee, as a [`streamGrants`](#grants) grant ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)). Where neither fits, add the statement in an `afterBuild` hook, which sees every component's result.
 
 ## Constraints
 
-`streamName` is validated at build against the [CreateStream](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_CreateStream.html) rules — 1 to 128 characters from `[a-zA-Z0-9_.-]` — so a bad name fails at `cdk synth` rather than at deploy ([ADR-0010](../../docs/adr/0010-aws-property-constraints.md)). The validator is exported for direct use:
+`streamName` is validated at build against the [CreateStream](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_CreateStream.html) rules — 1 to 128 characters from `[a-zA-Z0-9_.-]` — so a bad name fails at `cdk synth` rather than at deploy ([ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md)). The validator is exported for direct use:
 
 ```ts
 import { constraints } from "@composurecdk/kinesis";
@@ -153,7 +153,7 @@ constraints.validate.streamName("telemetry"); // throws on an invalid name
 
 ## Alarms
 
-The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Kinesis) by default. Alarms are returned in the build result's `alarms`, keyed as below. No alarm actions are configured — apply them from the result or with [`alarmActionsPolicy`](../cloudwatch/README.md).
+The builder creates [AWS-recommended CloudWatch alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#Kinesis) by default. Alarms are returned in the build result's `alarms`, keyed as below. No alarm actions are configured — apply them from the result or with [`alarmActionsPolicy`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/README.md).
 
 Each alarm's metric, statistic, period, datapoints and comparison follow the AWS page exactly. AWS gives no numeric threshold for any Kinesis alarm — every one is "depends on your situation" — so the thresholds below are this library's starting points, chosen against AWS's threshold justification for each (for example, iterator age past 50% of retention is where AWS says data loss becomes a risk, and throttling should alarm when sustained but not at zero, since throttled requests are retried). Tune them to your workload via `recommendedAlarms`.
 
@@ -285,7 +285,7 @@ handler.grant(
 );
 ```
 
-To invoke a Lambda function from the consumer, attach it with [`kinesisConsumerEventSource`](../lambda/README.md#kinesis-data-streams) from `@composurecdk/lambda`, passing `ref("consumer", (r) => r.consumer)`. Use [`kinesisEventSource`](../lambda/README.md#kinesis-data-streams) for a shared-throughput consumer of the stream itself.
+To invoke a Lambda function from the consumer, attach it with [`kinesisConsumerEventSource`](https://github.com/laazyj/composureCDK/blob/main/packages/lambda/README.md#kinesis-data-streams) from `@composurecdk/lambda`, passing `ref("consumer", (r) => r.consumer)`. Use [`kinesisEventSource`](https://github.com/laazyj/composureCDK/blob/main/packages/lambda/README.md#kinesis-data-streams) for a shared-throughput consumer of the stream itself.
 
 ### Consumer alarm
 

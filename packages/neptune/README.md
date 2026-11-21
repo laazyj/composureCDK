@@ -1,6 +1,6 @@
 # @composurecdk/neptune
 
-Amazon Neptune cluster builder for [ComposureCDK](../../README.md).
+Amazon Neptune cluster builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for Amazon Neptune clusters with secure, AWS-recommended defaults. It wraps the CDK alpha [`DatabaseCluster`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-neptune-alpha-readme.html) L2 construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -47,7 +47,7 @@ The `vpc` is set via the dedicated `.vpc()` method (it is required and accepts a
 
 ## Build result
 
-`build()` returns every construct the builder creates, per the [build-results-must-be-complete](../../docs/architecture.md) rule:
+`build()` returns every construct the builder creates, per the [build-results-must-be-complete](https://github.com/laazyj/composureCDK/blob/main/docs/architecture.md) rule:
 
 ```ts
 interface ClusterBuilderResult {
@@ -78,7 +78,7 @@ The defaults are exported as `CLUSTER_DEFAULTS` for visibility and testing.
 
 ### Encryption at rest
 
-`storageEncrypted` is on by default, using the AWS-managed Neptune key. `.kmsKey(...)` selects a customer-managed key instead — for independent rotation, a key policy you control, and CloudTrail visibility of decrypt calls. It accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system rather than a construct created before `compose`:
+`storageEncrypted` is on by default, using the AWS-managed Neptune key. `.kmsKey(...)` selects a customer-managed key instead — for independent rotation, a key policy you control, and CloudTrail visibility of decrypt calls. It accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) can be a component of the same system rather than a construct created before `compose`:
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
@@ -105,7 +105,7 @@ Audit log _export_ only emits data once audit logging is _enabled_ in the cluste
 
 ## Granting access
 
-Because IAM authentication is on by default, a principal needs two things to reach the cluster, and each is declared where its dependency already points ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). The **network path** is a rule in the cluster's own security group, so it stays on the cluster — `allowDefaultPortFrom(peer)`, the same method `createInterfaceEndpointBuilder` exposes. The **IAM grant** lands on the consumer's principal, so it is declared on the grantee builder, pointing back at the cluster via a `ref`:
+Because IAM authentication is on by default, a principal needs two things to reach the cluster, and each is declared where its dependency already points ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)). The **network path** is a rule in the cluster's own security group, so it stays on the cluster — `allowDefaultPortFrom(peer)`, the same method `createInterfaceEndpointBuilder` exposes. The **IAM grant** lands on the consumer's principal, so it is declared on the grantee builder, pointing back at the cluster via a `ref`:
 
 ```ts
 import { clusterGrants, type ClusterBuilderResult } from "@composurecdk/neptune";
@@ -141,7 +141,7 @@ The grant goes on any builder that accepts one — an `InstanceBuilder`, a `Func
 
 If you disable IAM authentication (`.iamAuthentication(false)`), the network path is the whole grant — the alpha L2 then rejects a data-plane grant at synth rather than emitting an inert policy, so drop the `clusterGrants` call along with IAM auth.
 
-For a worked example, see the [Neptune graph stack](../examples/src/neptune-graph-app.ts).
+For a worked example, see the [Neptune graph stack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/neptune-graph-app.ts).
 
 ## Recommended Alarms
 

@@ -1,6 +1,6 @@
 # @composurecdk/custom-resources
 
-Compose-native `AwsCustomResource` builder for [ComposureCDK](../../README.md).
+Compose-native `AwsCustomResource` builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 Some AWS operations have **no CloudFormation resource** — they are account-level SDK calls only reachable through CDK's [`AwsCustomResource`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.custom_resources.AwsCustomResource.html). The canonical example is `ses:SetActiveReceiptRuleSet`: the one call that makes an SES receipt rule set actually receive mail. There is no CFN property for "active rule set".
 
@@ -8,7 +8,7 @@ This package wraps `AwsCustomResource` as a builder so those calls become first-
 
 > **When a domain builder already covers the call you need, prefer it** — it scopes IAM automatically and reads as intent rather than plumbing (e.g. a future SES `.activate()`). This builder is for the long tail of one-off SDK calls that don't justify a domain builder.
 
-> **Invoking your own Lambda during deployment is a different job** — use [`.invokeOnDeploy()`](../lambda/README.md#deploy-time-invocation-invokeondeploy) on the function builder. Reaching for `onCreate: { service: "Lambda", action: "invoke" }` here **will not fail the deployment when your handler fails**: the provider only reports `FAILED` when the _SDK call_ throws, and a handler that throws still returns HTTP 200 with a `FunctionError` field, so the deploy goes green.
+> **Invoking your own Lambda during deployment is a different job** — use [`.invokeOnDeploy()`](https://github.com/laazyj/composureCDK/blob/main/packages/lambda/README.md#deploy-time-invocation-invokeondeploy) on the function builder. Reaching for `onCreate: { service: "Lambda", action: "invoke" }` here **will not fail the deployment when your handler fails**: the provider only reports `FAILED` when the _SDK call_ throws, and a handler that throws still returns HTTP 200 with a `FunctionError` field, so the deploy goes green.
 
 ## Usage
 
@@ -41,7 +41,7 @@ const activation = createAwsCustomResourceBuilder()
 
 `.dependsOn(ref("ruleSet"))` is the explicit, reliable seam: it resolves the named component against the build context and adds a `DependsOn` to that component's construct(s) — even when the SDK call's parameters are hardcoded strings with no token, and only for the component you name (nothing incidental).
 
-This is the builder-level form of `@composurecdk/core`'s [`dependsOn` combinator](../core/README.md#in-a-composed-system-dependson), targeting the custom resource. Prefer it here: it keeps the dependency with the SDK call that needs it, works on a sub-builder inside a composite, and survives `.copy()`.
+This is the builder-level form of `@composurecdk/core`'s [`dependsOn` combinator](https://github.com/laazyj/composureCDK/blob/main/packages/core/README.md#in-a-composed-system-dependson), targeting the custom resource. Prefer it here: it keeps the dependency with the SDK call that needs it, works on a sub-builder inside a composite, and survives `.copy()`.
 
 ## IAM: `allow(actions, resources)`
 

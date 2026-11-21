@@ -12,7 +12,7 @@ Ships a dual ESM/CommonJS build, so it loads from either kind of flat config. Ru
 
 ### Presets
 
-Rules are grouped by **what must be true of you** for the rule to be correct, so you enable the tiers that describe your package ([ADR-0019](../../docs/adr/0019-lint-rules-as-public-contract.md)):
+Rules are grouped by **what must be true of you** for the rule to be correct, so you enable the tiers that describe your package ([ADR-0019](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0019-lint-rules-as-public-contract.md)):
 
 | Preset           | Enable it if                                                                  |
 | ---------------- | ----------------------------------------------------------------------------- |
@@ -93,7 +93,7 @@ Each rule has a documentation page with its rationale, examples, deliberate excl
 
 ## Versioning
 
-Rule names, messages and default severities are public API ([ADR-0019](../../docs/adr/0019-lint-rules-as-public-contract.md)):
+Rule names, messages and default severities are public API ([ADR-0019](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0019-lint-rules-as-public-contract.md)):
 
 - **A new rule ships registered but in no preset**, so you can enable it the day it lands. It **joins a preset in a major**: a caret range — what `npm install` writes — picks up minors automatically, so a new rule in a preset turns green CI red on unchanged code.
 - **`internal` is the exception**: it describes composureCDK itself and has no outside consumers, so a new house rule joins it as it lands.
@@ -123,7 +123,7 @@ Rule names, messages and default severities are public API ([ADR-0019](../../doc
    ```
 
 2. Register it in `src/rules/index.ts`.
-3. Decide its tier in `src/configs/presets.ts` — the preset whose truth condition it matches, or none if it is landing ahead of the next major. A test asserts no rule lands in two tiers, and that a rule in none is listed as deliberate — see [ADR-0019](../../docs/adr/0019-lint-rules-as-public-contract.md).
+3. Decide its tier in `src/configs/presets.ts` — the preset whose truth condition it matches, or none if it is landing ahead of the next major. A test asserts no rule lands in two tiers, and that a rule in none is listed as deliberate — see [ADR-0019](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0019-lint-rules-as-public-contract.md).
 4. Write `docs/rules/<kebab-name>.md`, leading with `# composurecdk/<kebab-name>`. This is where rationale, examples, deliberate exclusions and known gaps live — the rule's own source comment stays a summary plus a link. `meta.docs.url` is derived from the name you registered, so there is nothing to wire up.
 5. Add a row to the table above, linking the page.
 6. Write `test/rules/<kebab-name>.test.ts` using `RuleTester` (see existing tests). Cover at least one valid and one invalid case per `messageId`.

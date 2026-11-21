@@ -1,8 +1,8 @@
 # @composurecdk/bedrockagentcore
 
-Amazon Bedrock AgentCore for [ComposureCDK](../../README.md): agent runtimes, memory, gateways and evaluations, with secure defaults, consumer-side grants and CloudWatch alarms.
+Amazon Bedrock AgentCore for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md): agent runtimes, memory, gateways and evaluations, with secure defaults, consumer-side grants and CloudWatch alarms.
 
-It builds on the stable [`aws-cdk-lib/aws-bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html) module. Model access comes from [`@composurecdk/bedrock`](../bedrock/README.md).
+It builds on the stable [`aws-cdk-lib/aws-bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html) module. Model access comes from [`@composurecdk/bedrock`](https://github.com/laazyj/composureCDK/blob/main/packages/bedrock/README.md).
 
 ```ts
 import { AgentCoreRuntime, AgentRuntimeArtifact } from "aws-cdk-lib/aws-bedrockagentcore";

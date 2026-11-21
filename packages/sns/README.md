@@ -1,6 +1,6 @@
 # @composurecdk/sns
 
-SNS topic and subscription builders for [ComposureCDK](../../README.md).
+SNS topic and subscription builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for SNS topics and subscriptions with secure, AWS-recommended defaults. They wrap the CDK [Topic](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Topic.html) and [Subscription](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.Subscription.html) constructs — refer to the CDK documentation for the full set of configurable properties.
 
@@ -29,7 +29,7 @@ These defaults are guided by the [AWS SNS Security Best Practices](https://docs.
 
 ### Encryption at rest
 
-SNS has no service-managed encryption option — a topic is unencrypted at rest until a KMS key is supplied. `.masterKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+SNS has no service-managed encryption option — a topic is unencrypted at rest until a KMS key is supplied. `.masterKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) can be a component of the same system:
 
 ```ts
 compose(
@@ -67,7 +67,7 @@ createTopicBuilder()
   .build(stack, "Alerts");
 ```
 
-`conditions` is optional; use one where the service supports it, to guard against the [confused deputy problem](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html). Integrations that wire themselves — EventBridge targets, S3 notifications, and [`@composurecdk/budgets`](../budgets/README.md) SNS subscribers — already add their statement to the topic's policy, so they need no `allowServicePublish`.
+`conditions` is optional; use one where the service supports it, to guard against the [confused deputy problem](https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html). Integrations that wire themselves — EventBridge targets, S3 notifications, and [`@composurecdk/budgets`](https://github.com/laazyj/composureCDK/blob/main/packages/budgets/README.md) SNS subscribers — already add their statement to the topic's policy, so they need no `allowServicePublish`.
 
 For any other statement, use `addToResourcePolicy`. Pass a function of the topic to name its ARN, which an SNS statement needs as its `Resource`:
 
@@ -84,7 +84,7 @@ createTopicBuilder().addToResourcePolicy(
 );
 ```
 
-- **Use it for what an in-app grant cannot express:** access from another account, and guardrails such as an organisation (`aws:PrincipalOrgID`) or VPC endpoint (`aws:SourceVpce`) condition. Grant an IAM principal in the app access on the principal's side with `topicGrants` instead ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)).
+- **Use it for what an in-app grant cannot express:** access from another account, and guardrails such as an organisation (`aws:PrincipalOrgID`) or VPC endpoint (`aws:SourceVpce`) condition. Grant an IAM principal in the app access on the principal's side with `topicGrants` instead ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)).
 - **The statement, or the function's return value, may be a `ref` or `combine`**, so it can name a sibling the policy depends on, such as a VPC endpoint. A component that depends on the topic cannot be named that way: `compose` rejects the cycle.
 
 Do not create another `TopicPolicy` for a topic built here: each policy resource replaces the topic's policy outright, so one of them is lost. Add to the topic's own policy with `addToResourcePolicy` instead. [`topicPolicyConflictPolicy`](#topic-policy-conflict-policy) catches this at synth.
@@ -195,7 +195,7 @@ for (const alarm of Object.values(result.alarms)) {
 
 ### Alert topics
 
-`numberOfNotificationsFailed` and the two redrive alarms report that SNS is failing to deliver the topic's messages. Don't send one to the topic it watches: its notification goes down the same failing path, so only subscriptions that are still delivering receive it, and on a single-subscriber topic none do. This is easy to do by accident with an alert topic, because a stack-wide [`alarmActionsPolicy`](../cloudwatch/README.md) also reaches the topic's own alarms.
+`numberOfNotificationsFailed` and the two redrive alarms report that SNS is failing to deliver the topic's messages. Don't send one to the topic it watches: its notification goes down the same failing path, so only subscriptions that are still delivering receive it, and on a single-subscriber topic none do. This is easy to do by accident with an alert topic, because a stack-wide [`alarmActionsPolicy`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/README.md) also reaches the topic's own alarms.
 
 The builder warns at synth time (`TOPIC_ALARM_SELF_NOTIFICATION_WARNING_ID`) when an alarm on one of those metrics, recommended or added with `addAlarm`, lists its own topic in its actions. Fix it in one of two ways:
 
@@ -228,7 +228,7 @@ result.subscriptions.ops; // AWS SNS Subscription construct
 
 Each subscription is exposed on `result.subscriptions` under the key supplied to `addSubscription`.
 
-Cross-component subscriptions can be declared with `ref(...)` inside a [`compose`](../core/README.md) system, so the subscription's endpoint is resolved from another component's build output at build time:
+Cross-component subscriptions can be declared with `ref(...)` inside a [`compose`](https://github.com/laazyj/composureCDK/blob/main/packages/core/README.md) system, so the subscription's endpoint is resolved from another component's build output at build time:
 
 ```ts
 import { compose, ref } from "@composurecdk/core";
@@ -326,7 +326,7 @@ If the DLQ is encrypted with a customer-managed KMS key (`createQueueBuilder("dl
 
 The CloudWatch metrics that surface delivery failures (`NumberOfNotificationsRedrivenToDlq`, `NumberOfNotificationsFailedToRedriveToDlq`) are topic-level, so the recommended alarms for them live on the `TopicBuilder` (see [Recommended Alarms](#recommended-alarms) above). It creates them when a subscription added via `addSubscription()` has a DLQ; see the footnote there for a DLQ on a subscription made with `createSubscriptionBuilder`. Pair them with the DLQ's own depth alarm — that pair is what turns an undelivered notification into a page.
 
-[`ComposureCDK-OrderProcessorStack`](../examples/src/order-processor-app.ts) deploys this shape end to end and its [smoke test](../examples/test/smoke/order-processor.smoke.mjs) proves the delivery path against live AWS.
+[`ComposureCDK-OrderProcessorStack`](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/order-processor-app.ts) deploys this shape end to end and its [smoke test](https://github.com/laazyj/composureCDK/blob/main/packages/examples/test/smoke/order-processor.smoke.mjs) proves the delivery path against live AWS.
 
 ## Subscription Defaults
 
@@ -379,6 +379,6 @@ The check matches topics by the resolved `Topics`/`TopicArn` value: a literal AR
 
 ## Examples
 
-- [OrderProcessorStack](../examples/src/order-processor-app.ts) — SNS → SQS fan-out with a dead-letter queue on the subscription
-- [DualFunctionStack](../examples/src/dual-function-app.ts) — Two Lambda functions with TopicBuilder for alarm actions
-- [StaticWebsiteStack](../examples/src/static-website/app.ts) — Static website with TopicBuilder for alarm actions
+- [OrderProcessorStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/order-processor-app.ts) — SNS → SQS fan-out with a dead-letter queue on the subscription
+- [DualFunctionStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/dual-function-app.ts) — Two Lambda functions with TopicBuilder for alarm actions
+- [StaticWebsiteStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/static-website/app.ts) — Static website with TopicBuilder for alarm actions

@@ -1,10 +1,14 @@
 import { CfnBudget, type CfnBudgetProps } from "aws-cdk-lib/aws-budgets";
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { ITopic, TopicPolicy } from "aws-cdk-lib/aws-sns";
 import type { IConstruct } from "constructs";
 import { Builder, COPY_STATE, type IBuilder, type Lifecycle } from "@composurecdk/core";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import type { BudgetAlarmConfig } from "./alarm-config.js";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { BudgetAlarmConfig, BudgetAlarmKey } from "./alarm-config.js";
 import { buildBudgetAlarms } from "./budget-alarm-builder.js";
 import { assertValidBudgetCurrency, warnIfNonUsdCurrency } from "./currency.js";
 import { BUDGET_DEFAULTS } from "./defaults.js";
@@ -121,8 +125,12 @@ export interface BudgetBuilderResult {
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
+   *
+   * A recommended alarm is `Alarm | undefined`: it is off unless configured.
+   * Any other key is a compile error; read a custom alarm through
+   * {@link WithCustomAlarms}.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<BudgetAlarmKey>;
 }
 
 /**
@@ -154,7 +162,7 @@ export interface BudgetBuilderResult {
 // eslint-disable-next-line composurecdk/builder-must-be-tagged -- AWS::Budgets::Budget has no Tags property
 export type IBudgetBuilder = IBuilder<BudgetBuilderProps, BudgetBuilder>;
 
-class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
+class BudgetBuilder implements Lifecycle<WithCustomAlarms<BudgetBuilderResult, string>> {
   props: Partial<BudgetBuilderProps> = {};
   readonly #notifications: NotificationEntry[] = [];
   readonly #customAlarms: AlarmDefinitionBuilder<CfnBudget>[] = [];
@@ -256,7 +264,11 @@ class BudgetBuilder implements Lifecycle<BudgetBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string, context: Record<string, object> = {}): BudgetBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context: Record<string, object> = {},
+  ): WithCustomAlarms<BudgetBuilderResult, string> {
     const {
       recommendedAlarms: alarmConfig,
       topicPolicy = BUDGET_DEFAULTS.topicPolicy,

@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 
 import { Annotations, Match } from "aws-cdk-lib/assertions";
-import { Metric } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { type CfnBudget } from "aws-cdk-lib/aws-budgets";
-import { buildFixture, testEnv } from "@composurecdk/cdk-testing";
-import type { AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
-import { createBudgetBuilder } from "../src/budget-builder.js";
+import { assertAssignable, buildFixture, newStack, testEnv } from "@composurecdk/cdk-testing";
+import { compose, ref } from "@composurecdk/core";
+import type { AlarmDefinitionBuilder, WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { type BudgetBuilderResult, createBudgetBuilder } from "../src/budget-builder.js";
 
 const buildAndSynth = buildFixture(
   () => createBudgetBuilder().budgetName("Account").limit({ amount: 1000 }),
@@ -246,5 +247,51 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["ec2EstimatedCharges", "ec2EstimatedChargesHigh"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+describe("typed alarm keys", () => {
+  it("types a recommended key as Alarm | undefined, and rejects a misspelled one", () => {
+    const { result } = buildAndSynth((b) => {
+      b.recommendedAlarms({ estimatedCharges: { threshold: 50 } });
+    });
+    const typed: BudgetBuilderResult = result;
+    const charges = typed.alarms.estimatedCharges;
+
+    assertAssignable<Alarm | undefined, typeof charges>();
+    // @ts-expect-error -- a recommended alarm is off unless configured, so it is not always an Alarm
+    assertAssignable<Alarm, typeof charges>();
+    expect(charges).toBeDefined();
+    // @ts-expect-error -- "estimatedCharge" is not a budget alarm key
+    expect(typed.alarms.estimatedCharge).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack({ env: testEnv("us-east-1") });
+    const system = compose(
+      {
+        budget: createBudgetBuilder()
+          .budgetName("Account")
+          .limit({ amount: 1000 })
+          .addAlarm("ec2EstimatedCharges", customCpuAlarm),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref(
+              "budget",
+              (r: WithCustomAlarms<BudgetBuilderResult, "ec2EstimatedCharges">) => {
+                // @ts-expect-error -- "ec2EstimatedCharge" was not declared as a custom key
+                expect(r.alarms.ec2EstimatedCharge).toBeUndefined();
+                return r.alarms.ec2EstimatedCharges;
+              },
+            ).resolve(context),
+          }),
+        },
+      },
+      { budget: [], consumer: ["budget"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.budget.alarms.ec2EstimatedCharges);
   });
 });

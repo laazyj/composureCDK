@@ -8,9 +8,11 @@ import type { AlarmDefinition } from "@composurecdk/cloudwatch";
 import {
   type AlarmConfigurer,
   AlarmDefinitionBuilder,
+  type AlarmsOf,
   createAlarms,
+  type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
-import type { BudgetAlarmConfig } from "./alarm-config.js";
+import type { BudgetAlarmConfig, BudgetAlarmKey } from "./alarm-config.js";
 import { resolveBudgetAlarmDefinitions } from "./budget-alarms.js";
 import type { BudgetBuilderResult } from "./budget-builder.js";
 
@@ -50,10 +52,14 @@ export interface BudgetAlarmBuilderProps {
  */
 export interface BudgetAlarmBuilderResult {
   /**
-   * The CloudWatch alarms created by this builder, keyed by alarm name.
+   * The CloudWatch alarms created by this builder, keyed by alarm key.
    * Uses the same key scheme as {@link BudgetBuilderResult.alarms}.
+   *
+   * A recommended alarm is `Alarm | undefined`: it is off unless configured.
+   * Any other key is a compile error; read a custom alarm through
+   * {@link WithCustomAlarms}.
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<BudgetAlarmKey>;
 }
 
 /**
@@ -131,7 +137,7 @@ export function buildBudgetAlarms(
   return createAlarms(scope, id, allAlarmDefs);
 }
 
-class BudgetAlarmBuilder implements Lifecycle<BudgetAlarmBuilderResult> {
+class BudgetAlarmBuilder implements Lifecycle<WithCustomAlarms<BudgetAlarmBuilderResult, string>> {
   props: Partial<BudgetAlarmBuilderProps> = {};
   #budget?: Resolvable<BudgetBuilderResult>;
   readonly #customAlarms: AlarmDefinitionBuilder<CfnBudget>[] = [];
@@ -188,7 +194,11 @@ class BudgetAlarmBuilder implements Lifecycle<BudgetAlarmBuilderResult> {
     target.#customAlarms.push(...this.#customAlarms);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): BudgetAlarmBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<BudgetAlarmBuilderResult, string> {
     const target = this.#budget ? resolve(this.#budget, context ?? {}) : undefined;
     return {
       alarms: buildBudgetAlarms(scope, id, target, {

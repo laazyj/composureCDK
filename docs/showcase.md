@@ -1,6 +1,6 @@
 # Showcase
 
-Real-world projects and patterns built with ComposureCDK, grouped by the kind of system they build. Each category opens with what ComposureCDK gives you for that use case, a short canonical example, a link to a runnable example app, a deep-dive comparison against idiomatic CDK, and the real-world projects that run it in production. More categories will be added as the library grows.
+Real-world projects and patterns built with ComposureCDK, grouped by the kind of system they build. [Ecosystem](#ecosystem) lists packages that work alongside it. Each category opens with what ComposureCDK gives you for that use case, a short canonical example, a link to a runnable example app, a deep-dive comparison against idiomatic CDK, and the real-world projects that run it in production. More categories will be added as the library grows.
 
 ## Add the badge
 
@@ -79,9 +79,15 @@ The use of [`at(id, component)`](architecture.md#pinning-a-components-construct-
 - **[ukehoot.net](https://github.com/laazyj/ukehoot.net)** — the same shape, distinguished by a CloudFront function serving 301 redirects for the group's legacy Tumblr URLs (2012–2018) to their archived equivalents.
 - **[uke-o-ono.com](https://github.com/laazyj/ukeoono.com)** — DNS hosted at **Cloudflare rather than Route 53**: apex/`www` are CNAMEs pointed at the distribution by hand, and the `us-east-1` ACM certificate is validated manually and imported by ARN rather than created and DNS-validated by the builder.
 
+## Ecosystem
+
+Packages that work alongside ComposureCDK. Those from [Composure Labs](../README.md#composure-labs) are first-party.
+
+- **[`@composure-labs/dynamodb-guard`](https://github.com/composure-labs/dynamodb-guard)** — catches DynamoDB expression mistakes, such as an unaliased reserved word, before deploy. The [fulfilment workflow example](../packages/examples/src/fulfilment-workflow-app.ts) uses its synth check.
+
 ## Submitting your project
 
-Open a pull request adding your project under the relevant category above (or proposing a new category), or open an issue if you'd prefer the maintainer to write the entry up. Entries should link to a public repo or homepage so readers can verify the project exists.
+Open a pull request adding your project under the relevant category above (or proposing a new category), or your package under [Ecosystem](#ecosystem), or open an issue if you'd prefer the maintainer to write the entry up. Entries should link to a public repo or homepage so readers can verify the project exists.
 
 <!--
 Skeleton for a new consumer entry:

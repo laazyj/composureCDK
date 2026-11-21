@@ -261,9 +261,24 @@ const handler = createFunctionBuilder()
 
 Custom alarm keys must not conflict with recommended alarm keys. To replace a recommended alarm, disable it first and add a custom one with the same key.
 
+### Reading alarms by key
+
+`FunctionBuilderResult` types `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended alarm is `Alarm | undefined`, because it can be disabled or depend on configuration the function lacks (`duration` needs a `timeout`). The event-source keys are typed by suffix, so any `<key>DroppedEvents` is accepted and `<key>DroppedEvent` is not. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("handler", (r: FunctionBuilderResult) => r.alarms.errors); // Alarm | undefined
+ref(
+  "handler",
+  (r: WithCustomAlarms<FunctionBuilderResult, "highInvocations">) => r.alarms.highInvocations,
+); // Alarm
+ref("handler", (r: FunctionBuilderResult) => r.alarms.error); // compile error
+```
+
+The custom keys you name are not checked against the builder's `addAlarm` calls. The result of the builder's own `build()` accepts any key, as `WithCustomAlarms<FunctionBuilderResult, string>`. The recommended keys are exported as `FunctionAlarmKey`.
+
 ### Applying alarm actions
 
-Alarms are returned in the build result as `Record<string, Alarm>`:
+Alarms are returned in the build result's `alarms`, keyed by alarm:
 
 ```ts
 const result = handler.build(stack, "MyFunction");

@@ -1,10 +1,15 @@
-import { type Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { type IQueue, Queue, QueueEncryption, type QueueProps } from "aws-cdk-lib/aws-sqs";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
+import type { QueueAlarmKey } from "./queue-alarm-config.js";
 import type { QueueBuilderExtensionProps, QueueBuilderPropsByRole } from "./queue-props.js";
 import { isDlqRole, isFifoRole, type QueueRole } from "./queue-role.js";
 import { QUEUE_DEFAULTS } from "./defaults.js";
@@ -27,14 +32,17 @@ export interface QueueBuilderResult {
    *
    * Includes both AWS-recommended alarms and any custom alarms added
    * via `addAlarm`. Access individual alarms by key (e.g.,
-   * `result.alarms.approximateAgeOfOldestMessage`).
+   * `result.alarms.approximateAgeOfOldestMessage`). A recommended alarm
+   * is `Alarm | undefined`: it may be disabled, or off for the queue's
+   * role. Any other key is a compile error; read a custom alarm through
+   * {@link WithCustomAlarms}.
    *
    * No alarm actions are configured — apply them via the result or an
    * `afterBuild` hook.
    *
    * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best_Practice_Recommended_Alarms_AWS_Services.html#SQS
    */
-  alarms: Record<string, Alarm>;
+  alarms: AlarmsOf<QueueAlarmKey>;
 }
 
 /**
@@ -100,7 +108,7 @@ export type IQueueBuilder<R extends QueueRole = "standard"> = ITaggedBuilder<
   QueueBuilder
 >;
 
-class QueueBuilder implements Lifecycle<QueueBuilderResult> {
+class QueueBuilder implements Lifecycle<WithCustomAlarms<QueueBuilderResult, string>> {
   props: Partial<InternalQueueBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<IQueue>[] = [];
   readonly #policyStatements: QueuePolicyStatement[] = [];
@@ -139,7 +147,11 @@ class QueueBuilder implements Lifecycle<QueueBuilderResult> {
     target.#policyStatements.push(...this.#policyStatements);
   }
 
-  build(scope: IConstruct, id: string, context?: Record<string, object>): QueueBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context?: Record<string, object>,
+  ): WithCustomAlarms<QueueBuilderResult, string> {
     const {
       queueRole: role = "standard",
       encryptionMasterKey,

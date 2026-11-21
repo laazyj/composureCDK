@@ -3,6 +3,7 @@ import { validateAlarmName } from "./alarm-name.js";
 
 export type { AlarmConfig, AlarmConfigDefaults } from "./alarm-config.js";
 export type { AlarmDefinition, AlarmMetric } from "./alarm-definition.js";
+export type { AlarmsOf, WithCustomAlarms } from "./alarms-of.js";
 export { type AlarmConfigurer, AlarmDefinitionBuilder } from "./alarm-definition-builder.js";
 export { type AlarmName, alarmName } from "./alarm-name.js";
 export {

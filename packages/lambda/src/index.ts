@@ -11,7 +11,11 @@ export {
   INVOKE_ON_DEPLOY_DEFAULTS,
   type InvokeOnDeployOptions,
 } from "./invoke-on-deploy.js";
-export { type FunctionAlarmConfig, type PercentageAlarmConfig } from "./alarm-config.js";
+export {
+  type FunctionAlarmConfig,
+  type FunctionAlarmKey,
+  type PercentageAlarmConfig,
+} from "./alarm-config.js";
 export { FUNCTION_ALARM_DEFAULTS } from "./alarm-defaults.js";
 export {
   type ComposureEventSource,

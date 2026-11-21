@@ -3,9 +3,11 @@ import { Duration } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
 import { type IRole, Role } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
-import { createMemoryBuilder } from "../src/memory-builder.js";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
+import { createMemoryBuilder, type MemoryBuilderResult } from "../src/memory-builder.js";
 
 const buildAndSynth = buildFixture(() => createMemoryBuilder().memoryName("support"), "Memory");
 
@@ -114,5 +116,46 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["invocations", "sessions"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("has no recommended alarm keys", () => {
+    const { result } = buildAndSynth();
+    const typed: MemoryBuilderResult = result;
+
+    // @ts-expect-error -- memory has no recommended alarms
+    expect(typed.alarms.systemErrors).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const system = compose(
+      {
+        memory: createMemoryBuilder()
+          .memoryName("support")
+          .addAlarm("writeErrors", (a) =>
+            a
+              .metric((m) => m.metric("Errors", { dimensionsMap: { Operation: "CreateEvent" } }))
+              .threshold(0)
+              .greaterThan(),
+          ),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("memory", (r: WithCustomAlarms<MemoryBuilderResult, "writeErrors">) => {
+              // @ts-expect-error -- "writeError" was not declared as a custom key
+              expect(r.alarms.writeError).toBeUndefined();
+              return r.alarms.writeErrors;
+            }).resolve(context),
+          }),
+        },
+      },
+      { memory: [], consumer: ["memory"] },
+    );
+
+    const built = system.build(newStack(), "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.memory.alarms.writeErrors);
   });
 });

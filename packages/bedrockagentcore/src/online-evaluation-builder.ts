@@ -14,7 +14,6 @@ import {
   PolicyStatement,
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import type { IConstruct } from "constructs";
 import {
   COPY_STATE,
@@ -28,12 +27,15 @@ import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation
 import {
   type AlarmConfigurer,
   AlarmDefinitionBuilder,
+  type AlarmsOf,
   createAlarms,
+  type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
 import { createRoleBuilder } from "@composurecdk/iam";
 import type { AgentCoreMetricSource } from "./alarms.js";
 import {
   type OnlineEvaluationAlarmConfig,
+  type OnlineEvaluationAlarmKey,
   onlineEvaluationMetrics,
   resolveOnlineEvaluationAlarms,
 } from "./evaluation-alarms.js";
@@ -61,8 +63,13 @@ export interface OnlineEvaluationBuilderProps extends Omit<
 export interface OnlineEvaluationBuilderResult {
   onlineEvaluation: OnlineEvaluationConfig;
   role: IRole;
-  /** The CloudWatch alarms created, keyed by evaluator. */
-  alarms: Record<string, Alarm>;
+  /**
+   * The CloudWatch alarms created, keyed by evaluator. Every key is accepted,
+   * because evaluator names are the caller's; a score alarm is
+   * `Alarm | undefined`, since each is opt-in. Read a custom alarm as `Alarm`
+   * through {@link WithCustomAlarms}.
+   */
+  alarms: AlarmsOf<OnlineEvaluationAlarmKey>;
 }
 
 /**
@@ -75,7 +82,9 @@ export type IOnlineEvaluationBuilder = ITaggedBuilder<
   OnlineEvaluationBuilder
 >;
 
-class OnlineEvaluationBuilder implements Lifecycle<OnlineEvaluationBuilderResult> {
+class OnlineEvaluationBuilder implements Lifecycle<
+  WithCustomAlarms<OnlineEvaluationBuilderResult, string>
+> {
   props: Partial<OnlineEvaluationBuilderProps> = {};
   readonly #grants = new GrantQueue<IGrantable>();
   readonly #customAlarms: AlarmDefinitionBuilder<AgentCoreMetricSource>[] = [];
@@ -113,7 +122,7 @@ class OnlineEvaluationBuilder implements Lifecycle<OnlineEvaluationBuilderResult
     scope: IConstruct,
     id: string,
     context: Record<string, object> = {},
-  ): OnlineEvaluationBuilderResult {
+  ): WithCustomAlarms<OnlineEvaluationBuilderResult, string> {
     const {
       onlineEvaluationConfigName,
       executionRole,

@@ -2,8 +2,10 @@ export {
   AGENTCORE_ALARM_DEFAULTS,
   RUNTIME_ALARM_DEFAULTS,
   type AgentCoreAlarmConfig,
+  type AgentCoreAlarmKey,
   type AgentCoreMetricSource,
   type GatewayAlarmConfig,
+  type GatewayAlarmKey,
 } from "./alarms.js";
 export {
   createGatewayBuilder,
@@ -40,6 +42,7 @@ export { ONLINE_EVALUATION_DEFAULTS } from "./online-evaluation-defaults.js";
 export {
   ONLINE_EVALUATION_ALARM_DEFAULTS,
   type OnlineEvaluationAlarmConfig,
+  type OnlineEvaluationAlarmKey,
 } from "./evaluation-alarms.js";
 export {
   createRuntimeBuilder,

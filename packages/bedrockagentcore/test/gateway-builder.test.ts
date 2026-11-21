@@ -12,9 +12,11 @@ import {
 import { type IRole, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
-import { buildFixture, newStack, policyJson } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
-import { createGatewayBuilder } from "../src/gateway-builder.js";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable, buildFixture, newStack, policyJson } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
+import { createGatewayBuilder, type GatewayBuilderResult } from "../src/gateway-builder.js";
 
 const buildAndSynth = buildFixture(() => createGatewayBuilder().gatewayName("tools"), "Gateway");
 
@@ -232,5 +234,52 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["invocations", "sessions"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth();
+    const typed: GatewayBuilderResult = result;
+    const errors = typed.alarms.systemErrors;
+
+    assertAssignable<Alarm | undefined, typeof errors>();
+    assertAssignable<Alarm | undefined, typeof typed.alarms.targetExecutionTime>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof errors>();
+    expect(errors).toBeDefined();
+    // @ts-expect-error -- "systemError" is not a gateway alarm key
+    expect(typed.alarms.systemError).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const system = compose(
+      {
+        gateway: createGatewayBuilder()
+          .gatewayName("tools")
+          .addAlarm("invocations", (a) =>
+            a
+              .metric((m) => m.metric("Invocations"))
+              .threshold(1000)
+              .greaterThan(),
+          ),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("gateway", (r: WithCustomAlarms<GatewayBuilderResult, "invocations">) => {
+              // @ts-expect-error -- "invocation" was not declared as a custom key
+              expect(r.alarms.invocation).toBeUndefined();
+              return r.alarms.invocations;
+            }).resolve(context),
+          }),
+        },
+      },
+      { gateway: [], consumer: ["gateway"] },
+    );
+
+    const built = system.build(newStack(), "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.gateway.alarms.invocations);
   });
 });

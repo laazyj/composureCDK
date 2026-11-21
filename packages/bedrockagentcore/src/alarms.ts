@@ -124,7 +124,12 @@ export function perMinute(source: AgentCoreMetricSource): AgentCoreMetricSource 
   };
 }
 
-type AgentCoreAlarmKey = Exclude<keyof AgentCoreAlarmConfig, "enabled">;
+/**
+ * The keys of a runtime endpoint's recommended alarms, one per
+ * {@link AgentCoreAlarmConfig} entry. A runtime's own alarms, which watch its
+ * `DEFAULT` endpoint, have the same keys.
+ */
+export type AgentCoreAlarmKey = Exclude<keyof AgentCoreAlarmConfig, "enabled">;
 
 /**
  * Defaults for the on-by-default AgentCore alarms, shaped after AWS's
@@ -181,10 +186,11 @@ export interface GatewayAlarmConfig extends AgentCoreAlarmConfig {
   targetExecutionTime?: AlarmConfig | false;
 }
 
+/** The keys of a gateway's recommended alarms, one per {@link GatewayAlarmConfig} entry. */
+export type GatewayAlarmKey = Exclude<keyof GatewayAlarmConfig, "enabled">;
+
 /** {@link agentCoreAlarmSpecs} plus the gateway's target execution time. */
-export function gatewayAlarmSpecs(
-  subject: string,
-): Record<Exclude<keyof GatewayAlarmConfig, "enabled">, ThresholdAlarmSpec> {
+export function gatewayAlarmSpecs(subject: string): Record<GatewayAlarmKey, ThresholdAlarmSpec> {
   return {
     ...agentCoreAlarmSpecs(subject),
     targetExecutionTime: {

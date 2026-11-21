@@ -6,9 +6,11 @@ import {
 } from "aws-cdk-lib/aws-bedrockagentcore";
 import { SecurityGroup, Vpc } from "aws-cdk-lib/aws-ec2";
 import { type IGrantable, PolicyStatement, Role } from "aws-cdk-lib/aws-iam";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { type Grant, ref } from "@composurecdk/core";
-import { createRuntimeBuilder } from "../src/runtime-builder.js";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, type Grant, ref } from "@composurecdk/core";
+import { createRuntimeBuilder, type RuntimeBuilderResult } from "../src/runtime-builder.js";
 
 const IMAGE = "123456789012.dkr.ecr.eu-west-2.amazonaws.com/agent:1";
 
@@ -304,5 +306,61 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["invocations", "sessions"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  const sessions = (b: ReturnType<typeof publicRuntime>) =>
+    b.addAlarm("sessions", (a) =>
+      a
+        .metric((m) => m.metric("SessionCount"))
+        .threshold(10)
+        .greaterThan(),
+    );
+
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth((b) => b.addEndpoint("prod"));
+    const typed: RuntimeBuilderResult = result;
+    const userErrors = typed.alarms.userErrors;
+
+    assertAssignable<Alarm | undefined, typeof userErrors>();
+    assertAssignable<Alarm | undefined, typeof typed.endpoints.prod.alarms.userErrors>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof userErrors>();
+    expect(userErrors).toBeDefined();
+    // @ts-expect-error -- "userError" is not a runtime alarm key
+    expect(typed.alarms.userError).toBeUndefined();
+  });
+
+  it("keeps custom alarms off added endpoints, which watch only the DEFAULT endpoint", () => {
+    const result = sessions(publicRuntime()).addEndpoint("prod").build(newStack(), "Agent");
+
+    expect(result.alarms.sessions).toBeDefined();
+    // @ts-expect-error -- custom alarms are created on the DEFAULT endpoint only
+    expect(result.endpoints.prod.alarms.sessions).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const system = compose(
+      {
+        agent: sessions(publicRuntime()),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("agent", (r: WithCustomAlarms<RuntimeBuilderResult, "sessions">) => {
+              // @ts-expect-error -- "session" was not declared as a custom key
+              expect(r.alarms.session).toBeUndefined();
+              return r.alarms.sessions;
+            }).resolve(context),
+          }),
+        },
+      },
+      { agent: [], consumer: ["agent"] },
+    );
+
+    const built = system.build(newStack(), "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.agent.alarms.sessions);
   });
 });

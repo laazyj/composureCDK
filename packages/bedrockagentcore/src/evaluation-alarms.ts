@@ -21,6 +21,15 @@ export interface OnlineEvaluationAlarmConfig {
 }
 
 /**
+ * The keys of an online evaluation's recommended alarms: each is a key of
+ * {@link OnlineEvaluationAlarmConfig.scores}, an evaluator's metric name such
+ * as `Builtin.Helpfulness` or a custom evaluator's name. Those names are the
+ * caller's, so any key is accepted; a recommended alarm still reads as
+ * `Alarm | undefined`.
+ */
+export type OnlineEvaluationAlarmKey = string;
+
+/**
  * Scores arrive as sessions are evaluated, not every minute: alarm on 2 of 3
  * hourly averages below the threshold. No evaluations emit no data.
  */

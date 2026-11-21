@@ -11,11 +11,16 @@ import {
 } from "aws-cdk-lib/aws-bedrockagentcore";
 import { type IRole, Role } from "aws-cdk-lib/aws-iam";
 import { Code, Function as LambdaFunction, Runtime } from "aws-cdk-lib/aws-lambda";
-import { buildFixture, newStack, policyJson } from "@composurecdk/cdk-testing";
-import { ref } from "@composurecdk/core";
+import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
+import { assertAssignable, buildFixture, newStack, policyJson } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
 import { inferenceProfile, modelGrants } from "@composurecdk/bedrock";
 import { createEvaluatorBuilder } from "../src/evaluator-builder.js";
-import { createOnlineEvaluationBuilder } from "../src/online-evaluation-builder.js";
+import {
+  createOnlineEvaluationBuilder,
+  type OnlineEvaluationBuilderResult,
+} from "../src/online-evaluation-builder.js";
 
 const haiku = inferenceProfile.global(
   FoundationModelIdentifier.ANTHROPIC_CLAUDE_HAIKU_4_5_20251001_V1_0,
@@ -204,6 +209,50 @@ describe("createOnlineEvaluationBuilder", () => {
 
         expect(Object.keys(result.alarms)).toEqual(["samples", "lowScore"]);
         template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+      });
+    });
+
+    // Score alarms are keyed by the caller's evaluator names, so any key is
+    // accepted; the `@ts-expect-error` line is checked by tsc (`typecheck`).
+    describe("alarm keys (type-level)", () => {
+      it("types a score alarm as optional", () => {
+        const { result } = buildAndSynth((b) =>
+          b.recommendedAlarms({ scores: { "Builtin.Helpfulness": { threshold: 0.5 } } }),
+        );
+        const typed: OnlineEvaluationBuilderResult = result;
+        const helpfulness = typed.alarms["Builtin.Helpfulness"];
+
+        assertAssignable<Alarm | undefined, typeof helpfulness>();
+        // @ts-expect-error -- a score alarm is opt-in, so it is not always an Alarm
+        assertAssignable<Alarm, typeof helpfulness>();
+        expect(helpfulness).toBeDefined();
+      });
+
+      it("resolves a declared custom key through a typed ref as an Alarm", () => {
+        const system = compose(
+          {
+            quality: evaluation().addAlarm("samples", (a) =>
+              a
+                .metric((m) => m.metric("Builtin.Helpfulness", { statistic: "SampleCount" }))
+                .threshold(1)
+                .lessThan(),
+            ),
+            consumer: {
+              build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+                alarm: ref(
+                  "quality",
+                  (r: WithCustomAlarms<OnlineEvaluationBuilderResult, "samples">) =>
+                    r.alarms.samples,
+                ).resolve(context),
+              }),
+            },
+          },
+          { quality: [], consumer: ["quality"] },
+        );
+
+        const built = system.build(newStack(), "System");
+        assertAssignable<Alarm, typeof built.consumer.alarm>();
+        expect(built.consumer.alarm).toBe(built.quality.alarms.samples);
       });
     });
   });

@@ -6,17 +6,22 @@ import {
   type GatewayProps,
   type GatewayTarget,
 } from "aws-cdk-lib/aws-bedrockagentcore";
-import type { Alarm } from "aws-cdk-lib/aws-cloudwatch";
 import { type IRole, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import type { IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
-import { type AlarmConfigurer, AlarmDefinitionBuilder } from "@composurecdk/cloudwatch";
+import {
+  type AlarmConfigurer,
+  AlarmDefinitionBuilder,
+  type AlarmsOf,
+  type WithCustomAlarms,
+} from "@composurecdk/cloudwatch";
 import { createRoleBuilder } from "@composurecdk/iam";
 import {
   type AgentCoreMetricSource,
   buildAgentCoreAlarms,
   type GatewayAlarmConfig,
+  type GatewayAlarmKey,
   gatewayAlarmSpecs,
   perMinute,
 } from "./alarms.js";
@@ -54,8 +59,12 @@ export interface GatewayBuilderResult {
   gateway: Gateway;
   /** Targets added with `addLambdaTarget()` or `addTarget()`, keyed by key. */
   targets: Record<string, GatewayTarget>;
-  /** The CloudWatch alarms created, keyed by alarm key. */
-  alarms: Record<string, Alarm>;
+  /**
+   * The CloudWatch alarms created, keyed by alarm key. A recommended alarm is
+   * `Alarm | undefined`: it may be disabled or opt-in. Any other key is a
+   * compile error; read a custom alarm through {@link WithCustomAlarms}.
+   */
+  alarms: AlarmsOf<GatewayAlarmKey>;
 }
 
 /**
@@ -72,7 +81,7 @@ export type GatewayTargetFactory = (
   context: Record<string, object>,
 ) => GatewayTarget;
 
-class GatewayBuilder implements Lifecycle<GatewayBuilderResult> {
+class GatewayBuilder implements Lifecycle<WithCustomAlarms<GatewayBuilderResult, string>> {
   props: Partial<GatewayBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<AgentCoreMetricSource>[] = [];
   readonly #targets = new Map<string, GatewayTargetFactory>();
@@ -126,7 +135,11 @@ class GatewayBuilder implements Lifecycle<GatewayBuilderResult> {
     for (const [key, factory] of this.#targets) target.#targets.set(key, factory);
   }
 
-  build(scope: IConstruct, id: string, context: Record<string, object> = {}): GatewayBuilderResult {
+  build(
+    scope: IConstruct,
+    id: string,
+    context: Record<string, object> = {},
+  ): WithCustomAlarms<GatewayBuilderResult, string> {
     const { role: roleRef, kmsKey: kmsKeyRef, recommendedAlarms, ...rest } = this.props;
     const kmsKey = kmsKeyRef && resolve(kmsKeyRef, context);
     const role: IRole =

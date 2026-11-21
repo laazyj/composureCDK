@@ -1,16 +1,36 @@
 import { describe, it, expect } from "vitest";
 import { Duration } from "aws-cdk-lib";
 import { Match } from "aws-cdk-lib/assertions";
-import { Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
+import { type Alarm, Metric, TreatMissingData } from "aws-cdk-lib/aws-cloudwatch";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { buildFixture, newStack } from "@composurecdk/cdk-testing";
-import { createBucketBuilder } from "../src/bucket-builder.js";
+import { assertAssignable, buildFixture, newStack } from "@composurecdk/cdk-testing";
+import type { WithCustomAlarms } from "@composurecdk/cloudwatch";
+import { compose, ref } from "@composurecdk/core";
+import { type BucketBuilderResult, createBucketBuilder } from "../src/bucket-builder.js";
 import { resolveBucketAlarmDefinitions } from "../src/bucket-alarms.js";
 
 const buildAndSynth = buildFixture(createBucketBuilder, "TestBucket");
 
 function withAlarms(builder: ReturnType<typeof createBucketBuilder>) {
   builder.serverAccessLogs(false).metrics([{ id: "EntireBucket" }]);
+}
+
+function customAlarm(builder: ReturnType<typeof createBucketBuilder>) {
+  return builder.serverAccessLogs(false).addAlarm("totalRequests", (alarm) =>
+    alarm
+      .metric(
+        (bucket) =>
+          new Metric({
+            namespace: "AWS/S3",
+            metricName: "GetRequests",
+            dimensionsMap: { BucketName: bucket.bucketName, FilterId: "EntireBucket" },
+            period: Duration.minutes(5),
+          }),
+      )
+      .threshold(100)
+      .lessThan()
+      .description("Bucket traffic has dropped below expected level"),
+  );
 }
 
 describe("recommended alarms", () => {
@@ -272,24 +292,6 @@ describe("addAlarm", () => {
 
   // Regression: disabling the recommended alarms must not drop custom alarms
   // added via addAlarm() — see issue #305.
-  function customAlarm(builder: ReturnType<typeof createBucketBuilder>) {
-    return builder.serverAccessLogs(false).addAlarm("totalRequests", (alarm) =>
-      alarm
-        .metric(
-          (bucket) =>
-            new Metric({
-              namespace: "AWS/S3",
-              metricName: "GetRequests",
-              dimensionsMap: { BucketName: bucket.bucketName, FilterId: "EntireBucket" },
-              period: Duration.minutes(5),
-            }),
-        )
-        .threshold(100)
-        .lessThan()
-        .description("Bucket traffic has dropped below expected level"),
-    );
-  }
-
   it("keeps a custom alarm when recommendedAlarms is false", () => {
     const { result, template } = buildAndSynth((b) => {
       customAlarm(b.recommendedAlarms(false).metrics([{ id: "EntireBucket" }]));
@@ -342,5 +344,47 @@ describe("addAlarms", () => {
 
     expect(Object.keys(result.alarms)).toEqual(["getRequests", "putRequests"]);
     template.resourceCountIs("AWS::CloudWatch::Alarm", 2);
+  });
+});
+
+// The `@ts-expect-error` lines are the assertions: tsc (the `typecheck`
+// target, run before `test`) fails if any of them stops being an error.
+describe("alarm keys (type-level)", () => {
+  it("types recommended alarms as optional and rejects a misspelled key", () => {
+    const { result } = buildAndSynth(withAlarms);
+    const typed: BucketBuilderResult = result;
+    const serverErrors = typed.alarms["serverErrors:EntireBucket"];
+
+    assertAssignable<Alarm | undefined, typeof serverErrors>();
+    // @ts-expect-error -- a recommended alarm may be disabled, so it is not always an Alarm
+    assertAssignable<Alarm, typeof serverErrors>();
+    expect(serverErrors).toBeDefined();
+    // @ts-expect-error -- "serverError" is not an S3 alarm name
+    expect(typed.alarms["serverError:EntireBucket"]).toBeUndefined();
+    // @ts-expect-error -- a recommended key names its metrics configuration
+    expect(typed.alarms.clientErrors).toBeUndefined();
+  });
+
+  it("resolves a declared custom key through a typed ref, and rejects an undeclared one", () => {
+    const stack = newStack();
+    const system = compose(
+      {
+        bucket: customAlarm(createBucketBuilder()),
+        consumer: {
+          build: (_scope: unknown, _id: string, context: Record<string, object>) => ({
+            alarm: ref("bucket", (r: WithCustomAlarms<BucketBuilderResult, "totalRequests">) => {
+              // @ts-expect-error -- "totalRequest" was not declared as a custom key
+              expect(r.alarms.totalRequest).toBeUndefined();
+              return r.alarms.totalRequests;
+            }).resolve(context),
+          }),
+        },
+      },
+      { bucket: [], consumer: ["bucket"] },
+    );
+
+    const built = system.build(stack, "System");
+    assertAssignable<Alarm, typeof built.consumer.alarm>();
+    expect(built.consumer.alarm).toBe(built.bucket.alarms.totalRequests);
   });
 });

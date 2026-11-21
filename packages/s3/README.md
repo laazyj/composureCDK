@@ -225,9 +225,21 @@ const site = createBucketBuilder()
   );
 ```
 
+### Reading alarms by key
+
+`BucketBuilderResult` types `alarms` by key, so a misspelled key is a compile error rather than `undefined` at synth. A recommended key names its metrics configuration, `serverErrors:<id>` or `clientErrors:<id>`, and its alarm is `Alarm | undefined`, because it can be disabled or the bucket may have no metrics configuration with that ID. To read a custom alarm, name its key with `WithCustomAlarms`, from `@composurecdk/cloudwatch`, and it is typed `Alarm`:
+
+```ts
+ref("site", (r: BucketBuilderResult) => r.alarms["serverErrors:EntireBucket"]); // Alarm | undefined
+ref("site", (r: WithCustomAlarms<BucketBuilderResult, "lowTraffic">) => r.alarms.lowTraffic); // Alarm
+ref("site", (r: BucketBuilderResult) => r.alarms["serverError:EntireBucket"]); // compile error
+```
+
+The metrics configuration ID is not checked, and neither are the custom keys you name against the builder's `addAlarm` calls. The result of the builder's own `build()` accepts any key, as `WithCustomAlarms<BucketBuilderResult, string>`. The recommended keys are exported as `BucketAlarmKey`.
+
 ### Applying alarm actions
 
-Alarms are returned in the build result as `Record<string, Alarm>`:
+Alarms are returned in the build result's `alarms`, keyed by alarm:
 
 ```ts
 const result = site.build(stack, "SiteBucket");

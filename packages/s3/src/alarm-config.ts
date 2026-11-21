@@ -48,3 +48,15 @@ export interface BucketAlarmConfig {
    */
   clientErrors?: AlarmConfig | false;
 }
+
+/**
+ * Keys of the recommended alarms a bucket builder can create, as they appear
+ * in `BucketBuilderResult.alarms`.
+ *
+ * These are not the {@link BucketAlarmConfig} keys themselves. Each entry in
+ * the bucket's `metrics` adds one alarm per enabled config entry, keyed
+ * `{config key}:{metrics configuration ID}` (`serverErrors:EntireBucket`), so
+ * the keys are template-literal patterns: any metrics configuration ID is
+ * accepted, a misspelled alarm name is not.
+ */
+export type BucketAlarmKey = `${Exclude<keyof BucketAlarmConfig, "enabled">}:${string}`;

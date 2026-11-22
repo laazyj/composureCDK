@@ -11,6 +11,7 @@ export {
 } from "./compose.js";
 export { CyclicDependencyError } from "./cyclic-dependency-error.js";
 export { DuplicateConstructIdError } from "./duplicate-construct-id-error.js";
+export { BuildIdMismatchError } from "./build-id-mismatch-error.js";
 export { type Grant, grantVia, GrantQueue } from "./grant.js";
 export { type Lifecycle } from "./lifecycle.js";
 export { scoped } from "./scoped.js";

@@ -15,7 +15,11 @@ import { S3_SERVER_ACCESS_LOGS_USE_BUCKET_POLICY } from "aws-cdk-lib/cx-api";
 import { buildFixture, newStack, tagsPerResource } from "@composurecdk/cdk-testing";
 import { ref } from "@composurecdk/core";
 import { assertCopyPreservesState } from "@composurecdk/core/testing";
-import { createBucketBuilder, type BucketBuilderProps } from "../src/bucket-builder.js";
+import {
+  createAccessLogsBucketBuilder,
+  createBucketBuilder,
+  type BucketBuilderProps,
+} from "../src/bucket-builder.js";
 import { DEFAULT_BUCKET_LIFECYCLE_RULES } from "../src/defaults.js";
 
 const buildAndSynth = buildFixture(createBucketBuilder, "TestBucket");
@@ -467,6 +471,33 @@ describe("BucketBuilder", () => {
       // Logging bucket is not versioned, so the noncurrent-version rule should not apply.
       const noncurrentRule = rules.find((r) => r.NoncurrentVersionExpiration !== undefined);
       expect(noncurrentRule).toBeUndefined();
+    });
+  });
+
+  describe("createAccessLogsBucketBuilder", () => {
+    it("is the setup the auto-created logging bucket starts from", () => {
+      const { template } = buildFixture(createAccessLogsBucketBuilder, "Logs")();
+
+      template.resourceCountIs("AWS::S3::Bucket", 1);
+      expect(findLogBucket(template)).toEqual(findLogBucket(buildAndSynth().template));
+    });
+
+    it("receives server access logs by bucket policy even with the app flag off", () => {
+      const { template } = buildAndSynth((b, stack) => {
+        stack.node.setContext(S3_SERVER_ACCESS_LOGS_USE_BUCKET_POLICY, false);
+        // Through copy(), so the preset's log-delivery setting must survive it.
+        const logs = createAccessLogsBucketBuilder().copy().build(stack, "Logs").bucket;
+        b.serverAccessLogs({ destination: logs });
+      });
+
+      expect(findLogBucket(template).Properties.AccessControl).toBeUndefined();
+      template.hasResourceProperties("AWS::S3::BucketPolicy", {
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({ Principal: { Service: "logging.s3.amazonaws.com" } }),
+          ]),
+        },
+      });
     });
   });
 

@@ -35,9 +35,8 @@ export type ServerAccessLogsConfig =
       destination?: IBucket;
       prefix?: string;
       /**
-       * Customize the auto-created logging sub-builder. Receives a builder
-       * pre-seeded with `versioned: false`, `removalPolicy: RETAIN`, and
-       * recursive access logging disabled.
+       * Customize the auto-created logging sub-builder. Receives the builder
+       * from {@link createAccessLogsBucketBuilder}.
        *
        * The callback receives the build context, so anything `IBucketBuilder`
        * accepts as a `Resolvable` can be a `ref` to a sibling component.
@@ -153,10 +152,18 @@ export interface BucketBuilderResult {
  */
 export type IBucketBuilder = ITaggedBuilder<BucketBuilderProps, BucketBuilder>;
 
+/**
+ * Set by {@link createAccessLogsBucketBuilder}: the bucket is built to receive
+ * S3 server access logs through its bucket policy. Module-private, so it is not
+ * part of the builder's fluent API.
+ */
+const LOG_DELIVERY_BY_POLICY = Symbol("logDeliveryByPolicy");
+
 class BucketBuilder implements Lifecycle<WithCustomAlarms<BucketBuilderResult, string>> {
   props: Partial<BucketBuilderProps> = {};
   readonly #customAlarms: AlarmDefinitionBuilder<Bucket>[] = [];
   readonly #policyStatements: BucketPolicyStatement[] = [];
+  [LOG_DELIVERY_BY_POLICY] = false;
 
   addAlarm(key: string, configure: AlarmConfigurer<Bucket>): this {
     this.#customAlarms.push(configure(new AlarmDefinitionBuilder<Bucket>(key)));
@@ -190,6 +197,7 @@ class BucketBuilder implements Lifecycle<WithCustomAlarms<BucketBuilderResult, s
   [COPY_STATE](target: BucketBuilder): void {
     target.#customAlarms.push(...this.#customAlarms);
     target.#policyStatements.push(...this.#policyStatements);
+    target[LOG_DELIVERY_BY_POLICY] = this[LOG_DELIVERY_BY_POLICY];
   }
 
   build(
@@ -197,6 +205,18 @@ class BucketBuilder implements Lifecycle<WithCustomAlarms<BucketBuilderResult, s
     id: string,
     context?: Record<string, object>,
   ): WithCustomAlarms<BucketBuilderResult, string> {
+    // CDK grants log delivery by ACL unless `serverAccessLogsUseBucketPolicy` is
+    // set, reading it from the destination bucket's own context (#502). So a log
+    // bucket is built inside a scope that sets it, as its `Default` child, which
+    // CDK omits from logical IDs.
+    let bucketScope = scope;
+    let bucketId = id;
+    if (this[LOG_DELIVERY_BY_POLICY]) {
+      bucketScope = new Construct(scope, id);
+      bucketScope.node.setContext(S3_SERVER_ACCESS_LOGS_USE_BUCKET_POLICY, true);
+      bucketId = "Default";
+    }
+
     const {
       serverAccessLogs,
       recommendedAlarms: alarmConfig,
@@ -206,7 +226,12 @@ class BucketBuilder implements Lifecycle<WithCustomAlarms<BucketBuilderResult, s
     const { serverAccessLogs: defaultServerAccessLogs, ...cdkDefaults } = BUCKET_DEFAULTS;
     const cfg = serverAccessLogs ?? defaultServerAccessLogs;
 
-    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(scope, id, cfg, context);
+    const { accessLogsBucket, accessLogProps } = resolveAccessLogs(
+      bucketScope,
+      bucketId,
+      cfg,
+      context,
+    );
 
     const mergedProps = {
       ...cdkDefaults,
@@ -216,7 +241,7 @@ class BucketBuilder implements Lifecycle<WithCustomAlarms<BucketBuilderResult, s
       ...autoDeleteProps(bucketProps, BUCKET_DEFAULTS),
     } as BucketProps;
 
-    const bucket = new Bucket(scope, id, mergedProps);
+    const bucket = new Bucket(bucketScope, bucketId, mergedProps);
 
     for (const statement of this.#policyStatements) {
       const resolvable = typeof statement === "function" ? statement(bucket) : statement;
@@ -224,8 +249,8 @@ class BucketBuilder implements Lifecycle<WithCustomAlarms<BucketBuilderResult, s
     }
 
     const alarms = createBucketAlarms(
-      scope,
-      id,
+      bucketScope,
+      bucketId,
       bucket,
       alarmConfig,
       bucketProps.metrics ?? [],
@@ -265,25 +290,15 @@ function resolveAccessLogs(
     };
   }
 
-  let subBuilder = createBucketBuilder()
-    .serverAccessLogs(false)
-    .objectOwnership(ObjectOwnership.BUCKET_OWNER_ENFORCED)
-    .versioned(false)
-    .removalPolicy(RemovalPolicy.RETAIN)
-    .lifecycleRules(DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES);
+  let subBuilder = createAccessLogsBucketBuilder();
   if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }
-  // CDK grants log delivery by ACL unless `serverAccessLogsUseBucketPolicy` is
-  // set, reading it from the destination's own context — so scope it to a
-  // wrapper (#502). `Default` is omitted from logical IDs, keeping the bucket's.
-  const logsScope = new Construct(scope, `${id}AccessLogs`);
-  logsScope.node.setContext(S3_SERVER_ACCESS_LOGS_USE_BUCKET_POLICY, true);
   // Pass the build context down: `IBucketBuilder` widens `encryptionKey` to a
   // `Resolvable`, so a `configure` callback may hand it a `ref()` to a sibling
   // KMS key. Without the context that ref resolves against an empty record and
   // throws "component not found".
-  const accessLogsBucket = subBuilder.build(logsScope, "Default", context).bucket;
+  const accessLogsBucket = subBuilder.build(scope, `${id}AccessLogs`, context).bucket;
 
   return {
     accessLogsBucket,
@@ -363,4 +378,29 @@ function autoDeleteProps(
  */
 export function createBucketBuilder(): IBucketBuilder {
   return taggedBuilder<BucketBuilderProps, BucketBuilder>(BucketBuilder);
+}
+
+/**
+ * Creates a bucket builder pre-set to receive access logs: ACLs disabled
+ * (`BUCKET_OWNER_ENFORCED`), no server access logs of its own, unversioned,
+ * retained, and expiring logs under {@link DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES}.
+ * Each setting can be overridden.
+ *
+ * Its bucket receives S3 server access logs through its bucket policy whatever
+ * the app sets for `@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy`, so it can
+ * be another bucket's `serverAccessLogs({ destination })`. To that end it is
+ * built as the `Default` child of a construct with the given id, which keeps
+ * the logical ID a plain bucket at that id would have.
+ *
+ * {@link createBucketBuilder} builds its own server-access-logs bucket from this.
+ */
+export function createAccessLogsBucketBuilder(): IBucketBuilder {
+  const builder = createBucketBuilder();
+  (builder as unknown as BucketBuilder)[LOG_DELIVERY_BY_POLICY] = true;
+  return builder
+    .serverAccessLogs(false)
+    .objectOwnership(ObjectOwnership.BUCKET_OWNER_ENFORCED)
+    .versioned(false)
+    .removalPolicy(RemovalPolicy.RETAIN)
+    .lifecycleRules(DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES);
 }

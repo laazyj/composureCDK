@@ -217,6 +217,7 @@ export interface DistributionBuilderProps extends Omit<
   | "logFilePrefix"
   | "logIncludesCookies"
   | "certificate"
+  | "webAclId"
 > {
   /** See {@link AccessLogsConfig}. Defaults to `{ prefix: "logs/" }`. */
   accessLogs?: AccessLogsConfig;
@@ -234,6 +235,17 @@ export interface DistributionBuilderProps extends Omit<
    * this package's README.
    */
   certificate?: Resolvable<NonNullable<DistributionProps["certificate"]>>;
+
+  /**
+   * The AWS WAF web ACL that protects the distribution: its ARN, as a
+   * concrete value or a {@link Ref} — typically `webAcl.attrArn` from a
+   * composed `@composurecdk/wafv2` web ACL builder with scope `CLOUDFRONT`,
+   * which must be created in `us-east-1`.
+   *
+   * The inner type is read from CDK's own prop, so it tracks the installed
+   * `aws-cdk-lib`.
+   */
+  webAclId?: Resolvable<NonNullable<DistributionProps["webAclId"]>>;
 
   /**
    * Configuration for the default cache behavior. The origin is set via
@@ -464,6 +476,7 @@ class DistributionBuilder implements Lifecycle<
     const {
       accessLogs,
       certificate,
+      webAclId,
       defaultBehavior: userBehavior,
       recommendedAlarms: alarmConfig,
       ...distProps
@@ -493,6 +506,7 @@ class DistributionBuilder implements Lifecycle<
       ...accessLogProps,
       ...distProps,
       ...(resolvedCertificate ? { certificate: resolvedCertificate } : {}),
+      ...(webAclId !== undefined ? { webAclId: resolve(webAclId, context ?? {}) } : {}),
       defaultBehavior: behaviors.defaultBehavior,
       ...(Object.keys(behaviors.additionalBehaviors).length > 0
         ? { additionalBehaviors: behaviors.additionalBehaviors }

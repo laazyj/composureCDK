@@ -1,5 +1,8 @@
 import type { Rule } from "eslint";
-import type { CallExpression, Expression, Pattern, Property } from "estree";
+import type { CallExpression, Expression, Pattern, Program, Property } from "estree";
+import { exportedName, importBindingOf } from "./lib/imports.js";
+
+const SOURCE = "@composurecdk/cloudformation";
 
 const REQUIRED_FIELDS = ["name", "allowed", "source"] as const;
 
@@ -25,6 +28,9 @@ function isEmptyStringLiteral(value: Expression | Pattern): boolean {
  * see: a present-but-empty string compiles happily while degrading every message
  * the constraint will ever produce.
  *
+ * Only the `stringConstraint` imported from `@composurecdk/cloudformation` is
+ * checked, under any local alias.
+ *
  * See {@link https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/constraint-metadata-required.md | the rule documentation}.
  */
 export const rule: Rule.RuleModule = {
@@ -37,7 +43,7 @@ export const rule: Rule.RuleModule = {
     schema: [],
     messages: {
       missingField:
-        "stringConstraint() is missing required `{{field}}`. Every catalogue entry must set " +
+        "stringConstraint() is missing required `{{field}}`. Every stringConstraint() must set " +
         "name, allowed and source, so a synth-time error can name the allowed set and link the AWS doc.",
       emptyField:
         "stringConstraint() `{{field}}` is empty. It is surfaced verbatim in the validation " +
@@ -45,11 +51,28 @@ export const rule: Rule.RuleModule = {
     },
   },
   create(ctx) {
+    // Local names bound to the factory, read from the file's imports once, so
+    // every other call is skipped before the scope lookup.
+    const names = new Set<string>();
     return {
-      CallExpression(node: CallExpression) {
-        if (node.callee.type !== "Identifier" || node.callee.name !== "stringConstraint") {
-          return;
+      Program(program: Program) {
+        for (const statement of program.body) {
+          if (statement.type !== "ImportDeclaration" || statement.source.value !== SOURCE) continue;
+          for (const specifier of statement.specifiers) {
+            if (
+              specifier.type === "ImportSpecifier" &&
+              exportedName(specifier) === "stringConstraint"
+            ) {
+              names.add(specifier.local.name);
+            }
+          }
         }
+      },
+      CallExpression(node: CallExpression) {
+        if (node.callee.type !== "Identifier" || !names.has(node.callee.name)) return;
+        // A local declaration can shadow the import.
+        const binding = importBindingOf(ctx.sourceCode.getScope(node), node.callee.name);
+        if (binding?.source !== SOURCE) return;
         if (node.arguments.length === 0) return;
         const arg = node.arguments[0];
         if (arg.type !== "ObjectExpression") return;

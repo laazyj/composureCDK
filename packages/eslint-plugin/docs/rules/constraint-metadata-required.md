@@ -1,8 +1,8 @@
 # composurecdk/constraint-metadata-required
 
-Requires every `stringConstraint({ … })` call to set a non-empty `name`, `allowed`, and `source`.
+Requires every `stringConstraint({ … })` call from `@composurecdk/cloudformation` to set a non-empty `name`, `allowed`, and `source`.
 
-- **Preset:** `internal` (`error`)
+- **Preset:** `recommended` (`error`)
 - **Decision:** [ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md)
 
 ## Why
@@ -38,7 +38,8 @@ const GROUP_DESCRIPTION = stringConstraint({
 
 - **Non-literal values** — `allowed: SG_ALLOWED`. The contents are not statically knowable, so the rule leaves them alone.
 - **Calls that spread another object** — skipped, to avoid false positives where the required field arrives via the spread.
+- **Any other `stringConstraint`** — a function a project defines itself, or imports from anywhere but `@composurecdk/cloudformation`.
 
 ## How it works
 
-Syntactic. The rule keys on the `stringConstraint` callee name, which is unique to the constraint-catalogue mechanism.
+Syntactic. It checks calls to the `stringConstraint` imported from `@composurecdk/cloudformation`, under any local alias. A namespace import (`cf.stringConstraint(…)`) is not followed.

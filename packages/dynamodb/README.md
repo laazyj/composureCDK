@@ -1,6 +1,6 @@
 # @composurecdk/dynamodb
 
-DynamoDB table builders for [ComposureCDK](../../README.md).
+DynamoDB table builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for DynamoDB tables with secure, AWS-recommended defaults and built-in CloudWatch alarms. It ships **two builders**, one per CDK construct:
 
@@ -68,7 +68,7 @@ import { TABLE_DEFAULTS, TABLE_V2_DEFAULTS } from "@composurecdk/dynamodb";
 
 ### Customer-managed encryption keys
 
-Both builders accept a `Resolvable` for the key, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system rather than a construct created outside it.
+Both builders accept a `Resolvable` for the key, so a key built by [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) can be a component of the same system rather than a construct created outside it.
 
 `TableV2` takes the whole `TableEncryptionV2` — one prop that covers every mode, including per-replica key ARNs:
 
@@ -86,7 +86,7 @@ compose(
 );
 ```
 
-The classic `Table` takes the key directly on `.encryptionKey(...)`, which infers `TableEncryption.CUSTOMER_MANAGED` — the `AWS_MANAGED` default is mutually exclusive with a customer key, so it yields rather than making you set both ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)):
+The classic `Table` takes the key directly on `.encryptionKey(...)`, which infers `TableEncryption.CUSTOMER_MANAGED` — the `AWS_MANAGED` default is mutually exclusive with a customer key, so it yields rather than making you set both ([ADR-0009](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)):
 
 ```ts
 createTableBuilder()
@@ -96,7 +96,7 @@ createTableBuilder()
 
 ## Grants
 
-`tableGrants` gives a grantee access to a table — declared on the **grantee**, pointing at the table via a `ref` ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). One namespace serves both builders:
+`tableGrants` gives a grantee access to a table — declared on the **grantee**, pointing at the table via a `ref` ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)). One namespace serves both builders:
 
 ```ts
 createFunctionBuilder()
@@ -117,7 +117,7 @@ createFunctionBuilder()
 
 `update` is for a grantee that changes existing items but must never delete them — a worker moving a record's status, beside a separate writer granted `put`. IAM cannot stop an `UpdateItem` on a missing key from creating the item, so guard each call with a condition expression such as `attribute_exists(id)`.
 
-Each capability grants the table's customer-managed key, when it has one, in the grantee's identity policy, so a grant stands alone. A key built by [`@composurecdk/kms`](../kms/README.md) keeps CDK's default key policy, which delegates to IAM, so that is enough within the account. Two limits: on a `TableV2` with replicas only the primary Region's key is granted, not a replica's; and a key in another account needs its key policy to allow the grantee.
+Each capability grants the table's customer-managed key, when it has one, in the grantee's identity policy, so a grant stands alone. A key built by [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) keeps CDK's default key policy, which delegates to IAM, so that is enough within the account. Two limits: on a `TableV2` with replicas only the primary Region's key is granted, not a replica's; and a key in another account needs its key policy to allow the grantee.
 
 ## Resource policy
 
@@ -158,7 +158,7 @@ compose(
 ```
 
 - **Use `resources: ["*"]`; it means this table.** The policy is a property of the table resource itself, so naming `table.tableArn` would make the table depend on its own ARN, which CloudFormation rejects as a circular dependency.
-- **Use it for what an in-app grant cannot express:** access from another account, and guardrails such as the endpoint condition above. Grant an IAM principal in the app access on the principal's side with [`tableGrants`](#grants) instead ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)).
+- **Use it for what an in-app grant cannot express:** access from another account, and guardrails such as the endpoint condition above. Grant an IAM principal in the app access on the principal's side with [`tableGrants`](#grants) instead ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)).
 - **A component that depends on the table cannot be named here:** `compose` rejects the cycle.
 - **On a `TableV2` with replicas, it covers the primary Region only** under the recommended `@aws-cdk/aws-dynamodb:resourcePolicyPerReplica` flag. Give each replica its own policy with `replicas[].resourcePolicy`, or a guardrail like the one above leaves the replicas open.
 
@@ -178,7 +178,7 @@ result.table; // the table itself, which a DynamoEventSource consumes
 
 Neither construct exposes a distinct stream construct — the stream is an attribute of the table — so the result exposes `tableStreamArn` directly. It is `undefined` when no stream is configured, on both builders, so a `ref()` consumer can branch on its presence.
 
-To consume the stream from a Lambda, pass a `ref()` to the table into the [`@composurecdk/lambda`](../lambda#event-sources) `dynamoEventSource` factory — it applies secure stream defaults (bisect-on-error, partial-batch reporting), grants least-privilege `grantStreamRead`, and wires an `onFailure` dead-letter queue ergonomically. The [`DynamoStreamProcessor`](../examples/src/dynamo-stream-processor-app.ts) example shows the end-to-end table → stream → Lambda → DLQ wiring.
+To consume the stream from a Lambda, pass a `ref()` to the table into the [`@composurecdk/lambda`](https://github.com/laazyj/composureCDK/tree/main/packages/lambda#event-sources) `dynamoEventSource` factory — it applies secure stream defaults (bisect-on-error, partial-batch reporting), grants least-privilege `grantStreamRead`, and wires an `onFailure` dead-letter queue ergonomically. The [`DynamoStreamProcessor`](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/dynamo-stream-processor-app.ts) example shows the end-to-end table → stream → Lambda → DLQ wiring.
 
 ## Recommended Alarms
 
@@ -273,7 +273,7 @@ for (const alarm of Object.values(result.alarms)) {
 }
 ```
 
-For composing the alarm-actions wiring across multiple builders in a single `compose` system, see [`alarmActionsPolicy`](../cloudwatch/README.md) in `@composurecdk/cloudwatch`.
+For composing the alarm-actions wiring across multiple builders in a single `compose` system, see [`alarmActionsPolicy`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/README.md) in `@composurecdk/cloudwatch`.
 
 ## Composition
 
@@ -297,4 +297,4 @@ const system = compose(
 
 ## Checking expressions before deploy
 
-DynamoDB rejects an expression that names a [reserved word](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html) such as `status` without an alias, but only when the call runs: `cdk synth` and a mocked client both accept it. [`@composure-labs/dynamodb-guard`](https://github.com/composure-labs/dynamodb-guard), from [Composure Labs](../../README.md#composure-labs), catches that and DynamoDB's other expression mistakes before deploy: in unit tests, by checking the requests your mocked clients recorded, at synth for Step Functions tasks, and in lint. It can't check a code path no test runs. The [fulfilment workflow example](../examples/src/fulfilment-workflow-app.ts) checks its tasks at synth.
+DynamoDB rejects an expression that names a [reserved word](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html) such as `status` without an alias, but only when the call runs: `cdk synth` and a mocked client both accept it. [`@composure-labs/dynamodb-guard`](https://github.com/composure-labs/dynamodb-guard), from [Composure Labs](https://github.com/laazyj/composureCDK/blob/main/README.md#composure-labs), catches that and DynamoDB's other expression mistakes before deploy: in unit tests, by checking the requests your mocked clients recorded, at synth for Step Functions tasks, and in lint. It can't check a code path no test runs. The [fulfilment workflow example](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/fulfilment-workflow-app.ts) checks its tasks at synth.

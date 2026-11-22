@@ -1,6 +1,6 @@
 # @composurecdk/xray
 
-AWS X-Ray for [ComposureCDK](../../README.md). It enables [CloudWatch Transaction Search](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Transaction-Search.html), which sends X-Ray spans to CloudWatch Logs so they can be searched and analysed. Amazon Bedrock AgentCore online evaluation needs it.
+AWS X-Ray for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md). It enables [CloudWatch Transaction Search](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Transaction-Search.html), which sends X-Ray spans to CloudWatch Logs so they can be searched and analysed. Amazon Bedrock AgentCore online evaluation needs it.
 
 ```ts
 import { createTransactionSearchBuilder } from "@composurecdk/xray";

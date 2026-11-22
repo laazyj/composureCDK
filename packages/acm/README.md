@@ -1,6 +1,6 @@
 # @composurecdk/acm
 
-AWS Certificate Manager builder for [ComposureCDK](../../README.md).
+AWS Certificate Manager builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for ACM certificates with secure, AWS-recommended defaults, first-class DNS validation wiring, and a recommended `DaysToExpiry` alarm. It wraps the CDK [Certificate](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_certificatemanager.Certificate.html) construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -156,4 +156,4 @@ for (const alarm of Object.values(result.alarms)) {
 
 ## CloudFront certificates
 
-CloudFront viewer certificates must live in `us-east-1`. The ACM builder cannot enforce this on its own — certificates in other regions are perfectly valid for ALB, API Gateway, and other services. The constraint is enforced by CloudFront at association time, so if your certificate is for CloudFront, place the builder in a stack that targets `us-east-1` (e.g. via [`createStackBuilder`](../cloudformation/README.md) with an `env`).
+CloudFront viewer certificates must live in `us-east-1`. The ACM builder cannot enforce this on its own — certificates in other regions are perfectly valid for ALB, API Gateway, and other services. The constraint is enforced by CloudFront at association time, so if your certificate is for CloudFront, place the builder in a stack that targets `us-east-1` (e.g. via [`createStackBuilder`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudformation/README.md) with an `env`).

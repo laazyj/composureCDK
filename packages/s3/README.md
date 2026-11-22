@@ -1,6 +1,6 @@
 # @composurecdk/s3
 
-S3 builders for [ComposureCDK](../../README.md).
+S3 builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for S3 buckets and bucket deployments with secure, AWS-recommended defaults. It wraps the CDK [Bucket](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.Bucket.html) and [BucketDeployment](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3_deployment.BucketDeployment.html) constructs — refer to the CDK documentation for the full set of configurable properties.
 
@@ -32,7 +32,7 @@ These defaults are guided by the [AWS Well-Architected Security Pillar](https://
 
 ### Customer-managed encryption keys
 
-`.encryptionKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+`.encryptionKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) can be a component of the same system:
 
 ```ts
 compose(
@@ -44,7 +44,7 @@ compose(
 );
 ```
 
-Supplying a key switches `encryption` from the `S3_MANAGED` default to `BucketEncryption.KMS` — the two are mutually exclusive, so the default yields rather than making you set both ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)).
+Supplying a key switches `encryption` from the `S3_MANAGED` default to `BucketEncryption.KMS` — the two are mutually exclusive, so the default yields rather than making you set both ([ADR-0009](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)).
 
 The defaults are exported as `BUCKET_DEFAULTS` for visibility and testing:
 
@@ -126,7 +126,7 @@ createBucketBuilder().addToResourcePolicy(
 
 The statement — or the function's return value — may be a `ref` or `combine`, so it can name a sibling the bucket's policy depends on, such as a VPC endpoint for an `aws:SourceVpce` condition. Declare that sibling as a dependency of the bucket.
 
-A component that depends on the bucket cannot be named here: `compose` rejects the cycle. Declare that access where the dependency already points ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)) — a `bucketGrants` grant for an IAM principal, or `S3BucketOrigin.withOriginAccessControl(bucket, { originAccessLevels })` for a CloudFront distribution, which scopes the statement to that distribution. Where neither fits, add the statement in an `afterBuild` hook, which sees every component's result.
+A component that depends on the bucket cannot be named here: `compose` rejects the cycle. Declare that access where the dependency already points ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)) — a `bucketGrants` grant for an IAM principal, or `S3BucketOrigin.withOriginAccessControl(bucket, { originAccessLevels })` for a CloudFront distribution, which scopes the statement to that distribution. Where neither fits, add the statement in an `afterBuild` hook, which sees every component's result.
 
 The statements apply to this bucket only, not to the auto-created access logs bucket.
 
@@ -309,4 +309,4 @@ import { BUCKET_DEPLOYMENT_DEFAULTS } from "@composurecdk/s3";
 
 ## Examples
 
-- [StaticWebsiteStack](../examples/src/static-website/app.ts) — S3 + CloudFront static website with OAC, error pages, and content deployment
+- [StaticWebsiteStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/static-website/app.ts) — S3 + CloudFront static website with OAC, error pages, and content deployment

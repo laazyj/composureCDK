@@ -55,6 +55,8 @@
       "dependsOn": [{ "projects": "*", "target": "build" }],
       "cache": false
     },
+    "doc-links": { "command": "node scripts/doc-links.mjs", "cache": false },
+    "doc-links:check": { "command": "node scripts/doc-links.mjs --check", "cache": false },
     "cdk-floors:check": { "command": "node scripts/cdk-floors.mjs check", "cache": false },
     "cdk-floors:apply": { "command": "node scripts/cdk-floors.mjs apply", "cache": false },
     "cdk-floors:enforce": { "command": "node scripts/cdk-floors.mjs enforce", "cache": false },
@@ -106,6 +108,7 @@
         "zizmor",
         "catalogue:check",
         "licenses:check",
+        "doc-links:check",
         "cdk-floors:check",
         "cdk-flags:check",
         { "projects": "*", "target": "build" },

@@ -1,6 +1,6 @@
 # @composurecdk/iam
 
-IAM role, customer-managed policy, and policy-statement builders for [ComposureCDK](../../README.md).
+IAM role, customer-managed policy, and policy-statement builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for the most commonly configured IAM resources and centralises least-privilege guardrails so that consuming packages (Lambda, Budgets, SNS topic policies, …) do not have to reinvent them.
 
@@ -86,7 +86,7 @@ import { isStatementBuilder } from "@composurecdk/iam";
 const resolved = statements.map((s) => (isStatementBuilder(s) ? s.build() : s));
 ```
 
-Don't use `instanceof StatementBuilder`: with the ESM and CommonJS copies of this package both loaded, it misses a builder from the other copy, which then skips `build()` and the wildcard guard ([why](../eslint-plugin/docs/rules/no-realm-bound-instanceof.md)).
+Don't use `instanceof StatementBuilder`: with the ESM and CommonJS copies of this package both loaded, it misses a builder from the other copy, which then skips `build()` and the wildcard guard ([why](https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/no-realm-bound-instanceof.md)).
 
 ## Service Role Helper
 

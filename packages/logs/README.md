@@ -1,6 +1,6 @@
 # @composurecdk/logs
 
-CloudWatch Logs builders for [ComposureCDK](../../README.md).
+CloudWatch Logs builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for CloudWatch log groups with secure, AWS-recommended defaults. It wraps the CDK [LogGroup](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_logs.LogGroup.html) construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -51,7 +51,7 @@ CloudWatch Logs encrypts all log data at rest using AWS-managed keys. For additi
 const logGroup = createLogGroupBuilder().encryptionKey(myKmsKey).build(stack, "EncryptedLogs");
 ```
 
-`.encryptionKey(...)` accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+`.encryptionKey(...)` accepts a concrete key or a `Resolvable`, so a key built by [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) can be a component of the same system:
 
 ```ts
 compose(
@@ -69,8 +69,8 @@ The builder has no resource-policy method, on purpose. A CloudWatch Logs resourc
 
 You rarely need one yourself. Access from another account goes through a subscription filter and a Logs destination, which has its own policy, and a principal in the app needs an IAM grant. What a log-group policy is for is letting an AWS service write to the group, and the integrations that do so add their own:
 
-- **EventBridge targets** — `cloudWatchLogGroupTarget` from [`@composurecdk/events`](../events/README.md#target-helpers), through CDK's `CloudWatchLogGroup`.
-- **Route 53 query logging** — [`@composurecdk/route53`](../route53/README.md#query-logging) creates one shared policy per stack for every zone's log group.
+- **EventBridge targets** — `cloudWatchLogGroupTarget` from [`@composurecdk/events`](https://github.com/laazyj/composureCDK/blob/main/packages/events/README.md#target-helpers), through CDK's `CloudWatchLogGroup`.
+- **Route 53 query logging** — [`@composurecdk/route53`](https://github.com/laazyj/composureCDK/blob/main/packages/route53/README.md#query-logging) creates one shared policy per stack for every zone's log group.
 
 Where a service still needs one, create a single shared `ResourcePolicy` whose statements name the log groups it covers, rather than one per group. Once there are more than a few, give them a common name prefix and name `log-group:<prefix>*` instead, so a new group needs no policy change and the document stays within its size limit:
 

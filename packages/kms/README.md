@@ -1,6 +1,6 @@
 # @composurecdk/kms
 
-AWS Key Management Service builder for [ComposureCDK](../../README.md).
+AWS Key Management Service builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for KMS customer-managed keys (CMKs) with secure, AWS-recommended defaults, consumer-side grant helpers, and the AWS-recommended imported-key-material expiry alarm. It wraps the CDK [Key](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_kms.Key.html) construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -85,7 +85,7 @@ Both `encryptionKey`-style props infer the customer-managed encryption mode when
 
 These defaults follow the [Security Pillar's key-management guidance](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_data_rest_key_mgmt.html) and the [AWS KMS key rotation](https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html) and [key deletion](https://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html) documentation.
 
-AWS KMS only rotates symmetric encryption keys, so the `enableKeyRotation` default yields to a `keySpec` that cannot rotate — setting `.keySpec(KeySpec.RSA_4096)` produces a working asymmetric key rather than a CDK validation error ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)). Asking for both explicitly is still an error, raised by CDK.
+AWS KMS only rotates symmetric encryption keys, so the `enableKeyRotation` default yields to a `keySpec` that cannot rotate — setting `.keySpec(KeySpec.RSA_4096)` produces a working asymmetric key rather than a CDK validation error ([ADR-0009](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)). Asking for both explicitly is still an error, raised by CDK.
 
 The defaults are exported as `KEY_DEFAULTS` for visibility and testing:
 
@@ -104,7 +104,7 @@ const { alias } = createKeyBuilder().alias("orders/table").build(stack, "OrdersT
 
 ## Grants
 
-Consumer-side grant helpers ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)) — declared on the grantee, applied at its build:
+Consumer-side grant helpers ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)) — declared on the grantee, applied at its build:
 
 ```ts
 import { keyGrants } from "@composurecdk/kms";
@@ -153,7 +153,7 @@ Use `resources: ["*"]`: in a key policy it means this key, and the key's own ARN
 
 Prefer this to `.policy(...)`. Setting `policy` replaces CDK's default statement, so the account's IAM policies can no longer grant the key — every [`keyGrants`](#grants) grant, and every grant that extends to an encrypted resource's key, stops working. When `policy` is set, the statements join that document instead.
 
-The statement may be a `ref` or `combine`, resolved against the build context, so it can name a sibling the key depends on. A component that depends on the key — anything it encrypts, and anything granted it — cannot be named: `compose` rejects the cycle. Access for an IAM principal belongs on the grantee as a `keyGrants` grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). Where neither fits, add the statement in an `afterBuild` hook, which sees every component's result.
+The statement may be a `ref` or `combine`, resolved against the build context, so it can name a sibling the key depends on. A component that depends on the key — anything it encrypts, and anything granted it — cannot be named: `compose` rejects the cycle. Access for an IAM principal belongs on the grantee as a `keyGrants` grant ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)). Where neither fits, add the statement in an `afterBuild` hook, which sees every component's result.
 
 ## Recommended Alarms
 
@@ -243,7 +243,7 @@ for (const alarm of Object.values(result.alarms)) {
 }
 ```
 
-Or apply them across a whole scope with [`alarmActionsPolicy`](../cloudwatch/README.md).
+Or apply them across a whole scope with [`alarmActionsPolicy`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/README.md).
 
 ## Cost
 

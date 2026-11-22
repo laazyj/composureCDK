@@ -1,6 +1,6 @@
 # @composurecdk/core
 
-Core primitives for [ComposureCDK](../../README.md).
+Core primitives for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides the foundational types and utilities that all ComposureCDK resource packages build on: the fluent `Builder` proxy, the `compose` function for assembling component systems with dependency resolution, lazy `Ref` cross-references, and stack strategies for routing components to scopes.
 
@@ -85,7 +85,7 @@ class FailureCaptureBuilder implements Lifecycle<FailureCaptureResult> {
 
 The new construct is a target for `Tags.of()` and Aspects that reaches only the system. Hooks added with `afterBuild` on the wrapped system get it as their scope, so `tags()` there tags the system's resources alone. `at()` pins still win over keys, and a component routed to another stack keeps its prefixed id.
 
-Wrapping a system that is already deployed changes its construct paths, which replaces its resources. See [ADR-0020](../../docs/adr/0020-scoped-system-construct.md).
+Wrapping a system that is already deployed changes its construct paths, which replaces its resources. See [ADR-0020](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0020-scoped-system-construct.md).
 
 ## Ref
 
@@ -151,13 +151,13 @@ compose(
 );
 ```
 
-- **Prefer a builder's own option when it has one.** [`@composurecdk/custom-resources`](../custom-resources/README.md)' `.dependsOn()` and [`@composurecdk/lambda`](../lambda/README.md)'s `.invokeOnDeploy({ after })` pick the target, and `.invokeOnDeploy()` also waits for the function's execution role.
+- **Prefer a builder's own option when it has one.** [`@composurecdk/custom-resources`](https://github.com/laazyj/composureCDK/blob/main/packages/custom-resources/README.md)' `.dependsOn()` and [`@composurecdk/lambda`](https://github.com/laazyj/composureCDK/blob/main/packages/lambda/README.md)'s `.invokeOnDeploy({ after })` pick the target, and `.invokeOnDeploy()` also waits for the function's execution role.
 - **Name one construct in `sources`.** A whole-component ref would also reach the delegation builder's role ([what `sources` accepts](#what-sources-accepts)).
 - **Declare the sibling in the dependency record.** Refs in `sources` resolve against the build context. Under a nested system, a ref the inner record doesn't declare resolves to a parent component of the same name instead.
 - **Mind stacks.** Under `withStacks`, the target must be in the source's stack or in one that deploys after it. Otherwise synth fails with a cyclic-reference error.
 - **One target per wrapper.** To order two constructs of one component, nest two `dependsOn`s.
 
-See [ADR-0022](../../docs/adr/0022-deploy-dependencies-at-composition.md) for why this is a combinator and not a builder method.
+See [ADR-0022](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0022-deploy-dependencies-at-composition.md) for why this is a combinator and not a builder method.
 
 ### What `sources` accepts
 
@@ -187,7 +187,7 @@ addDependencies(
 
 Use these when a builder derives a construct ID from something the user supplied, such as a map key or a record name. The user wrote a key, not a construct ID, so the builder sanitises the ID it derives rather than constraining the key: the sanitise-derived-values rule of [ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md).
 
-`constructId` replaces `/` and control characters with `-`, and throws on `{ } [ ]`, because they mean an unresolved CDK token has leaked into the ID, which would give a logical ID that changes between synths. Given several parts, it sanitises each and joins them with `-`. To sanitise one fragment inside a larger ID, use `sanitizeConstructId`. Sanitise only the part you derive, never the `id` your builder was given: under `compose` it can contain `/` on purpose ([ADR-0012](../../docs/adr/0012-explicit-build-id-decoupled-from-compose-key.md)).
+`constructId` replaces `/` and control characters with `-`, and throws on `{ } [ ]`, because they mean an unresolved CDK token has leaked into the ID, which would give a logical ID that changes between synths. Given several parts, it sanitises each and joins them with `-`. To sanitise one fragment inside a larger ID, use `sanitizeConstructId`. Sanitise only the part you derive, never the `id` your builder was given: under `compose` it can contain `/` on purpose ([ADR-0012](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0012-explicit-build-id-decoupled-from-compose-key.md)).
 
 ```ts
 import { constructId } from "@composurecdk/core";
@@ -204,6 +204,6 @@ A construct ID is part of the resource's logical ID. Adopting these in a builder
 
 ## Examples
 
-- [MultiStackApp](../examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`
-- [StaticWebsiteStack](../examples/src/static-website/app.ts) — S3 + CloudFront composed system with `ref` and `afterBuild`
-- [DynamoStreamProcessorStack](../examples/src/dynamo-stream-processor-app.ts) — Stream consumer and its DLQ built under one construct with `scoped`, tagged as a unit
+- [MultiStackApp](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`
+- [StaticWebsiteStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/static-website/app.ts) — S3 + CloudFront composed system with `ref` and `afterBuild`
+- [DynamoStreamProcessorStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/dynamo-stream-processor-app.ts) — Stream consumer and its DLQ built under one construct with `scoped`, tagged as a unit

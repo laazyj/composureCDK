@@ -161,6 +161,11 @@ jobs:
       - name: Check every published package ships what it declares
         run: npx nx licenses:check
 
+      # Cheap gate: a link in a published README or doc that leaves its
+      # package works on GitHub but is dead on npm (#801).
+      - name: Check published docs' links work on npm
+        run: npx nx doc-links:check
+
       - name: Check exports
         run: npx nx run-many -t check:exports
 

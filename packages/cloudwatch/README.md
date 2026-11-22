@@ -1,13 +1,13 @@
 # @composurecdk/cloudwatch
 
-CloudWatch alarm primitives and the composite alarm builder for [ComposureCDK](../../README.md).
+CloudWatch alarm primitives and the composite alarm builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides the building blocks for CloudWatch alarms that follow ComposureCDK's conventions: readable, stack-scoped alarm names, alarm actions routed across a whole app, and alarm definitions that a builder resolves at build time. It serves two audiences:
 
 - **[App builders](#for-app-builders)**, who use ComposureCDK builders to define infrastructure.
 - **[Builder-package authors](#for-builder-package-authors)**, who write builders that ship recommended alarms, whether in this repository or their own.
 
-Everything this package exports is [public API](../../docs/architecture.md#public-api). It supplies the alarm mechanism (merging config, creating constructs, naming); which alarms a service gets, and their thresholds, belong to that service's package.
+Everything this package exports is [public API](https://github.com/laazyj/composureCDK/blob/main/docs/architecture.md#public-api). It supplies the alarm mechanism (merging config, creating constructs, naming); which alarms a service gets, and their thresholds, belong to that service's package.
 
 ## Contents
 
@@ -33,11 +33,11 @@ The config, option and result types of these exports are exported too, so you ca
 
 ## For app builders
 
-Most alarms come from a resource package: a builder's `recommendedAlarms` creates them and `addAlarm` adds your own (see, for example, [`@composurecdk/lambda`](../lambda/README.md)). The exports below tune those alarms. The two policies also apply to alarms created any other way.
+Most alarms come from a resource package: a builder's `recommendedAlarms` creates them and `addAlarm` adds your own (see, for example, [`@composurecdk/lambda`](https://github.com/laazyj/composureCDK/blob/main/packages/lambda/README.md)). The exports below tune those alarms. The two policies also apply to alarms created any other way.
 
 ### alarmActionsPolicy
 
-A [Policy](../../docs/adr/0002-policies.md) that routes CloudWatch alarm actions (e.g. SNS notifications) to every `Alarm` and `CompositeAlarm` in a construct subtree. Install it once on an `App` or `Stack` and it applies to every alarm the subtree produces, including alarms created later by builders or nested composed systems.
+A [Policy](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0002-policies.md) that routes CloudWatch alarm actions (e.g. SNS notifications) to every `Alarm` and `CompositeAlarm` in a construct subtree. Install it once on an `App` or `Stack` and it applies to every alarm the subtree produces, including alarms created later by builders or nested composed systems.
 
 ```ts
 import { alarmActionsPolicy } from "@composurecdk/cloudwatch";
@@ -66,7 +66,7 @@ All three action states are supported: `alarmActions`, `okActions`, and `insuffi
 
 #### Per-scope routing: different topics for different stacks
 
-Rules route by _alarm identity_ (id, path, predicate). To route by _scope_ instead, for example one SNS topic for everything in `us-east-1` and another for the primary region, call `alarmActionsPolicy` once per target scope. If the composed system builds the topics itself, this is the case that needs [`afterBuild`](../core/README.md): its closure receives the build `results`, so each call can reference its topic.
+Rules route by _alarm identity_ (id, path, predicate). To route by _scope_ instead, for example one SNS topic for everything in `us-east-1` and another for the primary region, call `alarmActionsPolicy` once per target scope. If the composed system builds the topics itself, this is the case that needs [`afterBuild`](https://github.com/laazyj/composureCDK/blob/main/packages/core/README.md): its closure receives the build `results`, so each call can reference its topic.
 
 ```ts
 compose({ usEast1Alerts: createTopicBuilder(), siteAlerts: createTopicBuilder() }, {/* … */})
@@ -88,7 +88,7 @@ The policy covers only L2 `Alarm` and `CompositeAlarm` constructs. It skips bare
 
 ### alarmNamePolicy
 
-A [Policy](../../docs/adr/0002-policies.md) that decorates CloudWatch alarm names. Like `alarmActionsPolicy`, it applies to every alarm in the subtree it is installed on.
+A [Policy](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0002-policies.md) that decorates CloudWatch alarm names. Like `alarmActionsPolicy`, it applies to every alarm in the subtree it is installed on.
 
 ```ts
 import { alarmNamePolicy } from "@composurecdk/cloudwatch";
@@ -130,11 +130,11 @@ If an alarm's name is an unresolved CDK token that does not resolve to a string 
 
 ### Alarm names
 
-Every alarm a ComposureCDK builder creates gets an explicit, hierarchical name of the form `${stackName}/${path}/${kebab(id)}/${kebab(key)}` (e.g. `payments-prod/checkout-fn/errors`), instead of CloudFormation's default name with a random suffix. The console shows the slashes as a hierarchy, and kebab-cased segments read cleanly in dashboards, on-call pages and email subjects. [`defaultAlarmName`](./src/default-alarm-name.ts) builds it, including the nested-stack case.
+Every alarm a ComposureCDK builder creates gets an explicit, hierarchical name of the form `${stackName}/${path}/${kebab(id)}/${kebab(key)}` (e.g. `payments-prod/checkout-fn/errors`), instead of CloudFormation's default name with a random suffix. The console shows the slashes as a hierarchy, and kebab-cased segments read cleanly in dashboards, on-call pages and email subjects. [`defaultAlarmName`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/src/default-alarm-name.ts) builds it, including the nested-stack case.
 
 `path` is the ids of the constructs between the stack and the builder's scope, and is empty for a builder built straight into the stack, as `compose()` does. It keeps two composites that each build a `queue` under their own construct (`…/orders/queue/…`, `…/refunds/queue/…`) from producing the same name, which CloudFormation rejects.
 
-To name one alarm yourself, pass an `AlarmName` in its config. `alarmName()` checks a string against [CloudWatch's naming rules](./src/alarm-name.ts) and returns the branded `AlarmName` type. It trims surrounding whitespace and otherwise uses the value as written.
+To name one alarm yourself, pass an `AlarmName` in its config. `alarmName()` checks a string against [CloudWatch's naming rules](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/src/alarm-name.ts) and returns the branded `AlarmName` type. It trims surrounding whitespace and otherwise uses the value as written.
 
 A name holding an unresolved CDK token (e.g. a `CfnParameter` value) is not validated, since its value is only known at deploy. The default name keeps such a segment verbatim rather than kebab-casing it, so the token still resolves.
 
@@ -152,7 +152,7 @@ To change names across an app, use [alarmNamePolicy](#alarmnamepolicy) instead.
 
 `createCompositeAlarmBuilder()` builds a [composite alarm](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Create_Composite_Alarm.html): an alarm whose state is a rule over other alarms. Use one to give a deployment pipeline a single rollback alarm, or to page once for a system instead of once per symptom.
 
-Its props are CDK's [`CompositeAlarmProps`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudwatch.CompositeAlarmProps.html). The build result is `{ alarm: CompositeAlarm }`. `alarmRule` is required, and it and `actionsSuppressor` accept a `Ref`, so the members can come from other components and the edges show in `compose()`. An `IAlarm` is itself an `IAlarmRule`, so CDK's `AlarmRule` combinators (`anyOf`, `allOf`, `not`, `fromAlarm(alarm, state)`) take member alarms directly. To combine alarms from several components, [`combine`](../../docs/architecture.md#combining-refs--one-consumer-many-dependencies) their refs. A recommended alarm is typed `Alarm | undefined` ([AlarmsOf](#alarmsof)), so pass the members through [`requireAlarms`](#requirealarms): a member that is disabled then fails at synth rather than silently dropping out of the rule.
+Its props are CDK's [`CompositeAlarmProps`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_cloudwatch.CompositeAlarmProps.html). The build result is `{ alarm: CompositeAlarm }`. `alarmRule` is required, and it and `actionsSuppressor` accept a `Ref`, so the members can come from other components and the edges show in `compose()`. An `IAlarm` is itself an `IAlarmRule`, so CDK's `AlarmRule` combinators (`anyOf`, `allOf`, `not`, `fromAlarm(alarm, state)`) take member alarms directly. To combine alarms from several components, [`combine`](https://github.com/laazyj/composureCDK/blob/main/docs/architecture.md#combining-refs--one-consumer-many-dependencies) their refs. A recommended alarm is typed `Alarm | undefined` ([AlarmsOf](#alarmsof)), so pass the members through [`requireAlarms`](#requirealarms): a member that is disabled then fails at synth rather than silently dropping out of the rule.
 
 ```ts
 import { combine, compose, ref } from "@composurecdk/core";
@@ -190,7 +190,7 @@ compose(
 
 The default name follows the [library convention](#alarm-names) without a key, `${stackName}/${path}/${kebab(id)}` (here `my-stack/rollback`). It is a plain string, not a token, so a pipeline can derive the alarm's ARN from it. To name it yourself, pass `compositeAlarmName(alarmName("…"))`. Both policies apply to composite alarms, and their `singleOnly` / `compositeOnly` rules let you notify on the composite and leave its members quiet, which is how AWS recommends using composites to reduce alarm noise.
 
-A composite can only watch alarms in its own account and region; CDK fails at synthesis on a member from another environment. CloudFront and Route 53 alarms live in `us-east-1` whatever the resource's region ([ADR-0004](../../docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md)), so build a composite over them into the `us-east-1` alarm stack.
+A composite can only watch alarms in its own account and region; CDK fails at synthesis on a member from another environment. CloudFront and Route 53 alarms live in `us-east-1` whatever the resource's region ([ADR-0004](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md)), so build a composite over them into the `us-east-1` alarm stack.
 
 ### Custom alarms
 
@@ -304,7 +304,7 @@ A builder that ships recommended alarms follows the same four steps:
 3. Turn each resolved config into an `AlarmDefinition`, and resolve any `addAlarm()` builders against the construct.
 4. Pass all the definitions to `createAlarms`.
 
-[`@composurecdk/sqs`](../sqs/src/queue-alarms.ts) and [`@composurecdk/lambda`](../lambda/src/function-alarms.ts) are complete examples. If the service publishes its metrics in one fixed region whatever the resource's region, as CloudFront and Route 53 do, also follow [ADR-0004](../../docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md).
+[`@composurecdk/sqs`](https://github.com/laazyj/composureCDK/blob/main/packages/sqs/src/queue-alarms.ts) and [`@composurecdk/lambda`](https://github.com/laazyj/composureCDK/blob/main/packages/lambda/src/function-alarms.ts) are complete examples. If the service publishes its metrics in one fixed region whatever the resource's region, as CloudFront and Route 53 do, also follow [ADR-0004](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0004-split-alarm-builder-for-fixed-region-metrics.md).
 
 ### AlarmConfig and AlarmConfigDefaults
 
@@ -423,7 +423,7 @@ Use this to adopt alarms that are already deployed. The construct ID becomes the
 
 `AlarmsOf<Recommended>` is the type of a builder result's `alarms`. Each recommended key is optional, because the alarm can be disabled, depend on configuration, or be skipped by `resolveAlarmThresholdBasis`. Any other key is a compile error.
 
-`WithCustomAlarms<Result, Custom>` adds custom alarm keys to a result from outside, each typed `Alarm`, because `addAlarm` always creates its alarm. A builder's `build()` returns `WithCustomAlarms<…, string>`, which accepts any key ([ADR-0021](../../docs/adr/0021-alarm-keys-typed-on-the-result.md) explains both choices):
+`WithCustomAlarms<Result, Custom>` adds custom alarm keys to a result from outside, each typed `Alarm`, because `addAlarm` always creates its alarm. A builder's `build()` returns `WithCustomAlarms<…, string>`, which accepts any key ([ADR-0021](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0021-alarm-keys-typed-on-the-result.md) explains both choices):
 
 ```ts
 import type { AlarmsOf, WithCustomAlarms } from "@composurecdk/cloudwatch";
@@ -453,4 +453,4 @@ List the keys the builder really creates, which are not always the config keys. 
 
 ### constraints
 
-`constraints.validate.alarmName` checks a string against CloudWatch's alarm-name rules and throws if it fails. Every ComposureCDK package exports its AWS-property checks in this `constraints.validate` / `constraints.sanitize` shape; see [Constraints](../../docs/constraints.md). Most code wants `alarmName()`, which runs the same check and returns an `AlarmName`.
+`constraints.validate.alarmName` checks a string against CloudWatch's alarm-name rules and throws if it fails. Every ComposureCDK package exports its AWS-property checks in this `constraints.validate` / `constraints.sanitize` shape; see [Constraints](https://github.com/laazyj/composureCDK/blob/main/docs/constraints.md). Most code wants `alarmName()`, which runs the same check and returns an `AlarmName`.

@@ -1,6 +1,6 @@
 # @composurecdk/sqs
 
-SQS queue builder for [ComposureCDK](../../README.md).
+SQS queue builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for SQS queues with secure, AWS-recommended defaults and built-in CloudWatch alarms. It wraps the CDK [Queue](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sqs.Queue.html) construct — refer to the CDK documentation for the full set of configurable properties.
 
@@ -118,7 +118,7 @@ Every role applies the following defaults. Each can be overridden via the builde
 
 ### Customer-managed encryption keys
 
-`.encryptionMasterKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](../kms/README.md) can be a component of the same system:
+`.encryptionMasterKey(...)` accepts a concrete `IKey` or a `Resolvable`, so a key built by [`@composurecdk/kms`](https://github.com/laazyj/composureCDK/blob/main/packages/kms/README.md) can be a component of the same system:
 
 ```ts
 compose(
@@ -130,7 +130,7 @@ compose(
 );
 ```
 
-Supplying a key switches `encryption` from the `SQS_MANAGED` default to `QueueEncryption.KMS` — the two are mutually exclusive, so the default yields rather than making you set both ([ADR-0009](../../docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)).
+Supplying a key switches `encryption` from the `SQS_MANAGED` default to `QueueEncryption.KMS` — the two are mutually exclusive, so the default yields rather than making you set both ([ADR-0009](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0009-defaults-yield-to-mutually-exclusive-siblings.md)).
 
 `visibilityTimeout` is intentionally not defaulted — it must match the longest consumer processing time, which is workload-specific. `retentionPeriod` is left at CDK's default of 4 days on the primary roles (the dead-letter roles raise it to 14 days, see above).
 
@@ -171,7 +171,7 @@ createQueueBuilder().addToResourcePolicy(
 
 The statement — or the function's return value — may be a `ref` or `combine`, so it can name a sibling the queue's policy depends on, such as a VPC endpoint for an `aws:SourceVpce` condition. Declare that sibling as a dependency of the queue.
 
-A component that depends on the queue cannot be named here: `compose` rejects the cycle. Most never need to be, because the wiring adds its own statement — an SNS subscription to the queue, an `@composurecdk/events` `sqsTarget`, or an S3 event notification. For an IAM principal, declare the access where the dependency already points, with a `queueGrants` grant ([ADR-0013](../../docs/adr/0013-consumer-side-grants.md)). Where none fits, add the statement in an `afterBuild` hook, which sees every component's result.
+A component that depends on the queue cannot be named here: `compose` rejects the cycle. Most never need to be, because the wiring adds its own statement — an SNS subscription to the queue, an `@composurecdk/events` `sqsTarget`, or an S3 event notification. For an IAM principal, declare the access where the dependency already points, with a `queueGrants` grant ([ADR-0013](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0013-consumer-side-grants.md)). Where none fits, add the statement in an `afterBuild` hook, which sees every component's result.
 
 ## Recommended Alarms
 
@@ -267,8 +267,8 @@ for (const alarm of Object.values(result.alarms)) {
 }
 ```
 
-For composing the alarm-actions wiring across multiple builders in a single `compose` system, see [`alarmActionsPolicy`](../cloudwatch/README.md) in `@composurecdk/cloudwatch`.
+For composing the alarm-actions wiring across multiple builders in a single `compose` system, see [`alarmActionsPolicy`](https://github.com/laazyj/composureCDK/blob/main/packages/cloudwatch/README.md) in `@composurecdk/cloudwatch`.
 
 ## Examples
 
-- [OrderProcessorStack](../examples/src/order-processor-app.ts) — Primary SQS queue with recommended alarms routed to a sibling SNS alert topic.
+- [OrderProcessorStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/order-processor-app.ts) — Primary SQS queue with recommended alarms routed to a sibling SNS alert topic.

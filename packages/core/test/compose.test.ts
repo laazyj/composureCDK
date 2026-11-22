@@ -295,6 +295,51 @@ describe("compose", () => {
       expect(aBuild.mock.calls[0][1]).toBe("shared");
       expect(bBuild.mock.calls[0][1]).toBe("shared");
     });
+
+    it("keeps the pin on a component routed to another stack", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const other = new Construct(undefined as never, "other");
+
+      compose({ a: at("fixed", a) }, { a: [] })
+        .withStacks({ a: other })
+        .build(createScope(), "parent");
+
+      expect(aBuild.mock.calls[0][1]).toBe("fixed");
+    });
+
+    it("throws, naming both ids, when a wrapper hides the pin from compose", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const pinned = at("Zone", a);
+      const wrapper: Lifecycle<{ x: number }> = {
+        build: (scope, id, context) => pinned.build(scope, id, context),
+      };
+
+      const system = compose({ zone: wrapper }, { zone: [] });
+
+      expect(() => system.build(createScope(), "parent")).toThrow(
+        expect.objectContaining({
+          name: "BuildIdMismatchError",
+          pinnedId: "Zone",
+          buildId: "parent/zone",
+          message: expect.stringContaining("make at() the outermost wrapper") as string,
+        }) as Error,
+      );
+      expect(aBuild).not.toHaveBeenCalled();
+    });
+
+    it("throws when two different pins wrap one component", () => {
+      const { lifecycle: a } = spyComponent({ x: 1 });
+
+      const system = compose({ a: at("Outer", at("Inner", a)) }, { a: [] });
+
+      expect(() => system.build(createScope(), "parent")).toThrow(
+        expect.objectContaining({
+          name: "BuildIdMismatchError",
+          pinnedId: "Inner",
+          buildId: "Outer",
+        }) as Error,
+      );
+    });
   });
 
   describe("withStacks", () => {

@@ -29,6 +29,40 @@ describe("constraints", () => {
     });
   });
 
+  describe("webAclDescription", () => {
+    it.each([
+      "Protects the API",
+      "Rate limits: 60/min per client, 3000/5m per IP.",
+      "abc",
+      "a".repeat(256),
+    ])("accepts %s", (value) => {
+      expect(() => {
+        constraints.validate.webAclDescription(value);
+      }).not.toThrow();
+    });
+
+    it.each([
+      ["an apostrophe", "The API's web ACL"],
+      ["an underscore", "api_waf"],
+      ["an em-dash", "API \u2014 edge"],
+      ["a leading +", "+ protects"],
+      ["a leading space", " Protects"],
+      ["a trailing space", "Protects "],
+      ["fewer than three characters", "ab"],
+      ["more than 256 characters", "a".repeat(257)],
+    ])("rejects %s", (_, value) => {
+      expect(() => {
+        constraints.validate.webAclDescription(value);
+      }).toThrow(/WAFv2 WebACL Description/);
+    });
+
+    it("skips a token", () => {
+      expect(() => {
+        constraints.validate.webAclDescription(token);
+      }).not.toThrow();
+    });
+  });
+
   describe("metricName", () => {
     it.each(["All", "Default_Action"])("rejects the reserved %s", (value) => {
       expect(() => {

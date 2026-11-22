@@ -119,6 +119,12 @@ describe("WebAclBuilder", () => {
       });
     });
 
+    it("rejects a description CloudFormation would reject", () => {
+      expect(() => buildAndSynth((b) => b.description("The API's web ACL"))).toThrow(
+        /WAFv2 WebACL Description "The API's web ACL" is invalid/,
+      );
+    });
+
     it("applies tags", () => {
       const { template } = buildAndSynth((b) => b.tag("team", "edge"));
 

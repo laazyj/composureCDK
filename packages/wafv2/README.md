@@ -241,12 +241,13 @@ const { webAcl } = createWebAclBuilder().scope("CLOUDFRONT").build(usEast1Stack,
 
 ## Constraints
 
-Names, metric names and labels are validated at build against the AWS rules above ([ADR-0010](../../docs/adr/0010-aws-property-constraints.md)). The validators are exported for direct use:
+Names, metric names, labels and the web ACL's description are validated at build against the AWS rules ([ADR-0010](../../docs/adr/0010-aws-property-constraints.md)), so a description [CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-wafv2-webacl.html) would reject, such as one with an apostrophe or underscore, fails at synth rather than at deploy. The validators are exported for direct use:
 
 ```ts
 import { constraints } from "@composurecdk/wafv2";
 
 constraints.validate.webAclName("api-waf");
+constraints.validate.webAclDescription("Protects the API");
 constraints.validate.ruleName("PerIpRate");
 constraints.validate.metricName("PerIpRate");
 constraints.validate.ruleLabel("auth:missing-token");

@@ -477,6 +477,10 @@ Adding to the public API is not a light decision. Once published, it must be doc
 
 A package's public API commonly includes: builders, with their props and result types; the types their emitted declarations name ([ADR-0001](adr/0001-builder-type-emission.md)); `*_DEFAULTS`; the [`constraints`](constraints.md) namespace; warning ids a consumer may acknowledge ([ADR-0011](adr/0011-cross-component-relationship-guards.md)); predicates such as `isRef`, and protocol symbols such as `COPY_STATE` ([ADR-0005](adr/0005-builder-copy.md)), but never the `Symbol.for` brand behind them; and mechanism for builder authors, such as `@composurecdk/cloudwatch`'s `createAlarms`.
 
+### Errors
+
+An exported error class is public API. The ESM and CommonJS copies of a package can both load in one process, so `instanceof` can miss an error thrown by the other copy, and consumers catch errors by `name` instead ([ADR-0007](adr/0007-dual-esm-cjs-publishing.md)). Each exported error sets `name` to its class name, and its TSDoc says to catch it by `name`.
+
 ### Dependencies
 
 A dependency on another package is part of the public API too, because every consumer installs it. It needs a reason of its own, such as composing that package's builders or naming its types; removing duplication is not enough.

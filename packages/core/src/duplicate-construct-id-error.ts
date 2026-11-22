@@ -5,6 +5,10 @@
  * inspect or report the collision programmatically, and surfaces the failure at
  * composition time rather than as an opaque CDK duplicate-construct error deeper
  * in synth.
+ *
+ * Catch this by `name`, not `instanceof`: under the dual ESM/CJS build
+ * (ADR-0007) the copy that threw may not be the copy the catching module
+ * imported, and `instanceof` is realm-bound.
  */
 export class DuplicateConstructIdError extends Error {
   /**

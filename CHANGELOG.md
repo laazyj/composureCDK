@@ -1,3 +1,91 @@
+## 0.15.0 (2026-11-22)
+
+### 🚀 Features
+
+- ⚠️ type the sqs and lambda builder results' alarms by key ([#799](https://github.com/laazyj/composureCDK/pull/799), [#796](https://github.com/laazyj/composureCDK/issues/796))
+- ⚠️ **acm:** type the certificate builder result's alarms by key ([#828](https://github.com/laazyj/composureCDK/pull/828), [#809](https://github.com/laazyj/composureCDK/issues/809))
+- ⚠️ **apigateway:** type the API builder results' alarms by key ([#835](https://github.com/laazyj/composureCDK/pull/835), [#810](https://github.com/laazyj/composureCDK/issues/810))
+- ⚠️ **bedrock:** type the bedrock builder results' alarms by key ([#838](https://github.com/laazyj/composureCDK/pull/838), [#811](https://github.com/laazyj/composureCDK/issues/811))
+- ⚠️ **bedrockagentcore:** type the AgentCore builder results' alarms by key ([#841](https://github.com/laazyj/composureCDK/pull/841), [#812](https://github.com/laazyj/composureCDK/issues/812))
+- ⚠️ **budgets:** type the budget builder results' alarms by key ([#832](https://github.com/laazyj/composureCDK/pull/832), [#813](https://github.com/laazyj/composureCDK/issues/813))
+- ⚠️ **cloudfront:** type the cloudfront builder results' alarms by key ([#806](https://github.com/laazyj/composureCDK/pull/806))
+- **cloudfront:** accept a ref for the distribution's web ACL ([#850](https://github.com/laazyj/composureCDK/pull/850))
+- **cloudwatch:** add a composite alarm builder ([#795](https://github.com/laazyj/composureCDK/pull/795), [#785](https://github.com/laazyj/composureCDK/issues/785))
+- **cloudwatch:** add requireAlarms to fail at synth on an absent alarm ([#805](https://github.com/laazyj/composureCDK/pull/805))
+- **core:** declare a component's deploy-time dependencies with dependsOn() ([#751](https://github.com/laazyj/composureCDK/pull/751), [#732](https://github.com/laazyj/composureCDK/issues/732))
+- ⚠️ **core:** throw when an at() pin is built under another id ([#854](https://github.com/laazyj/composureCDK/pull/854), [#853](https://github.com/laazyj/composureCDK/issues/853))
+- ⚠️ **dynamodb:** type the table builder results' alarms by key ([#834](https://github.com/laazyj/composureCDK/pull/834), [#814](https://github.com/laazyj/composureCDK/issues/814))
+- ⚠️ **ec2:** type the ec2 builder results' alarms by key ([#839](https://github.com/laazyj/composureCDK/pull/839), [#815](https://github.com/laazyj/composureCDK/issues/815))
+- ⚠️ **eslint-plugin:** move constraint-metadata-required to the recommended preset ([#863](https://github.com/laazyj/composureCDK/pull/863), [#803](https://github.com/laazyj/composureCDK/issues/803))
+- ⚠️ **events:** type the rule builder result's alarms by key ([#831](https://github.com/laazyj/composureCDK/pull/831), [#816](https://github.com/laazyj/composureCDK/issues/816))
+- **examples:** check the fulfilment workflow's DynamoDB expressions at synth ([#786](https://github.com/laazyj/composureCDK/pull/786))
+- **examples:** put the CRUD API behind a WAF web ACL ([#851](https://github.com/laazyj/composureCDK/pull/851), [#708](https://github.com/laazyj/composureCDK/issues/708))
+- ⚠️ **kinesis:** type the stream builder results' alarms by key ([#833](https://github.com/laazyj/composureCDK/pull/833), [#817](https://github.com/laazyj/composureCDK/issues/817))
+- ⚠️ **kms:** type the key builder result's alarms by key ([#827](https://github.com/laazyj/composureCDK/pull/827), [#818](https://github.com/laazyj/composureCDK/issues/818))
+- ⚠️ **neptune:** type the cluster builder result's alarms by key ([#829](https://github.com/laazyj/composureCDK/pull/829), [#819](https://github.com/laazyj/composureCDK/issues/819))
+- **organizations:** add the service control policy builder ([#682](https://github.com/laazyj/composureCDK/pull/682))
+- **organizations:** add the guardrails SCP statement library ([#683](https://github.com/laazyj/composureCDK/pull/683), [#25](https://github.com/laazyj/composureCDK/issues/25))
+- ⚠️ **route53:** type the health-check builder results' alarms by key ([#836](https://github.com/laazyj/composureCDK/pull/836), [#820](https://github.com/laazyj/composureCDK/issues/820))
+- ⚠️ **s3:** type the bucket builder result's alarms by key ([#825](https://github.com/laazyj/composureCDK/pull/825), [#821](https://github.com/laazyj/composureCDK/issues/821))
+- **sns:** stop shipping topic alarms that cannot fire or be heard ([#781](https://github.com/laazyj/composureCDK/pull/781), [#779](https://github.com/laazyj/composureCDK/issues/779), [#780](https://github.com/laazyj/composureCDK/issues/780))
+- ⚠️ **sns:** type the topic builder result's alarms by key ([#830](https://github.com/laazyj/composureCDK/pull/830), [#822](https://github.com/laazyj/composureCDK/issues/822))
+- ⚠️ **stepfunctions:** type the stepfunctions builder results' alarms by key ([#840](https://github.com/laazyj/composureCDK/pull/840), [#823](https://github.com/laazyj/composureCDK/issues/823))
+- ⚠️ **wafv2:** type the web ACL builder result's alarms by key ([#837](https://github.com/laazyj/composureCDK/pull/837), [#824](https://github.com/laazyj/composureCDK/issues/824))
+- **wafv2:** add typed rule helpers for rate limits, headers, managed groups and IP sets ([#848](https://github.com/laazyj/composureCDK/pull/848))
+
+### 🩹 Fixes
+
+- ⚠️ sanitise user-supplied keys in construct ids ([#849](https://github.com/laazyj/composureCDK/pull/849), [#807](https://github.com/laazyj/composureCDK/issues/807))
+- **s3:** disable ACLs on the auto-created access-logs bucket ([#603](https://github.com/laazyj/composureCDK/pull/603), [#502](https://github.com/laazyj/composureCDK/issues/502))
+- **wafv2:** reject a web ACL description CloudFormation would reject ([#852](https://github.com/laazyj/composureCDK/pull/852))
+
+### ⚠️ Breaking Changes
+
+- **eslint-plugin:** move constraint-metadata-required to the recommended preset ([#863](https://github.com/laazyj/composureCDK/pull/863), [#803](https://github.com/laazyj/composureCDK/issues/803))
+  composurecdk/constraint-metadata-required moves from
+  the internal preset to recommended, so a consumer extending recommended
+  now gets it at error. It also stops reporting on stringConstraint calls
+  that do not come from @composurecdk/cloudformation, and its
+  missing-field message is reworded.
+- **core:** throw when an at() pin is built under another id ([#854](https://github.com/laazyj/composureCDK/pull/854), [#853](https://github.com/laazyj/composureCDK/issues/853))
+  a component whose at() pin is hidden by a wrapper, or
+  that carries two different at() pins, now fails at synth instead of
+  building under the outer id. If such a component is already deployed,
+  its resources live at the outer id: remove the inner at() to keep them.
+  Otherwise move at() outermost so the component builds under its pin.
+- sanitise user-supplied keys in construct ids ([#849](https://github.com/laazyj/composureCDK/pull/849), [#807](https://github.com/laazyj/composureCDK/issues/807))
+  a deployed alarm, volume attachment, SNS subscription
+  or gateway target whose key contains `/` or a control character gets a
+  new logical id, so CloudFormation replaces it. Previously constructs
+  rewrote `/` to `--`; the id now uses `-`. To keep the old resource,
+  rename the key, or for an alarm pin its id with
+  `.constructId("<old id>")`. A key containing `{ } [ ]` now throws. A
+  gateway target factory that used its second argument as the target
+  name now receives the sanitised key; name the target from the key you
+  passed to addTarget instead.
+- **bedrockagentcore:** type the AgentCore builder results' alarms by key ([#841](https://github.com/laazyj/composureCDK/pull/841), [#812](https://github.com/laazyj/composureCDK/issues/812))
+- **stepfunctions:** type the stepfunctions builder results' alarms by key ([#840](https://github.com/laazyj/composureCDK/pull/840), [#823](https://github.com/laazyj/composureCDK/issues/823))
+- **ec2:** type the ec2 builder results' alarms by key ([#839](https://github.com/laazyj/composureCDK/pull/839), [#815](https://github.com/laazyj/composureCDK/issues/815))
+- **bedrock:** type the bedrock builder results' alarms by key ([#838](https://github.com/laazyj/composureCDK/pull/838), [#811](https://github.com/laazyj/composureCDK/issues/811))
+- **wafv2:** type the web ACL builder result's alarms by key ([#837](https://github.com/laazyj/composureCDK/pull/837), [#824](https://github.com/laazyj/composureCDK/issues/824))
+- **route53:** type the health-check builder results' alarms by key ([#836](https://github.com/laazyj/composureCDK/pull/836), [#820](https://github.com/laazyj/composureCDK/issues/820))
+- **apigateway:** type the API builder results' alarms by key ([#835](https://github.com/laazyj/composureCDK/pull/835), [#810](https://github.com/laazyj/composureCDK/issues/810))
+- **dynamodb:** type the table builder results' alarms by key ([#834](https://github.com/laazyj/composureCDK/pull/834), [#814](https://github.com/laazyj/composureCDK/issues/814))
+- **kinesis:** type the stream builder results' alarms by key ([#833](https://github.com/laazyj/composureCDK/pull/833), [#817](https://github.com/laazyj/composureCDK/issues/817))
+- **budgets:** type the budget builder results' alarms by key ([#832](https://github.com/laazyj/composureCDK/pull/832), [#813](https://github.com/laazyj/composureCDK/issues/813))
+- **events:** type the rule builder result's alarms by key ([#831](https://github.com/laazyj/composureCDK/pull/831), [#816](https://github.com/laazyj/composureCDK/issues/816))
+- **sns:** type the topic builder result's alarms by key ([#830](https://github.com/laazyj/composureCDK/pull/830), [#822](https://github.com/laazyj/composureCDK/issues/822))
+- **acm:** type the certificate builder result's alarms by key ([#828](https://github.com/laazyj/composureCDK/pull/828), [#809](https://github.com/laazyj/composureCDK/issues/809))
+- **neptune:** type the cluster builder result's alarms by key ([#829](https://github.com/laazyj/composureCDK/pull/829), [#819](https://github.com/laazyj/composureCDK/issues/819))
+- **kms:** type the key builder result's alarms by key ([#827](https://github.com/laazyj/composureCDK/pull/827), [#818](https://github.com/laazyj/composureCDK/issues/818))
+- **s3:** type the bucket builder result's alarms by key ([#825](https://github.com/laazyj/composureCDK/pull/825), [#821](https://github.com/laazyj/composureCDK/issues/821))
+- **cloudfront:** type the cloudfront builder results' alarms by key ([#806](https://github.com/laazyj/composureCDK/pull/806))
+- type the sqs and lambda builder results' alarms by key ([#799](https://github.com/laazyj/composureCDK/pull/799), [#796](https://github.com/laazyj/composureCDK/issues/796))
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.14.0 (2026-11-15)
 
 ### 🚀 Features

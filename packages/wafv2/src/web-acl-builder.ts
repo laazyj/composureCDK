@@ -30,6 +30,7 @@ import {
   webAclBaseName,
   validateMetricName,
   validateRuleName,
+  validateWebAclDescription,
   validateWebAclName,
 } from "./names.js";
 import {
@@ -237,6 +238,7 @@ class WebAclBuilder implements Lifecycle<WithCustomAlarms<WebAclBuilderResult, s
     } = this.props;
 
     if (rest.name !== undefined) validateWebAclName(rest.name);
+    if (rest.description !== undefined) validateWebAclDescription(rest.description);
     if (aclScope === "CLOUDFRONT") {
       if (this.#associations.length > 0) {
         throw new Error(

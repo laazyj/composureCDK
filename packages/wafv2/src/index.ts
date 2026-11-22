@@ -3,6 +3,7 @@ import {
   validateMetricName,
   validateRuleLabel,
   validateRuleName,
+  validateWebAclDescription,
   validateWebAclName,
 } from "./names.js";
 
@@ -61,6 +62,7 @@ export {
 export const constraints = {
   validate: {
     webAclName: validateWebAclName,
+    webAclDescription: validateWebAclDescription,
     ruleName: validateRuleName,
     metricName: validateMetricName,
     ruleLabel: validateRuleLabel,

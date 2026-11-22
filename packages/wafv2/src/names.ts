@@ -1,6 +1,7 @@
 import {
   charSets,
   sanitizeString,
+  type StringConstraint,
   stringConstraint,
   validateString,
 } from "@composurecdk/cloudformation";
@@ -47,6 +48,28 @@ const METRIC_NAME = stringConstraint({
   source: "https://docs.aws.amazon.com/waf/latest/APIReference/API_VisibilityConfig.html",
 });
 
+/** What a web ACL description may start with: no `+`, no whitespace. */
+const DESCRIPTION_HEAD = `${charSets.ALNUM}=:#@/\\-,.`;
+/** What it may otherwise hold, besides whitespace inside it. */
+const DESCRIPTION_CHARS = `${DESCRIPTION_HEAD}+`;
+
+/**
+ * AWS-property constraint for a web ACL's description: CloudFormation's
+ * pattern, which is stricter than WAF's API (it rejects `_`) and is checked
+ * first. Pattern-only, because the first and last characters are narrower
+ * than the rest.
+ */
+const WEB_ACL_DESCRIPTION: StringConstraint = {
+  name: "WAFv2 WebACL Description",
+  pattern: new RegExp(`^[${DESCRIPTION_HEAD}][${DESCRIPTION_CHARS}\\s]+[${DESCRIPTION_CHARS}]$`),
+  minLength: 3,
+  maxLength: 256,
+  allowed:
+    "ASCII letters, digits, whitespace and +=:#@/-,. — not starting with + or whitespace, nor ending with whitespace",
+  source:
+    "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-wafv2-webacl.html",
+};
+
 /** Metric names WAF reserves for its own aggregate metrics. */
 const RESERVED_METRIC_NAMES = ["All", "Default_Action"];
 
@@ -57,6 +80,15 @@ const RESERVED_METRIC_NAMES = ["All", "Default_Action"];
  */
 export function validateWebAclName(raw: string): void {
   validateString(raw, WEB_ACL_NAME);
+}
+
+/**
+ * Validates a web ACL description.
+ *
+ * @throws on invalid input.
+ */
+export function validateWebAclDescription(raw: string): void {
+  validateString(raw, WEB_ACL_DESCRIPTION);
 }
 
 /**

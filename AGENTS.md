@@ -44,7 +44,7 @@ Every publishable package ships dual ESM/CJS, built by `tshy` ([ADR-0007](docs/a
 
 - **No `import.meta` or top-level `await` in `src/`** — neither emits to CommonJS (`composurecdk/no-cjs-incompatible-syntax`).
 - **Cross-realm identity checks use a `Symbol.for(...)` brand, never `instanceof`** (`composurecdk/no-realm-bound-instanceof`) — the ESM and CJS copies of a package can both load in one process, for a relative import as much as a bare specifier. Brand a CDK L2 you cannot modify by reading its L1 instead (`CfnResource.isCfnResource` + `cfnResourceType`, [ADR-0011](docs/adr/0011-cross-component-relationship-guards.md)).
-- **An exported `Error` subclass sets `name` to its class name, and its TSDoc says to catch it by `name`, not `instanceof`** — consumers hit the same realm hazard ([Errors](docs/architecture.md#errors)).
+- **An exported `Error` subclass sets `name` to its class name, and its TSDoc says to catch it by `name`, not `instanceof`** (`composurecdk/error-name-matches-class`) — consumers hit the same realm hazard ([Errors](docs/architecture.md#errors)).
 - **A prop re-declared only to widen it to `Resolvable` reads its inner type from CDK's own prop** (`composurecdk/redeclared-prop-must-track-cdk-type`) — `Resolvable<NonNullable<TopicProps["masterKey"]>>`, never `Resolvable<IKey>` — so it tracks the consumer's installed `aws-cdk-lib` ([ADR-0018](docs/adr/0018-re-declared-props-track-cdk-prop-types.md)). Keep the indexed access inline: a named alias puts an unnameable type into the emitted builder type and reintroduces [ADR-0001](docs/adr/0001-builder-type-emission.md)'s TS2883.
 - **A new package** must be added to `@composurecdk/module-compat`'s `peerDependencies`, and to `cdk-flags.json`'s `modules` map.
 

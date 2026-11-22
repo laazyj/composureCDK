@@ -101,6 +101,8 @@ createBucketBuilder().serverAccessLogs({ destination: myBucket });
 createBucketBuilder().serverAccessLogs({ destination: myBucket, prefix: "x/" });
 ```
 
+The auto-created logging bucket has [ACLs disabled](https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html) (`BUCKET_OWNER_ENFORCED`) and grants `logging.s3.amazonaws.com` write access through its bucket policy, whatever your app sets for `@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy`. A `destination` you supply is wired by CDK, which enables ACLs on it unless that flag is set — set it in your `cdk.json`.
+
 `destination` and `configure` cannot be combined — the destination bucket is user-managed and is not built by this builder.
 
 The `configure` callback receives the build context, so anything `IBucketBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the bucket.

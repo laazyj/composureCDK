@@ -8,7 +8,7 @@ import {
   type SelectedSubnets,
 } from "aws-cdk-lib/aws-ec2";
 import type { IConstruct } from "constructs";
-import { resolve, type Resolvable } from "@composurecdk/core";
+import { resolve, type Resolvable, sanitizeConstructId } from "@composurecdk/core";
 import {
   type AlarmDefinition,
   type AlarmsOf,
@@ -192,11 +192,15 @@ export function createVolumeAttachments(
       }
     }
 
-    const attachment = new CfnVolumeAttachment(scope, `${id}${pending.key}Attachment`, {
-      device: pending.options.device,
-      instanceId: instance.instanceId,
-      volumeId: volume.volumeId,
-    });
+    const attachment = new CfnVolumeAttachment(
+      scope,
+      `${id}${sanitizeConstructId(pending.key)}Attachment`,
+      {
+        device: pending.options.device,
+        instanceId: instance.instanceId,
+        volumeId: volume.volumeId,
+      },
+    );
     attachmentRecords[pending.key] = attachment;
 
     alarmDefinitions.push(

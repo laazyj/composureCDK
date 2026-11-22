@@ -44,7 +44,8 @@ export class AlarmDefinitionBuilder<TConstruct> {
 
   /**
    * Sets an explicit construct id for the created alarm, used verbatim. When
-   * unset, {@link createAlarms} derives `` `${id}${Capitalize(key)}Alarm` ``.
+   * unset, {@link createAlarms} derives `` `${id}${Capitalize(key)}Alarm` ``,
+   * with `key` sanitised.
    *
    * Set this to preserve an existing CloudFormation logical ID when
    * grandfathering alarms into a stack.

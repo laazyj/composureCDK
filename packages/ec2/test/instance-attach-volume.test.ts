@@ -16,7 +16,7 @@ import { createVpcBuilder, type VpcBuilderResult } from "../src/vpc-builder.js";
 
 describe("InstanceBuilder.attachVolume", () => {
   describe("single attachment with VolumeBuilderResult ref", () => {
-    function buildAgent() {
+    function buildAgent(key = "AgentData") {
       const app = new App();
       const stack = new Stack(app, "TestStack");
       const result = compose(
@@ -31,7 +31,7 @@ describe("InstanceBuilder.attachVolume", () => {
             .vpc(ref<VpcBuilderResult>("network").map((r) => r.vpc))
             .instanceType(InstanceType.of(InstanceClass.T3, InstanceSize.MICRO))
             .machineImage(MachineImage.latestAmazonLinux2023())
-            .attachVolume("AgentData", ref<VolumeBuilderResult>("data"), {
+            .attachVolume(key, ref<VolumeBuilderResult>("data"), {
               device: "/dev/sdf",
             }),
         },
@@ -39,6 +39,15 @@ describe("InstanceBuilder.attachVolume", () => {
       ).build(stack, "AgentApp");
       return { stack, result, template: Template.fromStack(stack) };
     }
+
+    it("sanitises the key in the attachment's construct id", () => {
+      const { result } = buildAgent("Agent/Data");
+      expect(result.agent.volumeAttachments["Agent/Data"].node.id).toMatch(/Agent-DataAttachment$/);
+    });
+
+    it("throws when a key carries a leaked token", () => {
+      expect(() => buildAgent("${Token[TOKEN.1]}")).toThrow(/unresolved CDK token/);
+    });
 
     it("creates exactly one VolumeAttachment", () => {
       const { template } = buildAgent();

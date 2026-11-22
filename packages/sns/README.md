@@ -211,7 +211,7 @@ const alerts = createTopicBuilder()
 
 ## Adding Subscriptions to a Topic
 
-For the common case where a topic and its subscriptions are declared together, use `addSubscription` on the topic builder. It accepts any CDK [`ITopicSubscription`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.ITopicSubscription.html) (e.g. `EmailSubscription`, `LambdaSubscription`, `SqsSubscription`) and binds it via `ITopicSubscription.bind(topic)` — the same path CDK uses for `topic.addSubscription(...)`, so endpoint-specific wire-up (Lambda invoke permission, SQS queue policy, KMS decrypt policy) happens automatically.
+For the common case where a topic and its subscriptions are declared together, use `addSubscription` on the topic builder. It accepts any CDK [`ITopicSubscription`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sns.ITopicSubscription.html) (e.g. `EmailSubscription`, `LambdaSubscription`, `SqsSubscription`) and binds it via `ITopicSubscription.bind(topic)` — the same path CDK uses for `topic.addSubscription(...)`, so endpoint-specific wire-up (Lambda invoke permission, SQS queue policy, KMS decrypt policy) happens automatically. Each subscription's construct ID is `${id}${Capitalize(key)}Subscription`, with `key` sanitised by `sanitizeConstructId` from `@composurecdk/core`.
 
 ```ts
 import { createTopicBuilder } from "@composurecdk/sns";

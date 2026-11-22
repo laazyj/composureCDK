@@ -409,7 +409,7 @@ Each alarm is named with `def.alarmName` if set, and with [defaultAlarmName](#de
 
 #### Construct IDs
 
-Each alarm's construct ID is `${id}${Capitalize(key)}Alarm` (e.g. `MyFunctionErrorsAlarm`). Set `constructId` on a definition to use a different ID verbatim:
+Each alarm's construct ID is `${id}${Capitalize(key)}Alarm` (e.g. `MyFunctionErrorsAlarm`), with `key` passed through `sanitizeConstructId` from `@composurecdk/core`: `/` and control characters become `-`, and `{ } [ ]` throw, since they mean an unresolved CDK token has leaked into the key. Set `constructId` on a definition to use a different ID verbatim:
 
 ```ts
 const alarms = createAlarms(scope, "MyFunction", [

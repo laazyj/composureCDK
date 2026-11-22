@@ -147,7 +147,7 @@ const server = createInstanceBuilder()
 
 ### Attaching persistent volumes
 
-`attachVolume(key, volumeRef, opts)` mirrors the call shape of `addAlarm` and produces an `AWS::EC2::VolumeAttachment` for an externally-managed EBS volume. The volume reference accepts either a `Resolvable<VolumeBuilderResult>` (drop a `ref<VolumeBuilderResult>("data")` straight in) or a `Resolvable<IVolume>`.
+`attachVolume(key, volumeRef, opts)` mirrors the call shape of `addAlarm` and produces an `AWS::EC2::VolumeAttachment` for an externally-managed EBS volume. The volume reference accepts either a `Resolvable<VolumeBuilderResult>` (drop a `ref<VolumeBuilderResult>("data")` straight in) or a `Resolvable<IVolume>`. The attachment's construct ID is `${id}${key}Attachment`, with `key` sanitised by `sanitizeConstructId` from `@composurecdk/core`.
 
 ```ts
 import { compose, ref } from "@composurecdk/core";

@@ -107,6 +107,24 @@ describe("TopicBuilder", () => {
       });
     });
 
+    it("sanitises the key in the subscription's construct id", () => {
+      const stack = newStack();
+      const result = createTopicBuilder()
+        .addSubscription("ops/alerts", new EmailSubscription("ops@example.com"))
+        .build(stack, "TestTopic");
+
+      expect(result.subscriptions["ops/alerts"].node.id).toBe("TestTopicOps-alertsSubscription");
+    });
+
+    it("throws when a subscription key carries a leaked token", () => {
+      const stack = newStack();
+      expect(() =>
+        createTopicBuilder()
+          .addSubscription("${Token[TOKEN.1]}", new EmailSubscription("ops@example.com"))
+          .build(stack, "TestTopic"),
+      ).toThrow(/unresolved CDK token/);
+    });
+
     it("wires lambda invoke permission for a LambdaSubscription", () => {
       const app = new App();
       const stack = new Stack(app, "TestStack");

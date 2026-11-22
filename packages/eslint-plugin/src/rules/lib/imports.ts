@@ -1,5 +1,5 @@
 import type { Scope } from "eslint";
-import type { Identifier, ImportDeclaration, MemberExpression } from "estree";
+import type { Identifier, ImportDeclaration, ImportSpecifier, MemberExpression } from "estree";
 
 /**
  * Loose shape used to walk MemberExpression + TS-wrapper nodes uniformly.
@@ -107,4 +107,9 @@ export function importSourceOf(scope: Scope.Scope, name: string): string | undef
 /** True for `aws-cdk-lib` and any submodule of it. */
 export function isCdkSource(source: string): boolean {
   return source === "aws-cdk-lib" || source.startsWith("aws-cdk-lib/");
+}
+
+/** The name an import specifier imports, whether written as an identifier or a string. */
+export function exportedName({ imported }: ImportSpecifier): string {
+  return imported.type === "Identifier" ? imported.name : String(imported.value);
 }

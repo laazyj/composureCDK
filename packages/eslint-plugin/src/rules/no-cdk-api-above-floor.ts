@@ -1,11 +1,12 @@
 import type { Rule, Scope } from "eslint";
-import type { ImportDeclaration, ImportSpecifier, MemberExpression, Node } from "estree";
+import type { ImportDeclaration, MemberExpression, Node } from "estree";
 import {
   chainRoot,
   importBindingOf,
   importSourceOf,
   isCdkSource,
   unwrapWrappers,
+  exportedName,
 } from "./lib/imports.js";
 
 /** What every entry in the ban list says about the API it bans. */
@@ -126,10 +127,6 @@ function namespaceModule(scope: Scope.Scope, expr: MemberExpression["object"]): 
 /** `aws-cdk-lib/aws-cloudwatch` for the root's `aws_cloudwatch` re-export. */
 function submodule(name: string): string {
   return `aws-cdk-lib/${name.replaceAll("_", "-")}`;
-}
-
-function exportedName({ imported }: ImportSpecifier): string {
-  return imported.type === "Identifier" ? imported.name : String(imported.value);
 }
 
 /**

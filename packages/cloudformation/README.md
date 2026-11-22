@@ -238,7 +238,7 @@ export const constraints = {
 Call `constraints.validate.widgetName(this.props.name)` from your builder's `build()`. Typing the object with `satisfies ConstraintNamespace` gives consumers the same call shape in every package.
 
 - **`validateString`** throws, for values the author wrote and can fix. **`sanitizeString`** returns a legal copy, for values the author does not control: it replaces runs of disallowed characters (with `-` by default) and truncates to `maxLength`. Both skip a value holding an unresolved CDK token.
-- **`name` and `source` appear in every error, and `allowed` in every character-set error**, so give each a real value. The [`composurecdk/constraint-metadata-required`](https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/constraint-metadata-required.md) lint rule catches empty ones; it is not in the presets a builder author extends, so enable it in your own `rules`.
+- **`name` and `source` appear in every error, and `allowed` in every character-set error**, so give each a real value. The [`composurecdk/constraint-metadata-required`](https://github.com/laazyj/composureCDK/blob/main/packages/eslint-plugin/docs/rules/constraint-metadata-required.md) lint rule, in its `recommended` preset, catches empty ones.
 
 ## Examples
 

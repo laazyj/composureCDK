@@ -15,6 +15,7 @@ import type { Linter } from "eslint";
  */
 export const recommendedRules: Linter.RulesRecord = {
   "composurecdk/builder-must-implement-copy-state": "error",
+  "composurecdk/constraint-metadata-required": "error",
   "composurecdk/lifecycle-build-context-required": "error",
   "composurecdk/no-realm-bound-instanceof": "error",
 };
@@ -49,13 +50,12 @@ export const dualPublishingRules: Linter.RulesRecord = {
 
 /**
  * composureCDK's own house rules. Each encodes a convention or a hardcoded
- * value — this repo's CDK floor, its tagging wrapper, its constraint catalogue
- * — that is wrong elsewhere. Published so the preset is reproducible, not as a
+ * value — this repo's CDK floor, its tagging wrapper — that is wrong
+ * elsewhere. Published so the preset is reproducible, not as a
  * recommendation.
  */
 export const internalRules: Linter.RulesRecord = {
   "composurecdk/add-alarm-requires-add-alarms": "error",
   "composurecdk/builder-must-be-tagged": "error",
-  "composurecdk/constraint-metadata-required": "error",
   "composurecdk/no-cdk-api-above-floor": "error",
 };

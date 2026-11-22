@@ -29,8 +29,9 @@ interface ObjectWithProps<Props extends object> {
  * returns a tagged builder so the chain survives variant authoring.
  *
  * Tags accumulated via {@link ITaggedBuilder.tag | .tag()} and
- * {@link ITaggedBuilder.tags | .tags()} are applied to every construct in
- * the build result — see {@link applyBuilderTags} for the exact walk.
+ * {@link ITaggedBuilder.tags | .tags()} are applied to every construct
+ * reachable through plain objects in the build result; arrays and
+ * non-construct class instances are skipped.
  *
  * @typeParam Props - The configurable properties.
  * @typeParam T - The target class the builder wraps.
@@ -89,8 +90,8 @@ export type ITaggedBuilder<Props extends object, T> = {
  *    accumulate them in an insertion-ordered map. Repeated keys overwrite
  *    earlier values and emit `process.emitWarning` so the override is
  *    visible at the configuring call site.
- * 2. Intercepts `build()` to call {@link applyBuilderTags} on the result
- *    after the inner build completes.
+ * 2. Intercepts `build()` to tag every construct in the result after the
+ *    inner build completes.
  * 3. Intercepts `copy()` so the returned builder is itself a tagged builder
  *    with an independent clone of the accumulator. Without this, `.copy()`
  *    on a tagged builder would surface the bare inner Proxy and silently

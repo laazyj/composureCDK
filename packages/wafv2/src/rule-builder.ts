@@ -1,5 +1,13 @@
+import { Duration } from "aws-cdk-lib";
 import type { CfnWebACL } from "aws-cdk-lib/aws-wafv2";
-import { Builder, COPY_STATE, type IBuilder } from "@composurecdk/core";
+import {
+  Builder,
+  COPY_STATE,
+  type IBuilder,
+  isRef,
+  resolve,
+  type Resolvable,
+} from "@composurecdk/core";
 import type {
   CustomResponse,
   CustomResponseBody,
@@ -8,6 +16,14 @@ import type {
 import type { WebAclRuleAlarmConfig } from "./alarm-config.js";
 import { WEB_ACL_VISIBILITY_DEFAULTS } from "./defaults.js";
 import { validateMetricName, validateRuleLabel } from "./names.js";
+import { type ManagedRuleGroupOptions, managedRuleGroupStatement } from "./managed-rule-groups.js";
+import {
+  type ForwardedIpFallback,
+  NO_TRANSFORMATION,
+  type RateLimitAggregateKey,
+  type RateLimitSpec,
+  rateBasedStatement,
+} from "./rate-limit.js";
 
 /** The action a rule takes on a request that matches its statement. */
 export type WebAclRuleAction = "block" | "allow" | "count" | "captcha" | "challenge";
@@ -62,7 +78,39 @@ export interface RuleBuildContext {
   readonly sampledRequests: boolean;
   /** Where custom response bodies are collected. */
   readonly bodies: CustomResponseBodies;
+  /** Resolves the refs a rule was given, such as an IP set's ARN. */
+  readonly context: Record<string, object>;
+  /** Adds a synth warning to the web ACL. */
+  readonly warn: (id: string, message: string) => void;
 }
+
+/** Options for {@link IWebAclRuleBuilder.ipSet} when the client IP is in a header. */
+export interface IpSetForwardedIpOptions {
+  /** The header that carries the client IP, such as `X-Forwarded-For`. */
+  readonly headerName: string;
+  /** What to do with a request whose header holds no valid IP address. */
+  readonly fallbackBehavior: ForwardedIpFallback;
+  /**
+   * Which address in a comma-separated list to match: `FIRST`, `LAST`, or
+   * `ANY` of up to ten.
+   */
+  readonly position: "FIRST" | "LAST" | "ANY";
+}
+
+/**
+ * Where a rule's statement comes from: raw CloudFormation, or one of the
+ * helpers, which are turned into CloudFormation at build.
+ */
+type StatementSource =
+  | { readonly kind: "raw"; readonly statement: Resolvable<CfnWebACL.StatementProperty> }
+  | { readonly kind: "rate"; readonly rate: RateLimitSpec }
+  | {
+      readonly kind: "managed";
+      readonly name: string;
+      readonly options: ManagedRuleGroupOptions;
+    };
+
+const UNKNOWN_OVERRIDE_ANNOTATION = "@composurecdk/wafv2:unknown-managed-rule";
 
 /** A rule turned into CloudFormation, with what the web ACL needs to know about it. */
 export interface BuiltRule {
@@ -88,7 +136,10 @@ function isRuleGroupStatement(statement: CfnWebACL.StatementProperty): boolean {
 
 class WebAclRuleBuilder {
   props: Partial<WebAclRuleBuilderProps> = {};
-  #statement?: CfnWebACL.StatementProperty;
+  #statement?: StatementSource;
+  readonly #aggregateKeys: RateLimitAggregateKey[] = [];
+  #forwardedIpConfig?: CfnWebACL.ForwardedIPConfigurationProperty;
+  #scopeDown?: Resolvable<CfnWebACL.StatementProperty>;
   #action?: WebAclRuleAction;
   #response?: CustomResponse;
   readonly #labels: string[] = [];
@@ -101,9 +152,148 @@ class WebAclRuleBuilder {
    *
    * A rule has exactly one statement; setting a second throws.
    */
-  statement(statement: CfnWebACL.StatementProperty): this {
-    this.#setStatement("statement", statement);
+  statement(statement: Resolvable<CfnWebACL.StatementProperty>): this {
+    return this.#setStatement("statement", { kind: "raw", statement });
+  }
+
+  /**
+   * Makes this a rate-based rule: matches the requests from each client — by
+   * default each IP address — once it has sent more than `limit` in `window`,
+   * until its rate falls back under the limit. Choose what identifies a
+   * client with the `aggregateOn*` methods.
+   *
+   * A request missing any key it is aggregated on is not counted or limited,
+   * so rate-limiting on a header needs a rule before it that blocks requests
+   * without that header — see {@link blockUnlessHeader}.
+   *
+   * WAF applies and lifts the limit with a lag: in a sandbox test, about 25
+   * seconds to start and about a minute to lift after traffic stopped, so a
+   * new limit may not fire at once.
+   *
+   * @param limit - 10 to 2,000,000,000 requests.
+   * @param window - 1, 2, 5 or 10 minutes. Defaults to 5.
+   * @see https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-rate-based-request-limiting.html
+   */
+  rateLimit(limit: number, window: Duration = Duration.minutes(5)): this {
+    return this.#setStatement("rateLimit", { kind: "rate", rate: { limit, window } });
+  }
+
+  /** Counts a rate-based rule's requests per client IP address. This is the default. */
+  aggregateOnIp(): this {
+    return this.aggregateOn({ ip: {} });
+  }
+
+  /**
+   * Counts a rate-based rule's requests per client IP address as a proxy or
+   * load balancer reports it, in a header such as `X-Forwarded-For`. WAF
+   * skips requests without the header.
+   *
+   * @param headerName - The header that carries the client IP.
+   * @param fallbackBehavior - What to do with a request whose header holds no
+   *   valid IP address: `MATCH` limits it with the rest, `NO_MATCH` lets it by.
+   */
+  aggregateOnForwardedIp(headerName: string, fallbackBehavior: ForwardedIpFallback): this {
+    if (this.#forwardedIpConfig !== undefined) {
+      throw new Error(`aggregateOnForwardedIp(): the rule already aggregates on a forwarded IP.`);
+    }
+    this.#forwardedIpConfig = { headerName, fallbackBehavior };
+    return this.aggregateOn({ forwardedIp: {} });
+  }
+
+  /**
+   * Counts a rate-based rule's requests per value of a header, matched as
+   * sent. For an API called with temporary AWS credentials,
+   * `x-amz-security-token` limits each STS session separately.
+   */
+  aggregateOnHeader(name: string): this {
+    return this.aggregateOn({ header: { name, textTransformations: [...NO_TRANSFORMATION] } });
+  }
+
+  /**
+   * Counts a rate-based rule's requests per combination of these keys, as
+   * CloudFormation's `RateBasedStatementCustomKey`: cookies, query arguments,
+   * the query string, the URI path, the HTTP method, a label namespace and the
+   * rest. Adds to any keys already set; at most five in all.
+   */
+  aggregateOn(...keys: RateLimitAggregateKey[]): this {
+    this.#aggregateKeys.push(...keys);
     return this;
+  }
+
+  /**
+   * Narrows a rate-based or managed rule group rule to the requests that match
+   * `statement`. A rate-based rule counts only those requests; a rule group
+   * evaluates only them.
+   */
+  scopeDown(statement: Resolvable<CfnWebACL.StatementProperty>): this {
+    this.#scopeDown = statement;
+    return this;
+  }
+
+  /**
+   * Matches requests that lack the header `name`, or send it empty. The match
+   * on the name is not case-sensitive. The rule blocks by default; use
+   * `.respond()` to answer with your own status, or `.count()` to try it out.
+   *
+   * WAF treats a request without the header as not matching a statement that
+   * inspects it, so this is a `NotStatement` around a size check, which
+   * matches exactly those requests.
+   *
+   * @see https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-fields-list.html
+   */
+  blockUnlessHeader(name: string): this {
+    return this.#setStatement("blockUnlessHeader", {
+      kind: "raw",
+      statement: {
+        notStatement: {
+          statement: {
+            sizeConstraintStatement: {
+              // CDK types singleHeader as `any`, so it needs CloudFormation's casing.
+              fieldToMatch: { singleHeader: { Name: name } },
+              comparisonOperator: "GT",
+              size: 0,
+              textTransformations: [...NO_TRANSFORMATION],
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Evaluates a managed rule group, whose rules keep their own actions. Leave
+   * the rule's action unset to apply them, or call `.count()` to count every
+   * rule in the group instead, the way to try a group out before it blocks.
+   *
+   * AWS's groups are named in {@link AWS_MANAGED_RULE_GROUP_RULES}. No group is
+   * added to a web ACL by default: each blocks some legitimate traffic until it
+   * is tuned.
+   *
+   * @param name - The group's name, such as `AWSManagedRulesCommonRuleSet`.
+   */
+  managedRuleGroup<G extends string>(name: G, options: ManagedRuleGroupOptions<G> = {}): this {
+    return this.#setStatement("managedRuleGroup", { kind: "managed", name, options });
+  }
+
+  /**
+   * Matches requests from the addresses in an IP set: by its ARN, or a `ref`
+   * to it, such as `ref("ips", (r) => r.attrArn)`. Use `.allow()` for an
+   * allow-list; the rule blocks by default.
+   *
+   * @param forwardedIp - Match the address in a header, such as
+   *   `X-Forwarded-For`, instead of the one the request came from.
+   */
+  ipSet(arn: Resolvable<string>, forwardedIp?: IpSetForwardedIpOptions): this {
+    const statement = (resolved: string): CfnWebACL.StatementProperty => ({
+      ipSetReferenceStatement: {
+        arn: resolved,
+        ...(forwardedIp && { ipSetForwardedIpConfig: forwardedIp }),
+      },
+    });
+    return this.#setStatement("ipSet", {
+      kind: "raw",
+      statement: isRef(arn) ? arn.map(statement) : statement(arn),
+    });
   }
 
   /** Blocks matching requests. This is the default action. */
@@ -168,18 +358,72 @@ class WebAclRuleBuilder {
   /** @internal — see ADR-0005. */
   [COPY_STATE](target: WebAclRuleBuilder): void {
     target.#statement = this.#statement;
+    target.#aggregateKeys.push(...this.#aggregateKeys);
+    target.#forwardedIpConfig = this.#forwardedIpConfig;
+    target.#scopeDown = this.#scopeDown;
     target.#action = this.#action;
     target.#response = this.#response;
     target.#labels.push(...this.#labels);
   }
 
-  #setStatement(method: string, statement: CfnWebACL.StatementProperty): void {
+  #setStatement(method: string, source: StatementSource): this {
     if (this.#statement !== undefined) {
       throw new Error(
         `${method}(): the rule already has a statement. A rule has exactly one; combine conditions with an AndStatement or OrStatement.`,
       );
     }
-    this.#statement = statement;
+    this.#statement = source;
+    return this;
+  }
+
+  #buildStatement(ctx: RuleBuildContext, owner: string): CfnWebACL.StatementProperty {
+    const source = this.#statement;
+    if (source === undefined) {
+      throw new Error(`${owner} has no statement. Give it one, such as .statement({ ... }).`);
+    }
+    if (source.kind !== "rate" && this.#aggregateKeys.length > 0) {
+      throw new Error(
+        `${owner} aggregates on keys, but is not rate-based. The aggregateOn* methods apply to rateLimit() rules only.`,
+      );
+    }
+    if (source.kind === "raw" && this.#scopeDown !== undefined) {
+      throw new Error(
+        `${owner} has a scopeDown(), which applies to rateLimit() and managedRuleGroup() rules only.`,
+      );
+    }
+    const scopeDown =
+      this.#scopeDown === undefined ? undefined : resolve(this.#scopeDown, ctx.context);
+
+    switch (source.kind) {
+      case "raw":
+        return resolve(source.statement, ctx.context);
+      case "rate":
+        return {
+          rateBasedStatement: rateBasedStatement(
+            owner,
+            source.rate,
+            { keys: this.#aggregateKeys, forwardedIpConfig: this.#forwardedIpConfig },
+            scopeDown,
+          ),
+        };
+      case "managed": {
+        const { statement, unknownOverrides } = managedRuleGroupStatement(
+          owner,
+          source.name,
+          source.options,
+          scopeDown,
+        );
+        if (unknownOverrides.length > 0) {
+          ctx.warn(
+            UNKNOWN_OVERRIDE_ANNOTATION,
+            `${owner} overrides ${unknownOverrides.map((r) => `"${r}"`).join(", ")}, which this ` +
+              `package does not know as rules of ${source.name}. WAF silently ignores an override ` +
+              `that matches no rule, case-sensitively; check the name against the group's rules.`,
+          );
+        }
+        return { managedRuleGroupStatement: statement };
+      }
+    }
   }
 
   #setAction(action: WebAclRuleAction): this {
@@ -195,12 +439,8 @@ class WebAclRuleBuilder {
   /** @internal — the web ACL builder turns each rule into CloudFormation. */
   toRule(ctx: RuleBuildContext): BuiltRule {
     const who = `rule "${ctx.name}"`;
-    const statement = this.#statement;
-    if (statement === undefined) {
-      throw new Error(
-        `${ctx.owner} ${who} has no statement. Give it one, such as .statement({ ... }).`,
-      );
-    }
+    const owner = `${ctx.owner} ${who}`;
+    const statement = this.#buildStatement(ctx, owner);
 
     const metricName = this.props.metricName ?? ctx.name;
     validateMetricName(metricName);
@@ -208,7 +448,7 @@ class WebAclRuleBuilder {
     const rateBased = statement.rateBasedStatement !== undefined;
     const ruleGroup = isRuleGroupStatement(statement);
 
-    const { blocks, ...action } = this.#actionProperty(ctx, who, ruleGroup, rateBased);
+    const { blocks, ...action } = this.#actionProperty(ctx, owner, who, ruleGroup, rateBased);
     const property = {
       name: ctx.name,
       priority: this.props.priority ?? ctx.defaultPriority,
@@ -236,6 +476,7 @@ class WebAclRuleBuilder {
 
   #actionProperty(
     ctx: RuleBuildContext,
+    owner: string,
     who: string,
     ruleGroup: boolean,
     rateBased: boolean,
@@ -243,7 +484,7 @@ class WebAclRuleBuilder {
     if (ruleGroup) {
       if (this.#action !== undefined && this.#action !== "count") {
         throw new Error(
-          `${ctx.owner} ${who} evaluates a rule group, whose rules keep their own actions. ` +
+          `${owner} evaluates a rule group, whose rules keep their own actions. ` +
             `Use .count() to count them all instead, or leave the action unset.`,
         );
       }
@@ -256,7 +497,7 @@ class WebAclRuleBuilder {
     const action = this.#action ?? "block";
     if (action === "allow" && rateBased) {
       throw new Error(
-        `${ctx.owner} ${who} is rate-based, and a rate-based rule cannot Allow. Use block, count, captcha or challenge.`,
+        `${owner} is rate-based, and a rate-based rule cannot Allow. Use block, count, captcha or challenge.`,
       );
     }
     if (action !== "block") return { action: { [action]: {} }, blocks: false };

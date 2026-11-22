@@ -37,6 +37,7 @@ import {
   type BuiltRule,
   createWebAclRuleBuilder,
   type IWebAclRuleBuilder,
+  type RuleBuildContext,
 } from "./rule-builder.js";
 import { configureLogging, type WebAclLoggingConfig } from "./logging.js";
 import { type WebAclMetrics, webAclMetrics } from "./metrics.js";
@@ -257,10 +258,18 @@ class WebAclBuilder implements Lifecycle<WithCustomAlarms<WebAclBuilderResult, s
       action === "allow"
         ? { allow: {} }
         : { block: bodies.block("default action", "DefaultAction", response) };
-    const rules = this.#buildRules(owner, bodies, sampledRequests);
+    const rules = this.#buildRules({
+      owner,
+      bodies,
+      sampledRequests,
+      context,
+      warn: (annotation, message) => {
+        Annotations.of(scope).addWarningV2(annotation, message);
+      },
+    });
     const usesSampling = sampledRequests || rules.some((r) => r.sampled);
     // Read through `in`, not as a typed property: `dataProtectionConfig` is not in
-    // CfnWebACLProps at this package's aws-cdk-lib floor (2.93.0), so it only
+    // CfnWebACLProps at this package's aws-cdk-lib floor (2.133.0), so it only
     // reaches `rest` as a pass-through prop on a newer install.
     const hasDataProtection =
       "dataProtectionConfig" in rest && rest.dataProtectionConfig !== undefined;
@@ -316,16 +325,15 @@ class WebAclBuilder implements Lifecycle<WithCustomAlarms<WebAclBuilderResult, s
     };
   }
 
-  #buildRules(owner: string, bodies: CustomResponseBodies, sampledRequests: boolean): BuiltRule[] {
+  #buildRules(shared: Omit<RuleBuildContext, "name" | "defaultPriority">): BuiltRule[] {
+    const { owner } = shared;
     const rules = this.#rules.map((entry, index) => {
       const builder = createWebAclRuleBuilder();
       entry.configure(builder);
       return builder.toRule({
+        ...shared,
         name: entry.name,
-        owner,
         defaultPriority: index * DEFAULT_RULE_PRIORITY_STEP,
-        sampledRequests,
-        bodies,
       });
     });
 

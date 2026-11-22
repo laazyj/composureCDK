@@ -11,10 +11,11 @@ import { resolve, type Ref } from "./ref.js";
  * covers that construct's own children — ordering against a `RestApi` also
  * orders against its deployment and stage — so naming one is enough whenever
  * what you need sits under it. Naming the component instead also picks up its
- * *peers*: an API's access log group, a queue's dead-letter queue.
+ * *peers*: an API's access log group, a queue's dead-letter queue, and any
+ * construct the component was passed.
  *
- * This is the one place that explanation lives; builders exposing an ordering
- * option point here rather than restating it.
+ * Builders exposing a dependency option point here rather than restating it.
+ * The core README's "What `sources` accepts" section mirrors it for readers.
  */
 export type DependencySource = IConstruct | Ref<object>;
 
@@ -27,11 +28,13 @@ export type DependencySource = IConstruct | Ref<object>;
  * references A. A `ref()`-wired dependency usually produces such a reference
  * on its own. This is for the residual case where it does not — an SDK call
  * whose parameters are hardcoded strings, a function invoked for its effect
- * rather than its return value — where the edge has to be declared outright.
+ * rather than its return value — where the dependency has to be declared outright.
  *
- * It backs `dependsOn` in `@composurecdk/custom-resources` and `after` in
- * `@composurecdk/lambda`'s `.invokeOnDeploy()`, so a consumer implementing
- * their own `Lifecycle` can spell ordering the same way both do.
+ * This is for builder authors: a builder calls it from its own `build()`, with
+ * the context it was given, for a construct it creates. It backs `dependsOn()`
+ * in this package, the custom-resources builder's `.dependsOn()`, and `after`
+ * on lambda's `.invokeOnDeploy()`. An app author ordering a component inside
+ * `compose()` uses `dependsOn()` instead.
  */
 export function addDependencies(
   target: IConstruct,

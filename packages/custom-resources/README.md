@@ -41,6 +41,8 @@ const activation = createAwsCustomResourceBuilder()
 
 `.dependsOn(ref("ruleSet"))` is the explicit, reliable seam: it resolves the named component against the build context and adds a `DependsOn` to that component's construct(s) — even when the SDK call's parameters are hardcoded strings with no token, and only for the component you name (nothing incidental).
 
+This is the builder-level form of `@composurecdk/core`'s [`dependsOn` combinator](../core/README.md#in-a-composed-system-dependson), targeting the custom resource. Prefer it here: it keeps the dependency with the SDK call that needs it, works on a sub-builder inside a composite, and survives `.copy()`.
+
 ## IAM: `allow(actions, resources)`
 
 `.allow(...)` is sugar over `AwsCustomResourcePolicy.fromStatements`. `resources` is **required** — an account-level action legitimately needs `["*"]`, but that broad grant should be written explicitly so it is visible in review:

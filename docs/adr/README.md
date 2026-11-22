@@ -68,3 +68,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0019: Lint rules as public contract — preset tiers and rule semver](0019-lint-rules-as-public-contract.md)
 - [ADR-0020: `scoped()` — build a composed system under a construct of its own](0020-scoped-system-construct.md)
 - [ADR-0021: Alarm keys are typed on the result, not accumulated by the builder](0021-alarm-keys-typed-on-the-result.md)
+- [ADR-0022: Deploy-time dependencies are declared at composition — the `dependsOn()` combinator](0022-deploy-dependencies-at-composition.md)

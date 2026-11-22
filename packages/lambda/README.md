@@ -653,7 +653,7 @@ where this ordering does not reach. If the handler needs it at deploy time, name
 that resource in `after`.
 
 Everything else the call depends on goes in `after` as well. It takes any
-[`DependencySource`](../core/README.md#ordering-adddependencies) — the same
+[`DependencySource`](../core/README.md#what-sources-accepts) — the same
 shapes as `dependsOn` in
 [`@composurecdk/custom-resources`](../custom-resources/README.md).
 

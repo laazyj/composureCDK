@@ -243,7 +243,7 @@ What is skipped cannot tell you whether the examples deploy. The Consumer jobs p
 
 ## Versioning
 
-Fixed versioning across all packages — when any package changes, all bump together, so `@composurecdk/apigateway@0.5.0` always works with `@composurecdk/core@0.5.0`. `@composurecdk/examples`, `@composurecdk/cdk-testing` and `@composurecdk/module-compat` are versioned alongside the rest but marked `"private": true`, so they are never published.
+Fixed versioning across all packages — when any package changes, all bump together, so `@composurecdk/apigateway@0.5.0` always works with `@composurecdk/core@0.5.0`. `@composurecdk/examples`, `@composurecdk/cdk-testing` and `@composurecdk/module-compat` are versioned alongside the rest but marked `"private": true`, so they are never published. Every other package sets `"publishConfig": { "access": "public" }` instead. Each package sets exactly one of the two: [`scripts/published-packages.mjs`](../scripts/published-packages.mjs) is the one list of published packages the workspace scripts use, and it fails if a package sets both or neither.
 
 Bumps are derived from [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) since the previous tag:
 
@@ -369,7 +369,7 @@ Publishing uses [trusted publishers](https://docs.npmjs.com/trusted-publishers/)
 
 **Adding a new package:**
 
-1. Add `"publishConfig": { "access": "public" }` to its `package.json`.
+1. Add `"publishConfig": { "access": "public" }` to its `package.json`, and do not mark it `private` ([Versioning](#versioning)).
 2. Publish only the new package once. A full `npx nx release publish` also works — nx skips any package whose current version is already on the registry — but naming the project keeps the blast radius to the one package you intend to publish:
 
    ```sh

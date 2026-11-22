@@ -3,9 +3,7 @@
 // `consumer-compat.mjs`.
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { published } from "../published-packages.mjs";
 
 /** SemVer compare (assumes plain `MAJOR.MINOR.PATCH`, no pre-release tags). */
 export function compareSemver(a, b) {
@@ -14,26 +12,16 @@ export function compareSemver(a, b) {
   return a0 - b0 || a1 - b1 || a2 - b2;
 }
 
-const PACKAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "packages");
-
 /**
- * `npm pack`s every publishable `@composurecdk/*` package into `destination`
- * and returns `{ packageName: tarballFilename }`, so probes install the actual
+ * `npm pack`s every published package into `destination` and returns
+ * `{ packageName: tarballFilename }`, so probes install the actual
  * publishable artefact rather than the in-tree source.
  */
 export function packPublishablePackages(destination) {
   const tarballs = {};
-  for (const entry of readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    let pkg;
-    try {
-      pkg = JSON.parse(readFileSync(join(PACKAGES_DIR, entry.name, "package.json"), "utf8"));
-    } catch {
-      continue; // not a package directory
-    }
-    if (!pkg.name?.startsWith("@composurecdk/") || pkg.private === true) continue;
+  for (const { dir, manifest } of published()) {
     const output = execFileSync("npm", ["pack", "--pack-destination", destination], {
-      cwd: join(PACKAGES_DIR, entry.name),
+      cwd: dir,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });
@@ -42,8 +30,8 @@ export function packPublishablePackages(destination) {
       .map((line) => line.trim())
       .reverse()
       .find((line) => line.endsWith(".tgz"));
-    if (tarball === undefined) throw new Error(`npm pack for ${entry.name} produced no .tgz`);
-    tarballs[pkg.name] = tarball;
+    if (tarball === undefined) throw new Error(`npm pack for ${manifest.name} produced no .tgz`);
+    tarballs[manifest.name] = tarball;
   }
   return tarballs;
 }

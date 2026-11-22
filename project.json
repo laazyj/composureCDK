@@ -70,6 +70,7 @@
       "inputs": [
         "{workspaceRoot}/scripts/consumer-compat.mjs",
         "{workspaceRoot}/scripts/cdk-floor/packages.mjs",
+        "{workspaceRoot}/scripts/published-packages.mjs",
         { "input": "default", "projects": "@composurecdk/*" },
         { "dependentTasksOutputFiles": "**/*" },
         { "runtime": "npm --version" }

@@ -77,10 +77,10 @@ export function restApiUrl(api, region, path, stage = "prod") {
  * reach its backend answers 500 with an explanatory body, and that body is the
  * whole diagnosis.
  */
-export async function jsonRequest(url, { method = "GET", body } = {}) {
+export async function jsonRequest(url, { method = "GET", body, headers = {} } = {}) {
   const res = await fetch(url, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers: { ...(body && { "Content-Type": "application/json" }), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
 

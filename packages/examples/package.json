@@ -30,7 +30,8 @@
     "@composurecdk/route53": "^0.14.0",
     "@composurecdk/s3": "^0.14.0",
     "@composurecdk/sns": "^0.14.0",
-    "@composurecdk/sqs": "^0.14.0"
+    "@composurecdk/sqs": "^0.14.0",
+    "@composurecdk/wafv2": "^0.14.0"
   },
   "devDependencies": {
     "@composurecdk/cdk-testing": "*",

@@ -835,7 +835,7 @@ exports.handler = async () => {
   for (const gadget of SEED) {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-client-id": "catalogue-seed" },
       body: JSON.stringify(gadget),
     });
     if (!response.ok) {
@@ -897,7 +897,7 @@ exports.handler = async () => {
       },
       "Type": "AWS::Lambda::Function",
     },
-    "CrudApiAppseedCatalogueCurrentVersionAAB7FB9Dfe6536a22e0e8ec7897716b49e9e84c0": {
+    "CrudApiAppseedCatalogueCurrentVersionAAB7FB9Da89bf714d06b026ae203bfa4b2d1864f": {
       "Metadata": {
         "aws:cdk:do-not-refactor": true,
       },
@@ -934,7 +934,7 @@ exports.handler = async () => {
       "Properties": {
         "ExecuteOnHandlerChange": true,
         "HandlerArn": {
-          "Ref": "CrudApiAppseedCatalogueCurrentVersionAAB7FB9Dfe6536a22e0e8ec7897716b49e9e84c0",
+          "Ref": "CrudApiAppseedCatalogueCurrentVersionAAB7FB9Da89bf714d06b026ae203bfa4b2d1864f",
         },
         "InvocationType": "RequestResponse",
         "ServiceToken": {
@@ -1495,6 +1495,427 @@ exports.handler = async () => {
         "MetricName": "WriteThrottleEvents",
         "Namespace": "AWS/DynamoDB",
         "Period": 60,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppwaf": {
+      "Properties": {
+        "CustomResponseBodies": {
+          "PerClientRate": {
+            "Content": "{"message":"Too many requests; slow down and retry."}",
+            "ContentType": "APPLICATION_JSON",
+          },
+          "RequireClientId": {
+            "Content": "{"message":"Send an x-client-id header."}",
+            "ContentType": "APPLICATION_JSON",
+          },
+        },
+        "DefaultAction": {
+          "Allow": {},
+        },
+        "Description": "Identifies and rate-limits the client integrations of the gadget API",
+        "Rules": [
+          {
+            "Name": "IpReputation",
+            "OverrideAction": {
+              "Count": {},
+            },
+            "Priority": 0,
+            "Statement": {
+              "ManagedRuleGroupStatement": {
+                "Name": "AWSManagedRulesAmazonIpReputationList",
+                "VendorName": "AWS",
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "IpReputation",
+              "SampledRequestsEnabled": false,
+            },
+          },
+          {
+            "Action": {
+              "Block": {
+                "CustomResponse": {
+                  "CustomResponseBodyKey": "RequireClientId",
+                  "ResponseCode": 401,
+                },
+              },
+            },
+            "Name": "RequireClientId",
+            "Priority": 10,
+            "Statement": {
+              "NotStatement": {
+                "Statement": {
+                  "SizeConstraintStatement": {
+                    "ComparisonOperator": "GT",
+                    "FieldToMatch": {
+                      "SingleHeader": {
+                        "Name": "x-client-id",
+                      },
+                    },
+                    "Size": 0,
+                    "TextTransformations": [
+                      {
+                        "Priority": 0,
+                        "Type": "NONE",
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "RequireClientId",
+              "SampledRequestsEnabled": false,
+            },
+          },
+          {
+            "Action": {
+              "Block": {
+                "CustomResponse": {
+                  "CustomResponseBodyKey": "PerClientRate",
+                  "ResponseCode": 429,
+                  "ResponseHeaders": [
+                    {
+                      "Name": "Retry-After",
+                      "Value": "60",
+                    },
+                  ],
+                },
+              },
+            },
+            "Name": "PerClientRate",
+            "Priority": 20,
+            "Statement": {
+              "RateBasedStatement": {
+                "AggregateKeyType": "CUSTOM_KEYS",
+                "CustomKeys": [
+                  {
+                    "Header": {
+                      "Name": "x-client-id",
+                      "TextTransformations": [
+                        {
+                          "Priority": 0,
+                          "Type": "NONE",
+                        },
+                      ],
+                    },
+                  },
+                ],
+                "EvaluationWindowSec": 60,
+                "Limit": 300,
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "PerClientRate",
+              "SampledRequestsEnabled": false,
+            },
+          },
+          {
+            "Action": {
+              "Block": {
+                "CustomResponse": {
+                  "CustomResponseBodyKey": "PerClientRate",
+                  "ResponseCode": 429,
+                  "ResponseHeaders": [
+                    {
+                      "Name": "Retry-After",
+                      "Value": "300",
+                    },
+                  ],
+                },
+              },
+            },
+            "Name": "PerIpRate",
+            "Priority": 30,
+            "Statement": {
+              "RateBasedStatement": {
+                "AggregateKeyType": "IP",
+                "EvaluationWindowSec": 300,
+                "Limit": 3000,
+              },
+            },
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "PerIpRate",
+              "SampledRequestsEnabled": false,
+            },
+          },
+        ],
+        "Scope": "REGIONAL",
+        "VisibilityConfig": {
+          "CloudWatchMetricsEnabled": true,
+          "MetricName": "ComposureCDKCrudApiStackCrudApiAppwaf19808C26",
+          "SampledRequestsEnabled": false,
+        },
+      },
+      "Type": "AWS::WAFv2::WebACL",
+    },
+    "CrudApiAppwafAssociationa9c431bc": {
+      "DependsOn": [
+        "CrudApiAppapiDeploymentStageprod63E3B455",
+      ],
+      "Properties": {
+        "ResourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition",
+              },
+              ":apigateway:",
+              {
+                "Ref": "AWS::Region",
+              },
+              "::/restapis/",
+              {
+                "Ref": "CrudApiAppapi10BB4639",
+              },
+              "/stages/",
+              {
+                "Ref": "CrudApiAppapiDeploymentStageprod63E3B455",
+              },
+            ],
+          ],
+        },
+        "WebACLArn": {
+          "Fn::GetAtt": [
+            "CrudApiAppwaf",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::WAFv2::WebACLAssociation",
+    },
+    "CrudApiAppwafLogging": {
+      "DependsOn": [
+        "CrudApiAppwafLogsF6D38F20",
+      ],
+      "Properties": {
+        "LogDestinationConfigs": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":logs:",
+                {
+                  "Ref": "AWS::Region",
+                },
+                ":",
+                {
+                  "Ref": "AWS::AccountId",
+                },
+                ":log-group:",
+                {
+                  "Ref": "CrudApiAppwafLogsF6D38F20",
+                },
+              ],
+            ],
+          },
+        ],
+        "LoggingFilter": {
+          "DefaultBehavior": "DROP",
+          "Filters": [
+            {
+              "Behavior": "KEEP",
+              "Conditions": [
+                {
+                  "ActionCondition": {
+                    "Action": "BLOCK",
+                  },
+                },
+                {
+                  "ActionCondition": {
+                    "Action": "COUNT",
+                  },
+                },
+                {
+                  "ActionCondition": {
+                    "Action": "CAPTCHA",
+                  },
+                },
+                {
+                  "ActionCondition": {
+                    "Action": "CHALLENGE",
+                  },
+                },
+                {
+                  "ActionCondition": {
+                    "Action": "EXCLUDED_AS_COUNT",
+                  },
+                },
+              ],
+              "Requirement": "MEETS_ANY",
+            },
+          ],
+        },
+        "RedactedFields": [
+          {
+            "SingleHeader": {
+              "Name": "authorization",
+            },
+          },
+          {
+            "SingleHeader": {
+              "Name": "cookie",
+            },
+          },
+        ],
+        "ResourceArn": {
+          "Fn::GetAtt": [
+            "CrudApiAppwaf",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::WAFv2::LoggingConfiguration",
+    },
+    "CrudApiAppwafLogsF6D38F20": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "LogGroupName": "aws-waf-logs-ComposureCDKCrudApiStackCrudApiAppwaf19808C26",
+        "RetentionInDays": 731,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CrudApiAppwafPerClientRateBlockedRequestsAlarm5FAFF7D9": {
+      "Properties": {
+        "AlarmDescription": "WAF rule "PerClientRate" is blocking requests. Threshold: > 0 blocked requests in 5 minutes.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/waf/per-client-rate-blocked-requests",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "Region",
+            "Value": {
+              "Ref": "AWS::Region",
+            },
+          },
+          {
+            "Name": "Rule",
+            "Value": "PerClientRate",
+          },
+          {
+            "Name": "WebACL",
+            "Value": {
+              "Fn::Select": [
+                0,
+                {
+                  "Fn::Split": [
+                    "|",
+                    {
+                      "Ref": "CrudApiAppwaf",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "BlockedRequests",
+        "Namespace": "AWS/WAFV2",
+        "Period": 300,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppwafPerIpRateBlockedRequestsAlarmCAF60F57": {
+      "Properties": {
+        "AlarmDescription": "WAF rule "PerIpRate" is blocking requests. Threshold: > 0 blocked requests in 5 minutes.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/waf/per-ip-rate-blocked-requests",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "Region",
+            "Value": {
+              "Ref": "AWS::Region",
+            },
+          },
+          {
+            "Name": "Rule",
+            "Value": "PerIpRate",
+          },
+          {
+            "Name": "WebACL",
+            "Value": {
+              "Fn::Select": [
+                0,
+                {
+                  "Fn::Split": [
+                    "|",
+                    {
+                      "Ref": "CrudApiAppwaf",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "BlockedRequests",
+        "Namespace": "AWS/WAFV2",
+        "Period": 300,
+        "Statistic": "Sum",
+        "Threshold": 0,
+        "TreatMissingData": "notBreaching",
+      },
+      "Type": "AWS::CloudWatch::Alarm",
+    },
+    "CrudApiAppwafRequireClientIdBlockedRequestsAlarm4D0F4BEB": {
+      "Properties": {
+        "AlarmDescription": "WAF rule "RequireClientId" is blocking requests. Threshold: > 0 blocked requests in 5 minutes.",
+        "AlarmName": "composure-cdk-crud-api-stack/crud-api-app/waf/require-client-id-blocked-requests",
+        "ComparisonOperator": "GreaterThanThreshold",
+        "DatapointsToAlarm": 1,
+        "Dimensions": [
+          {
+            "Name": "Region",
+            "Value": {
+              "Ref": "AWS::Region",
+            },
+          },
+          {
+            "Name": "Rule",
+            "Value": "RequireClientId",
+          },
+          {
+            "Name": "WebACL",
+            "Value": {
+              "Fn::Select": [
+                0,
+                {
+                  "Fn::Split": [
+                    "|",
+                    {
+                      "Ref": "CrudApiAppwaf",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+        "EvaluationPeriods": 1,
+        "MetricName": "BlockedRequests",
+        "Namespace": "AWS/WAFV2",
+        "Period": 300,
         "Statistic": "Sum",
         "Threshold": 0,
         "TreatMissingData": "notBreaching",

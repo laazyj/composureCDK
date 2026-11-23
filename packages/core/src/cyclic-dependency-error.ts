@@ -1,6 +1,10 @@
 /**
  * Thrown when {@link compose} detects a cycle in the component dependency graph.
  * Carries the detected cycles so callers can inspect or report them programmatically.
+ *
+ * Catch this by `name`, not `instanceof`: under the dual ESM/CJS build
+ * (ADR-0007) the copy that threw may not be the copy the catching module
+ * imported, and `instanceof` is realm-bound.
  */
 export class CyclicDependencyError extends Error {
   /**

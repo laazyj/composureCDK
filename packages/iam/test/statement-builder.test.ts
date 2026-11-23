@@ -153,3 +153,13 @@ describe("isStatementBuilder", () => {
     expect(isStatementBuilder(foreign)).toBe(true);
   });
 });
+
+// Consumers catch this by `name`, not `instanceof` (docs/architecture.md, Errors).
+describe("WildcardResourceError", () => {
+  it("sets name to its class name", () => {
+    const error = new WildcardResourceError("Sid");
+
+    expect(error.name).toBe("WildcardResourceError");
+    expect(error.constructor.name).toBe("WildcardResourceError");
+  });
+});

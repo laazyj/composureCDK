@@ -1,6 +1,6 @@
 import { type IConstruct } from "constructs";
 import { type AfterBuildHook } from "@composurecdk/core";
-import { applyTagsToConstruct } from "./apply-builder-tags.js";
+import { applyBuilderTags, applyTagsToConstruct } from "./apply-builder-tags.js";
 import { validateTagRecord } from "./tag-validator.js";
 
 /**
@@ -9,20 +9,27 @@ import { validateTagRecord } from "./tag-validator.js";
  * - `system` tags reach every construct under the top-level scope passed
  *   to `build(scope, id)` — useful for ownership, environment, and cost
  *   allocation tags that should apply to every resource the system creates.
- * - `byComponent` tags reach only the scope a named component was built
- *   into. Under {@link ComposedSystem.withStacks} or
- *   {@link ComposedSystem.withStackStrategy}, components may live in
- *   different stacks — `byComponent` routes the tag to whichever scope
- *   that component received.
+ * - `byComponent` tags reach only the named component: every construct in
+ *   its build result, as `.tag()` on a builder does. When the component
+ *   also has its scope to itself among this system's components (its own
+ *   stack under
+ *   {@link ComposedSystem.withStacks} or
+ *   {@link ComposedSystem.withStackStrategy}), that whole scope is tagged
+ *   too, Stack included, along with anything else built into that stack.
+ *   In a shared scope (the top-level scope, or a stack shared via a
+ *   strategy), anything it creates but does not return is not reached;
+ *   give it its own stack, or a `scoped(compose(...))` with `system` tags,
+ *   if that matters.
  *
  * Component keys in `byComponent` are statically typed against the
  * composed system's component keys, matching the pattern `outputs()` uses
  * for its `scope` field, so a typo on a component name is a compile-time
  * error.
  *
- * Builder-level tags applied via `.tag()` / `.tags()` always take
- * precedence on key conflict because they target a closer scope; CDK's
- * native tag priority resolves the collision automatically.
+ * On a key conflict a builder's own `.tag()` / `.tags()` wins over
+ * `byComponent`, which wins over `system`. These tags are applied below
+ * CDK's default priority, so any tag added explicitly with
+ * `Tags.of(...).add(...)` at the default priority also wins over them.
  *
  * @typeParam T - The composed system's build result type. Inferred from
  * the surrounding `compose(...).afterBuild(tags(...))` chain.
@@ -36,13 +43,22 @@ export interface TagDefinitions<T extends object = object> {
   system?: Record<string, string>;
 
   /**
-   * Tags applied only to constructs under a specific component's scope.
-   * Component keys are statically checked against the composed system's
-   * component keys. Each key/value pair is validated identically to
-   * `system`.
+   * Tags applied to a named component only; see {@link TagDefinitions} for
+   * how much of it they reach. Component keys are statically checked
+   * against the composed system's component keys. Each key/value pair is
+   * validated identically to `system`.
    */
   byComponent?: Partial<Record<keyof T & string, Record<string, string>>>;
 }
+
+/**
+ * CDK tag priorities that keep the documented precedence: a builder's own
+ * `.tag()` (CDK's default, 100) beats `byComponent`, which beats `system`.
+ * `byComponent` tags the same constructs `.tag()` does, later in the build,
+ * so at an equal priority it would win instead.
+ */
+const COMPONENT_TAG_PRIORITY = 99;
+const SYSTEM_TAG_PRIORITY = 98;
 
 /**
  * Returns an {@link AfterBuildHook} that applies cross-cutting tags to a
@@ -55,19 +71,15 @@ export interface TagDefinitions<T extends object = object> {
  * - `system` entries are applied to the top-level `scope` via
  *   `Tags.of(scope).add(...)`. CDK's tag aspect propagates each tag
  *   through the construct subtree to every taggable descendant.
- * - `byComponent` entries are applied to `componentScopes[key]` —
- *   each component's own scope, which under
- *   {@link ComposedSystem.withStacks} or
- *   {@link ComposedSystem.withStackStrategy} may be a per-component
- *   stack rather than the top-level scope.
+ * - `byComponent` entries are applied to that component only (see
+ *   {@link TagDefinitions}).
  *
  * Tag keys and values are validated synchronously inside the hook before
  * any `Tags.of(...).add(...)` call. Invalid tags throw and surface at the
  * `compose(...).afterBuild(tags({...}))` site rather than at deploy time.
  *
  * Builder-level tags (set via `.tag()` / `.tags()` on individual builders)
- * land on closer-scoped constructs and therefore win on key collision —
- * CDK's tag priority resolves the collision automatically. Use builder
+ * win on key collision (see {@link TagDefinitions}). Use builder
  * tags for selector tags that must match exactly one resource type;
  * use this helper for system-wide concerns like ownership, environment,
  * and cost-allocation dimensions.
@@ -98,29 +110,34 @@ export function tags<T extends object = object>(defs: TagDefinitions<T>): AfterB
   if (defs.system) {
     validateTagRecord(defs.system);
   }
-  const byComponent = defs.byComponent as
-    Record<string, Record<string, string> | undefined> | undefined;
-  if (byComponent) {
-    for (const componentTags of Object.values(byComponent)) {
-      if (componentTags === undefined) continue;
-      validateTagRecord(componentTags);
-    }
-  }
+  const byComponent = Object.entries(
+    (defs.byComponent ?? {}) as Record<string, Record<string, string> | undefined>,
+  ).flatMap(([key, componentTags]) => {
+    if (componentTags === undefined) return [];
+    validateTagRecord(componentTags);
+    return [[key, new Map(Object.entries(componentTags))] as const];
+  });
 
-  return (scope, _id, _results, componentScopes) => {
+  return (scope, _id, results, componentScopes) => {
     if (defs.system) {
-      applyTagsToConstruct(scope, Object.entries(defs.system));
+      applyTagsToConstruct(scope, Object.entries(defs.system), SYSTEM_TAG_PRIORITY);
     }
-    if (byComponent) {
-      const scopesByKey = componentScopes as Readonly<Record<string, IConstruct | undefined>>;
-      for (const [componentKey, componentTags] of Object.entries(byComponent)) {
-        if (componentTags === undefined) continue;
-        const target = scopesByKey[componentKey];
-        if (target === undefined) {
-          throw new Error(`tags(): byComponent entry "${componentKey}" is not a known component.`);
-        }
-        applyTagsToConstruct(target, Object.entries(componentTags));
+    const scopesByKey = componentScopes as Readonly<Record<string, IConstruct | undefined>>;
+    for (const [componentKey, componentTags] of byComponent) {
+      const target = scopesByKey[componentKey];
+      if (target === undefined) {
+        throw new Error(`tags(): byComponent entry "${componentKey}" is not a known component.`);
       }
+      const ownsScope =
+        target !== scope && Object.values(scopesByKey).filter((s) => s === target).length === 1;
+      // What the component returned, wherever it lives (a nested system may
+      // route parts to other stacks), plus its whole scope when it owns one.
+      applyBuilderTags(
+        (results as Record<string, object>)[componentKey],
+        componentTags,
+        COMPONENT_TAG_PRIORITY,
+      );
+      if (ownsScope) applyTagsToConstruct(target, componentTags, COMPONENT_TAG_PRIORITY);
     }
   };
 }

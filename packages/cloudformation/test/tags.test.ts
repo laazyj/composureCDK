@@ -4,7 +4,7 @@ import { Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
-import { compose, singleStack, type Lifecycle } from "@composurecdk/core";
+import { compose, groupedStacks, singleStack, type Lifecycle } from "@composurecdk/core";
 import { tagsPerResource } from "@composurecdk/cdk-testing";
 import { createStackBuilder } from "../src/stack-builder.js";
 import { tags } from "../src/tags.js";
@@ -22,6 +22,27 @@ function topicComponent(): Lifecycle<{ topic: Topic }> {
     build: (scope: IConstruct, id: string) => ({
       topic: new Topic(scope, id),
     }),
+  };
+}
+
+/** A bucket component whose own builder-level `.tag()` sets `Tier=builder`. */
+function builderTaggedBucketComponent(): Lifecycle<{ bucket: Bucket }> {
+  return {
+    build: (scope: IConstruct, id: string) => {
+      const bucket = new Bucket(scope, id);
+      Tags.of(bucket).add("Tier", "builder");
+      return { bucket };
+    },
+  };
+}
+
+/** A bucket component that also creates a topic it does not return. */
+function bucketWithHiddenTopicComponent(): Lifecycle<{ bucket: Bucket }> {
+  return {
+    build: (scope: IConstruct, id: string) => {
+      new Topic(scope, `${id}Hidden`);
+      return { bucket: new Bucket(scope, id) };
+    },
   };
 }
 
@@ -85,6 +106,64 @@ describe("tags() afterBuild helper", () => {
     expect(topicTags).not.toEqual(expect.arrayContaining([{ Key: "Tier", Value: "data" }]));
   });
 
+  it("keeps `byComponent` tags off siblings that share the component's scope", () => {
+    const stack = new Stack(new App(), "TestStack");
+
+    compose(
+      { primary: bucketComponent(), notifier: topicComponent() },
+      { primary: [], notifier: [] },
+    )
+      .afterBuild(tags({ byComponent: { primary: { Tier: "data" } } }))
+      .build(stack, "MySystem");
+
+    const template = Template.fromStack(stack);
+    expect(tagsPerResource(template, "AWS::S3::Bucket")[0]).toEqual([
+      { Key: "Tier", Value: "data" },
+    ]);
+    expect(tagsPerResource(template, "AWS::SNS::Topic")[0]).toEqual([]);
+  });
+
+  it("treats a stack shared by two components as shared, and tags a stack of one whole", () => {
+    const app = new App({ context: { "@aws-cdk/core:explicitStackTags": true } });
+
+    compose(
+      {
+        primary: bucketComponent(),
+        notifier: topicComponent(),
+        archive: bucketWithHiddenTopicComponent(),
+      },
+      { primary: [], notifier: [], archive: [] },
+    )
+      .withStackStrategy(
+        groupedStacks(
+          { service: createStackBuilder(), archive: createStackBuilder() },
+          { primary: "service", notifier: "service", archive: "archive" },
+        ),
+      )
+      .afterBuild(
+        tags({ byComponent: { primary: { Tier: "data" }, archive: { Tier: "archive" } } }),
+      )
+      .build(app, "MySystem");
+
+    const assembly = app.synth();
+    const service = assembly.getStackByName("MySystem-service");
+    const archive = assembly.getStackByName("MySystem-archive");
+
+    const serviceTemplate = Template.fromJSON(service.template as Record<string, unknown>);
+    expect(tagsPerResource(serviceTemplate, "AWS::S3::Bucket")[0]).toEqual([
+      { Key: "Tier", Value: "data" },
+    ]);
+    expect(tagsPerResource(serviceTemplate, "AWS::SNS::Topic")[0]).toEqual([]);
+    expect(service.tags).toEqual({});
+
+    // A component with a stack of its own: the Stack and the topic it did not return are tagged.
+    const archiveTemplate = Template.fromJSON(archive.template as Record<string, unknown>);
+    expect(tagsPerResource(archiveTemplate, "AWS::SNS::Topic")[0]).toEqual([
+      { Key: "Tier", Value: "archive" },
+    ]);
+    expect(archive.tags).toEqual({ Tier: "archive" });
+  });
+
   it("validates tag keys at configuration time", () => {
     expect(() => tags({ system: { "aws:reserved": "x" } })).toThrow(/aws:/);
     expect(() => tags({ system: { "": "x" } })).toThrow(/non-empty/);
@@ -108,30 +187,49 @@ describe("tags() afterBuild helper", () => {
     }).toThrow(/not a known component/);
   });
 
-  it("composes with builder-level tags so closer scope wins on key collision", () => {
+  it("composes with builder-level tags so the builder's tag wins on key collision", () => {
     const stack = new Stack(new App(), "TestStack");
 
-    // A builder-level tag takes precedence over a system-level tag with the
-    // same key because Tags.of() applies at a deeper scope. Simulate the
-    // wrapper applying a builder-level Owner tag directly — the wrapper
-    // itself calls Tags.of(bucket).add(...) for each accumulated tag.
-    const taggedBucketComponent: Lifecycle<{ bucket: Bucket }> = {
-      build: (scope: IConstruct, id: string) => {
-        const bucket = new Bucket(scope, id);
-        Tags.of(bucket).add("Owner", "builder");
-        return { bucket };
-      },
-    };
-
-    compose({ primary: taggedBucketComponent }, { primary: [] })
-      .afterBuild(tags({ system: { Owner: "system" } }))
+    compose({ primary: builderTaggedBucketComponent() }, { primary: [] })
+      .afterBuild(tags({ system: { Tier: "system" } }))
       .build(stack, "MySystem");
 
-    const template = Template.fromStack(stack);
-    const ownerTags = tagsPerResource(template, "AWS::S3::Bucket")[0].filter(
-      (t) => t.Key === "Owner",
+    const tierTags = tagsPerResource(Template.fromStack(stack), "AWS::S3::Bucket")[0].filter(
+      (t) => t.Key === "Tier",
     );
-    expect(ownerTags).toEqual([{ Key: "Owner", Value: "builder" }]);
+    expect(tierTags).toEqual([{ Key: "Tier", Value: "builder" }]);
+  });
+
+  it.each([
+    ["a shared scope", false],
+    ["a stack of its own", true],
+  ])("keeps builder over `byComponent` over `system` in %s", (_, ownStack) => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack");
+    const system = compose(
+      { tagged: builderTaggedBucketComponent(), plain: bucketComponent() },
+      { tagged: [], plain: [] },
+    );
+    const composed = ownStack
+      ? system.withStacks({ tagged: stack, plain: new Stack(app, "Other") })
+      : system;
+    const root = ownStack ? app : stack;
+    composed
+      .afterBuild(
+        tags({
+          system: { Tier: "system", Owner: "system" },
+          byComponent: { tagged: { Tier: "component", Owner: "component" } },
+        }),
+      )
+      .build(root, "MySystem");
+
+    const bucketTags = tagsPerResource(Template.fromStack(stack), "AWS::S3::Bucket")[0];
+    expect(bucketTags).toEqual(
+      expect.arrayContaining([
+        { Key: "Tier", Value: "builder" },
+        { Key: "Owner", Value: "component" },
+      ]),
+    );
   });
 
   // `tags()` receives the scope `build()` was called with, which under a stack

@@ -1,0 +1,17 @@
+# ComposureCDK
+
+> Composable, lifecycle-managed AWS infrastructure for the AWS CDK: builders with secure defaults, composed into systems with `compose()`, wired with `ref`. Newer than most model training data, so read the agent rules before writing code with it.
+
+## Start here
+
+- [Agent rules](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md): the rules for laying out an app or builder library, condensed for coding agents. Also shipped in `node_modules/@composurecdk/core/docs/agent-rules.md`.
+- [Review rubric](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/review-rubric.md): how to review a change against the rules, with checks, severities and a report format. Also shipped in `node_modules/@composurecdk/core/docs/review-rubric.md`.
+
+## Reference
+
+- [Architecting an app](https://github.com/laazyj/composureCDK/blob/main/docs/guide/architecting-an-app.md): a worked example of the rules, from one `compose()` to subsystems across several stacks.
+- [Catalogue of principles](https://github.com/laazyj/composureCDK/blob/main/docs/guide/principles.md): look up a rule's reasons and sources by its ID.
+- [Architecture](https://github.com/laazyj/composureCDK/blob/main/docs/architecture.md): lifecycle, builders, `compose`, `ref`, defaults and policies.
+- [Stack management](https://github.com/laazyj/composureCDK/blob/main/docs/stack-management.md): placing components in stacks, and cross-stack references.
+- [Packages](https://github.com/laazyj/composureCDK/tree/main/packages): one README per AWS service.
+- [Examples](https://github.com/laazyj/composureCDK/blob/main/packages/examples/README.md): deployable apps.

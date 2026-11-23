@@ -122,6 +122,7 @@ The bucket gets ComposureCDK's secure defaults — encryption, blocked public ac
 
 ### Next steps
 
+- **[Architecting an app](docs/guide/architecting-an-app.md)** — how to lay out an app, from one `compose()` and one stack to several.
 - **[Architecture](docs/architecture.md)** — the model in depth: lifecycle, `compose`, `ref`, and builders.
 - **[Examples](packages/examples/README.md)** — runnable, deployable stacks across S3/CloudFront, Lambda, API Gateway, EC2, SQS, Neptune, and more.
 - **[Introducing ComposureCDK](https://jasonduffett.net/tech/introducing-composure-cdk/)** — the motivation and a full worked walkthrough.

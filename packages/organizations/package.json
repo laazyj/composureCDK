@@ -1,6 +1,6 @@
 {
   "name": "@composurecdk/organizations",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Composable AWS Organizations service control policy builders with synth-time guardrails",
   "repository": {
     "type": "git",
@@ -41,9 +41,9 @@
     }
   },
   "peerDependencies": {
-    "@composurecdk/cloudformation": "^0.15.0",
-    "@composurecdk/core": "^0.15.0",
-    "@composurecdk/iam": "^0.15.0",
+    "@composurecdk/cloudformation": "^0.16.0",
+    "@composurecdk/core": "^0.16.0",
+    "@composurecdk/iam": "^0.16.0",
     "aws-cdk-lib": "^2.70.0",
     "constructs": "^10.0.0"
   },

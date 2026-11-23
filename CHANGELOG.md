@@ -1,3 +1,26 @@
+## 0.16.0 (2026-11-23)
+
+### 🚀 Features
+
+- ⚠️ **core:** route every build through a typed stack strategy ([#880](https://github.com/laazyj/composureCDK/pull/880), [#855](https://github.com/laazyj/composureCDK/issues/855))
+- **eslint-plugin:** add error-name-matches-class rule ([#873](https://github.com/laazyj/composureCDK/pull/873))
+
+### ⚠️ Breaking Changes
+
+- **core:** route every build through a typed stack strategy ([#880](https://github.com/laazyj/composureCDK/pull/880), [#855](https://github.com/laazyj/composureCDK/issues/855))
+  StackStrategy.resolve(scope, systemId, componentKey) is
+  replaced by place(scope, systemId, keys), which returns the scope for
+  every key. A withStacks map must list every component; mark one that
+  should stay in the scope passed to build() with BUILD_SCOPE. Core's
+  groupedStacks(classify, factory) becomes groupedStacks(groups,
+  placement), and singleStack(factory) becomes singleStack(source).
+  ScopeFactory is removed: pass a built stack, or a Lifecycle such as
+  { build: (scope, id) => ({ stack: new MyStack(scope, id) }) }.
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.15.0 (2026-11-22)
 
 ### 🚀 Features

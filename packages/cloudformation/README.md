@@ -2,7 +2,7 @@
 
 CloudFormation builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
-This package provides a fluent builder for CloudFormation Stacks, convenience stack strategies, and a post-build hook for creating CloudFormation outputs from composed systems.
+This package provides a fluent builder for CloudFormation Stacks, which is a stack source for `@composurecdk/core`'s stack strategies, and a post-build hook for creating CloudFormation outputs from composed systems.
 
 ## Stack Builder
 
@@ -46,7 +46,7 @@ const { stack: us } = baseStack.copy().description("US region").build(app, "UsSt
 const { stack: eu } = baseStack.copy().description("EU region").build(app, "EuStack");
 ```
 
-## Stack strategies
+## Using with stack strategies
 
 A stack builder is a stack source for `withStacks`, and for the `singleStack` and `groupedStacks` strategies in [`@composurecdk/core`](https://github.com/laazyj/composureCDK/blob/main/packages/core/README.md#stack-routing): each builds it under its `at()` pin, or else an id it derives. See [Stack management](https://github.com/laazyj/composureCDK/blob/main/docs/stack-management.md) for when to use which.
 
@@ -70,8 +70,6 @@ compose({ site, cdn, cert }, { ... })
 ```
 
 Pass `builder.copy()` when the original may be changed after hand-off: the strategy builds it when the system builds.
-
-`singleStack` and `groupedStacks` exported from this package are deprecated wrappers over core's, and will be removed in the next minor release ([ADR-0023](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0023-stack-strategy-is-the-one-routing-seam.md)). Replace `singleStack()` with core's `singleStack(createStackBuilder())`, and a `groupedStacks(classify, builder)` with core's `groupedStacks(groups, placement)`.
 
 ## outputs
 

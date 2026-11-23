@@ -232,4 +232,4 @@ When `scope` is omitted, the output falls back to the scope passed to `build()` 
 Stack management is split across two packages:
 
 - **`@composurecdk/core`** — `StackStrategy`, `StackSource`, `BUILD_SCOPE`, `singleStack(source)`, `groupedStacks(groups, placement)`, and `.withStacks()` / `.withStackStrategy()` on `ComposedSystem`. Core depends only on `constructs`, not `aws-cdk-lib`.
-- **`@composurecdk/cloudformation`** — `createStackBuilder()`, a stack source for any of the above. This package depends on `aws-cdk-lib`. Its own `singleStack` and `groupedStacks` are deprecated wrappers over core's, and will be removed in the next minor release.
+- **`@composurecdk/cloudformation`** — `createStackBuilder()`, a stack source for any of the above. This package depends on `aws-cdk-lib`.

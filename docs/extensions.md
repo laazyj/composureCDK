@@ -118,6 +118,8 @@ Duplicate `.tag(k, ...)` calls last-wins and emit a Node process warning with na
 - `node --disable-warning=ComposureCDKTagOverride …` on Node 21.3+ to silence them globally, or
 - a `process.on("warning", w => { if (w.name !== TAG_OVERRIDE_WARNING_NAME) /* … */ })` listener for finer control.
 
+If you write your own builder, wrap its class with `taggedBuilder()` from `@composurecdk/cloudformation` to get the same `.tag()` / `.tags()`. A component that is not a props-based builder can't take `taggedBuilder()`; compose it on its own in a `scoped(compose({ component }, { component: [] }))` and tag that with the `tags()` hook below. [`scoped()`](../packages/core/README.md#encapsulating-a-system-scoped) gives it a construct of its own, so the tags reach only that component, not its siblings.
+
 ### Layer 2 — `tags()` afterBuild hook for cross-cutting tags
 
 For ownership, environment, and cost-allocation tags that should reach every component of a composed system, use the `tags()` hook:

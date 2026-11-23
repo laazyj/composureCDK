@@ -27,6 +27,10 @@ function isConstruct(value: unknown): value is IConstruct {
  * naturally — the walker descends through the plain-object value and tags
  * the construct field. Authors do not need an opt-in marker; if a construct
  * appears in the result, it is tagged.
+ *
+ * Internal to this package: `taggedBuilder()` is the public route to it,
+ * and `tags()` on a `scoped(compose(...))` covers a component that is not a
+ * props-based builder.
  */
 export function applyBuilderTags(result: object, tags: ReadonlyMap<string, string>): void {
   if (tags.size === 0) return;

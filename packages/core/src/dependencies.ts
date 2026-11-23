@@ -59,10 +59,10 @@ export function addDependencies(
  * construct** — its descendants are ordered transitively by CloudFormation, and
  * descending into a construct's own `node` tree would pull in unrelated nodes.
  *
- * Note this is a *wider* traversal than `applyBuilderTags`' walk in
- * `@composurecdk/cloudformation`, which deliberately skips arrays. The two are
- * not interchangeable: ordering against a construct held in an array is
- * harmless, tagging one that way is a visible change.
+ * Note this is a *wider* traversal than the build-result tag walk behind
+ * `taggedBuilder()` in `@composurecdk/cloudformation`, which deliberately
+ * skips arrays. The two are not interchangeable: ordering against a construct
+ * held in an array is harmless, tagging one that way is a visible change.
  *
  * @param value - The value to search (typically a component's build result).
  * @param out - Accumulates the constructs found.

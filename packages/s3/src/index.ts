@@ -1,4 +1,5 @@
 export {
+  createAccessLogsBucketBuilder,
   createBucketBuilder,
   type BucketBuilderProps,
   type BucketBuilderResult,

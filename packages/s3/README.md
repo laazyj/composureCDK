@@ -101,11 +101,25 @@ createBucketBuilder().serverAccessLogs({ destination: myBucket });
 createBucketBuilder().serverAccessLogs({ destination: myBucket, prefix: "x/" });
 ```
 
-The auto-created logging bucket has [ACLs disabled](https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html) (`BUCKET_OWNER_ENFORCED`) and grants `logging.s3.amazonaws.com` write access through its bucket policy, whatever your app sets for `@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy`. A `destination` you supply is wired by CDK, which enables ACLs on it unless that flag is set — set it in your `cdk.json`.
+The auto-created logging bucket has [ACLs disabled](https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html) (`BUCKET_OWNER_ENFORCED`) and grants `logging.s3.amazonaws.com` write access through its bucket policy, whatever your app sets for `@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy`. A `destination` you supply is wired by CDK, which enables ACLs on it unless that flag is set: build it with [`createAccessLogsBucketBuilder()`](#access-logs-bucket-preset), or set the flag in your `cdk.json`.
 
 `destination` and `configure` cannot be combined — the destination bucket is user-managed and is not built by this builder.
 
 The `configure` callback receives the build context, so anything `IBucketBuilder` accepts as a `Resolvable` can be a `ref` to a sibling — an `@composurecdk/kms` key for `encryptionKey`, for instance. Declare that component as a dependency of the bucket.
+
+#### Access-logs bucket preset
+
+`createAccessLogsBucketBuilder()` returns a bucket builder pre-set to receive access logs, the same setup the auto-created logging bucket starts from: `BUCKET_OWNER_ENFORCED`, no server access logs of its own, unversioned, `RETAIN`, and `DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES`. Use it for a log bucket you build yourself; a plain `createBucketBuilder()` would also create a server-access-logs bucket for it.
+
+As another bucket's `destination`, it receives logs through its bucket policy whatever your app sets for the flag. To make that work, the bucket is built as the `Default` child of a construct with the id you pass, which keeps the logical ID a plain bucket would have; `result.bucket.node.id` is `"Default"`.
+
+```ts
+const logs = createAccessLogsBucketBuilder()
+  .lifecycleRules([{ id: "ShortLogs", expiration: Duration.days(180) }]) // override a preset
+  .build(stack, "Logs").bucket;
+
+createBucketBuilder().serverAccessLogs({ destination: logs }).build(stack, "Site");
+```
 
 ### Resource policy
 

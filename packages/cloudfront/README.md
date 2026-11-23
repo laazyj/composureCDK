@@ -90,7 +90,7 @@ const cdn = createDistributionBuilder()
 
 ### Access logging
 
-CloudFront standard access logging is configured through a single `.accessLogs(config)` setting. By default, the builder creates a dedicated logging bucket (using `@composurecdk/s3` with its secure defaults, plus `BUCKET_OWNER_PREFERRED` object ownership which CloudFront standard logging requires) and writes logs under `logs/`. The created bucket is returned in the build result:
+CloudFront standard access logging is configured through a single `.accessLogs(config)` setting. By default, the builder creates a dedicated logging bucket (`@composurecdk/s3`'s `createAccessLogsBucketBuilder()`, with `BUCKET_OWNER_PREFERRED` object ownership, which CloudFront standard logging requires) and writes logs under `logs/`. The created bucket is returned in the build result:
 
 ```ts
 const result = createDistributionBuilder().origin(myOrigin).build(stack, "CDN");

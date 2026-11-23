@@ -10,7 +10,6 @@ import {
   type FunctionRuntime,
 } from "aws-cdk-lib/aws-cloudfront";
 import { type Bucket, type IBucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
-import { RemovalPolicy } from "aws-cdk-lib";
 import { type IConstruct } from "constructs";
 import { COPY_STATE, type Lifecycle, resolve, type Resolvable } from "@composurecdk/core";
 import { type ITaggedBuilder, taggedBuilder } from "@composurecdk/cloudformation";
@@ -20,11 +19,7 @@ import {
   type AlarmsOf,
   type WithCustomAlarms,
 } from "@composurecdk/cloudwatch";
-import {
-  DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES,
-  createBucketBuilder,
-  type IBucketBuilder,
-} from "@composurecdk/s3";
+import { createAccessLogsBucketBuilder, type IBucketBuilder } from "@composurecdk/s3";
 import type {
   DistributionAlarmConfig,
   DistributionAlarmKey,
@@ -183,10 +178,9 @@ export type AccessLogsConfig =
       prefix?: string;
       includeCookies?: boolean;
       /**
-       * Customize the auto-created logging sub-builder. Receives a builder
-       * pre-seeded with `versioned: false`, `objectOwnership:
-       * BUCKET_OWNER_PREFERRED`, `removalPolicy: RETAIN`, and recursive
-       * S3 server access logging disabled.
+       * Customize the auto-created logging sub-builder. Receives the builder
+       * from `@composurecdk/s3`'s `createAccessLogsBucketBuilder()`, with
+       * `objectOwnership: BUCKET_OWNER_PREFERRED`.
        *
        * The callback receives the build context, so anything `IBucketBuilder`
        * accepts as a `Resolvable` can be a `ref` to a sibling component.
@@ -609,13 +603,9 @@ function resolveAccessLogs(
     };
   }
 
-  let subBuilder = createBucketBuilder()
-    .serverAccessLogs(false)
-    .versioned(false)
+  let subBuilder = createAccessLogsBucketBuilder()
     // CloudFront standard logging writes via ACLs, which requires BucketOwnerPreferred.
-    .objectOwnership(ObjectOwnership.BUCKET_OWNER_PREFERRED)
-    .removalPolicy(RemovalPolicy.RETAIN)
-    .lifecycleRules(DEFAULT_ACCESS_LOG_BUCKET_LIFECYCLE_RULES);
+    .objectOwnership(ObjectOwnership.BUCKET_OWNER_PREFERRED);
   if (cfg.configure) {
     subBuilder = cfg.configure(subBuilder);
   }

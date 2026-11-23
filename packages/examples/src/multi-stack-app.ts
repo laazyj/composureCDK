@@ -12,11 +12,13 @@ import { exampleApp } from "./app-context.js";
  * compose-level stack map.
  *
  * Demonstrates:
- * - Routing components to different stacks via {@link ComposedSystem.withStacks}
+ * - Building each stack first, so the app holds it before the system builds
+ * - Placing every component on a stack via
+ *   {@link ComposedSystem.withStackPlacement}, which fails to compile if a
+ *   component is added or renamed without being placed
  * - Cross-stack references resolved automatically by CDK — weakly, via
  *   `Fn::GetStackOutput`, because the app's context sets
  *   `@aws-cdk/core:defaultCrossStackReferences` (see `app-context.ts`)
- * - Components without a stack mapping fall back to the default scope
  * - `.copy()` for deriving stack variants from a shared base configuration
  */
 export function createMultiStackApp(app = exampleApp()) {
@@ -50,7 +52,7 @@ export function createMultiStackApp(app = exampleApp()) {
     },
     { handler: [], api: ["handler"] },
   )
-    .withStacks({
+    .withStackPlacement({
       handler: serviceStack,
       api: apiStack,
     })

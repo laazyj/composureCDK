@@ -66,9 +66,52 @@ compose({ handler, api }, { handler: [], api: ["handler"] })
 
 CDK handles cross-stack references automatically — when the API in `apiStack` references the Lambda in `serviceStack`, CDK wires the value across for you. What it emits depends on the reference strength you have chosen; see [Cross-Stack References](#cross-stack-references).
 
-**When to use:** When you need explicit control over which components go into which Stacks. Good for systems with a small, stable number of Stacks where the mapping is obvious.
+**When to use:** When only some components need routing, and the rest belong in the scope passed to `build` — for example a nested system that sends one alarm builder to a `us-east-1` Stack. A component left out of the map lands in that scope without an error, so where every component should be placed, use `.withStackPlacement()`.
 
-### 4. Stack Strategies (`.withStackStrategy()`)
+### 4. Stack Placement (`.withStackPlacement()`)
+
+The same map as `.withStacks()`, but every component key is required. Adding or renaming a component without placing it fails to compile, rather than building it in the scope passed to `build`. The compiler sees only keys known statically, so it also throws at run time if a component is unplaced or the map names a non-component — for example when keys are spread in (`...Object.fromEntries(envs.map(…))`) or the map is cast.
+
+Build the Stacks first, in a stack layer of their own. Each one gets its own environment and configuration, and the app holds a handle on it before the system builds — for removal policies, Aspects and deploy order:
+
+```ts
+// stacks.ts
+export function createStacks(app: App, account: string) {
+  const base = createStackBuilder().tag("system", "factory");
+  const { stack: core } = base
+    .copy()
+    .env({ account, region: "eu-west-2" })
+    .description("Ingest and data plane")
+    .build(app, "Factory-Core");
+  const { stack: viewer } = base
+    .copy()
+    .env({ account, region: "us-east-1" })
+    .description("Viewer")
+    .build(app, "Factory-Viewer");
+  viewer.addDependency(core, "the viewer reads the data plane's bucket by name");
+  return { core, viewer };
+}
+
+// app.ts
+const stacks = createStacks(app, account);
+
+compose(
+  { ingestEdge, dataPlane, viewer },
+  { ingestEdge: [], dataPlane: ["ingestEdge"], viewer: [] },
+)
+  .withStackPlacement({
+    ingestEdge: stacks.core,
+    dataPlane: stacks.core,
+    viewer: stacks.viewer,
+  })
+  .build(app, "Factory");
+```
+
+Place the top-level subsystems, not their inner components, so each Stack is one part of the architecture. The values are any `IConstruct`, so Stacks built by a deployment framework's own factory or `Stack` subclass work unchanged.
+
+**When to use:** When a system spans several Stacks that differ in environment or configuration, or when the app needs a Stack before the system builds. This is the recommended form for more than one Stack.
+
+### 5. Stack Strategies (`.withStackStrategy()`)
 
 Strategies assign components to Stacks programmatically using rules rather than explicit mappings.
 
@@ -145,7 +188,8 @@ const myStrategy: StackStrategy = {
 | ----------------------------------------------------------- | ----------------------------- |
 | Everything fits in one Stack, no special config needed      | Direct Stack                  |
 | One Stack, but want tags/description/termination protection | StackBuilder                  |
-| Fixed number of Stacks, obvious component-to-Stack mapping  | `.withStacks()`               |
+| Several Stacks, every component placed on one               | `.withStackPlacement()`       |
+| Only some components routed, the rest in the build scope    | `.withStacks()`               |
 | Rule-based assignment, system may grow                      | `.withStackStrategy()`        |
 | Custom Stack subclass (DeploymentStack, etc.)               | Any approach + `ScopeFactory` |
 
@@ -204,13 +248,13 @@ compose(
   .build(app, "StaticWebsite");
 ```
 
-When `scope` is omitted, the output falls back to the scope passed to `build()` — typically the app under `.withStacks()` or `.withStackStrategy()`, which means CDK will fail at synth if no owning Stack is reachable. Either omit `scope` only in the single-Stack case, or set it on every entry.
+When `scope` is omitted, the output falls back to the scope passed to `build()` — typically the app under `.withStackPlacement()`, `.withStacks()` or `.withStackStrategy()`, which means CDK will fail at synth if no owning Stack is reachable. Either omit `scope` only in the single-Stack case, or set it on every entry.
 
 ## Package Structure
 
 Stack management is split across two packages:
 
-- **`@composurecdk/core`** — `StackStrategy`, `ScopeFactory`, `singleStack(factory)`, `groupedStacks(classify, factory)`, and `.withStacks()` / `.withStackStrategy()` on `ComposedSystem`. Core depends only on `constructs`, not `aws-cdk-lib`.
+- **`@composurecdk/core`** — `StackStrategy`, `ScopeFactory`, `singleStack(factory)`, `groupedStacks(classify, factory)`, and `.withStackPlacement()` / `.withStacks()` / `.withStackStrategy()` on `ComposedSystem`. Core depends only on `constructs`, not `aws-cdk-lib`.
 - **`@composurecdk/cloudformation`** — `createStackBuilder()`, plus convenience `singleStack(builder?)` and `groupedStacks(classify, builder?)` that accept a `Lifecycle<StackBuilderResult>` (typically an `IStackBuilder`) and default to a fresh `createStackBuilder()`. This package depends on `aws-cdk-lib`.
 
 If you use CDK `Stack` (the common case), import strategies from `@composurecdk/cloudformation` and pass a configured `IStackBuilder` (with `.copy()` to snapshot when needed). If you use a custom Stack subclass, import from `@composurecdk/core` and provide your own `ScopeFactory`.

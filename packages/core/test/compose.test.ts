@@ -421,6 +421,65 @@ describe("compose", () => {
     });
   });
 
+  describe("withStackPlacement", () => {
+    it("builds each component into the scope placed for it", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+      const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
+      const { lifecycle: c, build: cBuild } = spyComponent({ z: 3 });
+      const core = new Construct(undefined as never, "core");
+      const viewer = new Construct(undefined as never, "viewer");
+
+      compose({ a, b, c }, { a: [], b: ["a"], c: ["b"] })
+        .withStackPlacement({ a: core, b: core, c: viewer })
+        .build(createScope(), "test");
+
+      expect(aBuild.mock.calls[0][0]).toBe(core);
+      expect(bBuild.mock.calls[0][0]).toBe(core);
+      expect(cBuild.mock.calls[0][0]).toBe(viewer);
+    });
+
+    it("requires every component key, and only those keys", () => {
+      const system = compose(
+        { a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) },
+        {
+          a: [],
+          b: [],
+        },
+      );
+      const scope = new Construct(undefined as never, "s");
+
+      expect(() =>
+        // @ts-expect-error -- b is not placed
+        system.withStackPlacement({ a: scope }),
+      ).toThrow("Not placed: b.");
+      expect(() =>
+        // @ts-expect-error -- c is not a component
+        system.withStackPlacement({ a: scope, b: scope, c: scope }),
+      ).toThrow("Not components: c.");
+      expect(() =>
+        system.withStackPlacement({ a: scope, b: undefined, c: scope } as never),
+      ).toThrow(
+        "withStackPlacement must place every component, and only components. Not placed: b. Not components: c.",
+      );
+    });
+
+    it("throws when a component the type cannot see is left unplaced", () => {
+      const envs = ["dev", "prod"];
+      // Spreading dynamic keys drops them from the components' type.
+      const system = compose(
+        {
+          root: stubComponent({}),
+          ...Object.fromEntries(envs.map((env) => [env, stubComponent({})])),
+        },
+        { root: [], ...Object.fromEntries(envs.map((env) => [env, []])) },
+      );
+
+      expect(() =>
+        system.withStackPlacement({ root: new Construct(undefined as never, "s") }),
+      ).toThrow("Not placed: dev, prod.");
+    });
+  });
+
   describe("withStackStrategy", () => {
     it("routes components to scopes determined by the strategy", () => {
       const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });

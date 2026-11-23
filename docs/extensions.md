@@ -22,7 +22,7 @@ type AfterBuildHook<T extends object> = (
 - **`scope`** — The construct scope passed to `build`. Hooks that create a single shared construct typically attach it here.
 - **`id`** — The system id passed to `build`.
 - **`results`** — The combined build outputs of all components, keyed by component name.
-- **`componentScopes`** — The scope each component was built into, keyed by component name. Under `.withStacks()` or `.withStackStrategy()` these differ per component; otherwise they all equal `scope`. Hooks use this to attach per-component constructs (e.g. outputs) to the Stack that owns the underlying resource.
+- **`componentScopes`** — The scope each component was built into, keyed by component name. Under `.withStackPlacement()`, `.withStacks()` or `.withStackStrategy()` these differ per component; otherwise they all equal `scope`. Hooks use this to attach per-component constructs (e.g. outputs) to the Stack that owns the underlying resource.
 
 ## Using afterBuild
 
@@ -49,7 +49,7 @@ compose({ site, cdn }, { site: [], cdn: ["site"] })
 
 ### Composing with stack routing
 
-`.afterBuild()` chains with `.withStacks()` and `.withStackStrategy()`:
+`.afterBuild()` chains with `.withStackPlacement()`, `.withStacks()` and `.withStackStrategy()`:
 
 ```ts
 compose({ handler, api, table }, { ... })
@@ -60,13 +60,13 @@ compose({ handler, api, table }, { ... })
   .build(app, "MySystem");
 ```
 
-Stack routing methods (`.withStacks()`, `.withStackStrategy()`) are mutually exclusive — choose one. But any number of `.afterBuild()` hooks can follow.
+Stack routing methods (`.withStackPlacement()`, `.withStacks()`, `.withStackStrategy()`) are mutually exclusive — choose one. But any number of `.afterBuild()` hooks can follow.
 
 ## Package structure
 
 The extension system spans two layers:
 
-- **`@composurecdk/core`** defines `AfterBuildHook<T>`, `.afterBuild()` on `ComposedSystem`, and `ConfiguredSystem` (the chainable type returned by `.withStacks()`, `.withStackStrategy()`, and `.afterBuild()`). Core depends only on `constructs`, not `aws-cdk-lib`.
+- **`@composurecdk/core`** defines `AfterBuildHook<T>`, `.afterBuild()` on `ComposedSystem`, and `ConfiguredSystem` (the chainable type returned by `.withStackPlacement()`, `.withStacks()`, `.withStackStrategy()`, and `.afterBuild()`). Core depends only on `constructs`, not `aws-cdk-lib`.
 - **Domain packages** provide hook implementations. For example, `@composurecdk/cloudformation` exports `outputs()` which creates `CfnOutput` constructs.
 
 ## Writing a custom hook
@@ -140,7 +140,7 @@ compose(
 ```
 
 - **`system`** — applied to the top-level scope. CDK's tag aspect propagates each tag to every taggable descendant.
-- **`byComponent`** — applied to a specific component's scope. Under `.withStacks()` or `.withStackStrategy()` this is the per-component stack; otherwise it's the top-level scope. Component keys are statically checked against the composed system's component keys.
+- **`byComponent`** — applied to a specific component's scope. Under `.withStackPlacement()`, `.withStacks()` or `.withStackStrategy()` this is the per-component stack; otherwise it's the top-level scope. Component keys are statically checked against the composed system's component keys.
 
 ### Precedence
 
@@ -182,7 +182,7 @@ Each output definition accepts:
 - **`value`** — A concrete string or a `Ref` that resolves against the build results.
 - **`description`** — Optional description for the CloudFormation output.
 - **`exportName`** — Optional export name for cross-stack references.
-- **`scope`** — Optional Stack to attach the output to. Either an `IConstruct` (a direct Stack reference, typical with `.withStacks()`) or a component key string typed against the composed system (typical with `.withStackStrategy()`, where stacks are created dynamically). When omitted, the output falls back to the hook's `scope` — the top-level scope given to `build()`. See [Per-Output Stack Routing](./stack-management.md#per-output-stack-routing).
+- **`scope`** — Optional Stack to attach the output to. Either an `IConstruct` (a direct Stack reference, typical with `.withStackPlacement()` or `.withStacks()`) or a component key string typed against the composed system (typical with `.withStackStrategy()`, where stacks are created dynamically). When omitted, the output falls back to the hook's `scope` — the top-level scope given to `build()`. See [Per-Output Stack Routing](./stack-management.md#per-output-stack-routing).
 
 ### `tags()` — `@composurecdk/cloudformation`
 

@@ -121,11 +121,40 @@ export interface ComposedSystem<Components extends Record<string, Lifecycle>> ex
   withStacks(stacks: { [K in keyof Components]?: IConstruct }): ConfiguredSystem<Components>;
 
   /**
+   * Returns a new {@link ConfiguredSystem} that builds every component into
+   * the scope (typically a Stack) the placement names for it.
+   *
+   * Unlike {@link withStacks}, the placement is total: every component key
+   * must be mapped, so adding or renaming a component without placing it is a
+   * compile error rather than a component silently built in the scope passed
+   * to `build`. The type sees only static keys, so the placement is also
+   * checked at run time. Build the stacks before the system, so the app holds
+   * each one to configure before build.
+   *
+   * Mutually exclusive with {@link withStacks} and {@link withStackStrategy}.
+   *
+   * @param placement - The scope for each component key.
+   * @returns A {@link ConfiguredSystem} with stack routing applied.
+   * @throws Error if a component has no scope, or a key is not a component.
+   *
+   * @example
+   * ```ts
+   * compose({ handler, api }, { handler: [], api: ["handler"] })
+   *   .withStackPlacement({ handler: serviceStack, api: serviceStack })
+   *   .build(app, "MySystem");
+   * ```
+   */
+  withStackPlacement(placement: {
+    readonly [K in keyof Components]: IConstruct;
+  }): ConfiguredSystem<Components>;
+
+  /**
    * Returns a new {@link ConfiguredSystem} that uses a {@link StackStrategy}
    * to determine each component's scope during build. The returned system
    * supports further chaining of {@link ConfiguredSystem.afterBuild | .afterBuild()} hooks.
    *
-   * Mutually exclusive with {@link withStacks} — calling one locks the
+   * Mutually exclusive with {@link withStacks} and
+   * {@link withStackPlacement} — calling one locks the
    * stack routing; further stack-routing methods are not available on the
    * returned {@link ConfiguredSystem}.
    *
@@ -178,6 +207,7 @@ export interface ComposedSystem<Components extends Record<string, Lifecycle>> ex
 /**
  * A {@link Lifecycle} with stack routing or post-build hooks applied.
  * Returned by {@link ComposedSystem.withStacks},
+ * {@link ComposedSystem.withStackPlacement},
  * {@link ComposedSystem.withStackStrategy}, and
  * {@link ComposedSystem.afterBuild}.
  *
@@ -222,6 +252,22 @@ class ComposedLifecycle<
     return new ConfiguredLifecycle((scope, id, parentContext, keyed) =>
       this.#buildWith(scope, id, stacks, parentContext, keyed),
     );
+  }
+
+  withStackPlacement(placement: {
+    readonly [K in keyof Components]: IConstruct;
+  }): ConfiguredSystem<Components> {
+    const scopes: Partial<Record<string, IConstruct>> = placement;
+    const unplaced = Object.keys(this.#components).filter((key) => scopes[key] === undefined);
+    const unknown = Object.keys(scopes).filter((key) => !Object.hasOwn(this.#components, key));
+    if (unplaced.length > 0 || unknown.length > 0) {
+      throw new Error(
+        "withStackPlacement must place every component, and only components." +
+          (unplaced.length > 0 ? ` Not placed: ${unplaced.join(", ")}.` : "") +
+          (unknown.length > 0 ? ` Not components: ${unknown.join(", ")}.` : ""),
+      );
+    }
+    return this.withStacks(placement);
   }
 
   withStackStrategy(strategy: StackStrategy): ConfiguredSystem<Components> {
@@ -320,8 +366,8 @@ type BuildFn<Components extends Record<string, Lifecycle>> = (
 /**
  * A configured lifecycle that accumulates post-build hooks and applies them
  * after the underlying build function completes. Returned by
- * {@link ComposedLifecycle}'s `withStacks`, `withStackStrategy`, and
- * `afterBuild` methods.
+ * {@link ComposedLifecycle}'s `withStacks`, `withStackPlacement`,
+ * `withStackStrategy`, and `afterBuild` methods.
  */
 class ConfiguredLifecycle<
   Components extends Record<string, Lifecycle>,

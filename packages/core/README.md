@@ -39,11 +39,14 @@ Cyclic dependencies are detected at composition time and throw a `CyclicDependen
 
 ### Stack routing
 
-Route components to different scopes (typically Stacks) using `withStacks` or `withStackStrategy`:
+Route components to different scopes (typically Stacks) using `withStackPlacement`, `withStacks` or `withStackStrategy`:
 
 ```ts
-// Explicit scope mapping
-system.withStacks({ handler: serviceStack, api: apiStack }).build(app, "MySystem");
+// Every component placed on a stack you built; a missing key fails to compile
+system.withStackPlacement({ handler: serviceStack, api: apiStack }).build(app, "MySystem");
+
+// Explicit scope mapping; unmapped components build in the scope passed to build()
+system.withStacks({ api: apiStack }).build(serviceStack, "MySystem");
 
 // Strategy-based routing
 import { singleStack, groupedStacks } from "@composurecdk/core";
@@ -204,6 +207,6 @@ A construct ID is part of the resource's logical ID. Adopting these in a builder
 
 ## Examples
 
-- [MultiStackApp](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/multi-stack-app.ts) — System composed with `withStacks` for multi-stack routing, demonstrates cross-component wiring with `ref`
+- [MultiStackApp](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/multi-stack-app.ts) — System composed with `withStackPlacement` for multi-stack routing, demonstrates cross-component wiring with `ref`
 - [StaticWebsiteStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/static-website/app.ts) — S3 + CloudFront composed system with `ref` and `afterBuild`
 - [DynamoStreamProcessorStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/dynamo-stream-processor-app.ts) — Stream consumer and its DLQ built under one construct with `scoped`, tagged as a unit

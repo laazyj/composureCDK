@@ -242,5 +242,5 @@ Call `constraints.validate.widgetName(this.props.name)` from your builder's `bui
 
 ## Examples
 
-- [MultiStackApp](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStacks()`
+- [MultiStackApp](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/multi-stack-app.ts) — REST API + Lambda split across stacks via `.withStackPlacement()`
 - [StaticWebsiteStack](https://github.com/laazyj/composureCDK/blob/main/packages/examples/src/static-website/app.ts) — CloudFormation outputs with `afterBuild` and `outputs`

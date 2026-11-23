@@ -46,57 +46,32 @@ const { stack: us } = baseStack.copy().description("US region").build(app, "UsSt
 const { stack: eu } = baseStack.copy().description("EU region").build(app, "EuStack");
 ```
 
-## Stack Strategies
+## Stack strategies
 
-Convenience wrappers around `@composurecdk/core`'s strategy primitives. Both accept a `Lifecycle<StackBuilderResult>` (typically an `IStackBuilder`) and default to a fresh `createStackBuilder()` per call.
-
-### singleStack
-
-Places all components in a single auto-created Stack:
+A stack builder is a stack source for `withStacks`, and for the `singleStack` and `groupedStacks` strategies in [`@composurecdk/core`](https://github.com/laazyj/composureCDK/blob/main/packages/core/README.md#stack-routing): each builds it under its `at()` pin, or else an id it derives. See [Stack management](https://github.com/laazyj/composureCDK/blob/main/docs/stack-management.md) for when to use which.
 
 ```ts
-import { singleStack } from "@composurecdk/cloudformation";
+import { compose, groupedStacks } from "@composurecdk/core";
+import { createStackBuilder } from "@composurecdk/cloudformation";
 
-compose({ handler, api }, { handler: [], api: ["handler"] })
-  .withStackStrategy(singleStack())
-  .build(app, "MySystem");
-```
-
-Pass a configured builder to apply tags, description, etc. to the strategy's stack. Use `.copy()` to snapshot the configuration when the original may be mutated later:
-
-```ts
 const base = createStackBuilder().tag("team", "platform");
 
-compose({ ... }, { ... })
-  .withStackStrategy(singleStack(base.copy()))
-  .build(app, "MySystem");
-```
-
-### groupedStacks
-
-Groups components into named Stacks by a classifier function:
-
-```ts
-import { groupedStacks } from "@composurecdk/cloudformation";
-
-compose({ handler, api, table }, { ... })
+compose({ site, cdn, cert }, { ... })
   .withStackStrategy(
-    groupedStacks((key) => (key === "table" ? "persistence" : "service")),
+    groupedStacks(
+      {
+        site: base.copy().env({ account, region: "eu-west-2" }),
+        edge: base.copy().env({ account, region: "us-east-1" }),
+      },
+      { site: "site", cdn: "site", cert: "edge" },
+    ),
   )
-  .build(app, "MySystem");
+  .build(app, "Website");
 ```
 
-The same builder is invoked once per group key with `${systemId}-${group}` as the id, so any tags configured on the supplied builder propagate to every stack the strategy creates. As with `singleStack`, pass `builder.copy()` to snapshot the configuration when the original may be mutated after hand-off:
+Pass `builder.copy()` when the original may be changed after hand-off: the strategy builds it when the system builds.
 
-```ts
-const base = createStackBuilder().tag("team", "platform");
-
-compose({ ... }, { ... })
-  .withStackStrategy(
-    groupedStacks((key) => (key === "table" ? "persistence" : "service"), base.copy()),
-  )
-  .build(app, "MySystem");
-```
+`singleStack` and `groupedStacks` exported from this package are deprecated wrappers over core's, and will be removed in the next minor release ([ADR-0023](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0023-stack-strategy-is-the-one-routing-seam.md)). Replace `singleStack()` with core's `singleStack(createStackBuilder())`, and a `groupedStacks(classify, builder)` with core's `groupedStacks(groups, placement)`.
 
 ## outputs
 

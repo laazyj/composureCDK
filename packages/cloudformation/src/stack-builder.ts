@@ -20,8 +20,9 @@ export interface StackBuilderResult {
  * for chaining), or call with no arguments to read the current value.
  *
  * The builder implements {@link Lifecycle}, so it can be used directly as
- * a component in a {@link compose | composed system}, or handed to a stack
- * strategy via {@link singleStack} / {@link groupedStacks}. When handing a
+ * a component in a {@link compose | composed system}, or handed as a stack
+ * source to `withStacks`, or to `singleStack` / `groupedStacks` from
+ * `@composurecdk/core`. When handing a
  * builder to a strategy that may be invoked after further configuration of
  * the original, pass `builder.copy()` to snapshot the current state.
  *
@@ -56,8 +57,8 @@ class StackBuilder implements Lifecycle<StackBuilderResult> {
  * builder exposes every {@link StackProps} property as a fluent setter/getter,
  * `.tag(key, value)` / `.tags({...})` for stack-level tagging, and `.copy()`
  * for variant authoring. It implements {@link Lifecycle}, so it composes
- * naturally and can be passed to {@link singleStack} or
- * {@link groupedStacks}.
+ * naturally and is a stack source for `withStacks`, `singleStack` and
+ * `groupedStacks` from `@composurecdk/core`.
  *
  * @returns A fluent builder for a CloudFormation Stack.
  *

@@ -10,7 +10,7 @@ How you partition resources across Stacks has real consequences:
 - **500 resources per Stack** — a hard CloudFormation limit. Large systems must split.
 - **Cross-stack references couple Stack lifecycles** — how tightly is a decision you make, not a fixed property. See [Cross-Stack References](#cross-stack-references).
 - **Split by lifecycle and ownership, not by service type** — group resources that change together and are owned by the same team, not by whether they are Lambda functions or DynamoDB tables.
-- **Stack subclasses are common** — for example Amazon teams typically use `DeploymentStack` or other custom subclasses rather than `Stack` directly. ComposureCDK supports this through `ScopeFactory`.
+- **Stack subclasses are common** — for example Amazon teams typically use `DeploymentStack` or other custom subclasses rather than `Stack` directly. ComposureCDK supports this: anywhere a Stack is expected, you can pass one you built, or a `Lifecycle` that builds one.
 
 ## Approaches
 
@@ -48,7 +48,7 @@ StackBuilder supports every `StackProps` property as a fluent setter/getter, plu
 
 ### 3. Stack Map (`.withStacks()`)
 
-Route components to specific Stacks by name. Each component is built into its assigned Stack; components without a mapping use the default scope.
+Route each component to a Stack by key. Every component key is required.
 
 ```ts
 const { stack: serviceStack } = createStackBuilder()
@@ -64,92 +64,113 @@ compose({ handler, api }, { handler: [], api: ["handler"] })
   .build(app, "MySystem");
 ```
 
+Each value is a **stack source**:
+
+- **A Stack you have built.** The app holds it before the system builds, so it can attach removal policies, Aspects or `addDependency`. Any construct works, including a deployment framework's own `Stack` subclass.
+- **A `Lifecycle` that builds one,** such as `createStackBuilder()`. It is built under its `at()` pin, or else `` `${systemId}-${key}` ``. Giving one builder to two keys builds two Stacks; to share one, pass a built Stack or use `groupedStacks`.
+- **`BUILD_SCOPE`** (from `@composurecdk/core`), which keeps the component in the scope passed to `build()`. A nested system can then send one component, such as an alarm builder, to a `us-east-1` Stack and leave the rest with its parent.
+
+A missing key, an `undefined` value or a key that is not a component fails to compile where the type can see it. In every case it throws a `StackPlacementError` when the system builds, naming the keys. That includes keys spread in at run time, such as one component per environment from `Object.fromEntries`.
+
 CDK handles cross-stack references automatically — when the API in `apiStack` references the Lambda in `serviceStack`, CDK wires the value across for you. What it emits depends on the reference strength you have chosen; see [Cross-Stack References](#cross-stack-references).
 
-**When to use:** When you need explicit control over which components go into which Stacks. Good for systems with a small, stable number of Stacks where the mapping is obvious.
+**When to use:** when you want to say which Stack each component goes on. `.withStacks(map)` is the shortcut for `groupedStacks` with each key its own group (below).
 
 ### 4. Stack Strategies (`.withStackStrategy()`)
 
-Strategies assign components to Stacks programmatically using rules rather than explicit mappings.
+Every build of a system goes through a `StackStrategy`; `.withStacks()` is one, and with none set, every component builds in the scope passed to `build()`. `@composurecdk/core` provides two more. Both take stack sources, as above.
 
 #### `singleStack`
 
-All components share one auto-created Stack.
+All components share one Stack:
 
 ```ts
-import { singleStack } from "@composurecdk/cloudformation";
+import { singleStack } from "@composurecdk/core";
+import { createStackBuilder } from "@composurecdk/cloudformation";
 
 compose({ handler, api }, { handler: [], api: ["handler"] })
-  .withStackStrategy(singleStack())
+  .withStackStrategy(singleStack(createStackBuilder().terminationProtection(true)))
   .build(app, "MySystem");
 ```
 
 #### `groupedStacks`
 
-Components are grouped by a classifier function. Each group gets its own Stack.
+Components are placed in named groups, and each group gets its own Stack. `groups` gives each group's stack source; the placement maps every component key to a group. Both are typed, so a key that is missing, or placed in a group that doesn't exist, fails to compile. A placed key that isn't a component, such as the old name left behind by a rename, still compiles, because the placement's keys are inferred from it; the build then throws a `StackPlacementError`. Only groups that some component is placed in are built.
+
+**A Stack per Region.** CloudFront certificates and web ACLs, and Billing and Route 53 metrics, live only in `us-east-1`:
 
 ```ts
-import { groupedStacks } from "@composurecdk/cloudformation";
+import { groupedStacks } from "@composurecdk/core";
 
-compose({ handler, api, table }, { handler: [], api: ["handler"], table: [] })
-  .withStackStrategy(groupedStacks((key) => (key === "table" ? "persistence" : "service")))
-  .build(app, "MySystem");
+compose({ site, cdn, cert, cdnAlarms }, { ... })
+  .withStackStrategy(
+    groupedStacks(
+      {
+        site: createStackBuilder().env({ account, region: "eu-west-2" }).crossRegionReferences(true),
+        edge: createStackBuilder().env({ account, region: "us-east-1" }).crossRegionReferences(true),
+      },
+      { site: "site", cdn: "site", cert: "edge", cdnAlarms: "edge" },
+    ),
+  )
+  .build(app, "Website");
 ```
 
-Both `singleStack` and `groupedStacks` from `@composurecdk/cloudformation` default to creating a plain CDK Stack. Pass a configured `IStackBuilder` to apply `description`, `terminationProtection`, tags, etc. to every Stack the strategy creates:
+References between Regions need `crossRegionReferences` on both Stacks, or a name both sides build the same way.
+
+**Subsystems grouped into deployment units.** A Stack is a unit of deployment, so group the system's top-level subsystems by how they are deployed, not one Stack each. The apex DNS zone outlives every environment; the application deploys and tears down as one:
 
 ```ts
-import { singleStack, createStackBuilder } from "@composurecdk/cloudformation";
+const { stack: dns } = createStackBuilder().terminationProtection(true).build(app, "ApexDns");
 
-const baseStack = createStackBuilder()
-  .terminationProtection(true)
-  .tag("team", "platform");
-
-compose({ ... }, { ... })
-  .withStackStrategy(singleStack(baseStack.copy()))
-  .build(app, "MySystem");
+compose({ apexDns, ingestEdge, dataPlane, viewer }, { ... })
+  .withStackStrategy(
+    groupedStacks(
+      { dns, app: createStackBuilder().description("Ingest, data plane and viewer") },
+      { apexDns: "dns", ingestEdge: "app", dataPlane: "app", viewer: "app" },
+    ),
+  )
+  .build(app, "Factory");
 ```
 
-The strategy calls `builder.build(scope, id).stack` lazily. Pass `builder.copy()` (rather than the live builder) when the original may be mutated further — `.copy()` snapshots the current props and tags so later edits do not leak into the strategy's stack.
+`dns` is built by the app, so it can depend on other Stacks, or they on it, before the system builds.
 
-For non-Stack scope types (`DeploymentStack`, custom subclasses), drop down to `@composurecdk/core`'s `singleStack` / `groupedStacks`, which accept a raw `ScopeFactory`:
+#### Stack ids and renames
 
-```ts
-import { singleStack } from "@composurecdk/core";
-import { DeploymentStack } from "my-cdk-extensions";
+A builder source is built under `` `${systemId}-${group}` ``, so renaming a group renames its Stack, which CloudFormation treats as a new Stack. To keep the deployed Stack through a rename, do one of these:
 
-compose({ ... }, { ... })
-  .withStackStrategy(singleStack((scope, id) => new DeploymentStack(scope, id)))
-  .build(app, "MySystem");
-```
+- **Pin the stack name,** with `.stackName("Factory-Core")` on the builder. Logical ids are computed within the Stack, so its resources stay put. The CDK selector (`cdk deploy <id>`) and the paths in `cdk.out` still change.
+- **Pin the construct id,** with `at("Factory-Core", createStackBuilder())`. For a top-level Stack with no stack name set, that is also its name, so nothing changes.
 
-**When to use:** When you want rule-based Stack assignment that scales with the number of components. Good for systems that grow over time — adding a component doesn't require updating a Stack map.
+The strategies build a builder when the system builds. Pass `builder.copy()` when the original may be changed after hand-off ([ADR-0005](adr/0005-builder-copy.md)).
 
 ### Custom strategies
 
-Implement the `StackStrategy` interface directly for advanced routing logic:
+Implement `StackStrategy`'s `place`, which is called once per build with every component key, and returns the scope for each:
 
 ```ts
 import { type StackStrategy } from "@composurecdk/core";
 
-const myStrategy: StackStrategy = {
-  resolve(scope, systemId, componentKey) {
-    // Return the scope each component should be built in
-  },
+const byStage: StackStrategy = {
+  place: (scope, systemId, keys) =>
+    Object.fromEntries(keys.map((key) => [key, stageStacks[stageOf(key)]])),
 };
 ```
 
+`compose()` checks the answer as it does for `.withStacks()`, throwing a `StackPlacementError` that names the keys.
+
 ## Decision Guide
 
-| Question                                                    | Recommendation                |
-| ----------------------------------------------------------- | ----------------------------- |
-| Everything fits in one Stack, no special config needed      | Direct Stack                  |
-| One Stack, but want tags/description/termination protection | StackBuilder                  |
-| Fixed number of Stacks, obvious component-to-Stack mapping  | `.withStacks()`               |
-| Rule-based assignment, system may grow                      | `.withStackStrategy()`        |
-| Custom Stack subclass (DeploymentStack, etc.)               | Any approach + `ScopeFactory` |
+| Question                                                    | Recommendation                            |
+| ----------------------------------------------------------- | ----------------------------------------- |
+| Everything fits in one Stack, no special config needed      | Direct Stack                              |
+| One Stack, but want tags/description/termination protection | StackBuilder, or `singleStack(builder)`   |
+| Each component on a Stack you choose                        | `.withStacks()`                           |
+| Stacks per Region, or per deployment unit of subsystems     | `groupedStacks`                           |
+| The app needs a Stack before build (policies, deploy order) | Build it, and pass it as the stack source |
+| Custom Stack subclass (DeploymentStack, etc.)               | Pass it, or a `Lifecycle` that builds it  |
+| A rule no built-in strategy covers                          | A custom `StackStrategy`                  |
 
-Start with the simplest approach that meets your needs. You can adopt more sophisticated stack management later without changing your component definitions — stack routing is a concern of `compose`, not individual components.
+Start with the simplest approach that meets your needs. You can adopt more sophisticated stack management later without changing your component definitions — stack routing is a concern of `compose`, not individual components. See [ADR-0023](adr/0023-stack-strategy-is-the-one-routing-seam.md) for why routing has one mechanism.
 
 ## Cross-Stack References
 
@@ -204,13 +225,11 @@ compose(
   .build(app, "StaticWebsite");
 ```
 
-When `scope` is omitted, the output falls back to the scope passed to `build()` — typically the app under `.withStacks()` or `.withStackStrategy()`, which means CDK will fail at synth if no owning Stack is reachable. Either omit `scope` only in the single-Stack case, or set it on every entry.
+When `scope` is omitted, the output falls back to the scope passed to `build()` — typically the app when components are routed to other Stacks, which means CDK will fail at synth if no owning Stack is reachable. Either omit `scope` only in the single-Stack case, or set it on every entry.
 
 ## Package Structure
 
 Stack management is split across two packages:
 
-- **`@composurecdk/core`** — `StackStrategy`, `ScopeFactory`, `singleStack(factory)`, `groupedStacks(classify, factory)`, and `.withStacks()` / `.withStackStrategy()` on `ComposedSystem`. Core depends only on `constructs`, not `aws-cdk-lib`.
-- **`@composurecdk/cloudformation`** — `createStackBuilder()`, plus convenience `singleStack(builder?)` and `groupedStacks(classify, builder?)` that accept a `Lifecycle<StackBuilderResult>` (typically an `IStackBuilder`) and default to a fresh `createStackBuilder()`. This package depends on `aws-cdk-lib`.
-
-If you use CDK `Stack` (the common case), import strategies from `@composurecdk/cloudformation` and pass a configured `IStackBuilder` (with `.copy()` to snapshot when needed). If you use a custom Stack subclass, import from `@composurecdk/core` and provide your own `ScopeFactory`.
+- **`@composurecdk/core`** — `StackStrategy`, `StackSource`, `BUILD_SCOPE`, `singleStack(source)`, `groupedStacks(groups, placement)`, and `.withStacks()` / `.withStackStrategy()` on `ComposedSystem`. Core depends only on `constructs`, not `aws-cdk-lib`.
+- **`@composurecdk/cloudformation`** — `createStackBuilder()`, a stack source for any of the above. This package depends on `aws-cdk-lib`. Its own `singleStack` and `groupedStacks` are deprecated wrappers over core's, and will be removed in the next minor release.

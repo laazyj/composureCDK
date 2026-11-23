@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { App, Stack } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { newStack } from "@composurecdk/cdk-testing";
-import { compose, Ref, type Lifecycle } from "@composurecdk/core";
+import { compose, groupedStacks, Ref, type Lifecycle } from "@composurecdk/core";
+import { createStackBuilder } from "../src/stack-builder.js";
 import { outputs } from "../src/outputs.js";
-import { groupedStacks } from "../src/strategies.js";
 
 function stubComponent<T extends object>(result: T): Lifecycle<T> {
   return { build: () => result };
@@ -243,13 +243,17 @@ describe("outputs", () => {
 
     it("routes outputs via a component key under .withStackStrategy()", () => {
       const app = new App();
-      const classify = (k: string) => (k === "data" ? "data" : "compute");
 
       compose(
         { data: stubComponent({ name: "t1" }), api: stubComponent({ route: "/" }) },
         { data: [], api: ["data"] },
       )
-        .withStackStrategy(groupedStacks(classify))
+        .withStackStrategy(
+          groupedStacks(
+            { data: createStackBuilder(), compute: createStackBuilder() },
+            { data: "data", api: "compute" },
+          ),
+        )
         .afterBuild(
           outputs({
             TableName: { value: "tbl", scope: "data" },

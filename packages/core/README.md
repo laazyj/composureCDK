@@ -39,21 +39,32 @@ Cyclic dependencies are detected at composition time and throw a `CyclicDependen
 
 ### Stack routing
 
-Route components to different scopes (typically Stacks) using `withStacks` or `withStackStrategy`:
+Every build of a system goes through a `StackStrategy`, which decides the scope (typically a Stack) each component builds in. With none set, every component builds in the scope passed to `build()`.
 
 ```ts
-// Explicit scope mapping
+import { BUILD_SCOPE, groupedStacks, singleStack } from "@composurecdk/core";
+
+// A stack for each component; every key is required
 system.withStacks({ handler: serviceStack, api: apiStack }).build(app, "MySystem");
 
-// Strategy-based routing
-import { singleStack, groupedStacks } from "@composurecdk/core";
+// Keep one component in the scope passed to build()
+system.withStacks({ handler: BUILD_SCOPE, api: apiStack }).build(serviceStack, "MySystem");
 
-system.withStackStrategy(singleStack(myFactory)).build(app, "MySystem");
+// Every component on one stack
+system.withStackStrategy(singleStack(createStackBuilder())).build(app, "MySystem");
 
+// Components grouped onto stacks, typed by group and by key
 system
-  .withStackStrategy(groupedStacks((key) => (key === "handler" ? "compute" : "api"), myFactory))
+  .withStackStrategy(
+    groupedStacks(
+      { compute: createStackBuilder().env(euWest2), api: apiStack },
+      { handler: "compute", api: "api" },
+    ),
+  )
   .build(app, "MySystem");
 ```
+
+Each of these takes a **stack source**: a stack you have built, a `Lifecycle` that builds one, or `BUILD_SCOPE`. `withStacks(map)` is `groupedStacks` with each key its own group. A wrong placement, including keys the type cannot see, throws a `StackPlacementError` when the system builds. To write your own strategy, implement `StackStrategy`'s `place(scope, systemId, keys)`. See [Stack management](https://github.com/laazyj/composureCDK/blob/main/docs/stack-management.md) and [ADR-0023](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0023-stack-strategy-is-the-one-routing-seam.md).
 
 ### Post-build hooks
 

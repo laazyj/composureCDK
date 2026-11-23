@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Construct } from "constructs";
 import { compose, type AfterBuildHook } from "../src/compose.js";
 import { at } from "../src/build-id.js";
-import { groupedStacks } from "../src/stack-strategy.js";
+import { BUILD_SCOPE, groupedStacks, type StackStrategy } from "../src/stack-strategy.js";
 import { CyclicDependencyError } from "../src/cyclic-dependency-error.js";
 import { DuplicateConstructIdError } from "../src/duplicate-construct-id-error.js";
 import { type Lifecycle } from "../src/lifecycle.js";
@@ -16,6 +16,11 @@ function stubComponent<T extends Record<string, unknown>>(result: T): Lifecycle<
   return {
     build: () => result,
   };
+}
+
+/** A stack source that builds a plain construct, standing in for a stack builder. */
+function stackSource(): Lifecycle<{ stack: Construct }> {
+  return { build: (parent, id) => ({ stack: new Construct(parent, id) }) };
 }
 
 function spyComponent<T extends Record<string, unknown>>(result: T) {
@@ -355,18 +360,82 @@ describe("compose", () => {
       expect(build.mock.calls[0][0]).toBe(customScope);
     });
 
-    it("falls back to default scope for components not in the stacks map", () => {
+    it("keeps a component marked BUILD_SCOPE in the scope passed to build", () => {
       const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
       const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
       const defaultScope = createScope();
       const customScope = new Construct(undefined as never, "custom");
 
       compose({ a, b }, { a: [], b: ["a"] })
-        .withStacks({ a: customScope })
+        .withStacks({ a: customScope, b: BUILD_SCOPE })
         .build(defaultScope, "test");
 
       expect(aBuild.mock.calls[0][0]).toBe(customScope);
       expect(bBuild.mock.calls[0][0]).toBe(defaultScope);
+    });
+
+    it("builds a stack source that is a Lifecycle, under the system id and key", () => {
+      const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
+
+      compose({ a }, { a: [] }).withStacks({ a: stackSource() }).build(createScope(), "test");
+
+      expect((aBuild.mock.calls[0][0] as Construct).node.id).toBe("test-a");
+    });
+
+    it("requires every component key, and only those keys, when compiling", () => {
+      const system = compose(
+        { a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) },
+        {
+          a: [],
+          b: [],
+        },
+      );
+      const scope = new Construct(undefined as never, "s");
+
+      // @ts-expect-error -- b is not placed
+      system.withStacks({ a: scope });
+      // @ts-expect-error -- c is not a component
+      system.withStacks({ a: scope, b: scope, c: scope });
+    });
+
+    it("throws StackPlacementError for an undefined stack source", () => {
+      const system = compose(
+        { a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) },
+        {
+          a: [],
+          b: [],
+        },
+      );
+      const scope = new Construct(undefined as never, "s");
+
+      expect(() =>
+        system.withStacks({ a: scope, b: undefined } as never).build(createScope(), "test"),
+      ).toThrow(
+        expect.objectContaining({
+          name: "StackPlacementError",
+          systemId: "test",
+          unplaced: ["b"],
+          unknown: [],
+        }),
+      );
+    });
+
+    it("throws when a component the type cannot see is left out", () => {
+      const envs = ["dev", "prod"];
+      // Spreading dynamic keys drops them from the components' type.
+      const system = compose(
+        {
+          root: stubComponent({}),
+          ...Object.fromEntries(envs.map((env) => [env, stubComponent({})])),
+        },
+        { root: [], ...Object.fromEntries(envs.map((env) => [env, []])) },
+      );
+
+      expect(() =>
+        system
+          .withStacks({ root: new Construct(undefined as never, "s") })
+          .build(createScope(), "test"),
+      ).toThrow("Not placed: dev, prod.");
     });
 
     it("supports multiple components routed to different scopes", () => {
@@ -378,7 +447,7 @@ describe("compose", () => {
       const defaultScope = createScope();
 
       compose({ a, b, c }, { a: [], b: ["a"], c: ["b"] })
-        .withStacks({ a: scopeA, b: scopeB })
+        .withStacks({ a: scopeA, b: scopeB, c: BUILD_SCOPE })
         .build(defaultScope, "test");
 
       expect(aBuild.mock.calls[0][0]).toBe(scopeA);
@@ -422,16 +491,44 @@ describe("compose", () => {
   });
 
   describe("withStackStrategy", () => {
+    it("rejects, when compiling, a strategy typed by fewer keys than the system has", () => {
+      const system = compose(
+        { a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) },
+        {
+          a: [],
+          b: [],
+        },
+      );
+
+      // @ts-expect-error -- the strategy cannot place b
+      system.withStackStrategy(groupedStacks({ g: stackSource() }, { a: "g" }));
+    });
+
+    it("throws, naming the keys, when a hand-written strategy's answer is incomplete", () => {
+      const scope = new Construct(undefined as never, "s");
+      const partial: StackStrategy = { place: () => ({ a: scope, stale: scope }) };
+
+      expect(() =>
+        compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: [], b: [] })
+          .withStackStrategy(partial)
+          .build(createScope(), "sys"),
+      ).toThrow(
+        'The stack strategy for "sys" must place every component, and only components. Not placed: b. Not components: stale.',
+      );
+    });
+
     it("routes components to scopes determined by the strategy", () => {
       const { lifecycle: a, build: aBuild } = spyComponent({ x: 1 });
       const { lifecycle: b, build: bBuild } = spyComponent({ y: 2 });
       const scope = createScope();
 
-      const classify = (key: string) => (key === "a" ? "groupA" : "groupB");
-      const factory = (parent: Construct, id: string) => new Construct(parent, id);
-
       compose({ a, b }, { a: [], b: ["a"] })
-        .withStackStrategy(groupedStacks(classify, factory))
+        .withStackStrategy(
+          groupedStacks(
+            { groupA: stackSource(), groupB: stackSource() },
+            { a: "groupA", b: "groupB" },
+          ),
+        )
         .build(scope, "sys");
 
       expect(aBuild.mock.calls[0][0]).not.toBe(scope);
@@ -449,8 +546,8 @@ describe("compose", () => {
       compose({ db, server }, { db: [], server: ["db"] })
         .withStackStrategy(
           groupedStacks(
-            (key) => (key === "db" ? "data" : "compute"),
-            (parent, id) => new Construct(parent, id),
+            { data: stackSource(), compute: stackSource() },
+            { db: "data", server: "compute" },
           ),
         )
         .build(scope, "sys");
@@ -561,8 +658,8 @@ describe("compose", () => {
       compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: [], b: ["a"] })
         .withStackStrategy(
           groupedStacks(
-            (key) => (key === "a" ? "groupA" : "groupB"),
-            (parent, id) => new Construct(parent, id),
+            { groupA: stackSource(), groupB: stackSource() },
+            { a: "groupA", b: "groupB" },
           ),
         )
         .afterBuild(hookFn)
@@ -693,13 +790,13 @@ describe("compose", () => {
       expect(componentScopes).toEqual({ a: scope, b: scope });
     });
 
-    it("reflects withStacks routing, falling back to the base scope", () => {
+    it("reflects withStacks routing, including BUILD_SCOPE", () => {
       const hookFn = vi.fn<AfterBuildHook<{ a: { x: number }; b: { y: number } }>>();
       const base = createScope();
       const customA = new Construct(undefined as never, "customA");
 
       compose({ a: stubComponent({ x: 1 }), b: stubComponent({ y: 2 }) }, { a: [], b: ["a"] })
-        .withStacks({ a: customA })
+        .withStacks({ a: customA, b: BUILD_SCOPE })
         .afterBuild(hookFn)
         .build(base, "sys");
 
@@ -717,8 +814,8 @@ describe("compose", () => {
       compose({ a, b }, { a: [], b: ["a"] })
         .withStackStrategy(
           groupedStacks(
-            (key) => (key === "a" ? "groupA" : "groupB"),
-            (parent, id) => new Construct(parent, id),
+            { groupA: stackSource(), groupB: stackSource() },
+            { a: "groupA", b: "groupB" },
           ),
         )
         .afterBuild(hookFn)

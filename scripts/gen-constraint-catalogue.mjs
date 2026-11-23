@@ -22,27 +22,23 @@
  *   node scripts/gen-constraint-catalogue.mjs --check
  */
 
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { format, resolveConfig } from "prettier";
 
+import { published } from "./published-packages.mjs";
+
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const PACKAGES_DIR = join(REPO_ROOT, "packages");
 const OUTPUT = join(REPO_ROOT, "docs", "constraints.md");
 
 const MODES = ["validate", "sanitize"];
 
 async function discover() {
   const entries = [];
-  for (const dir of readdirSync(PACKAGES_DIR).sort()) {
-    const manifestPath = join(PACKAGES_DIR, dir, "package.json");
-    if (!existsSync(manifestPath)) continue;
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-    if (manifest.private) continue;
-
-    const distIndex = join(PACKAGES_DIR, dir, "dist", "esm", "index.js");
+  for (const { dir, manifest } of published()) {
+    const distIndex = join(dir, "dist", "esm", "index.js");
     if (!existsSync(distIndex)) {
       throw new Error(
         `Missing build output for ${manifest.name} (${distIndex}). Run \`npx nx run-many -t build\` first.`,

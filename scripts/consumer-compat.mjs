@@ -24,6 +24,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { packPublishablePackages } from "./cdk-floor/packages.mjs";
+import { published } from "./published-packages.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MODULE_COMPAT = join(REPO_ROOT, "packages", "module-compat");
@@ -54,9 +55,8 @@ function pack(dir) {
 function externalPeers() {
   const lock = readJson(join(REPO_ROOT, "package-lock.json")).packages;
   const peers = {};
-  for (const [path, entry] of Object.entries(lock)) {
-    if (!path.startsWith("packages/") || entry.private === true) continue;
-    for (const peer of Object.keys(entry.peerDependencies ?? {})) {
+  for (const { manifest } of published()) {
+    for (const peer of Object.keys(manifest.peerDependencies ?? {})) {
       if (peer.startsWith("@composurecdk/")) continue;
       const version = lock[`node_modules/${peer}`]?.version;
       if (version === undefined) fail(`package-lock.json has no hoisted ${peer}`);

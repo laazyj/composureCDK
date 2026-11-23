@@ -130,17 +130,19 @@ compose(
   { agent: createInstanceBuilder(), bucket: createBucketBuilder() },
   { agent: [], bucket: [] },
 )
+  .withStacks({ agent: agentStack, bucket: dataStack })
   .afterBuild(
     tags({
       system: { Owner: "platform", Environment: "prod" },
+      // `agent` has its own stack, so this tag stays with it.
       byComponent: { agent: { Project: "claude-rig" } },
     }),
   )
-  .build(stack, "MySystem");
+  .build(app, "MySystem");
 ```
 
 - **`system`** — applied to the top-level scope. CDK's tag aspect propagates each tag to every taggable descendant.
-- **`byComponent`** — applied to a specific component's scope. Under `.withStacks()` or `.withStackStrategy()` this is the per-component stack; otherwise it's the top-level scope. Component keys are statically checked against the composed system's component keys.
+- **`byComponent`** — applied to the scope a named component was built into: its own stack under `.withStacks()` or `.withStackStrategy()`, otherwise the top-level scope its siblings share, so they get the tag too. To tag one component alone without its own stack, compose it on its own in a [`scoped(compose(...))`](../packages/core/README.md#encapsulating-a-system-scoped) and give that system `system` tags. Component keys are statically checked against the composed system's component keys.
 
 ### Precedence
 

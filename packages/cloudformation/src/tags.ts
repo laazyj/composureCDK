@@ -9,11 +9,13 @@ import { validateTagRecord } from "./tag-validator.js";
  * - `system` tags reach every construct under the top-level scope passed
  *   to `build(scope, id)` — useful for ownership, environment, and cost
  *   allocation tags that should apply to every resource the system creates.
- * - `byComponent` tags reach only the scope a named component was built
- *   into. Under {@link ComposedSystem.withStacks} or
- *   {@link ComposedSystem.withStackStrategy}, components may live in
- *   different stacks — `byComponent` routes the tag to whichever scope
- *   that component received.
+ * - `byComponent` tags reach the scope a named component was built into.
+ *   Under {@link ComposedSystem.withStacks} or
+ *   {@link ComposedSystem.withStackStrategy} that may be the component's
+ *   own stack, which keeps the tag to that component. Otherwise every
+ *   component shares the top-level scope, so siblings get the tag too. To
+ *   tag one component alone, compose it on its own in a
+ *   `scoped(compose(...))` and give that system `system` tags.
  *
  * Component keys in `byComponent` are statically typed against the
  * composed system's component keys, matching the pattern `outputs()` uses
@@ -36,10 +38,10 @@ export interface TagDefinitions<T extends object = object> {
   system?: Record<string, string>;
 
   /**
-   * Tags applied only to constructs under a specific component's scope.
-   * Component keys are statically checked against the composed system's
-   * component keys. Each key/value pair is validated identically to
-   * `system`.
+   * Tags applied under a named component's scope; see {@link TagDefinitions}
+   * for when that reaches its siblings. Component keys are statically checked
+   * against the composed system's component keys. Each key/value pair is
+   * validated identically to `system`.
    */
   byComponent?: Partial<Record<keyof T & string, Record<string, string>>>;
 }
@@ -55,11 +57,8 @@ export interface TagDefinitions<T extends object = object> {
  * - `system` entries are applied to the top-level `scope` via
  *   `Tags.of(scope).add(...)`. CDK's tag aspect propagates each tag
  *   through the construct subtree to every taggable descendant.
- * - `byComponent` entries are applied to `componentScopes[key]` —
- *   each component's own scope, which under
- *   {@link ComposedSystem.withStacks} or
- *   {@link ComposedSystem.withStackStrategy} may be a per-component
- *   stack rather than the top-level scope.
+ * - `byComponent` entries are applied to `componentScopes[key]`, the
+ *   scope that component was built into (see {@link TagDefinitions}).
  *
  * Tag keys and values are validated synchronously inside the hook before
  * any `Tags.of(...).add(...)` call. Invalid tags throw and surface at the
@@ -84,13 +83,15 @@ export interface TagDefinitions<T extends object = object> {
  *   { agent: createInstanceBuilder(), bucket: createBucketBuilder() },
  *   { agent: [], bucket: [] },
  * )
+ *   .withStacks({ agent: agentStack, bucket: dataStack })
  *   .afterBuild(
  *     tags({
  *       system: { Owner: "platform", Environment: "prod" },
+ *       // `agent` has its own stack, so this tag stays with it.
  *       byComponent: { agent: { Project: "claude-rig" } },
  *     }),
  *   )
- *   .build(stack, "MySystem");
+ *   .build(app, "MySystem");
  * ```
  */
 export function tags<T extends object = object>(defs: TagDefinitions<T>): AfterBuildHook<T> {

@@ -22,7 +22,7 @@ export function createMyBuilder(): IMyBuilder {
 
 ## compose
 
-Composes a set of `Lifecycle` components into a single system with automatic dependency resolution. Dependencies are declared as data; the system builds components in topological order and passes resolved outputs as context.
+Composes a set of `Lifecycle` components into a single system with automatic dependency resolution. Dependencies are declared as data; the system builds components in topological order and passes resolved outputs as context. Components with no dependency path between them have no defined order relative to each other, so a component that must build after another declares that dependency (see [compose](https://github.com/laazyj/composureCDK/blob/main/docs/architecture.md#compose) in the architecture guide).
 
 ```ts
 import { compose } from "@composurecdk/core";

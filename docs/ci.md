@@ -92,6 +92,10 @@ The script refuses, with a comment on the pull request saying why, unless:
 
 The merge is pinned to the head SHA it judged, so a push after the checks makes GitHub reject it. Re-run a refused merge by commenting `/squash` again.
 
+After it merges, `/squash` closes the issues named in the commit's closing footers (`Closes #N`, `Fixes #N`, `Resolves #N`, one per line or comma-separated), as completed. GitHub does not do this itself: when a pull request merges, it closes only the issues the pull request's _description_ names, and ignores the squash commit's message. #25, #601, #779 and #780 stayed open that way. Only footer lines count, so `Refs #N` or an issue mentioned mid-sentence closes nothing. A failure to close fails the run after the merge, and leaves the issue for a person.
+
+A pull request's description can still close an issue on its own. GitHub reads a closing keyword next to an issue number anywhere in the description, including in prose about another PR: the bottom of a stack that says "the last PR closes #708" closes #708 when _it_ merges (#708 and #647 closed early that way). Put the closing footer in the commit, and in the description write "#708 is closed by the last PR in the stack", or put the keyword in a code span, which GitHub ignores.
+
 It merges with a PAT stored as `SQUASH_MERGE_TOKEN`, because a merge made with `GITHUB_TOKEN` starts no workflows, and the release gate needs CI to run on the commit it lands. Create a fine-grained PAT scoped to this repository with **Contents**, **Pull requests** and **Workflows** read and write. A pull request that changes a workflow cannot be merged without **Workflows**. The PAT is held only in the merge step's environment, and the job restores no dependency cache, as in `release.yml` (see [Auditing the workflows](#auditing-the-workflows)). Its owner is recorded as the merger, and the commits audit assigns its issues to them.
 
 To see what `/squash` would do without merging, run it with `DRY_RUN=1`:

@@ -11,10 +11,13 @@
  * `squashMergeRefusals` in commit-rules.mjs finds nothing. The merge is pinned
  * to the head SHA it judged.
  *
- * `GH_TOKEN` reads the pull request and comments on it. `MERGE_TOKEN`, a PAT,
- * checks the commenter's permission and merges: a merge made with
- * `GITHUB_TOKEN` starts no workflows, and the release gate needs CI to run on
- * the commit. `DRY_RUN=1` prints the verdict and message instead, using
+ * After merging, it closes the issues the message's closing footers name,
+ * which GitHub does not.
+ *
+ * `GH_TOKEN` reads the pull request, comments on it and closes the issues.
+ * `MERGE_TOKEN`, a PAT, checks the commenter's permission and merges: a merge
+ * made with `GITHUB_TOKEN` starts no workflows, and the release gate needs CI
+ * to run on the commit. `DRY_RUN=1` prints the verdict and message instead, using
  * `GH_TOKEN` throughout.
  *
  * Usage:
@@ -25,6 +28,7 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import {
+  closedIssues,
   pullRequestAgentSignal,
   squashMergeRefusals,
   squashMessage,
@@ -55,13 +59,18 @@ const api = (path, token) => JSON.parse(gh(["api", path], token));
 // Each page as the API returns it: an array for a list, an object for a search.
 const pagesOf = (path) => JSON.parse(gh(["api", "--paginate", "--slurp", path]));
 
-/** Report on the pull request and the run summary, then stop. */
-function refuse(heading, reasons) {
-  const text = [`**\`/squash\` did not merge:** ${heading}`, "", ...reasons.map((r) => `- ${r}`)];
+/** Log each reason as an error, and write `text` to the run summary. */
+function report(reasons, text) {
   for (const reason of reasons) console.log(`::error::${reason}`);
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${text.join("\n")}\n`);
   }
+}
+
+/** Report on the pull request and the run summary, then stop. */
+function refuse(heading, reasons) {
+  const text = [`**\`/squash\` did not merge:** ${heading}`, "", ...reasons.map((r) => `- ${r}`)];
+  report(reasons, text);
   if (!dryRun) gh(["pr", "comment", number, "--repo", repo, "--body", text.join("\n")]);
   process.exit(1);
 }
@@ -90,8 +99,10 @@ const refusals = squashMergeRefusals({
 if (refusals.length > 0) refuse("it is not ready.", refusals);
 
 const { subject, body } = squashMessage(pr.title, pr.number, commits);
+const issues = closedIssues(body, repo);
 if (dryRun) {
   console.log(`Would squash ${pr.head.sha.slice(0, 7)} as:\n\n${subject}\n\n${body}`);
+  console.log(`\nWould close: ${issues.map((n) => `#${n}`).join(", ") || "nothing"}`);
   process.exit(0);
 }
 
@@ -120,4 +131,28 @@ try {
   // gh prints the API's reason: a push since the checks ran, a conflict, or a
   // token without the Workflows permission for a PR that changes a workflow.
   refuse("GitHub rejected the merge.", [String(error.stderr || error.message).trim()]);
+}
+
+// The merge has landed, so a failure here is reported, not refused: the run
+// fails so it shows, and the issue is left for a person to close.
+for (const issue of issues) {
+  try {
+    const { state, pull_request: isPullRequest } = api(`repos/${repo}/issues/${issue}`);
+    if (isPullRequest || state !== "open") continue;
+    gh([
+      "api",
+      "--method",
+      "PATCH",
+      `repos/${repo}/issues/${issue}`,
+      "-f",
+      "state=closed",
+      "-f",
+      "state_reason=completed",
+    ]);
+    console.log(`Closed #${issue}.`);
+  } catch (error) {
+    const reason = `Merged, but could not close #${issue}: ${String(error.stderr || error.message).trim()}`;
+    report([reason], [reason]);
+    process.exitCode = 1;
+  }
 }

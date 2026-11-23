@@ -4,9 +4,9 @@ import { Template } from "aws-cdk-lib/assertions";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { type IConstruct } from "constructs";
-import { compose, type Lifecycle } from "@composurecdk/core";
+import { compose, singleStack, type Lifecycle } from "@composurecdk/core";
 import { tagsPerResource } from "@composurecdk/cdk-testing";
-import { singleStack } from "../src/strategies.js";
+import { createStackBuilder } from "../src/stack-builder.js";
 import { tags } from "../src/tags.js";
 
 function bucketComponent(): Lifecycle<{ bucket: Bucket }> {
@@ -144,7 +144,7 @@ describe("tags() afterBuild helper", () => {
     const app = new App({ context: { "@aws-cdk/core:explicitStackTags": true } });
 
     compose({ primary: bucketComponent() }, { primary: [] })
-      .withStackStrategy(singleStack())
+      .withStackStrategy(singleStack(createStackBuilder()))
       .afterBuild(tags({ system: { Owner: "platform" } }))
       .build(app, "MySystem");
 

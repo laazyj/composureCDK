@@ -6,6 +6,7 @@ export {
   type IStackBuilder,
   type StackBuilderResult,
 } from "./stack-builder.js";
+// eslint-disable-next-line @typescript-eslint/no-deprecated -- kept exported for one minor release (ADR-0023)
 export { singleStack, groupedStacks } from "./strategies.js";
 export { stackNameSegments } from "./stack-name-segments.js";
 export { outputs, type OutputDefinition, type OutputDefinitions } from "./outputs.js";

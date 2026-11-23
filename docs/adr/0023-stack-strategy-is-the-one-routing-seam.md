@@ -1,6 +1,6 @@
 # ADR 0023: A stack strategy is the one way to route components to stacks
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-23
 
 ## Context

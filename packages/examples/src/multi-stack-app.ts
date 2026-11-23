@@ -16,7 +16,8 @@ import { exampleApp } from "./app-context.js";
  * - Cross-stack references resolved automatically by CDK — weakly, via
  *   `Fn::GetStackOutput`, because the app's context sets
  *   `@aws-cdk/core:defaultCrossStackReferences` (see `app-context.ts`)
- * - Components without a stack mapping fall back to the default scope
+ * - Every component key mapped to a stack, checked when compiling and again
+ *   when the system builds
  * - `.copy()` for deriving stack variants from a shared base configuration
  */
 export function createMultiStackApp(app = exampleApp()) {

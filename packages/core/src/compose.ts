@@ -4,7 +4,17 @@ import { buildIdOf, SCOPED_BUILD } from "./build-id.js";
 import { CyclicDependencyError } from "./cyclic-dependency-error.js";
 import { DuplicateConstructIdError } from "./duplicate-construct-id-error.js";
 import { type Lifecycle } from "./lifecycle.js";
-import { type StackStrategy } from "./stack-strategy.js";
+import { StackPlacementError } from "./stack-placement-error.js";
+import {
+  BUILD_SCOPE,
+  groupedStacks,
+  singleStack,
+  type StackSource,
+  type StackStrategy,
+} from "./stack-strategy.js";
+
+/** With no strategy set, every component builds in the scope passed to `build`. */
+const DEFAULT_STRATEGY = singleStack(BUILD_SCOPE);
 
 /**
  * Maps a record of {@link Lifecycle} components to a record of their build outputs.
@@ -101,15 +111,20 @@ export interface ComposedSystem<Components extends Record<string, Lifecycle>> ex
   BuildResult<Components>
 > {
   /**
-   * Returns a new {@link Lifecycle} that routes components to specific scopes
-   * (typically Stacks) during build. Components not listed in the map use the
-   * default scope passed to `build`.
+   * Returns a new {@link ConfiguredSystem} that builds each component on the
+   * stack the map gives for it. A shortcut for {@link withStackStrategy} with
+   * `groupedStacks`, each key its own group.
    *
-   * Accepts any `IConstruct`, so `Stack`, `DeploymentStack`, or custom
-   * subclasses all work.
+   * Every component key is required, and the map is checked when the system
+   * builds, as for {@link withStackStrategy}. Each value is a
+   * {@link StackSource}: a stack you have built (any `IConstruct`, so `Stack`
+   * subclasses work), a `Lifecycle` that builds one, or `BUILD_SCOPE` to keep
+   * the component in the scope passed to `build`. One builder given to two
+   * keys builds two stacks; to share one, pass a built stack or use
+   * `groupedStacks`.
    *
-   * @param stacks - A partial map from component key to scope.
-   * @returns A {@link Lifecycle} with stack routing applied.
+   * @param stacks - The stack source for each component key.
+   * @returns A {@link ConfiguredSystem} with stack routing applied.
    *
    * @example
    * ```ts
@@ -118,12 +133,21 @@ export interface ComposedSystem<Components extends Record<string, Lifecycle>> ex
    *   .build(app, "MySystem");
    * ```
    */
-  withStacks(stacks: { [K in keyof Components]?: IConstruct }): ConfiguredSystem<Components>;
+  withStacks(stacks: {
+    readonly [K in keyof Components]: StackSource;
+  }): ConfiguredSystem<Components>;
 
   /**
    * Returns a new {@link ConfiguredSystem} that uses a {@link StackStrategy}
    * to determine each component's scope during build. The returned system
    * supports further chaining of {@link ConfiguredSystem.afterBuild | .afterBuild()} hooks.
+   *
+   * The strategy is typed by the system's keys, so one that places fewer keys
+   * than the system has fails to compile. Its answer is also checked when the
+   * system builds, which catches keys the type cannot see.
+   *
+   * @throws {@link StackPlacementError} when the system builds, if a component
+   *   has no scope or the strategy places a key that is not a component.
    *
    * Mutually exclusive with {@link withStacks} — calling one locks the
    * stack routing; further stack-routing methods are not available on the
@@ -136,14 +160,16 @@ export interface ComposedSystem<Components extends Record<string, Lifecycle>> ex
    * ```ts
    * compose({ handler, api, table }, { ... })
    *   .withStackStrategy(groupedStacks(
-   *     key => key === "table" ? "persistence" : "service",
-   *     (app, id) => new Stack(app, id),
+   *     { service: serviceStack, persistence: createStackBuilder() },
+   *     { handler: "service", api: "service", table: "persistence" },
    *   ))
    *   .afterBuild(outputs({ ... }))
    *   .build(app, "MySystem");
    * ```
    */
-  withStackStrategy(strategy: StackStrategy): ConfiguredSystem<Components>;
+  withStackStrategy(
+    strategy: StackStrategy<keyof Components & string>,
+  ): ConfiguredSystem<Components>;
 
   /**
    * Returns a new {@link ConfiguredSystem} that invokes the given hook after
@@ -208,6 +234,7 @@ class ComposedLifecycle<
   readonly #graph: Graph;
   readonly #components: Components;
   readonly #dependencies: { [Property in keyof Components]: Dependency<Components> };
+  readonly #keys: readonly (keyof Components & string)[];
 
   constructor(
     components: Components,
@@ -216,26 +243,27 @@ class ComposedLifecycle<
     this.#components = components;
     this.#dependencies = dependencies;
     this.#graph = buildDependencyGraph(components, dependencies);
+    this.#keys = Object.keys(components);
   }
 
-  withStacks(stacks: { [K in keyof Components]?: IConstruct }): ConfiguredSystem<Components> {
+  withStacks(stacks: {
+    readonly [K in keyof Components]: StackSource;
+  }): ConfiguredSystem<Components> {
+    const eachKeyItsOwnGroup = Object.fromEntries(Object.keys(stacks).map((key) => [key, key]));
+    return this.withStackStrategy(groupedStacks(stacks, eachKeyItsOwnGroup));
+  }
+
+  withStackStrategy(
+    strategy: StackStrategy<keyof Components & string>,
+  ): ConfiguredSystem<Components> {
     return new ConfiguredLifecycle((scope, id, parentContext, keyed) =>
-      this.#buildWith(scope, id, stacks, parentContext, keyed),
+      this.#buildWith(scope, id, strategy, parentContext, keyed),
     );
-  }
-
-  withStackStrategy(strategy: StackStrategy): ConfiguredSystem<Components> {
-    return new ConfiguredLifecycle((scope, id, parentContext, keyed) => {
-      const stacks = Object.fromEntries(
-        Object.keys(this.#components).map((key) => [key, strategy.resolve(scope, id, key)]),
-      ) as { [K in keyof Components]?: IConstruct };
-      return this.#buildWith(scope, id, stacks, parentContext, keyed);
-    });
   }
 
   afterBuild(hook: AfterBuildHook<BuildResult<Components>>): ConfiguredSystem<Components> {
     return new ConfiguredLifecycle<Components>((scope, id, parentContext, keyed) =>
-      this.#buildWith(scope, id, undefined, parentContext, keyed),
+      this.#buildWith(scope, id, DEFAULT_STRATEGY, parentContext, keyed),
     ).afterBuild(hook);
   }
 
@@ -244,7 +272,7 @@ class ComposedLifecycle<
     id: string,
     parentContext?: Record<string, object>,
   ): BuildResult<Components> {
-    return this.#buildWith(scope, id, undefined, parentContext, false).results;
+    return this.#buildWith(scope, id, DEFAULT_STRATEGY, parentContext, false).results;
   }
 
   /** @internal Builds with key-only ids; see {@link scoped}. */
@@ -253,7 +281,22 @@ class ComposedLifecycle<
     id: string,
     parentContext?: Record<string, object>,
   ): BuildResult<Components> {
-    return this.#buildWith(scope, id, undefined, parentContext, true).results;
+    return this.#buildWith(scope, id, DEFAULT_STRATEGY, parentContext, true).results;
+  }
+
+  /** Asks the strategy for every component's scope, and checks its answer. */
+  #place(
+    strategy: StackStrategy<keyof Components & string>,
+    scope: IConstruct,
+    id: string,
+  ): Readonly<Record<string, IConstruct>> {
+    const placement: Partial<Record<string, IConstruct>> = strategy.place(scope, id, this.#keys);
+    const unplaced = this.#keys.filter((key) => placement[key] === undefined);
+    const unknown = Object.keys(placement).filter((key) => !Object.hasOwn(this.#components, key));
+    if (unplaced.length > 0 || unknown.length > 0) {
+      throw new StackPlacementError(id, unplaced, unknown);
+    }
+    return placement as Readonly<Record<string, IConstruct>>;
   }
 
   /**
@@ -265,10 +308,11 @@ class ComposedLifecycle<
   #buildWith(
     scope: IConstruct,
     id: string,
-    stacks: { [K in keyof Components]?: IConstruct } | undefined,
+    strategy: StackStrategy<keyof Components & string>,
     parentContext: Record<string, object> | undefined,
     keyed: boolean,
   ): BuildOutcome<Components> {
+    const placement = this.#place(strategy, scope, id);
     const results: Record<string, object> = {};
     const componentScopes: Record<string, IConstruct> = {};
     // Tracks the construct ids built into each scope so an explicit id from
@@ -277,7 +321,7 @@ class ComposedLifecycle<
     const idsByScope = new Map<IConstruct, Set<string>>();
 
     for (const key of alg.topsort(this.#graph)) {
-      const componentScope = stacks?.[key] ?? scope;
+      const componentScope = placement[key];
       componentScopes[key] = componentScope;
       const deps = (this.#dependencies[key] ?? []) as string[];
       // Inner deps shadow parent context on key collision.

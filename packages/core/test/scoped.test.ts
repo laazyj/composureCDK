@@ -5,6 +5,7 @@ import { compose } from "../src/compose.js";
 import { DuplicateConstructIdError } from "../src/duplicate-construct-id-error.js";
 import { type Lifecycle } from "../src/lifecycle.js";
 import { scoped } from "../src/scoped.js";
+import { BUILD_SCOPE } from "../src/stack-strategy.js";
 
 /** A component that creates one construct, as every real builder does. */
 function resource(): Lifecycle<{ construct: IConstruct; context?: Record<string, object> }> {
@@ -96,6 +97,7 @@ describe("scoped", () => {
     const other = new Construct(root, "Other");
     const result = scoped(
       compose({ bucket: resource(), queue: resource() }, { bucket: [], queue: [] }).withStacks({
+        bucket: BUILD_SCOPE,
         queue: other,
       }),
     ).build(root, "Failures");
@@ -106,12 +108,12 @@ describe("scoped", () => {
 
   it("hands a stack strategy the new construct as its parent scope", () => {
     const root = new RootConstruct();
-    const resolve = vi.fn((scope: IConstruct) => scope);
+    const place = vi.fn((scope: IConstruct) => ({ bucket: scope }));
     const result = scoped(
-      compose({ bucket: resource() }, { bucket: [] }).withStackStrategy({ resolve }),
+      compose({ bucket: resource() }, { bucket: [] }).withStackStrategy({ place }),
     ).build(root, "Failures");
 
-    expect(resolve).toHaveBeenCalledWith(result.bucket.construct.node.scope, "Failures", "bucket");
+    expect(place).toHaveBeenCalledWith(result.bucket.construct.node.scope, "Failures", ["bucket"]);
     expect(pathOf(result.bucket)).toBe("Failures/bucket");
   });
 

@@ -91,12 +91,13 @@ A stack carries its account and region, tags, description, deploy order, and any
 
 ### LAYER-9: Hand stacks to the system in a way that fits its size
 
-- **One stack:** `.withStackStrategy(singleStack(createStackBuilder()…))`, inline.
-- **Several stacks, or a stack that needs a handle** (retention, Aspects, deploy order): a stack layer of its own (`stacks.ts`) builds each stack explicitly and returns them, and `app.ts` places the **top-level subsystems** with `.withStacks({ … })`, which is typed by key. Place subsystems, never their inner components, so each deployment unit matches part of the architecture.
+- **One stack:** build the system into it.
+- **Several stacks:** `app.ts` places every **top-level subsystem**, never their inner components, with `.withStacks({ … })`, or `groupedStacks(…)` when several share a stack, so each deployment unit matches part of the architecture.
+- **A stack that needs a handle** (retention, Aspects, deploy order): a stack layer of its own (`stacks.ts`) builds it and returns it, and the placement takes the built stack. Otherwise the placement can take a builder.
 
 Deployment tooling can decide it for you: a pipeline framework that supplies its own `Stack` subclass needs the separate stack layer from the start. If such a stack needs a component that is already built (say its environment comes from a pipeline construct), build that part of the system first, then the stacks, then the rest.
 
-`core` · `decided` · enforced: `type` (`withStacks` keys) · gap: [#855](https://github.com/laazyj/composureCDK/issues/855) · see: [Stack management](../stack-management.md#decision-guide) · A§0, B P1, B P4, D 3, F 4
+`core` · `decided` · enforced: `type` (exhaustive placement, also checked at synth) · gap: [#884](https://github.com/laazyj/composureCDK/issues/884) · see: [Stack management](../stack-management.md#decision-guide), [ADR-0023](../adr/0023-stack-strategy-is-the-one-routing-seam.md) · A§0, B P1, B P4, D 3, F 4
 
 ### LAYER-10: Put a region-bound resource in a stack in that region, rather than switching features off
 

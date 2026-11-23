@@ -376,7 +376,9 @@ class ConfiguredLifecycle<
  * A directed acyclic graph is built eagerly from the declared dependencies.
  * Cyclic dependencies are detected at composition time and throw immediately.
  * When `build` is called, components are built in topological order, each
- * receiving the build outputs of its dependencies as its context.
+ * receiving the build outputs of its dependencies as its context. Components
+ * with no dependency path between them have no defined order relative to each
+ * other, so a component that must build after another declares that dependency.
  *
  * The returned {@link ComposedSystem} is a {@link Lifecycle}, so it can be
  * nested as a component in a larger `compose` call.
@@ -384,6 +386,7 @@ class ConfiguredLifecycle<
  * @param components - A record of named {@link Lifecycle} components.
  * @param dependencies - For each component, the list of other component keys it depends on.
  * @returns A {@link ComposedSystem} whose build output is the combined {@link BuildResult} of all components.
+ * @see {@link https://github.com/laazyj/composureCDK/blob/main/docs/architecture.md#compose | Architecture: compose}
  */
 export function compose<Components extends Record<string, Lifecycle>>(
   components: Components,

@@ -4,6 +4,7 @@ import {
   CLAUDE_CO_AUTHOR,
   agentInvolvement,
   attributionProblems,
+  closedIssues,
   isAgentEmail,
   mainCommitProblems,
   mergedTitle,
@@ -163,6 +164,24 @@ describe("squashMessage", () => {
   it("lists several commits' full messages", () => {
     const { body } = squashMessage("fix: x", 7, [commit("fix: a\n\nOne."), commit("fix: b")]);
     assert.equal(body, "* fix: a\n\nOne.\n\n* fix: b");
+  });
+});
+
+describe("closedIssues", () => {
+  const REPO = "laazyj/composureCDK";
+
+  it("reads every closing footer, sorted and once each", () => {
+    const message = "Why.\n\nCloses #25\nFixes: #4, laazyj/composureCDK#3\nresolved #25";
+    assert.deepEqual(closedIssues(message, REPO), [3, 4, 25]);
+  });
+
+  it("ignores Refs, prose and other repositories' issues", () => {
+    const message = "The follow-up closes #9 later.\n\nRefs #7\nCloses other/repo#8";
+    assert.deepEqual(closedIssues(message, REPO), []);
+  });
+
+  it("matches the repository regardless of case, and CRLF line endings", () => {
+    assert.deepEqual(closedIssues("x\r\n\r\nCloses LAAZYJ/composurecdk#12\r\n", REPO), [12]);
   });
 });
 

@@ -31,6 +31,7 @@ jobs:
       contents: read
       checks: read # the head commit's required checks
       pull-requests: write # read the PR and its commits, and say why it did not merge
+      issues: write # close the issues the commit's footer names
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

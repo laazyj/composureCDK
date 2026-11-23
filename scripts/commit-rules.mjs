@@ -288,9 +288,35 @@ export function mainCommitProblems(commit, prCommits, agentSignal = null) {
   return problems;
 }
 
+// The keywords GitHub reads as closing an issue, and an issue: `#12`, `o/r#3`.
+const CLOSING = String.raw`close[sd]?|fix(?:e[sd])?|resolve[sd]?`;
+const ISSUE = String.raw`(?:[\w.-]+\/[\w.-]+)?#\d+`;
+
+/**
+ * The issues of `repo` (`owner/name`) a commit message closes: each line that
+ * is a closing footer, `Closes #12` or `Fixes: o/r#3, #4`. `Refs` and a
+ * keyword mid-sentence close nothing. Sorted, once each. `/squash` closes
+ * these itself; see docs/ci.md#merging.
+ */
+export function closedIssues(message, repo) {
+  const numbers = new Set();
+  for (const line of message.split("\n")) {
+    const footer = CLOSING_FOOTER.exec(line.trim());
+    if (!footer) continue;
+    for (const [, owner, number] of footer[1].matchAll(/(?:([\w.-]+\/[\w.-]+))?#(\d+)/g)) {
+      if (!owner || owner.toLowerCase() === repo.toLowerCase()) numbers.add(Number(number));
+    }
+  }
+  return [...numbers].sort((a, b) => a - b);
+}
+
+const CLOSING_FOOTER = new RegExp(
+  String.raw`^(?:${CLOSING}):?\s+(${ISSUE}(?:\s*,\s*${ISSUE})*)$`,
+  "i",
+);
+
 // A footer that links an issue in the release notes: `Closes #12`, `Refs: o/r#3`.
-const ISSUE_REFERENCE =
-  /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?)\b:?\s+(?:[\w.-]+\/[\w.-]+)?#\d+/i;
+const ISSUE_REFERENCE = new RegExp(String.raw`\b(?:${CLOSING}|refs?)\b:?\s+${ISSUE}`, "i");
 
 /**
  * A body's text and its co-authors, compared apart: the web merge dialog

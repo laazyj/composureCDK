@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Construct } from "constructs";
 import { at } from "../src/build-id.js";
 import { type Lifecycle } from "../src/lifecycle.js";
+import { ref } from "../src/ref.js";
 import { BUILD_SCOPE, groupedStacks, singleStack } from "../src/stack-strategy.js";
 
 function createScope(id = "root"): Construct {
@@ -24,7 +25,7 @@ describe("singleStack", () => {
     expect(build).toHaveBeenCalledOnce();
     expect(build).toHaveBeenCalledWith(scope, "sys");
     expect(placement.a).toBe(placement.b);
-    expect(placement.a.node.id).toBe("sys");
+    expect((placement.a as Construct).node.id).toBe("sys");
   });
 
   it("uses a built stack as it is", () => {
@@ -72,7 +73,19 @@ describe("groupedStacks", () => {
 
     expect(placement.ui).toBe(viewer);
     expect(placement.alarms).toBe(scope);
-    expect(placement.ingest.node.id).toBe("sys-core");
+    expect((placement.ingest as Construct).node.id).toBe("sys-core");
+  });
+
+  it("passes a ref source through unbuilt, for compose() to resolve", () => {
+    const stack = ref<{ stack: Construct }>("prodStack").get("stack");
+
+    const placement = groupedStacks({ prod: stack }, { a: "prod", b: "prod" }).place(
+      createScope(),
+      "sys",
+      ["a", "b"],
+    );
+
+    expect(placement).toEqual({ a: stack, b: stack });
   });
 
   it("builds only the groups some component is placed in", () => {

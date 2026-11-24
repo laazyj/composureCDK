@@ -4,6 +4,7 @@ import { buildIdOf, SCOPED_BUILD } from "./build-id.js";
 import { CyclicDependencyError } from "./cyclic-dependency-error.js";
 import { DuplicateConstructIdError } from "./duplicate-construct-id-error.js";
 import { type Lifecycle } from "./lifecycle.js";
+import { resolve, type Resolvable } from "./ref.js";
 import { StackPlacementError } from "./stack-placement-error.js";
 import {
   BUILD_SCOPE,
@@ -289,14 +290,18 @@ class ComposedLifecycle<
     strategy: StackStrategy<keyof Components & string>,
     scope: IConstruct,
     id: string,
-  ): Readonly<Record<string, IConstruct>> {
-    const placement: Partial<Record<string, IConstruct>> = strategy.place(scope, id, this.#keys);
+  ): Readonly<Record<string, Resolvable<IConstruct>>> {
+    const placement: Partial<Record<string, Resolvable<IConstruct>>> = strategy.place(
+      scope,
+      id,
+      this.#keys,
+    );
     const unplaced = this.#keys.filter((key) => placement[key] === undefined);
     const unknown = Object.keys(placement).filter((key) => !Object.hasOwn(this.#components, key));
     if (unplaced.length > 0 || unknown.length > 0) {
       throw new StackPlacementError(id, unplaced, unknown);
     }
-    return placement as Readonly<Record<string, IConstruct>>;
+    return placement as Readonly<Record<string, Resolvable<IConstruct>>>;
   }
 
   /**
@@ -321,12 +326,25 @@ class ComposedLifecycle<
     const idsByScope = new Map<IConstruct, Set<string>>();
 
     for (const key of alg.topsort(this.#graph)) {
-      const componentScope = placement[key];
-      componentScopes[key] = componentScope;
       const deps = (this.#dependencies[key] ?? []) as string[];
       // Inner deps shadow parent context on key collision.
       const innerContext = Object.fromEntries(deps.map((dep) => [dep, results[dep]]));
       const context = { ...parentContext, ...innerContext };
+      // A stack another component builds resolves against this component's
+      // context, so that component must be in its dependency record.
+      let componentScope: IConstruct;
+      try {
+        componentScope = resolve(placement[key], context);
+      } catch (cause) {
+        throw new StackPlacementError(
+          id,
+          [key],
+          [],
+          `"${key}" is placed on a stack another component builds; list that component in "${key}"'s dependency record.`,
+          { cause },
+        );
+      }
+      componentScopes[key] = componentScope;
       const component = this.#components[key];
       // An at()-tagged component pins its own id; otherwise derive it from the key.
       const componentId =

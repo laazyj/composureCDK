@@ -1,4 +1,4 @@
-import { Tags } from "aws-cdk-lib";
+import { type TagProps, Tags } from "aws-cdk-lib";
 import { Construct, type IConstruct } from "constructs";
 
 function isConstruct(value: unknown): value is IConstruct {
@@ -28,23 +28,26 @@ function isConstruct(value: unknown): value is IConstruct {
  * the construct field. Authors do not need an opt-in marker; if a construct
  * appears in the result, it is tagged.
  *
- * Internal to this package: `taggedBuilder()` is the public route to it,
- * and `tags()` on a `scoped(compose(...))` covers a component that is not a
- * props-based builder.
+ * Internal to this package: `taggedBuilder()` and `tags({ byComponent })` are
+ * the public routes to it.
  */
-export function applyBuilderTags(result: object, tags: ReadonlyMap<string, string>): void {
+export function applyBuilderTags(
+  result: object,
+  tags: ReadonlyMap<string, string>,
+  priority?: number,
+): void {
   if (tags.size === 0) return;
-  walkAndTag(result, tags);
+  walkAndTag(result, tags, priority);
 }
 
-function walkAndTag(value: unknown, tags: ReadonlyMap<string, string>): void {
+function walkAndTag(value: unknown, tags: ReadonlyMap<string, string>, priority?: number): void {
   if (isConstruct(value)) {
-    applyTagsToConstruct(value, tags);
+    applyTagsToConstruct(value, tags, priority);
     return;
   }
   if (isPlainObject(value)) {
     for (const inner of Object.values(value)) {
-      walkAndTag(inner, tags);
+      walkAndTag(inner, tags, priority);
     }
   }
 }
@@ -55,6 +58,21 @@ function walkAndTag(value: unknown, tags: ReadonlyMap<string, string>): void {
  * retains the props object for the aspect's lifetime but only ever reads it.
  */
 const STACK_ONLY = Object.freeze({ includeResourceTypes: ["aws:cdk:stack"] });
+
+/**
+ * The props for both `Tags.of(...).add(...)` calls at one priority, built once
+ * and shared like {@link STACK_ONLY}. Only a few priorities are ever used.
+ */
+const PROPS_BY_PRIORITY = new Map<number, readonly [TagProps, TagProps]>();
+
+function propsFor(priority: number): readonly [TagProps, TagProps] {
+  let props = PROPS_BY_PRIORITY.get(priority);
+  if (!props) {
+    props = [Object.freeze({ priority }), Object.freeze({ ...STACK_ONLY, priority })];
+    PROPS_BY_PRIORITY.set(priority, props);
+  }
+  return props;
+}
 
 /**
  * Applies every entry of `tags` to `target` via `Tags.of(target).add(...)`.
@@ -80,12 +98,21 @@ const STACK_ONLY = Object.freeze({ includeResourceTypes: ["aws:cdk:stack"] });
  * `cxapi.EXPLICIT_STACK_TAGS`, which does not exist at this package's
  * aws-cdk-lib floor, and re-tagging with a value already present is a no-op —
  * so paying for it always is cheaper than a floor bump.
+ *
+ * `priority` is CDK's tag priority, default 100. On a key collision the
+ * higher priority wins, and an equal one goes to whichever tag CDK applies
+ * last.
  */
-export function applyTagsToConstruct(target: IConstruct, tags: Iterable<[string, string]>): void {
+export function applyTagsToConstruct(
+  target: IConstruct,
+  tags: Iterable<[string, string]>,
+  priority = 100,
+): void {
   const t = Tags.of(target);
+  const [plain, stackOnly] = propsFor(priority);
   for (const [key, value] of tags) {
-    t.add(key, value);
-    t.add(key, value, STACK_ONLY);
+    t.add(key, value, plain);
+    t.add(key, value, stackOnly);
   }
 }
 

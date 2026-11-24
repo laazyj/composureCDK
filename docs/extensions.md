@@ -118,7 +118,7 @@ Duplicate `.tag(k, ...)` calls last-wins and emit a Node process warning with na
 - `node --disable-warning=ComposureCDKTagOverride …` on Node 21.3+ to silence them globally, or
 - a `process.on("warning", w => { if (w.name !== TAG_OVERRIDE_WARNING_NAME) /* … */ })` listener for finer control.
 
-If you write your own builder, wrap its class with `taggedBuilder()` from `@composurecdk/cloudformation` to get the same `.tag()` / `.tags()`. A component that is not a props-based builder can't take `taggedBuilder()`; compose it on its own in a `scoped(compose({ component }, { component: [] }))` and tag that with the `tags()` hook below. [`scoped()`](../packages/core/README.md#encapsulating-a-system-scoped) gives it a construct of its own, so the tags reach only that component, not its siblings.
+If you write your own builder, wrap its class with `taggedBuilder()` from `@composurecdk/cloudformation` to get the same `.tag()` / `.tags()`. A component that is not a props-based builder can't take `taggedBuilder()`; tag it with `byComponent` in the `tags()` hook below.
 
 ### Layer 2 — `tags()` afterBuild hook for cross-cutting tags
 
@@ -142,11 +142,11 @@ compose(
 ```
 
 - **`system`** — applied to the top-level scope. CDK's tag aspect propagates each tag to every taggable descendant.
-- **`byComponent`** — applied to a specific component's scope. Under `.withStacks()` or `.withStackStrategy()` this is the per-component stack; otherwise it's the top-level scope. Component keys are statically checked against the composed system's component keys.
+- **`byComponent`** — applied to the named component only: every construct in its build result, as builder-level `.tag()` does, plus its whole stack, Stack included, when it has one to itself among this system's components under `.withStacks()` or `.withStackStrategy()`. Anything else built into that stack is tagged too. In a shared scope, anything the component creates but doesn't return is not reached; give it its own stack, or a [`scoped(compose(...))`](../packages/core/README.md#encapsulating-a-system-scoped) with `system` tags, if that matters. Component keys are statically checked against the composed system's component keys.
 
 ### Precedence
 
-Builder-level tags win on key collision because they target a closer scope. CDK's tag priority resolves this automatically — there is no special configuration to enable it. Use Layer 2 for blanket cost/ownership dimensions and Layer 1 for the specific resource type a downstream consumer cares about.
+On a key collision, builder-level tags win over `byComponent`, which wins over `system`. `tags()` applies its tags just below CDK's default priority, so any tag you add yourself with `Tags.of(...).add(...)` at the default priority also wins over them. Use Layer 2 for blanket cost/ownership dimensions and Layer 1 for the specific resource type a downstream consumer cares about.
 
 See [ADR-0006](./adr/0006-decorator-builder-pattern.md) for the architectural decision behind the wrapper that powers builder-level tagging.
 

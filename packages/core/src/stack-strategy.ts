@@ -1,6 +1,7 @@
 import { Construct, type IConstruct } from "constructs";
 import { buildIdOf } from "./build-id.js";
 import { type Lifecycle } from "./lifecycle.js";
+import { type Ref, type Resolvable } from "./ref.js";
 
 /**
  * A {@link StackSource} meaning the scope passed to `build()`.
@@ -23,10 +24,12 @@ export const BUILD_SCOPE: unique symbol = Symbol.for("composurecdk.buildScope");
  *   `@composurecdk/cloudformation` or a deployment framework's own builder.
  *   It is built under its `at()` pin if it has one, otherwise under an id the
  *   strategy derives;
+ * - a {@link Ref} to a stack another component builds. Each component placed
+ *   on it must list that component in its dependency record (ADR-0024);
  * - {@link BUILD_SCOPE}, the scope passed to `build()`.
  */
 export type StackSource =
-  IConstruct | Lifecycle<{ readonly stack: IConstruct }> | typeof BUILD_SCOPE;
+  IConstruct | Lifecycle<{ readonly stack: IConstruct }> | Ref<IConstruct> | typeof BUILD_SCOPE;
 
 /**
  * Decides which scope (typically a Stack) each component of a composed system
@@ -34,7 +37,7 @@ export type StackSource =
  * component builds in the scope passed to `build()`.
  *
  * `place` is called once per build with every component key, and returns the
- * scope for each. `compose()` checks the answer, and throws if any component
+ * scope for each, or a {@link Ref} to it. `compose()` checks the answer, and throws if any component
  * has no scope or the answer names a key that is not a component, with a
  * `StackPlacementError`.
  *
@@ -60,13 +63,13 @@ export interface StackStrategy<K extends string = string> {
    * @param scope - The scope passed to `build`.
    * @param systemId - The id passed to `build`.
    * @param keys - Every component key in the system.
-   * @returns The scope for every key.
+   * @returns The scope, or a {@link Ref} to it, for every key.
    */
   readonly place: (
     scope: IConstruct,
     systemId: string,
     keys: readonly K[],
-  ) => Readonly<Record<K, IConstruct>>;
+  ) => Readonly<Record<K, Resolvable<IConstruct>>>;
 }
 
 /**
@@ -135,8 +138,8 @@ export function groupedStacks<G extends string, K extends string>(
     // when its group has no source: compose() then reports every problem in
     // one StackPlacementError.
     place: (scope, systemId) => {
-      const stacks = new Map<G, IConstruct>();
-      const result: Partial<Record<K, IConstruct>> = {};
+      const stacks = new Map<G, Resolvable<IConstruct>>();
+      const result: Partial<Record<K, Resolvable<IConstruct>>> = {};
       for (const [key, group] of Object.entries(placement) as [K, G | undefined][]) {
         if (group === undefined) continue;
         let stack = stacks.get(group);
@@ -148,13 +151,13 @@ export function groupedStacks<G extends string, K extends string>(
         }
         result[key] = stack;
       }
-      return result as Readonly<Record<K, IConstruct>>;
+      return result as Readonly<Record<K, Resolvable<IConstruct>>>;
     },
   };
 }
 
 /** Returns the scope a {@link StackSource} stands for, building it if needed. */
-function resolveSource(source: StackSource, scope: IConstruct, id: string): IConstruct {
+function resolveSource(source: StackSource, scope: IConstruct, id: string): Resolvable<IConstruct> {
   if (source === BUILD_SCOPE) return scope;
   if (isLifecycle(source)) {
     // The stack is the container components are built into, so it is built

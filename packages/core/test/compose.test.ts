@@ -490,6 +490,104 @@ describe("compose", () => {
     });
   });
 
+  describe("a stack another component builds (ADR-0024)", () => {
+    function pipelineBuilder(order: string[] = []): Lifecycle<{ envName: string }> {
+      return {
+        build: (scope, id) => {
+          order.push("pipeline");
+          new Construct(scope, id);
+          return { envName: "prod" };
+        },
+      };
+    }
+
+    function stackBuilder(order: string[] = []): Lifecycle<{ stack: Construct }> {
+      return {
+        build: (scope, id, context) => {
+          order.push("prodStack");
+          const { envName } = resolve(ref<{ envName: string }>("pipeline"), context);
+          return { stack: new Construct(scope, `${id}-${envName}`) };
+        },
+      };
+    }
+
+    function placed(name: string, order: string[] = []): Lifecycle<{ construct: Construct }> {
+      return {
+        build: (scope, id) => {
+          order.push(name);
+          return { construct: new Construct(scope, id) };
+        },
+      };
+    }
+
+    const prodStack = ref<{ stack: Construct }>("prodStack").get("stack");
+
+    it("builds the stack after the component it needs, and places components on it", () => {
+      const order: string[] = [];
+      const hookFn = vi.fn<AfterBuildHook<Record<string, object>>>();
+
+      const result = compose(
+        {
+          pipeline: pipelineBuilder(order),
+          prodStack: stackBuilder(order),
+          ingest: placed("ingest", order),
+          data: placed("data", order),
+        },
+        { pipeline: [], prodStack: ["pipeline"], ingest: ["prodStack"], data: ["prodStack"] },
+      )
+        .withStackStrategy(
+          groupedStacks(
+            { app: BUILD_SCOPE, prod: prodStack },
+            { pipeline: "app", prodStack: "app", ingest: "prod", data: "prod" },
+          ),
+        )
+        .afterBuild(hookFn)
+        .build(createScope(), "Factory");
+
+      expect(order.indexOf("pipeline")).toBeLessThan(order.indexOf("prodStack"));
+      expect(order.indexOf("prodStack")).toBeLessThan(order.indexOf("ingest"));
+      expect(result.ingest.construct.node.scope).toBe(result.prodStack.stack);
+      expect(result.data.construct.node.scope).toBe(result.prodStack.stack);
+      expect(hookFn.mock.calls[0][3].ingest).toBe(result.prodStack.stack);
+    });
+
+    it("rejects, at composition, a component placed on a stack that depends on it", () => {
+      expect(() =>
+        compose(
+          { pipeline: pipelineBuilder(), prodStack: stackBuilder() },
+          { pipeline: ["prodStack"], prodStack: ["pipeline"] },
+        ),
+      ).toThrow(CyclicDependencyError);
+    });
+
+    it("throws StackPlacementError, naming the placed component, when it leaves the stack out", () => {
+      const system = compose(
+        { pipeline: pipelineBuilder(), prodStack: stackBuilder(), ingest: placed("ingest") },
+        { pipeline: [], prodStack: ["pipeline"], ingest: [] },
+      ).withStackStrategy(
+        groupedStacks(
+          { app: BUILD_SCOPE, prod: prodStack },
+          { pipeline: "app", prodStack: "app", ingest: "prod" },
+        ),
+      );
+
+      let error: unknown;
+      try {
+        system.build(createScope(), "Factory");
+      } catch (e) {
+        error = e;
+      }
+
+      expect(error).toMatchObject({ name: "StackPlacementError", unplaced: ["ingest"] });
+      expect((error as Error).message).toContain(
+        `"ingest" is placed on a stack another component builds; list that component in "ingest"'s dependency record.`,
+      );
+      expect(((error as Error).cause as Error).message).toContain(
+        'Ref to "prodStack" cannot be resolved',
+      );
+    });
+  });
+
   describe("withStackStrategy", () => {
     it("rejects, when compiling, a strategy typed by fewer keys than the system has", () => {
       const system = compose(

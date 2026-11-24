@@ -64,7 +64,7 @@ system
   .build(app, "MySystem");
 ```
 
-Each of these takes a **stack source**: a stack you have built, a `Lifecycle` that builds one, or `BUILD_SCOPE`. `withStacks(map)` is `groupedStacks` with each key its own group. A wrong placement, including keys the type cannot see, throws a `StackPlacementError` when the system builds. To write your own strategy, implement `StackStrategy`'s `place(scope, systemId, keys)`. See [Stack management](https://github.com/laazyj/composureCDK/blob/main/docs/stack-management.md) and [ADR-0023](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0023-stack-strategy-is-the-one-routing-seam.md).
+Each of these takes a **stack source**: a stack you have built, a `Lifecycle` that builds one, a `ref` to a stack another component builds, or `BUILD_SCOPE`. `withStacks(map)` is `groupedStacks` with each key its own group. A wrong placement, including keys the type cannot see, throws a `StackPlacementError` when the system builds. To write your own strategy, implement `StackStrategy`'s `place(scope, systemId, keys)`. See [Stack management](https://github.com/laazyj/composureCDK/blob/main/docs/stack-management.md) and [ADR-0023](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0023-stack-strategy-is-the-one-routing-seam.md).
 
 ### Post-build hooks
 

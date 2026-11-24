@@ -11,6 +11,16 @@ describe("StackPlacementError", () => {
     );
   });
 
+  it("appends a detail and keeps the cause", () => {
+    const cause = new Error("inner");
+    const error = new StackPlacementError("sys", ["a"], [], "Why it failed.", { cause });
+
+    expect(error.message).toBe(
+      'The stack strategy for "sys" must place every component, and only components. Not placed: a. Why it failed.',
+    );
+    expect(error.cause).toBe(cause);
+  });
+
   it("is catchable by name, carrying both lists", () => {
     const error = new StackPlacementError("sys", ["a"], ["x"]);
 

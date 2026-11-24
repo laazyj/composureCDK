@@ -68,6 +68,7 @@ Each value is a **stack source**:
 
 - **A Stack you have built.** The app holds it before the system builds, so it can attach removal policies, Aspects or `addDependency`. Any construct works, including a deployment framework's own `Stack` subclass.
 - **A `Lifecycle` that builds one,** such as `createStackBuilder()`. It is built under its `at()` pin, or else `` `${systemId}-${key}` ``. Giving one builder to two keys builds two Stacks; to share one, pass a built Stack or use `groupedStacks`.
+- **A `ref` to a Stack another component builds,** for a Stack that can't exist until that component has built. See [A Stack that needs a component](#a-stack-that-needs-a-component).
 - **`BUILD_SCOPE`** (from `@composurecdk/core`), which keeps the component in the scope passed to `build()`. A nested system can then send one component, such as an alarm builder, to a `us-east-1` Stack and leave the rest with its parent.
 
 A missing key, an `undefined` value or a key that is not a component fails to compile where the type can see it. In every case it throws a `StackPlacementError` when the system builds, naming the keys. That includes keys spread in at run time, such as one component per environment from `Object.fromEntries`.
@@ -134,6 +135,33 @@ compose({ apexDns, ingestEdge, dataPlane, viewer }, { ... })
 
 `dns` is built by the app, so it can depend on other Stacks, or they on it, before the system builds.
 
+#### A Stack that needs a component
+
+Some Stacks can't be built until part of the system has, such as a deployment framework's `Stack` whose environment comes from the pipeline. Build that Stack in a component of its own, and give the placement a `ref` to it:
+
+```ts
+const prodStack = createDeploymentStackBuilder().env(
+  ref("pipeline", (r: PipelineResult) => r.pipeline.deploymentEnvironmentFor(prodAccount, region)),
+);
+
+compose(
+  { pipeline, prodStack, ingestEdge },
+  { pipeline: [], prodStack: ["pipeline"], ingestEdge: ["prodStack"] }, // placed on prodStack's Stack
+)
+  .withStackStrategy(
+    groupedStacks(
+      { app: BUILD_SCOPE, prod: ref<{ stack: Stack }>("prodStack").get("stack") },
+      { pipeline: "app", prodStack: "app", ingestEdge: "prod" },
+    ),
+  )
+  .build(app, "Factory");
+```
+
+- **Declare the Stack's component** in the dependency record of every component placed on it: that is what orders the build. Leave it out and the build throws a `StackPlacementError` naming the component. A cycle throws `CyclicDependencyError` when you compose.
+- **There is no handle before build.** Removal policies, Aspects and dependencies on this Stack go in its builder, or in an `afterBuild` hook.
+
+See [ADR-0024](adr/0024-stack-sources-that-a-component-builds.md).
+
 #### Stack ids and renames
 
 A builder source is built under `` `${systemId}-${group}` ``, so renaming a group renames its Stack, which CloudFormation treats as a new Stack. To keep the deployed Stack through a rename, do one of these:
@@ -168,6 +196,7 @@ const byStage: StackStrategy = {
 | Stacks per Region, or per deployment unit of subsystems     | `groupedStacks`                           |
 | The app needs a Stack before build (policies, deploy order) | Build it, and pass it as the stack source |
 | Custom Stack subclass (DeploymentStack, etc.)               | Pass it, or a `Lifecycle` that builds it  |
+| A Stack that needs a component built first (a pipeline)     | A component builds it; place with a `ref` |
 | A rule no built-in strategy covers                          | A custom `StackStrategy`                  |
 
 Start with the simplest approach that meets your needs. You can adopt more sophisticated stack management later without changing your component definitions — stack routing is a concern of `compose`, not individual components. See [ADR-0023](adr/0023-stack-strategy-is-the-one-routing-seam.md) for why routing has one mechanism.

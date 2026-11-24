@@ -70,3 +70,4 @@ ADRs are append-only. To change a decision, write a new ADR that supersedes the 
 - [ADR-0021: Alarm keys are typed on the result, not accumulated by the builder](0021-alarm-keys-typed-on-the-result.md)
 - [ADR-0022: Deploy-time dependencies are declared at composition — the `dependsOn()` combinator](0022-deploy-dependencies-at-composition.md)
 - [ADR-0023: A stack strategy is the one way to route components to stacks](0023-stack-strategy-is-the-one-routing-seam.md)
+- [ADR-0024: A stack source can be a stack another component builds](0024-stack-sources-that-a-component-builds.md)

@@ -1,7 +1,7 @@
 {
   "name": "@composurecdk/cloudformation",
   "version": "0.16.0",
-  "description": "Composable CloudFormation stack builder and stack assignment strategies",
+  "description": "Composable CloudFormation stack builder, outputs and tags",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/laazyj/composureCDK.git",

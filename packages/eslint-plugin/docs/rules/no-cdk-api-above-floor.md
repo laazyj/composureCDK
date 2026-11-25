@@ -52,14 +52,18 @@ Set it per package where floors differ. This repo reads each package's floor fro
 
 Each entry is a fact about `aws-cdk-lib`, not a policy about a package. Every version is the first release carrying the API, verified by installing the releases either side of it.
 
-| API                                                | Since   | Use instead                                                                                                           |
-| -------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| `Cfn<Resource>.isCfn<Resource>` static type guards | 2.231.0 | `CfnResource.isCfnResource(x) && x.cfnResourceType === Cfn<Resource>.CFN_RESOURCE_TYPE_NAME` — see below.             |
-| `Match.stringLikeRegexp`                           | 2.9.0   | An exact value, or a plain regular expression tested against the value read from `Template.toJSON()`.                 |
-| `Annotations.addWarningV2`                         | 2.93.0  | `addWarning`, or feature-detect `addWarningV2` and fall back — `@composurecdk/cloudformation`'s template-text policy. |
-| `Annotations` from `aws-cdk-lib/assertions`        | 2.10.0  | The construct metadata it reads: `node.metadata` entries of type `aws:cdk:warning` or `aws:cdk:error`.                |
+| API                                                    | Since   | Use instead                                                                                                           |
+| ------------------------------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Cfn<Resource>.isCfn<Resource>` static type guards     | 2.231.0 | `CfnResource.isCfnResource(x) && x.cfnResourceType === Cfn<Resource>.CFN_RESOURCE_TYPE_NAME` — see below.             |
+| `Match.stringLikeRegexp`                               | 2.9.0   | An exact value, or a plain regular expression tested against the value read from `Template.toJSON()`.                 |
+| `Annotations.addWarningV2`                             | 2.93.0  | `addWarning`, or feature-detect `addWarningV2` and fall back — `@composurecdk/cloudformation`'s template-text policy. |
+| `Annotations` from `aws-cdk-lib/assertions`            | 2.10.0  | The construct metadata it reads: `node.metadata` entries of type `aws:cdk:warning` or `aws:cdk:error`.                |
+| Enhanced API Gateway `SecurityPolicy` members          | 2.242.0 | `SecurityPolicy.TLS_1_2`, or raise the package's floor.                                                               |
+| `EndpointAccessMode` from `aws-cdk-lib/aws-apigateway` | 2.242.0 | No access mode: only the enhanced security policies need one.                                                         |
 
 The `isCfn*` guards shipped on every generated L1 in 2.231.0 (2.230.0 lacks them); see issue #146. `isCfnResource` and `isCfnElement` are explicitly allowed: they are core, predate every floor, and `isCfnResource` is the portable replacement.
+
+The enhanced `SecurityPolicy` members (`TLS13_1_3_2025_09`, `TLS12_2018_EDGE` and the rest) are matched by their full names, not a `TLS13_` prefix, because `aws-elasticloadbalancingv2`'s `SslPolicy` has members with the same prefixes. The legacy `TLS_1_0` and `TLS_1_2` predate every floor.
 
 Add an entry whenever an API turns out to postdate a floor. Adding one makes the rule report where it did not, which is a breaking change to the rule ([Versioning](../../README.md#versioning)); with `floor` set, it reaches only the packages whose floor is below the new entry.
 
@@ -69,6 +73,7 @@ Add an entry whenever an API turns out to postdate a floor. Adding one makes the
 - `import = require()` bindings.
 - An instance member reached through a variable — `const a = Annotations.of(x); a.addWarningV2(…)`. The rule follows the chain through `Annotations.of(x)` back to the import, but not through an assignment. That same blind spot is what lets the feature-detecting fallback through, which is correct.
 - A re-export — `export { Annotations } from "aws-cdk-lib/assertions"`.
+- An `endpointAccessMode` set without the enum (a string cast). The floor's typecheck still rejects the property itself.
 
 ## How it works
 

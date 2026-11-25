@@ -156,6 +156,38 @@ ruleTester.run("no-cdk-api-above-floor", rule, {
       options: [{ floor: "2.10.0" }],
     },
     {
+      name: "the legacy API Gateway SecurityPolicy members, at any floor",
+      code: `
+        import { SecurityPolicy } from "aws-cdk-lib/aws-apigateway";
+        const p = [SecurityPolicy.TLS_1_0, SecurityPolicy.TLS_1_2];
+      `,
+      options: [{ floor: "2.1.0" }],
+    },
+    {
+      name: "an enhanced SecurityPolicy member at a floor that already has it",
+      code: `
+        import { SecurityPolicy } from "aws-cdk-lib/aws-apigateway";
+        const p = SecurityPolicy.TLS13_1_3_2025_09;
+      `,
+      options: [{ floor: "2.242.0" }],
+    },
+    {
+      name: "an elbv2 SslPolicy member that shares the TLS13_ prefix",
+      code: `
+        import { SslPolicy } from "aws-cdk-lib/aws-elasticloadbalancingv2";
+        const p = SslPolicy.TLS13_13;
+      `,
+      options: [{ floor: "2.1.0" }],
+    },
+    {
+      name: "EndpointAccessMode at a floor that already has it",
+      code: `
+        import { EndpointAccessMode } from "aws-cdk-lib/aws-apigateway";
+        const m = EndpointAccessMode.STRICT;
+      `,
+      options: [{ floor: "2.242.0" }],
+    },
+    {
       name: "a same-named export of an unrelated module",
       code: `
         import * as assertions from "./assertions.js";
@@ -323,6 +355,23 @@ ruleTester.run("no-cdk-api-above-floor", rule, {
         import { assertions } from "aws-cdk-lib";
         assertions.Annotations.fromStack(stack);
       `,
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      name: "an enhanced API Gateway SecurityPolicy member below 2.242.0",
+      code: `
+        import { SecurityPolicy } from "aws-cdk-lib/aws-apigateway";
+        const p = SecurityPolicy.TLS12_2018_EDGE;
+      `,
+      options: [{ floor: "2.241.0" }],
+      errors: [{ messageId: "aboveFloor" }],
+    },
+    {
+      name: "a named import of EndpointAccessMode below 2.242.0",
+      code: `
+        import { EndpointAccessMode, SecurityPolicy } from "aws-cdk-lib/aws-apigateway";
+      `,
+      options: [{ floor: "2.241.0" }],
       errors: [{ messageId: "aboveFloor" }],
     },
     {

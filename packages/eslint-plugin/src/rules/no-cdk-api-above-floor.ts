@@ -51,6 +51,21 @@ interface BannedExport extends Banned {
 const ALLOWED_CFN_GUARDS = new Set(["isCfnResource", "isCfnElement"]);
 
 /**
+ * API Gateway's enhanced `SecurityPolicy` members. Named in full: elbv2's
+ * `SslPolicy` shares the `TLS12_`/`TLS13_` prefixes. These names must stay
+ * unique across aws-cdk-lib; scope the entry by its owning enum if that changes.
+ */
+const APIGATEWAY_ENHANCED_SECURITY_POLICIES = new Set([
+  "TLS13_1_3_2025_09",
+  "TLS13_1_3_FIPS_2025_09",
+  "TLS13_1_2_PQ_2025_09",
+  "TLS13_1_2_PFS_PQ_2025_09",
+  "TLS13_2025_EDGE",
+  "TLS12_PFS_2025_EDGE",
+  "TLS12_2018_EDGE",
+]);
+
+/**
  * The ban list, as members and exports: facts about `aws-cdk-lib`, each true whatever the floor. The
  * rule reports an entry only where the configured floor predates its `since`,
  * so an entry costs nothing in a package whose floor is already above it.
@@ -85,6 +100,12 @@ const BANNED_MEMBERS: readonly BannedMember[] = [
       "`addWarning`, or feature-detect `addWarningV2` and fall back to `addWarning` where it is " +
       "missing, as @composurecdk/cloudformation's template-text policy does",
   },
+  {
+    matches: (name) => APIGATEWAY_ENHANCED_SECURITY_POLICIES.has(name),
+    label: "the enhanced API Gateway `SecurityPolicy` members",
+    since: "2.242.0",
+    use: "`SecurityPolicy.TLS_1_2`, or raise the package's floor",
+  },
 ];
 
 const BANNED_EXPORTS: readonly BannedExport[] = [
@@ -96,6 +117,13 @@ const BANNED_EXPORTS: readonly BannedExport[] = [
     use:
       "the construct metadata it reads — `node.metadata` entries of type `aws:cdk:warning` or " +
       "`aws:cdk:error`",
+  },
+  {
+    module: "aws-cdk-lib/aws-apigateway",
+    name: "EndpointAccessMode",
+    label: "`EndpointAccessMode` from `aws-cdk-lib/aws-apigateway`",
+    since: "2.242.0",
+    use: "no access mode: only the enhanced security policies need one",
   },
 ];
 

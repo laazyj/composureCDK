@@ -25,6 +25,16 @@ export interface RestApiBuilderPropsBase {
   policy?: Resolvable<NonNullable<RestApiBaseProps["policy"]>>;
 
   /**
+   * A custom domain name mapped to the API's root: CDK's `DomainNameOptions`,
+   * with `certificate` widened to a {@link Resolvable}. `securityPolicy`
+   * defaults per {@link DOMAIN_NAME_DEFAULTS}; set `endpointType` to match the
+   * API. See the README's "Custom domain" section.
+   */
+  domainName?: Omit<NonNullable<RestApiBaseProps["domainName"]>, "certificate"> & {
+    certificate: Resolvable<NonNullable<RestApiBaseProps["domainName"]>["certificate"]>;
+  };
+
+  /**
    * Whether to automatically create a CloudWatch log group for access logging,
    * and how to configure it; see {@link AccessLoggingConfig}.
    *

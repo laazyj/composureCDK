@@ -187,17 +187,57 @@ compose(
 - **Name resources in the relative `execute-api:/stage/METHOD/path` form.** The policy is a property of the API resource itself, so `api.arnForExecuteApi()` would make the API depend on its own id, which CloudFormation rejects as a circular dependency. API Gateway expands the relative form to the API's own ARN.
 - **A component that depends on the API cannot be named here:** `compose` rejects the cycle. Grant an IAM principal access on the principal's side with [`restApiGrants`](#invoke-grants) instead.
 
+## Custom domain
+
+`.domainName(options)` gives either builder a custom domain, mapped to the API's root. It takes CDK's `DomainNameOptions`, but `certificate` also accepts a `ref`, so a certificate built in the same system can be wired in. The alias record is a stock `createARecordBuilder()` from `@composurecdk/route53`, pointed at the API:
+
+```ts
+import { EndpointType } from "aws-cdk-lib/aws-apigateway";
+import { createCertificateBuilder, type CertificateBuilderResult } from "@composurecdk/acm";
+import {
+  apiGatewayAliasTarget,
+  createARecordBuilder,
+  createHostedZoneBuilder,
+  type HostedZoneBuilderResult,
+} from "@composurecdk/route53";
+
+const zone = ref("zone", (r: HostedZoneBuilderResult) => r.hostedZone);
+
+compose(
+  {
+    zone: createHostedZoneBuilder().zoneName("example.com"),
+    certificate: createCertificateBuilder().domainName("api.example.com").validationZone(zone),
+    api: createRestApiBuilder()
+      .endpointTypes([EndpointType.REGIONAL])
+      .domainName({
+        domainName: "api.example.com",
+        certificate: ref("certificate", (r: CertificateBuilderResult) => r.certificate),
+      }),
+    record: createARecordBuilder()
+      .zone(zone)
+      .recordName("api.example.com")
+      .target(apiGatewayAliasTarget(ref("api", (r: RestApiBuilderResult) => r.api))),
+  },
+  { zone: [], certificate: ["zone"], api: ["certificate"], record: ["zone", "api"] },
+);
+```
+
+- **`securityPolicy` defaults to `TLS_1_2`**; see [Secure Defaults](#secure-defaults).
+- **Set `endpointType` to match the API.** It keeps CDK's default, `REGIONAL`, whatever the API's own endpoint type, and `createRestApiBuilder()`'s API is `EDGE` unless you say otherwise. An `EDGE` domain needs its certificate in us-east-1. [#898](https://github.com/laazyj/composureCDK/issues/898) tracks defaulting it to the API's type.
+- **The domain is on the result as `api.domainName`.** For several domains or base paths, create CDK `DomainName`s yourself and alias them with `apiGatewayDomainAliasTarget`.
+
 ## Secure Defaults
 
 `createRestApiBuilder` applies the following defaults. Each can be overridden via the builder's fluent API.
 
-| Property           | Default | Rationale                                                                                                              |
-| ------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `accessLogging`    | `true`  | Auto-creates a CloudWatch log group for access logging with structured JSON output; customise it with `{ configure }`. |
-| `executionLogging` | `true`  | Creates the stage's execution log group in the stack, with a retention policy.                                         |
-| `tracingEnabled`   | `true`  | Enables X-Ray distributed tracing on the stage.                                                                        |
-| `loggingLevel`     | `INFO`  | Enables CloudWatch execution logging for all methods.                                                                  |
-| `dataTraceEnabled` | `false` | Prevents sensitive request/response bodies from appearing in logs.                                                     |
+| Property                    | Default   | Rationale                                                                                                                                |
+| --------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `accessLogging`             | `true`    | Auto-creates a CloudWatch log group for access logging with structured JSON output; customise it with `{ configure }`.                   |
+| `executionLogging`          | `true`    | Creates the stage's execution log group in the stack, with a retention policy.                                                           |
+| `tracingEnabled`            | `true`    | Enables X-Ray distributed tracing on the stage.                                                                                          |
+| `loggingLevel`              | `INFO`    | Enables CloudWatch execution logging for all methods.                                                                                    |
+| `dataTraceEnabled`          | `false`   | Prevents sensitive request/response bodies from appearing in logs.                                                                       |
+| `domainName.securityPolicy` | `TLS_1_2` | Makes the custom domain's TLS floor explicit in the template. Applies only when `domainName` is set; exported as `DOMAIN_NAME_DEFAULTS`. |
 
 These defaults are guided by the [AWS Well-Architected Serverless Applications Lens](https://docs.aws.amazon.com/wellarchitected/latest/serverless-applications-lens/opex-distributed-tracing.html).
 

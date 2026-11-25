@@ -10,6 +10,7 @@ import {
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { SPEC_REST_API_DEFAULTS } from "./defaults.js";
 import { resolveDeployOptions } from "./deploy-options.js";
+import { resolveDomainName } from "./domain-name.js";
 import { resolveExecutionLogGroup } from "./execution-logging.js";
 import { createRestApiAlarms } from "./rest-api-alarms.js";
 
@@ -23,7 +24,9 @@ import { createRestApiAlarms } from "./rest-api-alarms.js";
  * so it keeps tracking the installed `aws-cdk-lib` (ADR-0018).
  */
 export interface SpecRestApiBuilderProps
-  extends Omit<SpecRestApiProps, "apiDefinition" | "policy">, RestApiBuilderPropsBase {
+  extends
+    Omit<SpecRestApiProps, "apiDefinition" | "policy" | "domainName">,
+    RestApiBuilderPropsBase {
   /**
    * The OpenAPI specification that defines the API.
    *
@@ -120,6 +123,7 @@ class SpecRestApiBuilder implements Lifecycle<WithCustomAlarms<SpecRestApiBuilde
       recommendedAlarms: alarmConfig,
       apiDefinition,
       policy,
+      domainName,
       ...specRestApiProps
     } = this.props;
 
@@ -134,6 +138,7 @@ class SpecRestApiBuilder implements Lifecycle<WithCustomAlarms<SpecRestApiBuilde
     // without leaving a half-built access log group in the scope.
     const resolvedDefinition = resolve(apiDefinition, context);
     const resolvedPolicy = policy === undefined ? undefined : resolve(policy, context);
+    const resolvedDomainName = resolveDomainName(domainName, context);
 
     const { accessLogGroup, deployOptions } = resolveDeployOptions(
       scope,
@@ -148,6 +153,7 @@ class SpecRestApiBuilder implements Lifecycle<WithCustomAlarms<SpecRestApiBuilde
       ...specRestApiProps,
       apiDefinition: resolvedDefinition,
       policy: resolvedPolicy,
+      domainName: resolvedDomainName,
       deployOptions,
     });
 

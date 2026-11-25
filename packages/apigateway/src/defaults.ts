@@ -1,4 +1,9 @@
-import { MethodLoggingLevel, type StageOptions } from "aws-cdk-lib/aws-apigateway";
+import {
+  type DomainNameOptions,
+  MethodLoggingLevel,
+  SecurityPolicy,
+  type StageOptions,
+} from "aws-cdk-lib/aws-apigateway";
 import type { RestApiBuilderProps } from "./rest-api-builder.js";
 import type { SpecRestApiBuilderProps } from "./spec-rest-api-builder.js";
 
@@ -70,3 +75,18 @@ export const SPEC_REST_API_DEFAULTS = {
 
   deployOptions: DEPLOY_OPTIONS_DEFAULTS,
 } satisfies Partial<SpecRestApiBuilderProps>;
+
+/**
+ * Secure defaults applied to a REST API's custom `domainName`, under the
+ * options the user sets. Applied by both {@link createRestApiBuilder} and
+ * {@link createSpecRestApiBuilder}, and only when a `domainName` is set.
+ */
+export const DOMAIN_NAME_DEFAULTS = {
+  /**
+   * Require TLS 1.2 as the minimum protocol version. CDK documents this as
+   * its default but leaves the property out of the template; setting it makes
+   * the TLS floor explicit in the synthesised `AWS::ApiGateway::DomainName`.
+   * @see https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-in-transit.html
+   */
+  securityPolicy: SecurityPolicy.TLS_1_2,
+} satisfies Partial<DomainNameOptions>;

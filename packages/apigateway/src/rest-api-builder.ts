@@ -16,6 +16,7 @@ import {
 import type { RestApiBuilderPropsBase, RestApiBuilderResultBase } from "./builder-common.js";
 import { REST_API_DEFAULTS } from "./defaults.js";
 import { resolveDeployOptions } from "./deploy-options.js";
+import { resolveDomainName } from "./domain-name.js";
 import { resolveExecutionLogGroup } from "./execution-logging.js";
 import { ResourceBuilder } from "./resource-builder.js";
 import { createRestApiAlarms } from "./rest-api-alarms.js";
@@ -26,7 +27,7 @@ import { createRestApiAlarms } from "./rest-api-alarms.js";
  * Extends the CDK {@link RestApiProps} with additional builder-specific options.
  */
 export interface RestApiBuilderProps
-  extends Omit<RestApiProps, "policy">, RestApiBuilderPropsBase {}
+  extends Omit<RestApiProps, "policy" | "domainName">, RestApiBuilderPropsBase {}
 
 /**
  * The build output of a {@link IRestApiBuilder}. Contains the CDK constructs
@@ -137,11 +138,13 @@ class RestApiBuilder implements Lifecycle<WithCustomAlarms<RestApiBuilderResult,
       executionLogging,
       recommendedAlarms: alarmConfig,
       policy,
+      domainName,
       ...restApiProps
     } = this.props;
     // Resolved before anything is created, so an unresolvable ref fails
     // without leaving a half-built access log group in the scope.
     const resolvedPolicy = policy === undefined ? undefined : resolve(policy, context);
+    const resolvedDomainName = resolveDomainName(domainName, context);
     const { accessLogGroup, deployOptions } = resolveDeployOptions(
       scope,
       id,
@@ -154,6 +157,7 @@ class RestApiBuilder implements Lifecycle<WithCustomAlarms<RestApiBuilderResult,
     const api = new RestApi(scope, id, {
       ...restApiProps,
       policy: resolvedPolicy,
+      domainName: resolvedDomainName,
       deployOptions,
     });
     this.#root.applyTo(api.root, context ?? {});

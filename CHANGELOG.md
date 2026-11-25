@@ -1,3 +1,39 @@
+## 0.17.0 (2026-11-25)
+
+### 🚀 Features
+
+- **apigateway:** accept a resolvable certificate for a REST API's custom domain ([#899](https://github.com/laazyj/composureCDK/pull/899), [#897](https://github.com/laazyj/composureCDK/issues/897))
+- ⚠️ **cloudformation:** remove the deprecated singleStack and groupedStacks ([#887](https://github.com/laazyj/composureCDK/pull/887))
+
+### 🩹 Fixes
+
+- ⚠️ **cloudformation:** tag only the named component with tags() byComponent ([#886](https://github.com/laazyj/composureCDK/pull/886), [#882](https://github.com/laazyj/composureCDK/issues/882))
+
+### ⚠️ Breaking Changes
+
+- **cloudformation:** remove the deprecated singleStack and groupedStacks ([#887](https://github.com/laazyj/composureCDK/pull/887))
+  @composurecdk/cloudformation no longer exports
+  singleStack or groupedStacks. Import them from @composurecdk/core
+  instead. Replace singleStack() with singleStack(createStackBuilder()),
+  and singleStack(builder) with singleStack(builder). Replace
+  groupedStacks(classify, builder) with groupedStacks(groups, placement):
+  name a stack source for each group, and map every component key to its
+  group.
+- **cloudformation:** tag only the named component with tags() byComponent ([#886](https://github.com/laazyj/composureCDK/pull/886), [#882](https://github.com/laazyj/composureCDK/issues/882))
+  a byComponent tag no longer reaches a component's
+  siblings when they share a scope, and in a shared scope it reaches only
+  the constructs in the component's build result. A deployed stack that
+  relied on the old reach loses those tags on its next deploy. To keep
+  tagging the whole scope, use system tags, or give the component a stack
+  of its own. tags() also applies its tags below CDK's default
+  priority now, so a tag added with Tags.of(...).add(...) at the default
+  priority wins over a system or byComponent tag with the same key, even
+  from a wider scope. Pass a lower priority there to keep the old result.
+
+### 💀 Thank You
+
+- Jason Duffett
+
 ## 0.16.0 (2026-11-23)
 
 ### 🚀 Features

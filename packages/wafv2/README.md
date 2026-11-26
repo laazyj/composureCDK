@@ -148,6 +148,19 @@ createWebAclBuilder()
 
 Each checks WAF's documented limits when it is called, skipping tokens: those in the table, 1 to 10 text transformations, a query argument name of at most 30 characters, and an ARN of 20 to 2,048 characters.
 
+`and(...statements)`, `or(...statements)` and `not(statement)` combine statements, and nest to any depth. A ref inside one, such as a regex pattern set's ARN, is resolved at build. WAF evaluates a rate-based or rule-group statement only as a rule's own statement, so nesting one, in a combinator or a `scopeDown()`, throws.
+
+```ts
+createWebAclBuilder().addRule("AdminFromAbroad", (rule) =>
+  rule.statement(
+    ruleStatements.and(
+      ruleStatements.byteMatch(fieldToMatch.uriPath(), "STARTS_WITH", "/admin"),
+      ruleStatements.not(ruleStatements.geoMatch(["GB"])),
+    ),
+  ),
+);
+```
+
 ### Raw statements and CloudFormation casing
 
 `statement()` also takes CDK's `CfnWebACL.StatementProperty`, for a statement `ruleStatements` does not cover. Most of it is camelCase, as usual, but CDK types several fields as `any` and passes them through untouched, so **they need CloudFormation's PascalCase**. A wrong case is accepted at synth and fails at deploy. `fieldToMatch` emits the right casing, so use it inside a raw statement too:

@@ -234,6 +234,111 @@ describe("ruleStatements", () => {
     });
   });
 
+  describe("and, or, not", () => {
+    const admin = ruleStatements.byteMatch(fieldToMatch.uriPath(), "STARTS_WITH", "/admin");
+    const abroad = ruleStatements.not(ruleStatements.geoMatch(["GB"]));
+
+    it("combines statements, nesting to any depth", () => {
+      expect(
+        synthStatement(
+          ruleStatements.or(
+            ruleStatements.and(ruleStatements.geoMatch(["US"]), abroad),
+            ruleStatements.geoMatch(["KP"]),
+          ),
+        ),
+      ).toEqual({
+        OrStatement: {
+          Statements: [
+            {
+              AndStatement: {
+                Statements: [
+                  { GeoMatchStatement: { CountryCodes: ["US"] } },
+                  { NotStatement: { Statement: { GeoMatchStatement: { CountryCodes: ["GB"] } } } },
+                ],
+              },
+            },
+            { GeoMatchStatement: { CountryCodes: ["KP"] } },
+          ],
+        },
+      });
+    });
+
+    it("resolves a ref inside a combinator", () => {
+      const stack = newStack();
+      const patterns = new CfnRegexPatternSet(stack, "Bots", {
+        scope: "REGIONAL",
+        regularExpressionList: ["^curl/"],
+      });
+      const { webAcl } = createWebAclBuilder()
+        .addRule("AdminBots", (r) =>
+          r.statement(
+            ruleStatements.and(
+              admin,
+              ruleStatements.regexPatternSet(
+                ref("patterns", (p: CfnRegexPatternSet) => p.attrArn),
+                fieldToMatch.header("user-agent"),
+              ),
+            ),
+          ),
+        )
+        .build(stack, "WithPatterns", { patterns });
+
+      const [rule] = webAcl.rules as CfnWebACL.RuleProperty[];
+      const statement = rule.statement as CfnWebACL.StatementProperty;
+      expect(stack.resolve(statement.andStatement)).toEqual({
+        statements: [
+          admin,
+          {
+            regexPatternSetReferenceStatement: expect.objectContaining({
+              arn: { "Fn::GetAtt": [stack.getLogicalId(patterns), "Arn"] },
+            }) as unknown,
+          },
+        ],
+      });
+    });
+
+    it("rejects no statements", () => {
+      expect(() => ruleStatements.and()).toThrow(/at least one statement/);
+      expect(() => ruleStatements.or()).toThrow(/at least one statement/);
+    });
+
+    it.each([
+      ["rateBasedStatement", { rateBasedStatement: { limit: 100, aggregateKeyType: "IP" } }],
+      [
+        "managedRuleGroupStatement",
+        { managedRuleGroupStatement: { vendorName: "AWS", name: "AWSManagedRulesCommonRuleSet" } },
+      ],
+      ["ruleGroupReferenceStatement", { ruleGroupReferenceStatement: { arn: REGEX_SET_ARN } }],
+    ])("rejects a nested %s", (kind, statement) => {
+      expect(() => ruleStatements.not(statement)).toThrow(
+        new RegExp(`a ${kind} cannot be nested in another statement`),
+      );
+    });
+
+    it("rejects a non-nestable scope-down", () => {
+      expect(() =>
+        buildAndSynth((b) =>
+          b.addRule("Rule", (r) =>
+            r
+              .rateLimit(100)
+              .scopeDown({ rateBasedStatement: { limit: 10, aggregateKeyType: "IP" } }),
+          ),
+        ),
+      ).toThrow(/rule "Rule" scopeDown\(\): a rateBasedStatement cannot be nested/);
+    });
+
+    it("rejects a non-nestable statement behind a ref at build", () => {
+      const rated = ref("x", () => ({
+        rateBasedStatement: { limit: 100, aggregateKeyType: "IP" },
+      }));
+      expect(() =>
+        createWebAclBuilder()
+          .addRule("Rule", (r) => r.statement(ruleStatements.and(admin, rated)))
+          .build(newStack(), "Waf", { x: {} }),
+      ).toThrow(/a rateBasedStatement cannot be nested/);
+    });
+  });
+
   it("scopes down a rule", () => {
     const { template } = buildAndSynth((b) =>
       b.addRule("AdminRate", (r) =>

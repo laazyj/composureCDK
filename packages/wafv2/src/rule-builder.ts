@@ -10,7 +10,13 @@ import type { WebAclRuleAlarmConfig } from "./alarm-config.js";
 import { WEB_ACL_VISIBILITY_DEFAULTS } from "./defaults.js";
 import { validateMetricName, validateRuleLabel } from "./names.js";
 import { type ManagedRuleGroupOptions, managedRuleGroupStatement } from "./managed-rule-groups.js";
-import { fieldToMatch, type IpSetForwardedIpOptions, ruleStatements } from "./statements.js";
+import {
+  assertNestable,
+  fieldToMatch,
+  type IpSetForwardedIpOptions,
+  isRuleGroupStatement,
+  ruleStatements,
+} from "./statements.js";
 import {
   type ForwardedIpFallback,
   NO_TRANSFORMATION,
@@ -106,13 +112,6 @@ export interface BuiltRule {
   readonly blocks: boolean;
   /** The rule's recommended alarm configuration. */
   readonly alarms: WebAclRuleAlarmConfig | false | undefined;
-}
-
-const RULE_GROUP_STATEMENTS = ["managedRuleGroupStatement", "ruleGroupReferenceStatement"] as const;
-
-/** Whether `statement` evaluates a rule group, so its rule takes `overrideAction`. */
-function isRuleGroupStatement(statement: CfnWebACL.StatementProperty): boolean {
-  return RULE_GROUP_STATEMENTS.some((key) => statement[key] !== undefined);
 }
 
 class WebAclRuleBuilder {
@@ -225,11 +224,9 @@ class WebAclRuleBuilder {
   blockUnlessHeader(name: string): this {
     return this.#setStatement("blockUnlessHeader", {
       kind: "raw",
-      statement: {
-        notStatement: {
-          statement: ruleStatements.sizeConstraint(fieldToMatch.header(name), "GT", 0),
-        },
-      },
+      statement: ruleStatements.not(
+        ruleStatements.sizeConstraint(fieldToMatch.header(name), "GT", 0),
+      ),
     });
   }
 
@@ -336,7 +333,7 @@ class WebAclRuleBuilder {
   #setStatement(method: string, source: StatementSource): this {
     if (this.#statement !== undefined) {
       throw new Error(
-        `${method}(): the rule already has a statement. A rule has exactly one; combine conditions with an AndStatement or OrStatement.`,
+        `${method}(): the rule already has a statement. A rule has exactly one; combine conditions with ruleStatements.and() or .or().`,
       );
     }
     this.#statement = source;
@@ -360,6 +357,7 @@ class WebAclRuleBuilder {
     }
     const scopeDown =
       this.#scopeDown === undefined ? undefined : resolve(this.#scopeDown, ctx.context);
+    if (scopeDown !== undefined) assertNestable(`${owner} scopeDown()`, scopeDown);
 
     switch (source.kind) {
       case "raw":

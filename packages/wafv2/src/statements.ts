@@ -1,6 +1,6 @@
 import { Token } from "aws-cdk-lib";
 import type { CfnWebACL } from "aws-cdk-lib/aws-wafv2";
-import { isRef, type Resolvable } from "@composurecdk/core";
+import { combine, isRef, type Resolvable } from "@composurecdk/core";
 import { validateQueryArgumentName, validateReferenceArn } from "./names.js";
 import { type ForwardedIpFallback, NO_TRANSFORMATION } from "./rate-limit.js";
 
@@ -314,7 +314,98 @@ export const ruleStatements = {
       },
     }));
   },
+
+  /**
+   * Matches requests that match every one of `statements`.
+   *
+   * @see https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statements-logical.html
+   */
+  and(
+    ...statements: Resolvable<CfnWebACL.StatementProperty>[]
+  ): Resolvable<CfnWebACL.StatementProperty> {
+    return combinator("and", statements, (nested) => ({ andStatement: { statements: nested } }));
+  },
+
+  /**
+   * Matches requests that match any of `statements`.
+   *
+   * @see https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statements-logical.html
+   */
+  or(
+    ...statements: Resolvable<CfnWebACL.StatementProperty>[]
+  ): Resolvable<CfnWebACL.StatementProperty> {
+    return combinator("or", statements, (nested) => ({ orStatement: { statements: nested } }));
+  },
+
+  /**
+   * Matches requests that do not match `statement`.
+   *
+   * @see https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statements-logical.html
+   */
+  not(statement: Resolvable<CfnWebACL.StatementProperty>): Resolvable<CfnWebACL.StatementProperty> {
+    return mapResolvable(statement, (nested) => {
+      assertNestable("ruleStatements.not()", nested);
+      return { notStatement: { statement: nested } };
+    });
+  },
 };
+
+const LOGICAL =
+  "https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statements-logical.html";
+
+/** Statements that evaluate a rule group, so their rule takes `overrideAction`. */
+const RULE_GROUP_STATEMENTS = ["managedRuleGroupStatement", "ruleGroupReferenceStatement"] as const;
+
+/** Statements WAF evaluates only as a rule's own statement, never nested in another. */
+const NOT_NESTABLE = ["rateBasedStatement", ...RULE_GROUP_STATEMENTS] as const;
+
+/**
+ * Whether `statement` evaluates a rule group, so its rule takes `overrideAction`.
+ *
+ * @internal
+ */
+export function isRuleGroupStatement(statement: CfnWebACL.StatementProperty): boolean {
+  return RULE_GROUP_STATEMENTS.some((key) => statement[key] !== undefined);
+}
+
+/**
+ * Throws if `statement` is one WAF cannot nest in another, as a logical or
+ * scope-down statement. `where` names the nesting point in the error.
+ *
+ * @internal
+ */
+export function assertNestable(where: string, statement: CfnWebACL.StatementProperty): void {
+  const kind = NOT_NESTABLE.find((key) => statement[key] !== undefined);
+  if (kind !== undefined) {
+    throw new Error(
+      `${where}: a ${kind} cannot be nested in another statement; give it a rule of its own. See ${LOGICAL}.`,
+    );
+  }
+}
+
+/**
+ * Builds an AND or OR statement from `statements` once they are all resolved:
+ * at once when none is a ref, otherwise at build.
+ */
+function combinator(
+  method: "and" | "or",
+  statements: readonly Resolvable<CfnWebACL.StatementProperty>[],
+  build: (nested: CfnWebACL.StatementProperty[]) => CfnWebACL.StatementProperty,
+): Resolvable<CfnWebACL.StatementProperty> {
+  if (statements.length === 0) {
+    fail(method, "a logical statement takes at least one statement.", LOGICAL);
+  }
+  const checkAndBuild = (resolved: CfnWebACL.StatementProperty[]) => {
+    for (const statement of resolved) assertNestable(`ruleStatements.${method}()`, statement);
+    return build(resolved);
+  };
+  if (!statements.some((statement) => isRef(statement))) {
+    return checkAndBuild(statements as CfnWebACL.StatementProperty[]);
+  }
+  // combine() takes a record, so key the statements by position; integer keys keep their order.
+  const byIndex = Object.fromEntries(statements.map((statement, i) => [String(i), statement]));
+  return combine(byIndex, (resolved) => checkAndBuild(Object.values(resolved)));
+}
 
 function checkArn(arn: string): string {
   validateReferenceArn(arn);

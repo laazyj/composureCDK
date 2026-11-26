@@ -60,7 +60,7 @@ The result is `{ webAcl, associations, logGroup?, logging?, metrics, alarms }`:
 | `blockUnlessHeader(name)`                                       | Matches requests without a header — see [Requiring a header](#requiring-a-header). |
 | `managedRuleGroup(name, options?)`                              | Evaluates a managed rule group — see [Managed rule groups](#managed-rule-groups).  |
 | `ipSet(arn, forwardedIp?)`                                      | Matches the addresses in an IP set — see [IP sets](#ip-sets).                      |
-| `statement(raw)`                                                | The rule's statement, as CloudFormation's `StatementProperty`, for anything else.  |
+| `statement(statement)`                                          | Any other statement — see [Statements](#statements).                               |
 | `block()` · `allow()` · `count()` · `captcha()` · `challenge()` | The action. `block()` is the default.                                              |
 | `respond(status, body?, headers?)`                              | Block with a custom response — see [Custom responses](#custom-responses).          |
 | `labels(...labels)`                                             | Labels to add to matching requests, for later rules to match on.                   |
@@ -117,22 +117,51 @@ The per-IP limit is a backstop, set well above the per-credential one because ma
 .addRule("Office", (rule) => rule.ipSet(ref("ips", (r: CfnIPSet) => r.attrArn)).allow())
 ```
 
+### Statements
+
+`ruleStatements` builds the statements the rule builder has no method for. Pass one to `statement()`, or to `scopeDown()`:
+
+```ts
+import { fieldToMatch, ruleStatements } from "@composurecdk/wafv2";
+
+createWebAclBuilder()
+  .addRule("Sanctioned", (rule) => rule.statement(ruleStatements.geoMatch(["KP", "IR"])))
+  .addRule("OversizeBody", (rule) =>
+    rule.statement(ruleStatements.sizeConstraint(fieldToMatch.body("MATCH"), "GT", 8192)),
+  )
+  .addRule("AdminRate", (rule) =>
+    rule
+      .rateLimit(100)
+      .scopeDown(ruleStatements.byteMatch(fieldToMatch.uriPath(), "STARTS_WITH", "/admin")),
+  );
+```
+
+| Statement                                               | Matches requests                                                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `geoMatch(countryCodes, forwardedIp?)`                  | from 1 to 50 countries, by ISO 3166-1 alpha-2 code: `GB`, not `UK`; `XK` for Kosovo.              |
+| `byteMatch(field, position, searchString, transforms?)` | whose `field` contains a string of 1 to 200 bytes `EXACTLY`, `STARTS_WITH`, `CONTAINS` and so on. |
+| `sizeConstraint(field, comparison, size, transforms?)`  | whose `field` is `GT`, `LE`, … `size` bytes.                                                      |
+| `regexPatternSet(arn, field, transforms?)`              | whose `field` matches a pattern in an `AWS::WAFv2::RegexPatternSet`, given by ARN or as a `ref`.  |
+| `ipSet(arn, forwardedIp?)`                              | from the addresses in an IP set, as the rule builder's `ipSet()`.                                 |
+
+`fieldToMatch` names the part of the request to inspect: `header(name)`, `queryArgument(name)`, `allQueryArguments()`, `queryString()`, `uriPath()`, `method()` or `body(oversizeHandling?)`. WAF inspects only the first 8 KB of a body behind an Application Load Balancer, and 16 KB by default elsewhere; `body("MATCH")` treats a larger body as matching, so a size check on it blocks bodies WAF could not see in full. The text transformations, such as `["URL_DECODE", "LOWERCASE"]`, are applied in order, and default to none.
+
+Each checks WAF's documented limits when it is called, skipping tokens: those in the table, 1 to 10 text transformations, a query argument name of at most 30 characters, and an ARN of 20 to 2,048 characters.
+
 ### Raw statements and CloudFormation casing
 
-`statement()` takes CDK's `CfnWebACL.StatementProperty`. Most of it is camelCase, as usual, but CDK types several fields as `any` and passes them through untouched, so **they need CloudFormation's PascalCase**. A wrong case is accepted at synth and fails at deploy.
+`statement()` also takes CDK's `CfnWebACL.StatementProperty`, for a statement `ruleStatements` does not cover. Most of it is camelCase, as usual, but CDK types several fields as `any` and passes them through untouched, so **they need CloudFormation's PascalCase**. A wrong case is accepted at synth and fails at deploy. `fieldToMatch` emits the right casing, so use it inside a raw statement too:
 
 ```ts
 rule.statement({
-  sizeConstraintStatement: {
-    fieldToMatch: { singleHeader: { Name: "x-api-key" } }, // Name, not name
-    comparisonOperator: "GT",
-    size: 0,
-    textTransformations: [{ priority: 0, type: "NONE" }],
+  xssMatchStatement: {
+    fieldToMatch: fieldToMatch.queryString(), // { queryString: {} }
+    textTransformations: [{ priority: 0, type: "URL_DECODE" }],
   },
 });
 ```
 
-The `any`-typed fields are `FieldToMatch`'s `singleHeader`, `singleQueryArgument`, `allQueryArguments`, `queryString`, `uriPath` and `method`, and a rate-based statement's custom keys `ip`, `forwardedIp`, `httpMethod` and `asn`. Fields that are empty objects (`uriPath: {}`) are unaffected.
+The `any`-typed fields are `FieldToMatch`'s `singleHeader` (`{ Name }`, not `{ name }`), `singleQueryArgument`, `allQueryArguments`, `queryString`, `uriPath` and `method`, and a rate-based statement's custom keys `ip`, `forwardedIp`, `httpMethod` and `asn`. Fields that are empty objects (`uriPath: {}`) are unaffected. The rest of `FieldToMatch` — cookies, all headers, the JSON body — CDK types in full.
 
 ### Priorities
 
@@ -309,7 +338,7 @@ const { webAcl } = createWebAclBuilder().scope("CLOUDFRONT").build(usEast1Stack,
 
 ## Constraints
 
-Names, metric names, labels and the web ACL's description are validated at build against the AWS rules ([ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md)), so a description [CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-wafv2-webacl.html) would reject, such as one with an apostrophe or underscore, fails at synth rather than at deploy. The validators are exported for direct use:
+Names, metric names, labels, query argument names, reference ARNs and the web ACL's description are validated at build against the AWS rules ([ADR-0010](https://github.com/laazyj/composureCDK/blob/main/docs/adr/0010-aws-property-constraints.md)), so a description [CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-wafv2-webacl.html) would reject, such as one with an apostrophe or underscore, fails at synth rather than at deploy. The validators are exported for direct use:
 
 ```ts
 import { constraints } from "@composurecdk/wafv2";
@@ -319,4 +348,6 @@ constraints.validate.webAclDescription("Protects the API");
 constraints.validate.ruleName("PerIpRate");
 constraints.validate.metricName("PerIpRate");
 constraints.validate.ruleLabel("auth:missing-token");
+constraints.validate.queryArgumentName("id");
+constraints.validate.referenceArn(ipSetArn);
 ```

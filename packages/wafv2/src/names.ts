@@ -185,3 +185,41 @@ export function validateRuleLabel(raw: string): void {
     }
   }
 }
+
+const WAF_API = "https://docs.aws.amazon.com/waf/latest/APIReference";
+
+/** The name of a query argument a statement inspects. */
+const QUERY_ARGUMENT_NAME = stringConstraint({
+  name: "WAFv2 FieldToMatch SingleQueryArgument Name",
+  charClass: "\\s\\S",
+  minLength: 1,
+  maxLength: 30,
+  allowed: "any characters",
+  source: `${WAF_API}/API_FieldToMatch.html`,
+});
+
+/** The ARN of the IP set or regex pattern set a reference statement names. */
+const REFERENCE_ARN = stringConstraint({
+  name: "WAFv2 reference statement ARN",
+  charClass: "\\s\\S",
+  minLength: 20,
+  maxLength: 2048,
+  allowed: "any characters",
+  source: `${WAF_API}/API_RegexPatternSetReferenceStatement.html`,
+});
+
+/**
+ * Validates the name of a query argument a statement inspects: 1–30
+ * characters. Throws if invalid; skips unresolved tokens.
+ */
+export function validateQueryArgumentName(raw: string): void {
+  validateString(raw, QUERY_ARGUMENT_NAME);
+}
+
+/**
+ * Validates the ARN of an IP set or regex pattern set a reference statement
+ * names: 20–2,048 characters. Throws if invalid; skips unresolved tokens.
+ */
+export function validateReferenceArn(raw: string): void {
+  validateString(raw, REFERENCE_ARN);
+}

@@ -1,6 +1,8 @@
 import type { ConstraintNamespace } from "@composurecdk/cloudformation";
 import {
   validateMetricName,
+  validateQueryArgumentName,
+  validateReferenceArn,
   validateRuleLabel,
   validateRuleName,
   validateWebAclDescription,
@@ -14,11 +16,20 @@ export {
   type WebAclBuilderResult,
 } from "./web-acl-builder.js";
 export {
-  type IpSetForwardedIpOptions,
   type IWebAclRuleBuilder,
   type WebAclRuleAction,
   type WebAclRuleBuilderProps,
 } from "./rule-builder.js";
+export {
+  type ByteMatchPosition,
+  fieldToMatch,
+  type ForwardedIpOptions,
+  type IpSetForwardedIpOptions,
+  type OversizeHandling,
+  ruleStatements,
+  type SizeComparison,
+  type TextTransformationType,
+} from "./statements.js";
 export { type ForwardedIpFallback, type RateLimitAggregateKey } from "./rate-limit.js";
 export {
   AWS_MANAGED_RULE_GROUP_RULES,
@@ -74,6 +85,8 @@ export const constraints = {
     ruleName: validateRuleName,
     metricName: validateMetricName,
     ruleLabel: validateRuleLabel,
+    queryArgumentName: validateQueryArgumentName,
+    referenceArn: validateReferenceArn,
   },
   sanitize: {},
 } satisfies ConstraintNamespace;

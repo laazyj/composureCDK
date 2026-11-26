@@ -133,6 +133,15 @@ try {
   refuse("GitHub rejected the merge.", [String(error.stderr || error.message).trim()]);
 }
 
+/** Whether the issue is closed now, or `false` if it cannot be read. */
+function isClosed(issue) {
+  try {
+    return api(`repos/${repo}/issues/${issue}`).state === "closed";
+  } catch {
+    return false;
+  }
+}
+
 // The merge has landed, so a failure here is reported, not refused: the run
 // fails so it shows, and the issue is left for a person to close.
 for (const issue of issues) {
@@ -151,6 +160,13 @@ for (const issue of issues) {
     ]);
     console.log(`Closed #${issue}.`);
   } catch (error) {
+    // A description that also names the issue makes GitHub close it as the
+    // merge lands. When that close falls between the read and the write
+    // above, the write fails with HTTP 422, but the issue is closed.
+    if (isClosed(issue)) {
+      console.log(`#${issue} was already closed.`);
+      continue;
+    }
     const reason = `Merged, but could not close #${issue}: ${String(error.stderr || error.message).trim()}`;
     report([reason], [reason]);
     process.exitCode = 1;

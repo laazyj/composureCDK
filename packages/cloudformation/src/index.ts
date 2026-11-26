@@ -11,6 +11,7 @@ export { outputs, type OutputDefinition, type OutputDefinitions } from "./output
 export { taggedBuilder, type ITaggedBuilder, TAG_OVERRIDE_WARNING_NAME } from "./tagged-builder.js";
 export { validateTag } from "./tag-validator.js";
 export { tags, type TagDefinitions } from "./tags.js";
+export { tagStack } from "./tag-stack.js";
 export {
   type StringConstraint,
   stringConstraint,

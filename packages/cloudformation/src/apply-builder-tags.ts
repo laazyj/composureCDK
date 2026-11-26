@@ -29,7 +29,7 @@ function isConstruct(value: unknown): value is IConstruct {
  * appears in the result, it is tagged.
  *
  * Internal to this package: `taggedBuilder()` and `tags({ byComponent })` are
- * the public routes to it.
+ * the public routes to it, as `tagStack()` is to {@link applyTagsToConstruct}.
  */
 export function applyBuilderTags(
   result: object,

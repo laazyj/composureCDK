@@ -35,6 +35,20 @@ stack-level tag that cost allocation and tag-based governance key on silently
 missing. The same guarantee holds for `tags()` applied via `afterBuild`,
 including when a stack strategy — not the caller — created the Stack.
 
+#### Tagging a stack the app built
+
+For a stack no builder can make, such as a deployment framework's own `Stack`
+subclass, `tagStack(stack, t)` tags it as `createStackBuilder().tags(t)` would.
+`Tags.of(stack).add(...)` would leave the stack itself untagged under
+`explicitStackTags`.
+
+```ts
+import { tagStack } from "@composurecdk/cloudformation";
+
+const stack = new FrameworkStack(app, "Api", { env });
+tagStack(stack, { app: "MyApp" }); // the stack, and each resource in it
+```
+
 ### Variants and snapshots with `.copy()`
 
 `.copy()` returns an independent builder with the same configured state. Use it to derive variants from a shared base, or to snapshot a builder before handing it to a stack strategy that may be invoked after further mutations:

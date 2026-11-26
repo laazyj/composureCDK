@@ -118,7 +118,7 @@ Duplicate `.tag(k, ...)` calls last-wins and emit a Node process warning with na
 - `node --disable-warning=ComposureCDKTagOverride …` on Node 21.3+ to silence them globally, or
 - a `process.on("warning", w => { if (w.name !== TAG_OVERRIDE_WARNING_NAME) /* … */ })` listener for finer control.
 
-If you write your own builder, wrap its class with `taggedBuilder()` from `@composurecdk/cloudformation` to get the same `.tag()` / `.tags()`. A component that is not a props-based builder can't take `taggedBuilder()`; tag it with `byComponent` in the `tags()` hook below.
+If you write your own builder, wrap its class with `taggedBuilder()` from `@composurecdk/cloudformation` to get the same `.tag()` / `.tags()`. A component that is not a props-based builder can't take `taggedBuilder()`; tag it with `byComponent` in the `tags()` hook below. A stack the app builds itself takes `tagStack(stack, tags)`.
 
 ### Layer 2 — `tags()` afterBuild hook for cross-cutting tags
 

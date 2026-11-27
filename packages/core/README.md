@@ -6,6 +6,17 @@ This package provides the foundational types and utilities that all ComposureCDK
 
 Most users interact with these primitives indirectly through resource packages (e.g., `@composurecdk/lambda`, `@composurecdk/s3`). Use this package directly when building a custom ComposureCDK resource package or when composing systems.
 
+**Using a coding agent?** This package ships [rules for coding agents](docs/agent-rules.md) on how to lay out an app or builder library, and a [review rubric](docs/review-rubric.md) for checking a change against them, by hand or with a review agent. Add this to your project's `AGENTS.md`, `CLAUDE.md` or equivalent:
+
+```md
+## ComposureCDK
+
+Before writing infrastructure code, read
+`node_modules/@composurecdk/core/docs/agent-rules.md` and follow it.
+To review infrastructure code, follow
+`node_modules/@composurecdk/core/docs/review-rubric.md`.
+```
+
 ## Builder
 
 Generic fluent-builder factory that wraps a class, exposing every property in `Props` as an overloaded getter/setter method. Resource packages use this internally to create their builders.

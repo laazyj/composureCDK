@@ -374,14 +374,9 @@ class WebAclBuilder implements Lifecycle<WithCustomAlarms<WebAclBuilderResult, s
  * createWebAclBuilder()
  *   .associateWith(ref("api", (r: RestApiBuilderResult) => r.api.deploymentStage))
  *   .addRule("BlockAdmin", (rule) =>
- *     rule.statement({
- *       byteMatchStatement: {
- *         fieldToMatch: { uriPath: {} },
- *         positionalConstraint: "STARTS_WITH",
- *         searchString: "/admin",
- *         textTransformations: [{ priority: 0, type: "NONE" }],
- *       },
- *     }).respond(404));
+ *     rule
+ *       .statement(ruleStatements.byteMatch(fieldToMatch.uriPath(), "STARTS_WITH", "/admin"))
+ *       .respond(404));
  * ```
  */
 export function createWebAclBuilder(): IWebAclBuilder {

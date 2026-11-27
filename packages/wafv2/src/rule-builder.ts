@@ -1,13 +1,6 @@
 import { Duration } from "aws-cdk-lib";
 import type { CfnWebACL } from "aws-cdk-lib/aws-wafv2";
-import {
-  Builder,
-  COPY_STATE,
-  type IBuilder,
-  isRef,
-  resolve,
-  type Resolvable,
-} from "@composurecdk/core";
+import { Builder, COPY_STATE, type IBuilder, resolve, type Resolvable } from "@composurecdk/core";
 import type {
   CustomResponse,
   CustomResponseBody,
@@ -17,6 +10,7 @@ import type { WebAclRuleAlarmConfig } from "./alarm-config.js";
 import { WEB_ACL_VISIBILITY_DEFAULTS } from "./defaults.js";
 import { validateMetricName, validateRuleLabel } from "./names.js";
 import { type ManagedRuleGroupOptions, managedRuleGroupStatement } from "./managed-rule-groups.js";
+import { fieldToMatch, type IpSetForwardedIpOptions, ruleStatements } from "./statements.js";
 import {
   type ForwardedIpFallback,
   NO_TRANSFORMATION,
@@ -84,19 +78,6 @@ export interface RuleBuildContext {
   readonly warn: (id: string, message: string) => void;
 }
 
-/** Options for {@link IWebAclRuleBuilder.ipSet} when the client IP is in a header. */
-export interface IpSetForwardedIpOptions {
-  /** The header that carries the client IP, such as `X-Forwarded-For`. */
-  readonly headerName: string;
-  /** What to do with a request whose header holds no valid IP address. */
-  readonly fallbackBehavior: ForwardedIpFallback;
-  /**
-   * Which address in a comma-separated list to match: `FIRST`, `LAST`, or
-   * `ANY` of up to ten.
-   */
-  readonly position: "FIRST" | "LAST" | "ANY";
-}
-
 /**
  * Where a rule's statement comes from: raw CloudFormation, or one of the
  * helpers, which are turned into CloudFormation at build.
@@ -145,10 +126,10 @@ class WebAclRuleBuilder {
   readonly #labels: string[] = [];
 
   /**
-   * Sets the rule's statement as raw CloudFormation, for a statement this
-   * builder has no helper for. Fields CDK types as `any` — `singleHeader`,
-   * `queryString`, `uriPath`, `method` and the like — pass through verbatim,
-   * so they must use CloudFormation's PascalCase (`{ Name: "x-api-key" }`).
+   * Sets the rule's statement: one of {@link ruleStatements}, or raw
+   * CloudFormation for a statement they do not cover. Build a raw statement's
+   * `fieldToMatch` with {@link fieldToMatch}: CDK passes several of its fields
+   * through verbatim, so they need CloudFormation's PascalCase.
    *
    * A rule has exactly one statement; setting a second throws.
    */
@@ -222,8 +203,8 @@ class WebAclRuleBuilder {
 
   /**
    * Narrows a rate-based or managed rule group rule to the requests that match
-   * `statement`. A rate-based rule counts only those requests; a rule group
-   * evaluates only them.
+   * `statement`, such as one of {@link ruleStatements}. A rate-based rule
+   * counts only those requests; a rule group evaluates only them.
    */
   scopeDown(statement: Resolvable<CfnWebACL.StatementProperty>): this {
     this.#scopeDown = statement;
@@ -246,15 +227,7 @@ class WebAclRuleBuilder {
       kind: "raw",
       statement: {
         notStatement: {
-          statement: {
-            sizeConstraintStatement: {
-              // CDK types singleHeader as `any`, so it needs CloudFormation's casing.
-              fieldToMatch: { singleHeader: { Name: name } },
-              comparisonOperator: "GT",
-              size: 0,
-              textTransformations: [...NO_TRANSFORMATION],
-            },
-          },
+          statement: ruleStatements.sizeConstraint(fieldToMatch.header(name), "GT", 0),
         },
       },
     });
@@ -284,15 +257,9 @@ class WebAclRuleBuilder {
    *   `X-Forwarded-For`, instead of the one the request came from.
    */
   ipSet(arn: Resolvable<string>, forwardedIp?: IpSetForwardedIpOptions): this {
-    const statement = (resolved: string): CfnWebACL.StatementProperty => ({
-      ipSetReferenceStatement: {
-        arn: resolved,
-        ...(forwardedIp && { ipSetForwardedIpConfig: forwardedIp }),
-      },
-    });
     return this.#setStatement("ipSet", {
       kind: "raw",
-      statement: isRef(arn) ? arn.map(statement) : statement(arn),
+      statement: ruleStatements.ipSet(arn, forwardedIp),
     });
   }
 

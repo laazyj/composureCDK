@@ -34,6 +34,8 @@ Cross-cutting tag key/value validation is not listed here; it is applied automat
 | `@composurecdk/organizations`  | `policyTargetId`           | `constraints.validate.policyTargetId`           | —                                   |
 | `@composurecdk/organizations`  | `rootId`                   | `constraints.validate.rootId`                   | —                                   |
 | `@composurecdk/wafv2`          | `metricName`               | `constraints.validate.metricName`               | —                                   |
+| `@composurecdk/wafv2`          | `queryArgumentName`        | `constraints.validate.queryArgumentName`        | —                                   |
+| `@composurecdk/wafv2`          | `referenceArn`             | `constraints.validate.referenceArn`             | —                                   |
 | `@composurecdk/wafv2`          | `ruleLabel`                | `constraints.validate.ruleLabel`                | —                                   |
 | `@composurecdk/wafv2`          | `ruleName`                 | `constraints.validate.ruleName`                 | —                                   |
 | `@composurecdk/wafv2`          | `webAclDescription`        | `constraints.validate.webAclDescription`        | —                                   |

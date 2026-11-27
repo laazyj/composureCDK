@@ -9,6 +9,8 @@ import type { IWebAclRuleBuilder } from "../src/rule-builder.js";
 
 const buildAndSynth = buildFixture(createWebAclBuilder, "Waf");
 
+const IP_SET_ARN = "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/office/abc";
+
 const ADMIN_PATH = {
   byteMatchStatement: {
     fieldToMatch: { uriPath: {} },
@@ -440,18 +442,14 @@ describe("rule helpers", () => {
 
   describe("ipSet", () => {
     it("references an IP set by ARN", () => {
-      const { template } = withRule((r) =>
-        r.ipSet("arn:aws:wafv2:us-east-1:123456789012:regional/ipset/office/abc").allow(),
-      );
+      const { template } = withRule((r) => r.ipSet(IP_SET_ARN).allow());
 
       template.hasResourceProperties("AWS::WAFv2::WebACL", {
         Rules: [
           Match.objectLike({
             Action: { Allow: {} },
             Statement: {
-              IPSetReferenceStatement: {
-                Arn: "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/office/abc",
-              },
+              IPSetReferenceStatement: { Arn: IP_SET_ARN },
             },
           }),
         ],
@@ -460,7 +458,7 @@ describe("rule helpers", () => {
 
     it("matches a forwarded IP", () => {
       const { template } = withRule((r) =>
-        r.ipSet("arn:ipset", {
+        r.ipSet(IP_SET_ARN, {
           headerName: "X-Forwarded-For",
           fallbackBehavior: "NO_MATCH",
           position: "FIRST",
@@ -471,7 +469,7 @@ describe("rule helpers", () => {
         "AWS::WAFv2::WebACL",
         ruleStatement({
           IPSetReferenceStatement: {
-            Arn: "arn:ipset",
+            Arn: IP_SET_ARN,
             IPSetForwardedIPConfig: {
               HeaderName: "X-Forwarded-For",
               FallbackBehavior: "NO_MATCH",

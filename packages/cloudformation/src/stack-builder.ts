@@ -30,6 +30,7 @@ export interface StackBuilderResult {
  * {@link ITaggedBuilder.tags | .tags()} are applied to the resulting Stack.
  * CloudFormation propagates stack-level tags to every resource the stack
  * contains, so a single `.tag()` call on a stack reaches everything inside.
+ * To tag a Stack the app built itself the same way, use {@link tagStack}.
  *
  * @example
  * ```ts

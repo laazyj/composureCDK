@@ -53,7 +53,12 @@ compose({ site, cdn }, { site: [], cdn: ["site"] })
 
 ```ts
 compose({ handler, api, table }, { ... })
-  .withStackStrategy(groupedStacks(key => key === "table" ? "persistence" : "service"))
+  .withStackStrategy(
+    groupedStacks(
+      { service: createStackBuilder(), persistence: createStackBuilder() },
+      { handler: "service", api: "service", table: "persistence" },
+    ),
+  )
   .afterBuild(outputs({
     ApiUrl: { value: ref("api", r => r.restApi.url), description: "API endpoint" },
   }))

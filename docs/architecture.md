@@ -66,6 +66,8 @@ When `compose` is called, it:
 2. Validates that the graph has no cycles. If a cycle is found, a `CyclicDependencyError` is thrown immediately — not deferred to build time.
 3. Returns a new `Lifecycle` whose `build` method topologically sorts the graph and builds each component in dependency order, passing the resolved outputs of its dependencies as context.
 
+The dependency record is the only build order `compose` promises: components with no path between them in the graph have no defined order relative to each other. When one must be built after another, declare that dependency ([DECL-11](guide/principles.md#decl-11-when-the-order-of-side-effects-on-a-shared-parent-matters-make-it-an-edge)).
+
 ### Eager validation
 
 Cycle detection happens at composition time, not build time. This means structural errors in the system are caught as early as possible — when the system is defined, not when it is deployed. This follows from the project tenet that dependencies are data, and data can be validated.

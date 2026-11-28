@@ -1,5 +1,7 @@
 # @composurecdk/cloudwatch
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 CloudWatch alarm primitives and the composite alarm builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides the building blocks for CloudWatch alarms that follow ComposureCDK's conventions: readable, stack-scoped alarm names, alarm actions routed across a whole app, and alarm definitions that a builder resolves at build time. It serves two audiences:

@@ -1,5 +1,7 @@
 # @composurecdk/s3
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 S3 builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for S3 buckets and bucket deployments with secure, AWS-recommended defaults. It wraps the CDK [Bucket](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.Bucket.html) and [BucketDeployment](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3_deployment.BucketDeployment.html) constructs — refer to the CDK documentation for the full set of configurable properties.

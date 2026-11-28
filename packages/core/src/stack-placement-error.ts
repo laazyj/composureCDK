@@ -1,3 +1,5 @@
+import { seeRule } from "./agent-rules.js";
+
 /**
  * Thrown when a composed system's stack strategy does not place every
  * component, or places a key that is not a component. Carries both lists so
@@ -26,7 +28,8 @@ export class StackPlacementError extends Error {
     super(
       `The stack strategy for "${systemId}" must place every component, and only components.` +
         (unplaced.length > 0 ? ` Not placed: ${unplaced.join(", ")}.` : "") +
-        (unknown.length > 0 ? ` Not components: ${unknown.join(", ")}.` : ""),
+        (unknown.length > 0 ? ` Not components: ${unknown.join(", ")}.` : "") +
+        seeRule("LAYER-9"),
     );
     this.name = "StackPlacementError";
   }

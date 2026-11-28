@@ -2,7 +2,7 @@
 
 These are the rules for writing, changing or reviewing an app or builder library built with ComposureCDK, condensed for coding agents. ComposureCDK is newer than most training data, so follow these rules rather than habits carried over from plain CDK.
 
-Each rule has an ID from the [catalogue of principles](https://github.com/laazyj/composureCDK/blob/main/docs/guide/principles.md), which gives its reasons and sources. [Architecting a ComposureCDK app](https://github.com/laazyj/composureCDK/blob/main/docs/guide/architecting-an-app.md) works through them with a running example. Cite rule IDs in review comments and change descriptions, so a person can look each one up. To review a change against these rules, use the [review rubric](review-rubric.md).
+Each rule has an ID from the [catalogue of principles](https://github.com/laazyj/composureCDK/blob/main/docs/guide/principles.md), which gives its reasons and sources. [Architecting a ComposureCDK app](https://github.com/laazyj/composureCDK/blob/main/docs/guide/architecting-an-app.md) works through them with a running example. Cite rule IDs in review comments and change descriptions, so a person can look each one up. To review a change against these rules, use the [review rubric](review-rubric.md). To audit, upgrade or refactor an existing app, follow [the audit guide](audit.md) first.
 
 ## Rules
 

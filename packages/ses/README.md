@@ -1,5 +1,7 @@
 # @composurecdk/ses
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 Compose-native builders for [AWS SES](https://docs.aws.amazon.com/ses/latest/dg/Welcome.html), part of [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 SES is Amazon's email service for **sending** and **receiving** mail. This package currently covers the **receiving** path — email identities, receipt rule sets, receipt filters, and rule actions. Sending-side builders (configuration sets, dedicated IP pools, VDM, reputation alarms) will follow.

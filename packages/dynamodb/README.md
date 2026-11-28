@@ -1,5 +1,7 @@
 # @composurecdk/dynamodb
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 DynamoDB table builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for DynamoDB tables with secure, AWS-recommended defaults and built-in CloudWatch alarms. It ships **two builders**, one per CDK construct:

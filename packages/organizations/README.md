@@ -1,5 +1,7 @@
 # @composurecdk/organizations
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 AWS Organizations builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for **service control policies** (SCPs). CDK ships no Organizations L2, so the builder wraps the [`CfnPolicy`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_organizations.CfnPolicy.html) L1 construct, following the same pattern as `@composurecdk/budgets`: typed setters, synth-time validation, and builder tags.

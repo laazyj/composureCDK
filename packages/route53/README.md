@@ -1,5 +1,7 @@
 # @composurecdk/route53
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 Route 53 hosted zone and record builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for Route 53 public hosted zones, for the record types most commonly needed when fronting an AWS workload (A/AAAA alias, CNAME, TXT, MX, SRV, CAA, NS, DS, HTTPS, SVCB), and for both halves of a cross-account subdomain delegation. It wraps the CDK [aws-route53](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_route53-readme.html) constructs — refer to the CDK documentation for the full set of configurable properties.

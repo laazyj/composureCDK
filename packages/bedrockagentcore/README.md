@@ -1,5 +1,7 @@
 # @composurecdk/bedrockagentcore
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 Amazon Bedrock AgentCore for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md): agent runtimes, memory, gateways and evaluations, with secure defaults, consumer-side grants and CloudWatch alarms.
 
 It builds on the stable [`aws-cdk-lib/aws-bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html) module. Model access comes from [`@composurecdk/bedrock`](https://github.com/laazyj/composureCDK/blob/main/packages/bedrock/README.md).

@@ -1,5 +1,7 @@
 # @composurecdk/iam
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 IAM role, customer-managed policy, and policy-statement builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides fluent builders for the most commonly configured IAM resources and centralises least-privilege guardrails so that consuming packages (Lambda, Budgets, SNS topic policies, …) do not have to reinvent them.

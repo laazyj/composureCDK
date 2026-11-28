@@ -1,5 +1,7 @@
 # @composurecdk/lambda
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 Lambda builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for AWS Lambda functions with secure, AWS-recommended defaults. It wraps the CDK [Function](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_lambda.Function.html) construct — refer to the CDK documentation for the full set of configurable properties.

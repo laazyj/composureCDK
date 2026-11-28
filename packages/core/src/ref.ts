@@ -1,3 +1,5 @@
+import { seeRule } from "./agent-rules.js";
+
 /**
  * @internal Brands every {@link Ref} instance so {@link isRef} can recognise
  * one without `instanceof`. `instanceof` is realm-bound: when `@composurecdk/core`
@@ -65,8 +67,9 @@ export class Ref<T> {
             (Object.keys(context).length === 0
               ? ` The context is empty: if this ref was passed to a sub-builder through a ` +
                 `\`configure\` callback, the enclosing builder may not be forwarding its ` +
-                `build context to that sub-builder's build().`
-              : ""),
+                `build context to that sub-builder's build() (the ` +
+                `composurecdk/lifecycle-build-must-forward-context lint rule catches this).`
+              : seeRule("DECL-3")),
         );
       }
       return context[component] as T;
@@ -159,6 +162,7 @@ export class Ref<T> {
  * // With transform — concise single-call form
  * ref<FunctionBuilderResult>("handler", r => new LambdaIntegration(r.function))
  * ```
+ * @see {@link https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md | Agent rules (VOCAB-4)}
  */
 export function ref<T extends object>(component: string): Ref<T>;
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- T is inferred from the callback annotation

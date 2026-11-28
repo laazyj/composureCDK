@@ -1,5 +1,7 @@
 # @composurecdk/custom-resources
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 Compose-native `AwsCustomResource` builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 Some AWS operations have **no CloudFormation resource** — they are account-level SDK calls only reachable through CDK's [`AwsCustomResource`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.custom_resources.AwsCustomResource.html). The canonical example is `ses:SetActiveReceiptRuleSet`: the one call that makes an SES receipt rule set actually receive mail. There is no CFN property for "active rule set".

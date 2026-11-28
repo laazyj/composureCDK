@@ -1,5 +1,7 @@
 # @composurecdk/eslint-plugin
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 Internal ESLint plugin encoding ComposureCDK architectural invariants — tagged builders, lifecycle context, builder copy state.
 
 ```sh

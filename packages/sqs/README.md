@@ -1,5 +1,7 @@
 # @composurecdk/sqs
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 SQS queue builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for SQS queues with secure, AWS-recommended defaults and built-in CloudWatch alarms. It wraps the CDK [Queue](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_sqs.Queue.html) construct — refer to the CDK documentation for the full set of configurable properties.

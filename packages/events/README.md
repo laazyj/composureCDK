@@ -1,5 +1,7 @@
 # @composurecdk/events
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 EventBridge rule builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for EventBridge rules with secure, AWS-recommended defaults. It wraps the CDK [Rule](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_events.Rule.html) construct — refer to the CDK documentation for the full set of configurable properties.

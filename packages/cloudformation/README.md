@@ -1,5 +1,7 @@
 # @composurecdk/cloudformation
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 CloudFormation builders for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for CloudFormation Stacks, which is a stack source for `@composurecdk/core`'s stack strategies, and a post-build hook for creating CloudFormation outputs from composed systems.

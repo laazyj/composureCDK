@@ -1,5 +1,7 @@
 # @composurecdk/budgets
 
+> **For coding agents:** before writing or reviewing code with this package, read `docs/agent-rules.md` in `@composurecdk/core` ([online](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md)).
+
 AWS Budgets builder for [ComposureCDK](https://github.com/laazyj/composureCDK/blob/main/README.md).
 
 This package provides a fluent builder for `AWS::Budgets::Budget` with well-architected defaults, percentage-threshold notification helpers, and automatic `budgets.amazonaws.com` publish permission on SNS subscriber topics. It wraps the CDK L1 [CfnBudget](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_budgets.CfnBudget.html) construct — there is no L2 for Budgets.

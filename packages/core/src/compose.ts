@@ -431,6 +431,7 @@ class ConfiguredLifecycle<
  * @param dependencies - For each component, the list of other component keys it depends on.
  * @returns A {@link ComposedSystem} whose build output is the combined {@link BuildResult} of all components.
  * @see {@link https://github.com/laazyj/composureCDK/blob/main/docs/architecture.md#compose | Architecture: compose}
+ * @see {@link https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md | Agent rules (DECL-1 to DECL-12)}
  */
 export function compose<Components extends Record<string, Lifecycle>>(
   components: Components,

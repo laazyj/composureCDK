@@ -4,10 +4,10 @@ import { StackPlacementError } from "../src/stack-placement-error.js";
 describe("StackPlacementError", () => {
   it("names only the lists that have keys", () => {
     expect(new StackPlacementError("sys", ["a"], []).message).toBe(
-      'The stack strategy for "sys" must place every component, and only components. Not placed: a.',
+      'The stack strategy for "sys" must place every component, and only components. Not placed: a. See rule LAYER-9 in docs/agent-rules.md in @composurecdk/core (https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md).',
     );
     expect(new StackPlacementError("sys", [], ["x", "y"]).message).toBe(
-      'The stack strategy for "sys" must place every component, and only components. Not components: x, y.',
+      'The stack strategy for "sys" must place every component, and only components. Not components: x, y. See rule LAYER-9 in docs/agent-rules.md in @composurecdk/core (https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md).',
     );
   });
 

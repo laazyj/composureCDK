@@ -6,15 +6,14 @@ This package provides the foundational types and utilities that all ComposureCDK
 
 Most users interact with these primitives indirectly through resource packages (e.g., `@composurecdk/lambda`, `@composurecdk/s3`). Use this package directly when building a custom ComposureCDK resource package or when composing systems.
 
-**Using a coding agent?** This package ships [rules for coding agents](docs/agent-rules.md) on how to lay out an app or builder library, and a [review rubric](docs/review-rubric.md) for checking a change against them, by hand or with a review agent. Add this to your project's `AGENTS.md`, `CLAUDE.md` or equivalent:
+**Using a coding agent?** This package ships [rules for coding agents](docs/agent-rules.md) on how to lay out an app or builder library, a [review rubric](docs/review-rubric.md) for checking a change against them, by hand or with a review agent, and an [audit guide](docs/audit.md) for an existing app. Add this to your project's `AGENTS.md`, `CLAUDE.md` or equivalent:
 
 ```md
 ## ComposureCDK
 
-Before writing infrastructure code, read
-`node_modules/@composurecdk/core/docs/agent-rules.md` and follow it.
-To review infrastructure code, follow
-`node_modules/@composurecdk/core/docs/review-rubric.md`.
+Before writing infrastructure code, read docs/agent-rules.md in the
+installed @composurecdk/core package, and follow it. To review it, follow
+docs/review-rubric.md beside it; to audit or refactor the app, docs/audit.md.
 ```
 
 ## Builder

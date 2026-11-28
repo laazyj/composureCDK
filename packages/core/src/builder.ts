@@ -101,6 +101,7 @@ export type IBuilder<Props extends object, T> = {
  *   `new constructor()`. Used internally by {@link IBuilder.copy} to wrap a
  *   freshly cloned instance without re-running the constructor for new state.
  * @returns A fluent {@link IBuilder} wrapping `instance`.
+ * @see {@link https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md | Agent rules (INLINE-2, INLINE-4)}
  */
 export function Builder<Props extends object, T extends ObjectWithProps<Props>>(
   constructor: Constructor<T>,

@@ -4,8 +4,9 @@
 
 ## Start here
 
-- [Agent rules](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md): the rules for laying out an app or builder library, condensed for coding agents. Also shipped in `node_modules/@composurecdk/core/docs/agent-rules.md`.
-- [Review rubric](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/review-rubric.md): how to review a change against the rules, with checks, severities and a report format. Also shipped in `node_modules/@composurecdk/core/docs/review-rubric.md`.
+- [Agent rules](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md): the rules for laying out an app or builder library, condensed for coding agents. Also shipped in the `@composurecdk/core` package, at `docs/agent-rules.md`.
+- [Review rubric](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/review-rubric.md): how to review a change against the rules, with checks, severities and a report format. Also shipped in the `@composurecdk/core` package, at `docs/review-rubric.md`.
+- [Audit guide](https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/audit.md): how to audit an existing app against the rules before upgrading or refactoring it. Also shipped in the `@composurecdk/core` package, at `docs/audit.md`.
 
 ## Reference
 

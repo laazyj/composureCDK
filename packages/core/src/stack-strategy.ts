@@ -82,6 +82,7 @@ export interface StackStrategy<K extends string = string> {
  *   .withStackStrategy(singleStack(createStackBuilder().description("Service")))
  *   .build(app, "MySystem");
  * ```
+ * @see {@link https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md | Agent rules (LAYER-9)}
  */
 export function singleStack(source: StackSource): StackStrategy {
   return {
@@ -125,6 +126,7 @@ export function singleStack(source: StackSource): StackStrategy {
  *   )
  *   .build(app, "FactoryForeman");
  * ```
+ * @see {@link https://github.com/laazyj/composureCDK/blob/main/packages/core/docs/agent-rules.md | Agent rules (LAYER-9)}
  */
 export function groupedStacks<G extends string, K extends string>(
   groups: Readonly<Record<G, StackSource>>,
